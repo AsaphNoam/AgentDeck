@@ -49,23 +49,35 @@ expect_failure() {
 
 file="$work/valid/HANDOFF.md"
 write_handoff "$file" \
-  '- **Must fix** — Localized. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.' \
-  '- **Worth fixing** — Coordinated. **Fix model:** medium — Codex Terra or Claude Opus.' \
-  '- **Must fix** — Architectural. **Fix model:** difficult — Codex Sol.'
-expect_pass 'valid mappings' "$file"
+  '### grouped-review — **Fix model:** difficult — Codex Sol.' \
+  '' \
+  '- **Must fix** — Localized.' \
+  '- **Worth fixing** — Architectural.'
+expect_pass 'group uses highest fix complexity' "$file"
 
 file="$work/missing/HANDOFF.md"
-write_handoff "$file" '- **Must fix** — Missing recommendation.'
-expect_failure 'missing recommendation' 'exactly one **Fix model:** recommendation' "$file"
+write_handoff "$file" '### missing' '' '- **Must fix** — Missing recommendation.'
+expect_failure 'missing recommendation' 'finding unit must contain exactly one **Fix model:** recommendation' "$file"
 
 file="$work/mismatch/HANDOFF.md"
 write_handoff "$file" \
-  '- **Must fix** — Wrong mapping. **Fix model:** trivial/easy — Codex Sol.'
-expect_failure 'invalid mapping' 'invalid fix-model band or model mapping' "$file"
+  '### mismatch — **Fix model:** trivial/easy — Codex Sol.' '' '- **Must fix** — Wrong mapping.'
+expect_failure 'invalid mapping' 'finding unit has an invalid fix-model band or model mapping' "$file"
 
 file="$work/duplicate/HANDOFF.md"
 write_handoff "$file" \
-  '- **Must fix** — Duplicate. **Fix model:** medium — Codex Terra or Claude Opus. **Fix model:** difficult — Codex Sol.'
-expect_failure 'duplicate recommendation' 'exactly one **Fix model:** recommendation' "$file"
+  '### duplicate — **Fix model:** medium — Codex Terra or Claude Opus. **Fix model:** difficult — Codex Sol.' \
+  '' '- **Must fix** — Duplicate.'
+expect_failure 'duplicate recommendation' 'finding unit must contain exactly one **Fix model:** recommendation' "$file"
+
+file="$work/per-item/HANDOFF.md"
+write_handoff "$file" \
+  '### grouped-review — **Fix model:** difficult — Codex Sol.' '' \
+  '- **Must fix** — Item duplicates routing. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.'
+expect_failure 'per-item recommendation' 'finding must not contain a per-item **Fix model:** recommendation' "$file"
+
+file="$work/ungrouped/HANDOFF.md"
+write_handoff "$file" '- **Must fix** — No originating unit.'
+expect_failure 'ungrouped finding' 'finding is not grouped under a ### finding unit' "$file"
 
 [ "$errors" -eq 0 ] || exit 1

@@ -152,30 +152,37 @@ check_spec_file() {
   esac
 }
 
-# Review findings carry the tags already required of them: the priority prefix,
-# the exact fix-model recommendation (workflow §7), and the invariant class for
-# code findings (INVARIANTS.md). These checks validate the recorded contract, not
-# the judgment behind priority, complexity, or model choice.
+# Each review finding unit carries one exact fix-model recommendation at its
+# highest fix complexity. Findings carry the priority prefix and invariant class
+# for code findings. This validates the recorded shape, not the classification.
 check_review_findings() {
   file=$1
   problems=$(awk '
-    function flush() {
+    function validate_unit(   normalized, copy, tag_count, model_count) {
+      if (unit == "") return
+      normalized = unit
+      gsub(/[[:space:]]+/, " ", normalized)
+      copy = normalized
+      tag_count = gsub(/\*\*Fix model:\*\*/, "", copy)
+      model_count = 0
+      if (index(normalized, "**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.") > 0) model_count++
+      if (index(normalized, "**Fix model:** medium — Codex Terra or Claude Opus.") > 0) model_count++
+      if (index(normalized, "**Fix model:** difficult — Codex Sol.") > 0) model_count++
+      if (tag_count != 1) {
+        print "finding unit must contain exactly one **Fix model:** recommendation: " unit
+      } else if (model_count != 1) {
+        print "finding unit has an invalid fix-model band or model mapping: " unit
+      }
+    }
+    function flush_finding(   normalized) {
       if (buf == "") return
       if (first !~ /^- \*\*(Must fix|Worth fixing)\*\*/) {
         print "finding must start with **Must fix** or **Worth fixing**: " first
       } else {
         normalized = buf
         gsub(/[[:space:]]+/, " ", normalized)
-        copy = normalized
-        tag_count = gsub(/\*\*Fix model:\*\*/, "", copy)
-        model_count = 0
-        if (index(normalized, "**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.") > 0) model_count++
-        if (index(normalized, "**Fix model:** medium — Codex Terra or Claude Opus.") > 0) model_count++
-        if (index(normalized, "**Fix model:** difficult — Codex Sol.") > 0) model_count++
-        if (tag_count != 1) {
-          print "finding must contain exactly one **Fix model:** recommendation: " first
-        } else if (model_count != 1) {
-          print "finding has an invalid fix-model band or model mapping: " first
+        if (normalized ~ /\*\*Fix model:\*\*/) {
+          print "finding must not contain a per-item **Fix model:** recommendation: " first
         } else if (normalized ~ /\.(go|ts|tsx|sh|css|json)/ &&
                    normalized !~ /INV §[0-9]/ && normalized !~ /\(no invariant class\)/) {
           print "finding cites code but has no INV §n tag or (no invariant class): " first
@@ -184,11 +191,18 @@ check_review_findings() {
       buf = ""
       first = ""
     }
-    /^## / { if (insection) { flush(); insection = 0 } }
+    /^## / { if (insection) { flush_finding(); validate_unit(); insection = 0 } }
     /^## Review findings/ { insection = 1; next }
-    insection && /^- / { flush(); first = $0; buf = $0; next }
+    insection && /^### / { flush_finding(); validate_unit(); unit = $0; next }
+    insection && /^- / {
+      flush_finding()
+      if (unit == "") print "finding is not grouped under a ### finding unit: " $0
+      first = $0
+      buf = $0
+      next
+    }
     insection && buf != "" { buf = buf " " $0; next }
-    END { if (insection) flush() }
+    END { if (insection) { flush_finding(); validate_unit() } }
   ' "$file")
 
   [ -n "$problems" ] || return

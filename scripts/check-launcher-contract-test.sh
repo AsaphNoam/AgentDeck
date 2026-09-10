@@ -67,15 +67,20 @@ dir=$(fixture review-selection)
 mutate_launcher "$dir" review 's/choose any available review unit named$/choose the first review unit named/'
 expect_failure 'review ordered selection' 'review selection does not authorize any available unit' "$dir"
 
-# The review launcher stops requiring a model recommendation for fixable findings.
+# The review launcher stops using the most difficult fix in the selected unit.
 dir=$(fixture review-fix-model)
-mutate_launcher "$dir" review 's/For every fixable finding/For every finding/'
+mutate_launcher "$dir" review 's/at the level of its most difficult open fix/for each open fix/'
 expect_failure 'review fix-model omission' 'missing fix-model recommendation' "$dir"
 
-# The investigation launcher records confidence but omits fix-model routing.
+# The investigation launcher stops using the most difficult fix in its unit.
 dir=$(fixture investigate-fix-model)
-mutate_launcher "$dir" investigate-bug 's/Record every fixable finding/Record every finding/'
+mutate_launcher "$dir" investigate-bug 's/at the level of its most difficult open fix/for each open fix/'
 expect_failure 'investigation fix-model omission' 'missing confidence and fix-model recommendation' "$dir"
+
+# The fix launcher weakens routing from the unit to individual findings.
+dir=$(fixture fix-model-unit)
+mutate_launcher "$dir" fix 's/applies to the whole grouped run/applies to each individual finding/'
+expect_failure 'fix model unit scope' 'fix-model recommendation does not apply to the whole unit' "$dir"
 
 # The design launcher recognizes a named idea only in the two queue sections.
 dir=$(fixture design-named)

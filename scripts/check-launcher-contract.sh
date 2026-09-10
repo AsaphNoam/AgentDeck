@@ -56,7 +56,7 @@ for tree in .agents .claude; do
       if ! grep -Fq 'Findings keep that same unit open' "$file"; then
         fail "$tree/$role: findings can split their originating unit"
       fi
-      if ! has_rule "$file" 'For every fixable finding, classify the fix complexity independently from severity and record exactly one §7 **Fix model** recommendation'; then
+      if ! has_rule "$file" 'Classify every fix independently from severity, then record exactly one §7 **Fix model** recommendation for the selected review unit at the level of its most difficult open fix'; then
         fail "$tree/$role: missing fix-model recommendation"
       fi
       if ! has_rule "$file" 'trivial/easy uses Claude Sonnet or Codex Luna; medium uses Codex Terra or Claude Opus; difficult uses Codex Sol.'; then
@@ -64,13 +64,13 @@ for tree in .agents .claude; do
       fi
     fi
     if [ "$role" = investigate-bug ]; then
-      if ! has_rule "$file" 'Record every fixable finding with its confidence level and exactly one §7 **Fix model** recommendation'; then
+      if ! has_rule "$file" 'record exactly one §7 **Fix model** recommendation for the investigation unit at the level of its most difficult open fix'; then
         fail "$tree/$role: missing confidence and fix-model recommendation"
       fi
       if ! has_rule "$file" 'trivial/easy uses Claude Sonnet or Codex Luna; medium uses Codex Terra or Claude Opus; difficult uses Codex Sol.'; then
         fail "$tree/$role: invalid fix-model mapping"
       fi
-      if ! has_rule "$file" 'Classify complexity independently from severity and repeat the recommendation in the human update.'; then
+      if ! has_rule "$file" 'Record it once with the unit, not on individual findings, and repeat it in the human update.'; then
         fail "$tree/$role: fix-model recommendation is not routed to the operator"
       fi
     fi
@@ -81,6 +81,10 @@ for tree in .agents .claude; do
     if [ "$role" = fix ] &&
        ! grep -Fq 'Chronology and other role queues' "$file"; then
       fail "$tree/$role: fix selection is gated by another unit"
+    fi
+    if [ "$role" = fix ] &&
+       ! has_rule "$file" "The unit's §7 **Fix model** recommendation applies to the whole grouped run and reflects its most difficult open fix"; then
+      fail "$tree/$role: fix-model recommendation does not apply to the whole unit"
     fi
     if [ "$role" = work ] &&
        ! grep -Fq 'add that completed change to the' "$file"; then
@@ -147,10 +151,13 @@ if ! has_rule "$workflow" '`**Fix model:** trivial/easy — Claude Sonnet or Cod
    ! has_rule "$workflow" '`**Fix model:** difficult — Codex Sol.'; then
   fail 'workflow: missing or invalid fix-model bands'
 fi
-if ! has_rule "$workflow" 'This is the right-sized model for the fix, not another severity label'; then
+if ! has_rule "$workflow" 'This is the right-sized model for the whole grouped fix run, not another severity label'; then
   fail 'workflow: fix complexity is not separated from finding severity'
 fi
-if ! has_rule "$workflow" 'Every code-defect, specification-gap, or observability finding that needs work gets the exact §7 **Fix model** recommendation'; then
+if ! has_rule "$workflow" 'at the level of its most difficult open fix'; then
+  fail 'workflow: fix model is not selected for the whole group'
+fi
+if ! has_rule "$workflow" 'observability findings that need work form one investigation fix unit with the exact §7 **Fix model** recommendation at the level of its most difficult fix'; then
   fail 'workflow: bug investigations do not inherit fix-model routing'
 fi
 

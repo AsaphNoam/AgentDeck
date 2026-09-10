@@ -17,6 +17,8 @@ findings touch, and workflow
 one available review and say which one you took, then handle its **Must fix** items first as the
 continuation of its originating change unit (workflow §1.4 and §8). Chronology and other role queues
 do not constrain selection. Stop when that unit is closed rather than continuing into another unit.
+The unit's §7 **Fix model** recommendation applies to the whole grouped run and reflects its most
+difficult open fix; do not split the unit or choose a weaker model for its easier individual findings.
 The fix commit
 closes that unit; it does not create a new default review unit. Name what is still open when you
 close. Name the finding's invariant class in the changelog line. Update the
