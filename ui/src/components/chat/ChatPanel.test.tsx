@@ -11,6 +11,7 @@ import { ChatPanel, initialTab } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
   getTranscript: vi.fn(async (id: string) => ({ agent_id: id, events: [] })),
+  getHeldPrompt: vi.fn(async (id: string) => ({ agent_id: id, text: "", after_seq: 0 })),
   setSessionConfig: vi.fn(),
   switchRuntime: vi.fn(),
   useBackends: vi.fn(),
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../api/client", () => ({
   getTranscript: mocks.getTranscript,
+  getHeldPrompt: mocks.getHeldPrompt,
   setSessionConfig: mocks.setSessionConfig,
   switchRuntime: mocks.switchRuntime,
 }));
@@ -34,6 +36,7 @@ vi.mock("../../api/sse", () => ({
 }));
 
 beforeEach(() => {
+  mocks.getHeldPrompt.mockImplementation(async (id: string) => ({ agent_id: id, text: "", after_seq: 0 }));
   mocks.useBackends.mockReturnValue({ data: undefined });
   mocks.useProjects.mockReturnValue({ data: undefined });
 });
@@ -41,12 +44,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   mocks.switchRuntime.mockReset();
+  mocks.getHeldPrompt.mockReset();
   mocks.setSessionConfig.mockReset();
   mocks.useBackends.mockReset();
   mocks.useProjects.mockReset();
   useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
-  useHeldStore.setState({ byAgent: {} });
+  useHeldStore.setState({ byAgent: {}, afterSeqByAgent: {} });
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
 });
 
@@ -319,8 +323,11 @@ describe("ChatPanel runtime picker", () => {
 describe("ChatPanel queued follow-up and steering", () => {
   it("clears the pending message only when the server's own event delivers it", async () => {
     useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), state: "busy" } }, order: ["a_live"], hydrated: true, hydrating: false });
-    useHeldStore.getState().hold("a_live", "then run the tests");
-    useTranscriptStore.setState({ byAgent: { a_live: [{ kind: "user_text", text: "then run the tests" }] } });
+    mocks.getHeldPrompt.mockResolvedValue({ agent_id: "a_live", text: "then run the tests", after_seq: 10 });
+    useTranscriptStore.setState({ byAgent: { a_live: [
+      { kind: "user_text", seq: 4, text: "then run the tests" },
+      { kind: "user_text", text: "then run the tests" },
+    ] } });
 
     renderPanel("a_live");
 
@@ -330,6 +337,16 @@ describe("ChatPanel queued follow-up and steering", () => {
 
     useTranscriptStore.setState({ byAgent: { a_live: [{ kind: "user_text", seq: 12, text: "then run the tests" }] } });
     await waitFor(() => expect(useHeldStore.getState().byAgent.a_live).toBeUndefined());
+  });
+
+  it("rehydrates a live held message after the panel remounts", async () => {
+    useAgentStore.setState({ agents: { a_live: { ...liveAgent("a_live"), state: "busy" } }, order: ["a_live"], hydrated: true, hydrating: false });
+    mocks.getHeldPrompt.mockResolvedValue({ agent_id: "a_live", text: "still queued", after_seq: 21 });
+
+    renderPanel("a_live");
+
+    expect(await screen.findByText("still queued")).toBeInTheDocument();
+    expect(useHeldStore.getState().afterSeqByAgent.a_live).toBe(21);
   });
 
   it("renders no Steer control for a session that does not advertise it", async () => {

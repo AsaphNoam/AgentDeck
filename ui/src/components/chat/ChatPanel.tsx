@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
-import { setSessionConfig, switchRuntime } from "../../api/client";
+import { getHeldPrompt, setSessionConfig, switchRuntime } from "../../api/client";
 import { useBackends, useProjects } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { sseClient } from "../../api/sse";
@@ -46,6 +46,8 @@ export function ChatPanel() {
   const discardAnnotations = useAnnotationStore((state) => state.discard);
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const held = useHeldStore((state) => state.byAgent[id]);
+  const heldAfterSeq = useHeldStore((state) => state.afterSeqByAgent[id] ?? 0);
+  const hold = useHeldStore((state) => state.hold);
   const releaseHeld = useHeldStore((state) => state.release);
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
@@ -82,6 +84,17 @@ export function ChatPanel() {
     return sseClient.registerOpenAgent(id);
   }, [id]);
 
+  useEffect(() => {
+    if (!agent?.running || agent.interface !== "chat") return;
+    let current = true;
+    getHeldPrompt(id).then((snapshot) => {
+      if (!current) return;
+      if (snapshot.text) hold(id, snapshot.text, snapshot.after_seq);
+      else releaseHeld(id);
+    }).catch(() => { /* SSE remains the primary agent-state path. */ });
+    return () => { current = false; };
+  }, [agent?.running, agent?.interface, id, hold, releaseHeld]);
+
   // A held message stops being pending the moment the server actually sends it,
   // which is when it enters the durable transcript as an ordinary user prompt.
   // Matching the sequenced server event rather than the local echo is what keeps
@@ -89,9 +102,9 @@ export function ChatPanel() {
   useEffect(() => {
     if (!held) return;
     const delivered = events.some((event) =>
-      (event.kind ?? event.type) === "user_text" && event.seq != null && String(event.text ?? "") === held);
+      (event.kind ?? event.type) === "user_text" && event.seq != null && event.seq > heldAfterSeq && String(event.text ?? "") === held);
     if (delivered) releaseHeld(id);
-  }, [events, held, id, releaseHeld]);
+  }, [events, held, heldAfterSeq, id, releaseHeld]);
 
   // Reveal a transcript event from the Files tab's "Diff" action: switch to the
   // transcript tab (its content is unmounted while another tab is active), then

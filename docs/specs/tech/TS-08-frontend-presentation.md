@@ -553,11 +553,14 @@ primitive seam; the rejected alternatives are recorded in §5.
 
 - **R56 — A held message is a transcript-tail affordance, not a
   transcript event.** The pending follow-up (FS-03.R48) renders at the end of the transcript beside
-  the R29 waiting indicator, from client state keyed to the agent, and is never merged into the
+  the R29 waiting indicator, from client state keyed to the agent and rehydrated from the runtime's
+  live hold snapshot on browser mount, and is never merged into the
   event list `foldTranscript` builds. Keeping it out of that list is what makes it structurally
   impossible for a live render and a reload to disagree about it (INV §1/§2, the rule this file
   already applies to the annotation-block fold): the server sends no event for a message it has not
-  delivered, so the only truthful place for it is beside the list.
+  delivered, so the only truthful place for it is beside the list. The snapshot includes the last
+  sequence present when the hold was accepted; only a matching user event with a later sequence
+  clears it, so an older identical prompt cannot do so.
 
   It must read as not-yet-sent rather than as a sent message awaiting reply — the failure mode is a
   person believing the agent has already seen it — and it carries its own withdraw affordance

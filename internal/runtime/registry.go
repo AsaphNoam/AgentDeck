@@ -270,6 +270,20 @@ func (r *Registry) WithdrawHeld(agentID string) error {
 	return chat.WithdrawHeld(agentID)
 }
 
+// Held returns the live chat hold for browser rehydration. Non-chat runtimes
+// cannot own a hold and therefore return the empty snapshot.
+func (r *Registry) Held(agentID string) (string, int64, error) {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return "", 0, err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return "", 0, nil
+	}
+	return chat.Held(agentID)
+}
+
 // Steer routes a steer to the owning chat runtime. A terminal owner advertises no
 // steering, so it yields the same ErrSteeringUnsupported an unadvertising adapter
 // does rather than a separate not-implemented shape (FS-03.R50).

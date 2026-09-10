@@ -231,7 +231,12 @@ type agentState struct {
 	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
 	// — there is nothing to persist and nothing to reap (INV §4, §16).
-	held string
+	held heldMessage
+}
+
+type heldMessage struct {
+	Text     string
+	AfterSeq int64
 }
 
 // pendingPerm is a withheld session/request_permission awaiting a decision.
@@ -410,9 +415,23 @@ func (c *ChatRuntime) WithdrawHeld(agentID string) error {
 		return err
 	}
 	as.mu.Lock()
-	as.held = ""
+	as.held = heldMessage{}
 	as.mu.Unlock()
 	return nil
+}
+
+// Held returns the authoritative live follow-up and the last transcript
+// sequence that existed when it was accepted. It is deliberately a runtime
+// read, not persistence: a browser may rehydrate while this dashboard process
+// is alive, while a dashboard restart still clears the live hold (FS-03.R48/R49).
+func (c *ChatRuntime) Held(agentID string) (string, int64, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return "", 0, err
+	}
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.held.Text, as.held.AfterSeq, nil
 }
 
 // SteerOutcome is what the adapter did with a steered message (TS-04.R49). The
@@ -450,12 +469,12 @@ func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOut
 		// Take the hold under the same lock it is written and released under, so a
 		// concurrent withdraw or turn-end delivery cannot let one message both
 		// steer and run as its own turn (INV §5).
-		if as.held == "" {
+		if as.held.Text == "" {
 			as.mu.Unlock()
 			return "", ErrNothingHeld
 		}
-		text = as.held
-		as.held = ""
+		text = as.held.Text
+		as.held = heldMessage{}
 	}
 	as.mu.Unlock()
 
@@ -476,8 +495,8 @@ func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOut
 		// act on it. The composer holds a message the person typed; a promoted one
 		// only exists here, so put it back unless something newer took its place.
 		as.mu.Lock()
-		if as.held == "" {
-			as.held = text
+		if as.held.Text == "" {
+			as.held = heldMessage{Text: text, AfterSeq: as.seq}
 		}
 		as.mu.Unlock()
 	}
@@ -558,7 +577,7 @@ func (as *agentState) claimTurnOrHold(text string) (string, bool) {
 	}
 	// At most one held message per agent: a second submission replaces it rather
 	// than stacking a second queued turn (FS-03.R48, INV §16).
-	as.held = text
+	as.held = heldMessage{Text: text, AfterSeq: as.seq}
 	return "", true
 }
 
@@ -605,33 +624,23 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 		}
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
-			as.mu.Lock()
-			as.turnActive = false
-			as.mu.Unlock()
 			// Transport closed (crash/stop) is owned by onTransportClosed / Stop.
 			// A genuine RPC error while the process lives surfaces here.
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
-			as.mu.Lock()
-			as.cancelEscalated = false
-			as.mu.Unlock()
+			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			c.finishTurn(as, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+			c.finishTurn(as, td)
+			c.runReservedHeld(as, nextText, nextTurnID)
 			return
 		}
 		td, hasPct := mapPromptResult(res)
-		as.mu.Lock()
-		as.turnActive = false
-		as.cancelEscalated = false
-		if hasPct {
-			as.contextPct = td.ContextPct
-		} else {
-			td.ContextPct = as.contextPct
-		}
-		as.mu.Unlock()
+		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
 
 		c.finishTurn(as, td)
+		c.runReservedHeld(as, nextText, nextTurnID)
 	}()
 
 	return nil
@@ -656,7 +665,7 @@ func (c *ChatRuntime) finishTurn(as *agentState, td TurnEndData) {
 // "stop that, do this instead" rather than a discard (FS-03.R49).
 func (c *ChatRuntime) deliverHeld(as *agentState) {
 	as.mu.Lock()
-	if as.held == "" || as.stopped {
+	if as.held.Text == "" || as.stopped {
 		as.mu.Unlock()
 		return
 	}
@@ -667,9 +676,44 @@ func (c *ChatRuntime) deliverHeld(as *agentState) {
 		as.mu.Unlock()
 		return
 	}
-	text := as.held
-	as.held = ""
+	text := as.held.Text
+	as.held = heldMessage{}
 	as.mu.Unlock()
+	c.runReservedHeld(as, text, turnID)
+}
+
+// reserveHeldSuccessorLocked settles the current gate and, when a follow-up is
+// waiting, transfers that same gate directly to it. There is no idle claim
+// window in which a newer Send can overtake the earlier held message (INV §5,
+// §15). Caller must hold as.mu.
+func (as *agentState) reserveHeldSuccessorLocked() (string, string) {
+	if as.held.Text == "" || as.stopped {
+		as.turnActive = false
+		return "", ""
+	}
+	text := as.held.Text
+	as.held = heldMessage{}
+	as.cancelEscalated = false
+	as.resolved = map[string]struct{}{}
+	return text, as.nextTurnIDLocked()
+}
+
+func (as *agentState) settleAndReserveHeld(td *TurnEndData, hasPct bool) (string, string) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	as.cancelEscalated = false
+	if hasPct {
+		as.contextPct = td.ContextPct
+	} else {
+		td.ContextPct = as.contextPct
+	}
+	return as.reserveHeldSuccessorLocked()
+}
+
+func (c *ChatRuntime) runReservedHeld(as *agentState, text, turnID string) {
+	if text == "" {
+		return
+	}
 	if err := c.runPromptTurn(as, text, turnID); err != nil {
 		// runPromptTurn already released the gate. Nobody is waiting on a return
 		// value here, so the person learns about it the only way that is visible:
@@ -1051,30 +1095,20 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		}
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
-			as.mu.Lock()
-			as.turnActive = false
-			as.mu.Unlock()
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
-			as.mu.Lock()
-			as.cancelEscalated = false
-			as.mu.Unlock()
+			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			c.finishTurn(as, TurnEndData{StopReason: "error", ContextPct: as.lastPct()})
+			c.finishTurn(as, td)
+			c.runReservedHeld(as, nextText, nextTurnID)
 			return
 		}
 		td, hasPct := mapPromptResult(res)
-		as.mu.Lock()
-		as.turnActive = false
-		as.cancelEscalated = false
-		if hasPct {
-			as.contextPct = td.ContextPct
-		} else {
-			td.ContextPct = as.contextPct
-		}
-		as.mu.Unlock()
+		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
 		c.finishTurn(as, td)
+		c.runReservedHeld(as, nextText, nextTurnID)
 	}()
 	return true, nil
 }

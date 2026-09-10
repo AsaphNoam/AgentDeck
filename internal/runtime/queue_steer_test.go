@@ -164,6 +164,32 @@ func TestSendPromptOrHoldQueuesOneFollowUpAndDeliversItAsTheNextTurn(t *testing.
 	}
 }
 
+// The completed turn transfers its gate to the already-held successor before
+// any newer Send can claim it. This deterministic gate-level regression covers
+// the ordering that a race detector cannot observe (FS-03.A31, INV §5/§15).
+func TestHeldSuccessorOwnsGateBeforeNewerSend(t *testing.T) {
+	as := &agentState{
+		turnActive: true,
+		turnSeq:    1,
+		held:       heldMessage{Text: "queued first", AfterSeq: 7},
+	}
+	as.mu.Lock()
+	text, turnID := as.reserveHeldSuccessorLocked()
+	as.mu.Unlock()
+	if text != "queued first" || turnID == "" {
+		t.Fatalf("reserved successor = %q %q", text, turnID)
+	}
+	if _, held := as.claimTurnOrHold("newer send"); !held {
+		t.Fatal("newer Send claimed the gate before the queued successor")
+	}
+	as.mu.Lock()
+	got := as.held.Text
+	as.mu.Unlock()
+	if got != "newer send" {
+		t.Fatalf("next held message = %q, want newer send", got)
+	}
+}
+
 // TestWithdrawnFollowUpIsNeverSent covers the withdraw half of FS-03.A31 and
 // TS-03.R38's idempotence: a withdrawn message runs no turn, and withdrawing
 // again is success rather than an error.

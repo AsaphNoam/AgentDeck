@@ -59,8 +59,16 @@ func (s *Server) handlePrompt(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, sessionOpError(err))
 		return
 	}
+	afterSeq := int64(0)
+	if held {
+		_, afterSeq, err = s.registry.Held(id)
+		if err != nil {
+			writeAPIError(w, sessionOpError(err))
+			return
+		}
+	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
-		"accepted": true, "agent_id": id, "delivery": promptDelivery(held),
+		"accepted": true, "agent_id": id, "delivery": promptDelivery(held), "after_seq": afterSeq,
 	})
 }
 
@@ -72,6 +80,21 @@ func promptDelivery(held bool) string {
 		return "held"
 	}
 	return "sent"
+}
+
+// handleGetPrompt rehydrates the runtime-owned hold after a browser reload.
+// Empty text means no message is currently held; the value remains live state
+// and never enters the transcript or database (FS-03.R48/R49, TS-08.R56).
+func (s *Server) handleGetPrompt(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	text, afterSeq, err := s.registry.Held(id)
+	if err != nil {
+		writeAPIError(w, sessionOpError(err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"agent_id": id, "text": text, "after_seq": afterSeq,
+	})
 }
 
 // handleWithdrawPrompt implements DELETE /api/sessions/{id}/prompt: the one

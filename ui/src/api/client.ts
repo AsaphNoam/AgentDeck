@@ -112,11 +112,15 @@ export type PromptDelivery = "sent" | "held";
 export type SteerOutcome = "steered" | "new_turn";
 
 export function sendPrompt(agentId: string, text: string) {
-  return json<{ accepted: true; agent_id: string; delivery: PromptDelivery }>(`/api/sessions/${agentId}/prompt`, {
+  return json<{ accepted: true; agent_id: string; delivery: PromptDelivery; after_seq: number }>(`/api/sessions/${agentId}/prompt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
+}
+
+export function getHeldPrompt(agentId: string) {
+  return json<{ agent_id: string; text: string; after_seq: number }>(`/api/sessions/${agentId}/prompt`);
 }
 
 /** Withdraws the agent's held follow-up. A no-op when nothing is held. */

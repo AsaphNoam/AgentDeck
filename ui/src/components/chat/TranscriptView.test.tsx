@@ -14,7 +14,7 @@ afterEach(() => {
   window.getSelection()?.removeAllRanges();
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
-  useHeldStore.setState({ byAgent: {} });
+  useHeldStore.setState({ byAgent: {}, afterSeqByAgent: {} });
 });
 
 const events = [{ kind: "assistant_text", seq: 7, text: "First line\nSecond line" }];

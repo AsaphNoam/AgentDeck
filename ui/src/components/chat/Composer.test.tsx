@@ -6,6 +6,7 @@ import { http, HttpResponse } from "msw";
 import { Composer } from "./Composer";
 import { getChatDraft } from "./drafts";
 import { useHeldStore } from "../../store/heldStore";
+import { useTranscriptStore } from "../../store/transcriptStore";
 
 // Files returned by the mock file-search, narrowed by the q param so the test can
 // assert query filtering (FS-03.R30/A15).
@@ -43,7 +44,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  useHeldStore.setState({ byAgent: {} });
+  useHeldStore.setState({ byAgent: {}, afterSeqByAgent: {} });
+  useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
   server.resetHandlers();
   promptBodies = [];
   failFileSearch = false;
@@ -333,6 +335,19 @@ describe("Composer queued follow-up and steering", () => {
     // Send stays present on a busy agent; Cancel is still offered beside it.
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("does not echo a message when an idle-looking submit is held by the server", async () => {
+    server.use(http.post("/api/sessions/:id/prompt", () =>
+      HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "held", after_seq: 8 }, { status: 202 })));
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+
+    type(ta, "raced with another turn");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    await waitFor(() => expect(useHeldStore.getState().byAgent.a_1).toBe("raced with another turn"));
+    expect(useTranscriptStore.getState().byAgent.a_1 ?? []).toHaveLength(0);
   });
 
   it("withdraws the held message through the prompt resource", async () => {

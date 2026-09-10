@@ -2,8 +2,8 @@ import { create } from "zustand";
 
 // The queued follow-up (FS-03.R48) is live state on both sides. The runtime holds
 // at most one per agent and it dies with the process, so this mirror is memory
-// only: a reload correctly starts empty rather than restoring a pending badge for
-// a message the server may already have sent.
+// only: a browser reload rehydrates it from the runtime's live snapshot, while a
+// dashboard restart correctly clears it with the runtime process.
 //
 // It is deliberately not merged into the transcript event list (TS-08.R56): the
 // server sends no event for a message it has not delivered, so keeping it beside
@@ -11,19 +11,26 @@ import { create } from "zustand";
 // reload to disagree about it.
 interface HeldStoreState {
   byAgent: Record<string, string>;
-  hold: (agentId: string, text: string) => void;
+  afterSeqByAgent: Record<string, number>;
+  hold: (agentId: string, text: string, afterSeq?: number) => void;
   release: (agentId: string) => void;
 }
 
 export const useHeldStore = create<HeldStoreState>((set) => ({
   byAgent: {},
-  hold: (agentId, text) =>
-    set((state) => ({ byAgent: { ...state.byAgent, [agentId]: text } })),
+  afterSeqByAgent: {},
+  hold: (agentId, text, afterSeq = 0) =>
+    set((state) => ({
+      byAgent: { ...state.byAgent, [agentId]: text },
+      afterSeqByAgent: { ...state.afterSeqByAgent, [agentId]: afterSeq },
+    })),
   release: (agentId) =>
     set((state) => {
       if (!(agentId in state.byAgent)) return state;
       const byAgent = { ...state.byAgent };
+      const afterSeqByAgent = { ...state.afterSeqByAgent };
       delete byAgent[agentId];
-      return { byAgent };
+      delete afterSeqByAgent[agentId];
+      return { byAgent, afterSeqByAgent };
     }),
 }));

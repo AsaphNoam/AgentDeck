@@ -181,7 +181,6 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
     // A busy agent queues the message, and a queued message is not in the
     // transcript until the server actually sends it — so there is nothing to
     // echo yet, and the pending tail carries it instead (FS-03.R48, TS-08.R56).
-    if (!busy) append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
     // Capture the draft generation this send owns. If the person edits the draft
     // for this agent while the request is in flight, the completion must leave
     // that newer draft alone instead of discarding or overwriting it (INV §1/§5).
@@ -195,7 +194,8 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
       // The server's answer decides whether this ran or is waiting, so the
       // pending state is rendered from what happened rather than inferred from
       // agent status (TS-03.R38).
-      if (result.delivery === "held") hold(agentId, prompt);
+      if (result.delivery === "held") hold(agentId, prompt, result.after_seq);
+      else append(agentId, { kind: "user_text", text: prompt, message_id: `local-${Date.now()}` });
       // Only clear the draft we actually sent; a newer same-agent draft survives.
       if (chatDraftRevision(agentId) === draftRev) discardChatDraft(agentId);
     } catch (err) {

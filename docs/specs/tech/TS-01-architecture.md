@@ -128,7 +128,10 @@ resolves in one critical section; a hold that raced a `turn_end` would otherwise
 turn or double-send (INV §5, the class `internal/runtime` concurrency already pays for). Release is
 driven from the single place that already ends a turn, so cancel and normal completion cannot grow
 divergent delivery paths (INV §2), and a stop or crash releases the hold through the same teardown
-rather than a second cleanup (INV §4).
+rather than a second cleanup (INV §4). A completed turn transfers its gate directly to an
+already-held successor before publishing completion, so a newer submission cannot overtake the
+queued message. A read-only runtime snapshot exposes the hold and its acceptance sequence for
+browser rehydration without persisting it; a dashboard restart still clears the live field.
 
 **R13.** Archive/restore is one server-owned lifecycle service, not an HTTP handler
 calling another handler or a UI-side sequence of Stop and config writes. One server-owned transition

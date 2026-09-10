@@ -110,8 +110,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   there is no next turn: the message is released back into the composer as a draft when the composer
   is empty, and discarded when it is not — never overwriting text the person has since typed, the
   same rule R36 already applies to drafts racing an in-flight send. A held message does not survive a
-  dashboard restart; it is live state, not durable work, and the release-to-composer path is what
-  keeps that from silently losing typed text in the ordinary case.
+  dashboard restart; it is live state, not durable work. A browser reload rehydrates the hold from
+  the still-running dashboard process, including its delivery sequence boundary, so the pending
+  message and Withdraw remain available and a later stop can still release it to the composer.
 
 - **R50.** **Steer the turn that is running.** Beside Send, a chat agent
   whose runtime advertises steering offers **Steer**, which delivers the message into the in-flight
@@ -617,8 +618,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   draft; stopping it with text already in the composer discards the held message and leaves the typed
   text untouched; and a dashboard restart clears the held message. *Verify by* `Composer.test.tsx`
   for the two stop branches against the existing draft store, and a runtime test for
-  cancel-then-send. Restart needs no test of its own: the hold is an in-memory field on both sides,
-  so neither the runtime nor the browser store can carry it across a restart.
+  cancel-then-send. A browser remount rehydrates the still-live hold and its sequence boundary from
+  the dashboard; a dashboard restart clears it because the runtime field is intentionally in-memory.
 - **A30** (R47) — Choosing an effort in the chat header applies it
   without revealing or requiring **Switch**, leaves the agent running with the same process and
   conversation, and persists as the agent's effort; a rejected apply returns the select to the

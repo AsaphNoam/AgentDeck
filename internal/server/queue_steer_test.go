@@ -113,6 +113,30 @@ func TestPromptRouteHoldsInsteadOfConflicting(t *testing.T) {
 	if got := fieldOf(t, body, "delivery"); got != "held" {
 		t.Fatalf("delivery = %q, want held", got)
 	}
+	var accepted map[string]any
+	if err := json.Unmarshal(body, &accepted); err != nil {
+		t.Fatalf("decode held response: %v", err)
+	}
+	boundary, ok := accepted["after_seq"].(float64)
+	if !ok || boundary <= 0 {
+		t.Fatalf("after_seq = %#v, want the acceptance boundary", accepted["after_seq"])
+	}
+
+	getResp, err := http.Get(ts.URL + "/api/sessions/" + id + "/prompt")
+	if err != nil {
+		t.Fatalf("GET held prompt: %v", err)
+	}
+	defer getResp.Body.Close()
+	var snapshot struct {
+		Text     string `json:"text"`
+		AfterSeq int64  `json:"after_seq"`
+	}
+	if err := json.NewDecoder(getResp.Body).Decode(&snapshot); err != nil {
+		t.Fatalf("decode held snapshot: %v", err)
+	}
+	if snapshot.Text != "follow up" || snapshot.AfterSeq != int64(boundary) {
+		t.Fatalf("held snapshot = %+v, want text and boundary %v", snapshot, boundary)
+	}
 
 	// Withdraw before releasing so the open turn is the last one: a released hold
 	// would start its own turn, and the brief idle between the two is not the
