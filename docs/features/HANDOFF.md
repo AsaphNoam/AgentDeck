@@ -31,8 +31,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   available to start. Streaming agent thinking stays part-decided (live-only decided; rendering
   default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
   is the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** The duplicate-Steer investigation has one Must-fix. One
-  Must-fix remains on the queue/steer unit — the adapter-started steering turn escapes AgentDeck's
+- **Open findings:** One Must-fix remains on the queue/steer unit — the adapter-started steering turn escapes AgentDeck's
   turn lifecycle. No longer blocked: the operator decided on 2026-09-10 not to hide Steer, which
   selects host ownership of the adapter-started turn; see the finding for the resulting approach and
   structural work. Also open: live-gate finding durability, provider-contract oracles, the Codex
@@ -53,6 +52,12 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None. `v0.4.3` is cut.
+
+**Changelog — 2026-09-10 (fix):** Closed the `duplicate-steer-submission` Must-fix
+(FS-03.R50/A33, TS-03.R39; `INV §5`, `INV §17`). Steer now takes a synchronous per-agent in-flight
+claim and disables its control until the request settles, so a double-click produces one delivery
+and the control becomes available again afterward. The previously skipped reproduction failed with
+two requests before the fix and now passes with one. The originating investigation unit is closed.
 
 **Changelog — 2026-09-10 (fix):** Closed the `prompt-echo-race` Must-fix
 (FS-03.R6/R7/R48/A31, TS-08.R41/R56; `INV §2`, `INV §5`, `INV §17`). User-message
@@ -105,14 +110,13 @@ unrun real-provider/native-OS gates are recorded in
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
 passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
 the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
-The release shipped with five open Must-fix findings on the operator's explicit decision; two
-remain, listed under **Review findings**, and none was closed by the release itself. The credentialed Claude and
+The release shipped with five open Must-fix findings on the operator's explicit decision; one
+remains, listed under **Review findings**, and none was closed by the release itself. The credentialed Claude and
 Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
 in particular has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `duplicate-steer-submission`
-(trivial/easy, Sonnet/Luna), `queue-a-follow-up-while-busy` (difficult,
+`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `queue-a-follow-up-while-busy` (difficult,
 Sol), BR-1 (difficult, Sol), or BR-2 (medium, Terra/Opus); `/design-feature` may choose an available
 or resumable idea. Role queues are independent.
 
@@ -146,26 +150,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### duplicate-steer-submission — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Must fix** — Steer accepts duplicate submission while its first request is in flight
-  (**confirmed by reproduction test**). **Field report (verbatim):** “The steer message feature
-  makes messages appear in double while the agent is working.” AgentDeck version/commit and
-  environment were not supplied; no logs were supplied. **Where:**
-  `ui/src/components/chat/Composer.tsx:223-245,336-338` starts an unrestricted request on every
-  click and leaves the Steer control enabled; `ui/src/api/client.ts:131-139` sends each as an
-  independent `POST`; `internal/runtime/chat.go:481-492` delivers and records each accepted call.
-  The skipped reproduction in `ui/src/components/chat/Composer.test.tsx` holds the first response,
-  clicks Steer twice, and receives two requests where one is required. **Normal-use trigger:** a
-  person double-clicks Steer, or clicks again before a slow adapter response returns. **Why it
-  matters:** the adapter receives the correction twice and AgentDeck emits two distinct durable
-  `user_text` events, so the duplicate is both visible and actionable rather than a display-only
-  artifact. **Requirement:** `FS-03.R50/A33`, `TS-03.R39`; `INV §5`, `INV §17`. **Suggested fix/test:**
-  give Steer one client-side in-flight claim, disable the control until the request settles, unskip
-  the reproduction, and assert one HTTP request and one delivered transcript event. If one physical
-  click still reproduces after that guard, capture Network requests and SSE sequence numbers to
-  distinguish duplicate DOM submission from a provider/runtime event defect.
 
 ### queue-a-follow-up-while-busy — **Fix model:** difficult — Codex Sol.
 

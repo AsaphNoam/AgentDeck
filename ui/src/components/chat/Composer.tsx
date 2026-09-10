@@ -62,6 +62,7 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
   // Steer's outcome is best-effort by nature and the two outcomes mean different
   // things, so it is reported rather than left to be inferred (FS-03.R50).
   const [notice, setNotice] = useState<string | null>(null);
+  const [steering, setSteering] = useState(false);
   const held = useHeldStore((state) => state.byAgent[agentId]);
   const hold = useHeldStore((state) => state.hold);
   const releaseHeld = useHeldStore((state) => state.release);
@@ -76,6 +77,7 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
   const reqRef = useRef(0);
   const pendingCursor = useRef<number | null>(null);
   const currentAgentId = useRef(agentId);
+  const steeringAgents = useRef(new Set<string>());
   currentAgentId.current = agentId;
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
     setItems([]);
     setHighlight(0);
     setDismissedStart(null);
+    setSteering(steeringAgents.current.has(agentId));
   }, [agentId]);
 
   // Stop, crash, or archive leaves no next turn for a held message, so it comes
@@ -223,10 +226,14 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
   const steer = async () => {
     const typed = text.trim() ? text : "";
     if (!typed && !held) return;
+    if (steeringAgents.current.has(agentId)) return;
+    const steeringAgentId = agentId;
+    steeringAgents.current.add(steeringAgentId);
+    setSteering(true);
     setError(null);
     setNotice(null);
     try {
-      const result = await steerPrompt(agentId, typed);
+      const result = await steerPrompt(steeringAgentId, typed);
       if (typed) {
         setText("");
         setTrigger(null);
@@ -242,6 +249,9 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
       // composer keeps exactly what the person typed, with the reason (INV §8).
       const reason = err instanceof Error && err.message ? err.message : "the agent may have stopped";
       setError(`Could not steer — ${reason}.`);
+    } finally {
+      steeringAgents.current.delete(steeringAgentId);
+      if (currentAgentId.current === steeringAgentId) setSteering(false);
     }
   };
 
@@ -334,7 +344,7 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
       <div className="composer-actions">
         <button type="submit">Send</button>
         {busy && steerable && (
-          <button type="button" className="composer-steer" onClick={() => void steer()}>Steer</button>
+          <button type="button" className="composer-steer" disabled={steering} onClick={() => void steer()}>Steer</button>
         )}
         {held && (
           <button type="button" className="composer-withdraw" onClick={() => void withdraw()}>Withdraw queued</button>
