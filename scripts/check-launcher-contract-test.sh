@@ -67,6 +67,16 @@ dir=$(fixture review-selection)
 mutate_launcher "$dir" review 's/choose any available review unit named$/choose the first review unit named/'
 expect_failure 'review ordered selection' 'review selection does not authorize any available unit' "$dir"
 
+# The review launcher stops requiring a model recommendation for fixable findings.
+dir=$(fixture review-fix-model)
+mutate_launcher "$dir" review 's/For every fixable finding/For every finding/'
+expect_failure 'review fix-model omission' 'missing fix-model recommendation' "$dir"
+
+# The investigation launcher records confidence but omits fix-model routing.
+dir=$(fixture investigate-fix-model)
+mutate_launcher "$dir" investigate-bug 's/Record every fixable finding/Record every finding/'
+expect_failure 'investigation fix-model omission' 'missing confidence and fix-model recommendation' "$dir"
+
 # The design launcher recognizes a named idea only in the two queue sections.
 dir=$(fixture design-named)
 mutate_launcher "$dir" design-feature 's/names an entry in any section of `docs\/ideas.md`/names an entry in `New ideas` or `Ideas being defined`/'
@@ -91,5 +101,10 @@ expect_failure 'workflow named-idea narrowing' 'a named idea outside the queue s
 dir=$(fixture workflow-auto)
 mutate "$dir" docs/features/AGENT-WORKFLOW.md 's/automatic selection is limited to the available or resumable ideas: //'
 expect_failure 'workflow unbounded automatic selection' 'unnamed design selection is not limited' "$dir"
+
+# The workflow routes difficult fixes to an underqualified model.
+dir=$(fixture workflow-fix-model)
+mutate "$dir" docs/features/AGENT-WORKFLOW.md 's/difficult — Codex Sol/difficult — Codex Luna/'
+expect_failure 'workflow fix-model mismatch' 'missing or invalid fix-model bands' "$dir"
 
 [ "$errors" -eq 0 ] || exit 1

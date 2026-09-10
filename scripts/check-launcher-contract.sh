@@ -56,6 +56,23 @@ for tree in .agents .claude; do
       if ! grep -Fq 'Findings keep that same unit open' "$file"; then
         fail "$tree/$role: findings can split their originating unit"
       fi
+      if ! has_rule "$file" 'For every fixable finding, classify the fix complexity independently from severity and record exactly one §7 **Fix model** recommendation'; then
+        fail "$tree/$role: missing fix-model recommendation"
+      fi
+      if ! has_rule "$file" 'trivial/easy uses Claude Sonnet or Codex Luna; medium uses Codex Terra or Claude Opus; difficult uses Codex Sol.'; then
+        fail "$tree/$role: invalid fix-model mapping"
+      fi
+    fi
+    if [ "$role" = investigate-bug ]; then
+      if ! has_rule "$file" 'Record every fixable finding with its confidence level and exactly one §7 **Fix model** recommendation'; then
+        fail "$tree/$role: missing confidence and fix-model recommendation"
+      fi
+      if ! has_rule "$file" 'trivial/easy uses Claude Sonnet or Codex Luna; medium uses Codex Terra or Claude Opus; difficult uses Codex Sol.'; then
+        fail "$tree/$role: invalid fix-model mapping"
+      fi
+      if ! has_rule "$file" 'Classify complexity independently from severity and repeat the recommendation in the human update.'; then
+        fail "$tree/$role: fix-model recommendation is not routed to the operator"
+      fi
     fi
     if [ "$role" = fix ] &&
        ! grep -Fq 'it does not create a new default review unit.' "$file"; then
@@ -124,6 +141,17 @@ if ! grep -Fq 'no queue or chronology blocks another.' "$workflow"; then
 fi
 if grep -Eq 'earliest eligible|later eligible unit out of order|sole eligible review unit' "$workflow"; then
   fail 'workflow: stale global ordering rule'
+fi
+if ! has_rule "$workflow" '`**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.' ||
+   ! has_rule "$workflow" '`**Fix model:** medium — Codex Terra or Claude Opus.' ||
+   ! has_rule "$workflow" '`**Fix model:** difficult — Codex Sol.'; then
+  fail 'workflow: missing or invalid fix-model bands'
+fi
+if ! has_rule "$workflow" 'This is the right-sized model for the fix, not another severity label'; then
+  fail 'workflow: fix complexity is not separated from finding severity'
+fi
+if ! has_rule "$workflow" 'Every code-defect, specification-gap, or observability finding that needs work gets the exact §7 **Fix model** recommendation'; then
+  fail 'workflow: bug investigations do not inherit fix-model routing'
 fi
 
 [ "$errors" -eq 0 ] || exit 1

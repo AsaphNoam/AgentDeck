@@ -152,12 +152,10 @@ check_spec_file() {
   esac
 }
 
-# Review findings carry the two tags that are already required of them: the
-# priority prefix (workflow §7) and the invariant class (INVARIANTS.md, "/review
-# — sweep the diff against every class; tag each finding with its class number").
-# A review that never opened the invariant catalog cannot satisfy the second, so
-# an untagged code finding fails a command the loop already runs. This checks the
-# tag, not the thinking behind it; it exists so the omission cannot be silent.
+# Review findings carry the tags already required of them: the priority prefix,
+# the exact fix-model recommendation (workflow §7), and the invariant class for
+# code findings (INVARIANTS.md). These checks validate the recorded contract, not
+# the judgment behind priority, complexity, or model choice.
 check_review_findings() {
   file=$1
   problems=$(awk '
@@ -165,9 +163,23 @@ check_review_findings() {
       if (buf == "") return
       if (first !~ /^- \*\*(Must fix|Worth fixing)\*\*/) {
         print "finding must start with **Must fix** or **Worth fixing**: " first
-      } else if (buf ~ /\.(go|ts|tsx|sh|css|json)/ &&
-                 buf !~ /INV §[0-9]/ && buf !~ /\(no invariant class\)/) {
-        print "finding cites code but has no INV §n tag or (no invariant class): " first
+      } else {
+        normalized = buf
+        gsub(/[[:space:]]+/, " ", normalized)
+        copy = normalized
+        tag_count = gsub(/\*\*Fix model:\*\*/, "", copy)
+        model_count = 0
+        if (index(normalized, "**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.") > 0) model_count++
+        if (index(normalized, "**Fix model:** medium — Codex Terra or Claude Opus.") > 0) model_count++
+        if (index(normalized, "**Fix model:** difficult — Codex Sol.") > 0) model_count++
+        if (tag_count != 1) {
+          print "finding must contain exactly one **Fix model:** recommendation: " first
+        } else if (model_count != 1) {
+          print "finding has an invalid fix-model band or model mapping: " first
+        } else if (normalized ~ /\.(go|ts|tsx|sh|css|json)/ &&
+                   normalized !~ /INV §[0-9]/ && normalized !~ /\(no invariant class\)/) {
+          print "finding cites code but has no INV §n tag or (no invariant class): " first
+        }
       }
       buf = ""
       first = ""

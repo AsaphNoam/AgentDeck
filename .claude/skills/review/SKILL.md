@@ -17,6 +17,10 @@ Then sweep the diff against every invariant class by that index and tag each fin
 number; open a class body only where the trigger matches. A class with no applicable surface in the
 diff is a result to state, not a step to skip.
 
+For every fixable finding, classify the fix complexity independently from severity and record exactly
+one §7 **Fix model** recommendation: trivial/easy uses Claude Sonnet or Codex Luna; medium uses Codex
+Terra or Claude Opus; difficult uses Codex Sol. Repeat the recommendation in the human update.
+
 The human may name a commit/range in `$ARGUMENTS`; otherwise choose any available review unit named
 by the handoff and say which one you took (workflow §1.4 and §7). Administrative commits never become
 default review units: skip review reports, finding-fix commits, release records, and handoff,

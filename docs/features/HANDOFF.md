@@ -19,10 +19,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   the Claude 0.75.1 / codex-acp 1.10.0 / Codex 0.153.4 adapter bump. Publication state is recorded in
   **Active change**. `v0.4.2` and earlier ranges are in the state archive.
 - **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) stays open with one
-  Must-fix finding. The `usability-20260907` unit is now closed — its J2 and J5 Must-fixes were its
-  only open findings. Every other unit through this release is closed. The remaining open findings
-  belong to the BR-1 and BR-2 investigations, not to a review unit awaiting closure. Review records,
-  finding-fix commits, release records, and handoff/archive bookkeeping are administrative closure.
+  Must-fix finding. `fix-model-recommendations` awaits independent review once committed. The
+  `usability-20260907` unit is closed — its J2 and J5 Must-fixes were its only open findings. Every
+  other unit through this release is closed. The remaining open findings belong to the BR-1 and BR-2
+  investigations, not to a review unit awaiting closure. Review records, finding-fix commits,
+  release records, and handoff/archive bookkeeping are administrative closure.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   transport blocker; the ACP wait-list in `docs/ideas.md` records the other capabilities held behind
   an adapter contract.
@@ -53,6 +54,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None. `v0.4.3` is cut.
 
+**Changelog — 2026-09-10 (workflow):** Code review and bug investigation now attach one exact fix
+model recommendation to every fixable finding: trivial/easy uses Claude Sonnet or Codex Luna,
+medium uses Codex Terra or Claude Opus, and difficult uses Codex Sol. The band describes the
+complexity and risk of the fix, independently from finding severity, and is repeated in the human
+update. The specification checker rejects missing, duplicate, or mismatched recommendations; the
+launcher contract and mutation checks protect the mirrored role instructions. Existing findings
+were classified under the new rule.
+
 **Changelog — 2026-09-10 (fix):** Closed the `usability-20260907` unit's two Must-fix findings
 (FS-04.R34/A14, TS-04.R15, FS-12.R41/A17; `INV §8`, `INV §12`, `INV §2`, `INV §10`, `INV §17`).
 J2: an installed Claude adapter that rejects the readiness argv now reports
@@ -77,10 +86,10 @@ remain, listed under **Review findings**, and none was closed by the release its
 Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
 in particular has never been exercised against a provider.
 
-**Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
-may select any one open finding unit — `queue-a-follow-up-while-busy` is now unblocked and is the
-largest, alongside the BR-1 durability, provider-oracle, and BR-2 Codex version-authority findings;
-`/design-feature` may choose an available or resumable idea. Role queues are independent.
+**Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no unit waiting to
+start; `/fix` may select any one open finding unit — `queue-a-follow-up-while-busy` is now unblocked
+and is the largest, alongside the BR-1 durability, provider-oracle, and BR-2 Codex version-authority
+findings; `/design-feature` may choose an available or resumable idea. Role queues are independent.
 
 ## Decisions needing your input
 
@@ -133,7 +142,8 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   The same isolated run sent one single-click Steer during the held turn and observed one sequenced
   row, so a provider-specific single-Steer duplicate remains **undetermined** rather than attributed
   to the core steer path. Capture the affected backend and the two rows' `data-seq` values if that
-  narrower symptom remains after this confirmed echo race is fixed.
+  narrower symptom remains after this confirmed echo race is fixed. **Fix model:** medium — Codex
+  Terra or Claude Opus.
 
 - **Must fix** — Steer accepts duplicate submission while its first request is in flight
   (**confirmed by reproduction test**). **Field report (verbatim):** “The steer message feature
@@ -151,7 +161,8 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   give Steer one client-side in-flight claim, disable the control until the request settles, unskip
   the reproduction, and assert one HTTP request and one delivered transcript event. If one physical
   click still reproduces after that guard, capture Network requests and SSE sequence numbers to
-  distinguish duplicate DOM submission from a provider/runtime event defect.
+  distinguish duplicate DOM submission from a provider/runtime event defect. **Fix model:**
+  trivial/easy — Claude Sonnet or Codex Luna.
 
 - **Must fix** — An adapter-started steering turn escapes AgentDeck's turn lifecycle
   (**confirmed implementation and test-contract gap**). **Where:** `internal/runtime/chat.go:437-484`
@@ -184,7 +195,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   blocking on its own `session/prompt` Call (`internal/runtime/chat.go:599-625`), and a detached turn
   has no such outstanding request, so the gate needs a notification-driven release path that still
   yields exactly one terminal event and an answerable Cancel (`INV §2`, `INV §5`, `INV §17`; needs
-  focused `-race` coverage).
+  focused `-race` coverage). **Fix model:** difficult — Codex Sol.
 
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
@@ -201,6 +212,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   specify one compatibility policy (discover from the execution runtime, filter/mark models by the
   packaged version, or expose a first-class validated Codex executable override), show the effective
   runtime/version before launch, and test a personal cache that is newer than the packaged CLI.
+  **Fix model:** medium — Codex Terra or Claude Opus.
 
 - **Must fix** — BR-1 finding state was not durable across concurrent roles (**confirmed**).
   **Where:** `docs/archive/reviews/live-provider-acceptance-2026-07-26.md` recorded the exact Codex
@@ -212,7 +224,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   `INV §1`, `INV §10`. **Suggested fix/test:** a failed live gate must be recorded in HANDOFF before
   its role can close; if state-file ownership blocks that write, leave the role explicitly blocked
   rather than archiving the only finding. A commit/review that contains an acceptance report must
-  reconcile every Must-fix in it with live state.
+  reconcile every Must-fix in it with live state. **Fix model:** medium — Codex Terra or Claude Opus.
 - **Must fix** — provider-contract claims can still be proved by a self-authored oracle
   (**confirmed**). **Where:** TS-04.R18 asserted a `model[effort]` request shape after inspecting
   `codex-acp`'s internal `ModelId` parser without tracing `session/new` to `threadStart`; FS-09.A15
@@ -228,6 +240,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   complete reachability trace or a credentialed prompt receipt; label ACP `currentValue` as adapter
   configuration evidence, not provider execution evidence; and add an independently derived contract
   oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
+  **Fix model:** difficult — Codex Sol.
 - **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
   **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
   so it does not depend on the suspect ACP `model` member, but both adapters still receive an
@@ -235,7 +248,8 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   **Why it matters:** the same silent-ignore class may be live on surfaces explicitly advertised by
   AgentDeck. **Requirement:** FS-09.A6, `INV §12`. **Suggested fix/test:** keep the claims gated until
   each pinned CLI is installed and its model/prompt delivery is checked at the effective provider;
-  remove any redundant unsupported top-level fields once their real mechanism is known.
+  remove any redundant unsupported top-level fields once their real mechanism is known. **Fix
+  model:** medium — Codex Terra or Claude Opus.
 
 ## Design consistency notes
 

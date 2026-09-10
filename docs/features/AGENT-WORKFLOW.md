@@ -150,6 +150,22 @@ Check both directions:
 
 Also look for normal-use bugs: missing error handling at boundaries, realistic races, unsafe writes, dead code, and incomplete wiring. Unrequired complexity is likewise a finding: a new parallel mechanism or abstraction where an existing seam could extend, or code serving a case no requirement names. Ignore style preferences, demands for speculative edge-case handling, and micro-optimizations.
 
+Classify the fix work independently from finding severity, then end every fixable finding with
+exactly one of these recommendations:
+
+- `**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.` for a localized change at an existing
+  seam with a clear contract, straightforward regression test, and low state or concurrency risk.
+- `**Fix model:** medium — Codex Terra or Claude Opus.` for coordinated changes across layers,
+  specifications, or tests, including bounded concurrency or provider integration where ownership
+  and the desired behavior are already clear.
+- `**Fix model:** difficult — Codex Sol.` for new lifecycle or ownership machinery, durable
+  concurrent state, risky data migration, external-protocol uncertainty, or cross-subsystem
+  architecture.
+
+This is the right-sized model for the fix, not another severity label: a Must-fix may be trivial/easy
+and a Worth-fixing item may be difficult. Repeat each recommendation in the human update so the
+operator can route the fix without reopening the finding.
+
 Record each real finding in `## Review findings` in `HANDOFF.md` with its location, normal-use
 trigger, why it matters, relevant requirement ID when one exists, and a suggested test or fix. Start
 the bullet with either **Must fix** (a likely normal-use failure, data-loss risk, or requirement
@@ -255,8 +271,10 @@ and no specifications, with one exception: it may commit a reproduction test mar
    logged nothing, record what diagnostic should exist, where, and what question it would have
    answered, as its own finding. An undiagnosable report must at least make the next one diagnosable.
 6. **Close.** Record findings in `## Review findings` in `HANDOFF.md` using the §7 format plus the
-   confidence label, so §8 consumes them unchanged. Commit only the state file and any skipped
-   reproduction test, then finish with the §6 human update.
+   confidence label, so §8 consumes them unchanged. Every code-defect, specification-gap, or
+   observability finding that needs work gets the exact §7 **Fix model** recommendation; a
+   works-as-specified conclusion needs none. Commit only the state file and any skipped reproduction
+   test, then finish with the §6 human update.
 
 ## 13. Review a design
 

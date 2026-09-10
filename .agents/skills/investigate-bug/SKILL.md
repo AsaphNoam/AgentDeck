@@ -15,5 +15,8 @@ completely, then follow the investigation process.
 
 `$ARGUMENTS` carries the bug report: symptom text, a log excerpt, or a path to a log file; if empty,
 ask for the report. Do not change product code or specifications; the only allowed tree change is a
-reproduction test committed skipped. Record every finding with its confidence level, make the
-required state commit, and close with the concise human update.
+reproduction test committed skipped. Record every fixable finding with its confidence level and
+exactly one §7 **Fix model** recommendation: trivial/easy uses Claude Sonnet or Codex Luna; medium
+uses Codex Terra or Claude Opus; difficult uses Codex Sol. Classify complexity independently from
+severity and repeat the recommendation in the human update. Make the required state commit and close
+with the concise human update.

@@ -54,6 +54,7 @@ check-specs:
 	@scripts/check-specs.sh
 	@scripts/check-launcher-contract.sh
 	@scripts/check-launcher-contract-test.sh
+	@sh scripts/check-review-finding-contract-test.sh
 
 ## test: lint specs, then run the Go suite (no-tag fallback + sqlite_fts5 FTS)
 test: check-specs
