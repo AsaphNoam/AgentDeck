@@ -350,6 +350,25 @@ describe("Composer queued follow-up and steering", () => {
     expect(useTranscriptStore.getState().byAgent.a_1 ?? []).toHaveLength(0);
   });
 
+  // Skipped reproduction for the open HANDOFF finding: the server's sequenced
+  // event can win the race, then the successful response appends a second local echo.
+  it.skip("keeps one user message when its sequenced event arrives before the prompt response", async () => {
+    server.use(http.post("/api/sessions/:id/prompt", async ({ request }) => {
+      const text = String((await request.json() as { text: string }).text);
+      useTranscriptStore.getState().appendMessage("a_1", {
+        agent_id: "a_1", seq: 7, type: "user_text", ts: "t7", data: { text },
+      });
+      return HttpResponse.json({ accepted: true, agent_id: "a_1", delivery: "sent", after_seq: 7 }, { status: 202 });
+    }));
+    render(<Composer agentId="a_1" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+
+    type(ta, "wait before answering");
+    fireEvent.keyDown(ta, { key: "Enter" });
+
+    await waitFor(() => expect(useTranscriptStore.getState().byAgent.a_1).toHaveLength(1));
+  });
+
   it("withdraws the held message through the prompt resource", async () => {
     let withdrawn = 0;
     server.use(

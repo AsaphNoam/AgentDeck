@@ -113,6 +113,28 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 
 ## Review findings
 
+- **Must fix** — A sent prompt can render twice when its server event beats the HTTP response
+  (**confirmed by isolated browser reproduction and focused test**). **Revised field report
+  (verbatim):** “It's on every message, not just rapid double clicks, every message I sent had the
+  issue, it just disappears when the agent answers, try asking the agent a question that takes a few
+  seconds to answer, like asking it to wait.” Version/environment/logs remain unknown. **Where:**
+  `internal/runtime/chat.go:599-609` emits the sequenced `user_text` before the prompt route returns;
+  `ui/src/components/chat/Composer.tsx:190-198` appends an unsequenced local echo after that response;
+  `ui/src/store/transcriptStore.ts:166-179` only deduplicates the opposite arrival order, where the
+  local echo already exists when the server event arrives. In an isolated current-build browser run,
+  one Send starting a deliberately held turn rendered one `data-seq="2"` user row and one unsequenced
+  row from a single `POST /prompt`; a focused skipped test reproduces the same event order. **Normal-use
+  trigger:** the SSE user event reaches an open transcript before the successful prompt response,
+  especially visible while the response takes several seconds. **Why it matters:** the person sees
+  one delivered instruction as two messages even though the provider and durable transcript received
+  it once. **Requirement:** `FS-03.R6/R7/R48/A31`, `TS-08.R41/R56`; `INV §2`, `INV §5`, `INV §17`.
+  **Suggested fix/test:** centralize user-message reconciliation so both arrival orders replace or
+  suppress the matching unsequenced echo; unskip the focused test and assert one rendered event.
+  The same isolated run sent one single-click Steer during the held turn and observed one sequenced
+  row, so a provider-specific single-Steer duplicate remains **undetermined** rather than attributed
+  to the core steer path. Capture the affected backend and the two rows' `data-seq` values if that
+  narrower symptom remains after this confirmed echo race is fixed.
+
 - **Must fix** — Steer accepts duplicate submission while its first request is in flight
   (**confirmed by reproduction test**). **Field report (verbatim):** “The steer message feature
   makes messages appear in double while the agent is working.” AgentDeck version/commit and
