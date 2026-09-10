@@ -1994,7 +1994,7 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 	if err != nil {
 		return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, err)
 	}
-	if rebuilt := decodeSessionConfigOptions(result); len(rebuilt) > 0 {
+	if rebuilt, present := decodeSessionConfigOptionsWithPresence(result); present {
 		advertised.replace(rebuilt)
 	}
 	// An unreported value is not a mismatch: the peer is entitled to omit it, and

@@ -54,14 +54,27 @@ func (a sessionConfigAdvertisement) replace(next sessionConfigAdvertisement) {
 // (INV §12). An absent, null, or unparseable list advertises nothing, which fails
 // open under TS-04.R45/R46 rather than failing the session (INV §7).
 func decodeSessionConfigOptions(result json.RawMessage) sessionConfigAdvertisement {
+	options, _ := decodeSessionConfigOptionsWithPresence(result)
+	return options
+}
+
+// decodeSessionConfigOptionsWithPresence additionally reports whether the
+// response carried a valid configOptions array. Callers replacing an existing
+// advertisement need this distinction because an explicit [] is the peer's
+// complete, empty replacement rather than an omitted update (TS-04.R46).
+func decodeSessionConfigOptionsWithPresence(result json.RawMessage) (sessionConfigAdvertisement, bool) {
 	var response struct {
-		ConfigOptions []acpSessionConfigOption `json:"configOptions"`
+		ConfigOptions json.RawMessage `json:"configOptions"`
 	}
 	out := sessionConfigAdvertisement{}
 	if json.Unmarshal(result, &response) != nil {
-		return out
+		return out, false
 	}
-	for _, option := range response.ConfigOptions {
+	var options []acpSessionConfigOption
+	if len(response.ConfigOptions) == 0 || json.Unmarshal(response.ConfigOptions, &options) != nil || options == nil {
+		return out, false
+	}
+	for _, option := range options {
 		id := option.ID
 		if id == "" {
 			id = option.ConfigID
@@ -70,7 +83,7 @@ func decodeSessionConfigOptions(result json.RawMessage) sessionConfigAdvertiseme
 			out[id] = normalizeConfigValue(option.CurrentValue)
 		}
 	}
-	return out
+	return out, true
 }
 
 // normalizeConfigValue reduces a reported option value to the string vocabulary

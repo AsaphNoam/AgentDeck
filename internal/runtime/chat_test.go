@@ -1008,6 +1008,33 @@ func TestSessionConfigurationRereadsTheOptionListAfterAModelChange(t *testing.T)
 	}
 }
 
+// TS-04.R46, INV §1/§11 — an explicit empty configOptions array is the
+// peer's rebuilt full set, not an omitted update. The next required setting
+// must therefore be rejected as unavailable without sending another call.
+func TestSessionConfigurationReplacesTheOptionListWithExplicitEmpty(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.BackendType = "codex-acp"
+	spec.ModelID = "gpt-5.4-mini"
+	spec.Effort = "high"
+	logPath := filepath.Join(t.TempDir(), "config.log")
+	spec.Env = append(spec.Env,
+		"FAKEACP_CONFIG_LOG="+logPath,
+		"FAKEACP_MODEL_DROPS=model,effort,reasoning_effort",
+	)
+
+	_, err := c.Start(context.Background(), spec)
+	if !errors.Is(err, ErrSettingUnavailable) {
+		t.Fatalf("Start error = %v, want ErrSettingUnavailable after the peer empties its option list", err)
+	}
+	raw, readErr := os.ReadFile(logPath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if calls := strings.Count(strings.TrimSpace(string(raw)), "\n") + 1; calls != 1 {
+		t.Fatalf("configuration calls = %d, want only the model call", calls)
+	}
+}
+
 // FS-09.A27, INV §12 — a peer that answers success while its own rebuilt option
 // list reports a different effective value has ignored the setting. That is the
 // exact silent failure BR-1 shipped for Codex model delivery, so the RPC

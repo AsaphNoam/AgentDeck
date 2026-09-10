@@ -17,8 +17,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
 - **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) was explicitly
   reviewed through its implementation commit and has one Must-fix finding open.
-  `chat-session-configuration` was explicitly re-reviewed through its finding-fix commit; one
-  Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
+  `chat-session-configuration`, the BR-3 resume-replay unit,
   `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
   closed. Review records, finding-fix commits, release records, and handoff/archive/queue
   bookkeeping are administrative closure.
@@ -31,11 +30,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** The queue/steer review still has the untracked adapter-started-turn finding.
   Its reload/data-loss, repeated-text, optimistic-rendering, and turn-order findings are fixed. Two usability findings from the
-  2026-09-07 v0.4.2 review plus the open bug/session-configuration findings also remain: J2
+  2026-09-07 v0.4.2 review plus the open bug findings also remain: J2
   incompatible CLI status, J5 clipped lower-row card menus, live-gate finding durability,
-  provider-contract oracles, explicit-empty ACP option-list replacement, and the unverified
-  OpenCode/OpenHands paths. The six original `chat-session-configuration` findings are closed. The
-  claimed Claude model-delivery finding was retracted after a provider-authoritative prompt probe
+  provider-contract oracles, and the unverified OpenCode/OpenHands paths. The
+  `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
+  retracted after a provider-authoritative prompt probe
   disproved it.
 - **Bug reports:** BR-1 through BR-3 are investigated. BR-1: Codex chat silently ignored the selected
   model from its first release and later ignored effort too; its implementation is reviewed with
@@ -67,6 +66,12 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 **Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
 may select any one open finding unit, including `queue-a-follow-up-while-busy`; `/design-feature` may
 choose an available or resumable idea. Role queues are independent.
+
+**Changelog — 2026-09-10 (fix):** Closed the remaining `chat-session-configuration` finding
+(TS-04.R46; INV §1, §11). A present empty `configOptions` array now replaces the prior live
+advertisement, so a removed option cannot remain available for a later setting. The regression
+proves that the runtime refuses that later setting without sending it to the adapter. The
+originating review unit is closed.
 
 **Changelog — 2026-09-10 (fix):** Closed four queue/steer findings (FS-03.R48/R49/A31/A32,
 TS-01.R29, TS-03.R38, TS-08.R56; INV §1, §2, §4, §5, §8, §11, §15, §17). The runtime now exposes a
@@ -228,16 +233,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   complete reachability trace or a credentialed prompt receipt; label ACP `currentValue` as adapter
   configuration evidence, not provider execution evidence; and add an independently derived contract
   oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
-- **Worth fixing** — an explicit empty rebuilt ACP option list does not replace the previous list.
-  **Where:** `internal/runtime/chat.go:1674-1676` replaces the cached advertisement only when
-  `len(rebuilt) > 0`, although ACP's required `SetSessionConfigOptionResponse.configOptions` is a
-  full array and `[]` is a valid full set. **Normal-use trigger:** an adapter accepts a setting and
-  responds that the session now offers no configuration options. **Why it matters:** AgentDeck keeps
-  advertising removed options and can send a later setting the peer no longer accepts; it also
-  stores stale fast availability in the running row and header. **Requirement:** TS-04.R46,
-  `INV §1`, `INV §11`. **Suggested fix/test:** decode presence separately from contents and replace
-  on every present array, including `[]`; add a sequence test whose first set response empties the
-  list and whose next requested option must be unavailable.
 - **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
   **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
   so it does not depend on the suspect ACP `model` member, but both adapters still receive an
