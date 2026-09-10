@@ -192,6 +192,18 @@ describe("transcriptStore", () => {
     expect(events[0]).toMatchObject({ kind: "user_text", seq: 1, text: "persist this" });
   });
 
+  it("keeps the durable user event when it arrives before the optimistic bubble", () => {
+    useTranscriptStore.getState().appendMessage("a_5", {
+      agent_id: "a_5", seq: 2, type: "user_text", ts: "t2", data: { text: "already persisted" },
+    });
+    useTranscriptStore.getState().appendMessage("a_5", {
+      kind: "user_text", text: "already persisted", message_id: "local-2",
+    });
+    const events = useTranscriptStore.getState().byAgent.a_5;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: "user_text", seq: 2, text: "already persisted" });
+  });
+
   it("folds permission_resolved on setTranscript (refetch/archive replay)", () => {
     useTranscriptStore.getState().setTranscript("a_6", [
       { agent_id: "a_6", seq: 1, type: "permission_request", ts: "t1", data: { tool_call_id: "tc_7", name: "Bash", reason: "run" } },

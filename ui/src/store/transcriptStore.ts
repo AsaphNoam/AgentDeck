@@ -40,6 +40,24 @@ function textOf(event: TranscriptEvent) {
   return event.text ?? event.delta ?? "";
 }
 
+// Reconcile the two possible arrival orders for a submitted user message. The
+// composer and SSE stream both use appendMessage, so whichever arrives second
+// finds its opposite form here: the durable event replaces an optimistic one,
+// while an optimistic event is suppressed when the durable event already won.
+// Do not cross a completed turn when matching repeated prompt text.
+function reconcileUserMessage(events: TranscriptEvent[], event: TranscriptEvent) {
+  if (kindOf(event) !== "user_text") return false;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const candidate = events[i];
+    if (kindOf(candidate) === "turn_end") break;
+    if (kindOf(candidate) !== "user_text" || textOf(candidate) !== textOf(event)) continue;
+    if ((candidate.seq == null) === (event.seq == null)) continue;
+    if (event.seq != null) events[i] = event;
+    return true;
+  }
+  return false;
+}
+
 // clipPreview keeps the last `n` Unicode code points of `s` — the same end and
 // the same code-point-safe boundary as the server's lastAssistantPreview
 // (internal/server/reconcile.go), so a card shows the same tail whether it
@@ -166,16 +184,9 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
 	      // The composer displays a local user bubble immediately. Replace that
 	      // exact unsequenced bubble when its durable runtime event arrives so a
 	      // live SSE delivery does not render the prompt twice.
-      if (kind === "user_text") {
-        for (let i = events.length - 1; i >= 0; i--) {
-          if (kindOf(events[i]) === "user_text" && events[i].seq == null && textOf(events[i]) === textOf(event)) {
-            events[i] = event;
-            const rawIndex = rawEvents?.findIndex((item) => kindOf(item) === "user_text" && item.seq == null && textOf(item) === textOf(event)) ?? -1;
-            if (rawEvents && rawIndex >= 0) rawEvents[rawIndex] = event;
-            else rawEvents?.push(event);
-            return { byAgent: { ...state.byAgent, [agentId]: events }, pending: state.pending };
-          }
-        }
+      if (reconcileUserMessage(events, event)) {
+        if (rawEvents && !reconcileUserMessage(rawEvents, event) && event.seq != null) rawEvents.push(event);
+        return { byAgent: { ...state.byAgent, [agentId]: events }, pending: state.pending };
       }
       // Streamed assistant deltas carry no message_id; merge consecutive
       // assistant_text events into a single bubble on the shared replay/live path.

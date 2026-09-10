@@ -350,9 +350,9 @@ describe("Composer queued follow-up and steering", () => {
     expect(useTranscriptStore.getState().byAgent.a_1 ?? []).toHaveLength(0);
   });
 
-  // Skipped reproduction for the open HANDOFF finding: the server's sequenced
-  // event can win the race, then the successful response appends a second local echo.
-  it.skip("keeps one user message when its sequenced event arrives before the prompt response", async () => {
+  // The server's sequenced event can win the race with the prompt response; the
+  // durable event must remain the single rendered user message.
+  it("keeps one user message when its sequenced event arrives before the prompt response", async () => {
     server.use(http.post("/api/sessions/:id/prompt", async ({ request }) => {
       const text = String((await request.json() as { text: string }).text);
       useTranscriptStore.getState().appendMessage("a_1", {
@@ -366,7 +366,11 @@ describe("Composer queued follow-up and steering", () => {
     type(ta, "wait before answering");
     fireEvent.keyDown(ta, { key: "Enter" });
 
-    await waitFor(() => expect(useTranscriptStore.getState().byAgent.a_1).toHaveLength(1));
+    await waitFor(() => {
+      const events = useTranscriptStore.getState().byAgent.a_1;
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ kind: "user_text", seq: 7, text: "wait before answering" });
+    });
   });
 
   it("withdraws the held message through the prompt resource", async () => {

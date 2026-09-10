@@ -31,7 +31,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   available to start. Streaming agent thinking stays part-decided (live-only decided; rendering
   default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
   is the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** The prompt-echo and duplicate-Steer investigations each have one Must-fix. One
+- **Open findings:** The duplicate-Steer investigation has one Must-fix. One
   Must-fix remains on the queue/steer unit — the adapter-started steering turn escapes AgentDeck's
   turn lifecycle. No longer blocked: the operator decided on 2026-09-10 not to hide Steer, which
   selects host ownership of the adapter-started turn; see the finding for the resulting approach and
@@ -53,6 +53,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None. `v0.4.3` is cut.
+
+**Changelog — 2026-09-10 (fix):** Closed the `prompt-echo-race` Must-fix
+(FS-03.R6/R7/R48/A31, TS-08.R41/R56; `INV §2`, `INV §5`, `INV §17`). User-message
+reconciliation now handles both arrival orders: a durable sequenced event replaces an existing
+optimistic echo, while an optimistic echo is suppressed when the durable event already arrived.
+The regression test was confirmed failing before the fix and now asserts the single retained event
+has its durable sequence. The originating investigation unit is closed.
 
 **Changelog — 2026-09-10 (design):** Designed **open a file an agent mentioned** and made it ready
 to start: [`open-a-file-from-chat.md`](../ready-changes/open-a-file-from-chat.md). A filepath link an
@@ -98,14 +105,14 @@ unrun real-provider/native-OS gates are recorded in
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
 passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
 the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
-The release shipped with five open Must-fix findings on the operator's explicit decision; three
+The release shipped with five open Must-fix findings on the operator's explicit decision; two
 remain, listed under **Review findings**, and none was closed by the release itself. The credentialed Claude and
 Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
 in particular has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `prompt-echo-race` (medium, Terra/Opus),
-`duplicate-steer-submission` (trivial/easy, Sonnet/Luna), `queue-a-follow-up-while-busy` (difficult,
+`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `duplicate-steer-submission`
+(trivial/easy, Sonnet/Luna), `queue-a-follow-up-while-busy` (difficult,
 Sol), BR-1 (difficult, Sol), or BR-2 (medium, Terra/Opus); `/design-feature` may choose an available
 or resumable idea. Role queues are independent.
 
@@ -139,30 +146,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### prompt-echo-race — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — A sent prompt can render twice when its server event beats the HTTP response
-  (**confirmed by isolated browser reproduction and focused test**). **Revised field report
-  (verbatim):** “It's on every message, not just rapid double clicks, every message I sent had the
-  issue, it just disappears when the agent answers, try asking the agent a question that takes a few
-  seconds to answer, like asking it to wait.” Version/environment/logs remain unknown. **Where:**
-  `internal/runtime/chat.go:599-609` emits the sequenced `user_text` before the prompt route returns;
-  `ui/src/components/chat/Composer.tsx:190-198` appends an unsequenced local echo after that response;
-  `ui/src/store/transcriptStore.ts:166-179` only deduplicates the opposite arrival order, where the
-  local echo already exists when the server event arrives. In an isolated current-build browser run,
-  one Send starting a deliberately held turn rendered one `data-seq="2"` user row and one unsequenced
-  row from a single `POST /prompt`; a focused skipped test reproduces the same event order. **Normal-use
-  trigger:** the SSE user event reaches an open transcript before the successful prompt response,
-  especially visible while the response takes several seconds. **Why it matters:** the person sees
-  one delivered instruction as two messages even though the provider and durable transcript received
-  it once. **Requirement:** `FS-03.R6/R7/R48/A31`, `TS-08.R41/R56`; `INV §2`, `INV §5`, `INV §17`.
-  **Suggested fix/test:** centralize user-message reconciliation so both arrival orders replace or
-  suppress the matching unsequenced echo; unskip the focused test and assert one rendered event.
-  The same isolated run sent one single-click Steer during the held turn and observed one sequenced
-  row, so a provider-specific single-Steer duplicate remains **undetermined** rather than attributed
-  to the core steer path. Capture the affected backend and the two rows' `data-seq` values if that
-  narrower symptom remains after this confirmed echo race is fixed.
 
 ### duplicate-steer-submission — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
