@@ -49,12 +49,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None. `v0.4.3` is cut.
 
-**Release state:** The annotated tag `v0.4.3` exists locally on the release commit. Whether `main`
-and the tag were pushed — and therefore whether release CI ran and the archive, checksum, and
-manifest are attached to the GitHub Release — is recorded by the release session's final update; do
-not assume publication without checking `git log origin/main..main` and the CI run. The credentialed
-Claude and Codex journeys under **Acceptance gates** are owed regardless and this release did not
-run them.
+**Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
+passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
+the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
+The release shipped with five open Must-fix findings on the operator's explicit decision; they are
+listed under **Review findings** and none is closed by this release. The credentialed Claude and
+Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
+in particular has never been exercised against a provider.
 
 **Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
 may select any one open finding unit, including `queue-a-follow-up-while-busy`; `/design-feature` may
