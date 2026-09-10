@@ -224,6 +224,12 @@ Requirements are user-observable.
   or current-project indicator at the supported desktop floor. Link membership and routing remain
   feature-owned; presentation does not measure available width, persist state, fetch independently,
   or reinterpret project activity.
+- **R41** — A pointer-anchored menu opens fully inside the viewport. One shared
+  placement helper measures the rendered menu and shifts it back from the bottom and right edges
+  rather than reordering or flipping its items, so a menu opened near an edge exposes the same
+  actions in the same order as one opened in the middle. A menu taller than the viewport pins to the
+  leading margin and scrolls, so no item is unreachable. This governs every pointer-anchored menu:
+  agent cards, project cards, the project-dashboard background, and transcript annotations.
 
 ## 3. States & transitions
 
@@ -331,6 +337,11 @@ Requirements are user-observable.
   card; neither card shows a context meter while collapsed, and an expanded card shows the compact
   context figure in its header. Both skins keep R9's remaining order and R10's construction. —
   deterministic visual matrix plus the real-browser review in A1.
+
+- **A17** (R41) — A context menu opened on a lower-row card at the supported desktop
+  floor renders every lifecycle action, Archive included, inside the viewport, across menu heights
+  and bottom/right pointer positions. — `ui/src/lib/menuPlacement.test.ts` for the geometry,
+  `CardContextMenu.test.tsx` for the measured wiring, and a real-browser J5 lower-row pass.
 
 ## 6. Deviations & open decisions
 

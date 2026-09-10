@@ -40,6 +40,14 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "failed", Detail: "not_logged_in"}
 	}
 	if err != nil {
+		// An adapter that rejects the status argv itself — an older build with
+		// no `--cli` mode — is incompatible, not un-credentialed. INV §12: a
+		// tool that cannot be interrogated reports skipped, never failed,
+		// because a wrongly failed gate sends the operator to repair
+		// credentials that are fine (FS-04.R34/A14).
+		if rejectsArgument(out) {
+			return CredResult{Status: "skipped", Detail: "cli_incompatible"}
+		}
 		// Return only a bounded vocabulary; raw CLI output and account
 		// identity never cross the API boundary (TS-04.R15, INV §8/§12).
 		return CredResult{Status: "failed", Detail: "status_check_failed"}
@@ -51,10 +59,15 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 // both the optional flag and unsupported-argument vocabulary. That keeps an
 // unrelated auth/status failure from triggering the compatibility retry.
 func rejectsNoColorFlag(out []byte) bool {
+	return strings.Contains(strings.ToLower(string(out)), "-no-color") && rejectsArgument(out)
+}
+
+// rejectsArgument reports whether output is a CLI parser refusing one of the
+// arguments AgentDeck passed, rather than a status answer. The vocabulary is
+// substring-based so a wording change degrades to the caller's fallback
+// instead of a false verdict (INV §12).
+func rejectsArgument(out []byte) bool {
 	text := strings.ToLower(string(out))
-	if !strings.Contains(text, "-no-color") {
-		return false
-	}
 	for _, marker := range []string{
 		"unknown option",
 		"unknown flag",

@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useMenuPlacement } from "../../lib/menuPlacement";
 
 export type AnnotationMenuState = { x: number; y: number; label: string; annotate: () => void };
 
 export function AnnotationContextMenu({ menu, onClose }: { menu: AnnotationMenuState | null; onClose: () => void }) {
+  const placement = useMenuPlacement(menu);
   useEffect(() => {
     if (!menu) return;
     const onPointerDown = (event: MouseEvent) => {
@@ -23,7 +25,7 @@ export function AnnotationContextMenu({ menu, onClose }: { menu: AnnotationMenuS
   if (!menu) return null;
 
   return createPortal(
-    <div className="context-menu" data-ui="context-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+    <div className="context-menu" data-ui="context-menu" ref={placement.ref} style={placement.style} role="menu">
       <button
         type="button"
         data-slot="item"

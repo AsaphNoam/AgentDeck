@@ -422,3 +422,33 @@ func TestClassifyNativeOutputPrefersTheNegative(t *testing.T) {
 		}
 	}
 }
+
+// J2: an installed adapter too old to accept the status argv is incompatible,
+// not un-credentialed. INV §12 requires an un-interrogable tool to report
+// skipped, because a wrongly failed gate sends the operator to repair
+// credentials that are fine (FS-04.A14, TS-04.R15).
+func TestClaudeProberReportsIncompatibleCLIAsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	cliPath := filepath.Join(dir, "claude-agent-acp")
+	script := `#!/bin/sh
+echo "error: unknown option --cli" >&2
+exit 2
+`
+	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake claude: %v", err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	result := claudeProber{}.Check(
+		context.Background(),
+		config.Backend{},
+		config.Model{},
+		map[string]string{},
+	)
+	if result.Status != "skipped" {
+		t.Fatalf("status = %q, want skipped (detail=%q)", result.Status, result.Detail)
+	}
+	if result.Detail != "cli_incompatible" {
+		t.Errorf("detail = %q, want cli_incompatible", result.Detail)
+	}
+}

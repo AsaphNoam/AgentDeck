@@ -6,6 +6,7 @@ import { archiveAgent, getCapabilities, launchAgent, renameAgent, resumeAgent, s
 import { useBackends } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { terminalSupported } from "../../lib/backendTypes";
+import { useMenuPlacement } from "../../lib/menuPlacement";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
@@ -28,6 +29,7 @@ export function CardContextMenu() {
   const [runtime, setRuntime] = useState({ interface: "chat", backend: "", model: "", effort: "" });
   const [dialogError, setDialogError] = useState("");
   const [terminalAvailable, setTerminalAvailable] = useState(true);
+  const placement = useMenuPlacement(menu);
 
   useEffect(() => {
     if (!menu) return;
@@ -106,7 +108,7 @@ export function CardContextMenu() {
   };
 
   const menuView = menu && agent ? createPortal(
-    <div className="context-menu" data-ui="context-menu" style={{ left: menu.x, top: menu.y }} role="menu">
+    <div className="context-menu" data-ui="context-menu" ref={placement.ref} style={placement.style} role="menu">
       <button type="button" data-slot="item" onClick={() => { navigate(`/agent/${agent.agent_id}`); close(); }}>
         Open chat
       </button>

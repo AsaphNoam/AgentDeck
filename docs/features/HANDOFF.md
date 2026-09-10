@@ -19,8 +19,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   the Claude 0.75.1 / codex-acp 1.10.0 / Codex 0.153.4 adapter bump. Publication state is recorded in
   **Active change**. `v0.4.2` and earlier ranges are in the state archive.
 - **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) stays open with one
-  Must-fix finding; every other unit through this release is closed. Review records, finding-fix
-  commits, release records, and handoff/archive bookkeeping are administrative closure.
+  Must-fix finding. The `usability-20260907` unit is now closed — its J2 and J5 Must-fixes were its
+  only open findings. Every other unit through this release is closed. The remaining open findings
+  belong to the BR-1 and BR-2 investigations, not to a review unit awaiting closure. Review records,
+  finding-fix commits, release records, and handoff/archive bookkeeping are administrative closure.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
   transport blocker; the ACP wait-list in `docs/ideas.md` records the other capabilities held behind
   an adapter contract.
@@ -29,10 +31,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
   is the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** One Must-fix on the queue/steer unit — the adapter-started steering turn escapes
-  AgentDeck's turn lifecycle — blocked on the compatibility choice below. Also open: J2 incompatible
-  CLI status, J5 clipped lower-row card menus, live-gate finding durability, provider-contract
-  oracles, the Codex discovery-versus-execution version authority left by BR-2, and the unverified
-  OpenCode/OpenHands paths. See **Review findings**.
+  AgentDeck's turn lifecycle — blocked on the compatibility choice below. Also open: live-gate
+  finding durability, provider-contract oracles, the Codex discovery-versus-execution version
+  authority left by BR-2, and the unverified OpenCode/OpenHands paths. The `usability-20260907`
+  J2 and J5 Must-fixes are closed and removed. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and their reports are archived with this
   release. BR-3 is fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed, with the
   durability and oracle findings still open. BR-2's release pin is fixed by the adapter bump; its
@@ -49,16 +51,29 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None. `v0.4.3` is cut.
 
+**Changelog — 2026-09-10 (fix):** Closed the `usability-20260907` unit's two Must-fix findings
+(FS-04.R34/A14, TS-04.R15, FS-12.R41/A17; `INV §8`, `INV §12`, `INV §2`, `INV §10`, `INV §17`).
+J2: an installed Claude adapter that rejects the readiness argv now reports
+`skipped`/`cli_incompatible` with compatibility guidance instead of a credential failure, so
+onboarding no longer sends the operator to repair working credentials. J5: pointer-anchored menus
+measure themselves and clamp into the viewport through one shared `useMenuPlacement` helper, with a
+scroll floor for menus taller than the viewport. The helper also replaces the same unclamped
+positioning in the project-card, project-background, and annotation menus — same defect class, one
+helper rather than four copies (`INV §2`, `INV §10`) — and that widening is recorded here rather
+than hidden in the closure. The originating unit is closed.
+
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Both the release and CI runs
 passed, the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries
 the darwin/arm64 archive, `install.sh`, and a manifest declaring version `0.4.3` with its SHA-256.
-The release shipped with five open Must-fix findings on the operator's explicit decision; they are
-listed under **Review findings** and none is closed by this release. The credentialed Claude and
+The release shipped with five open Must-fix findings on the operator's explicit decision; three
+remain, listed under **Review findings**, and none was closed by the release itself. The credentialed Claude and
 Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
 in particular has never been exercised against a provider.
 
 **Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
-may select any one open finding unit, including `queue-a-follow-up-while-busy`; `/design-feature` may
+may select any one open finding unit — `queue-a-follow-up-while-busy` is blocked on the
+compatibility choice below, leaving the BR-1 durability, provider-oracle, and BR-2 Codex
+version-authority findings; `/design-feature` may
 choose an available or resumable idea. Role queues are independent.
 
 ## Decisions needing your input
@@ -130,24 +145,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   packaged version, or expose a first-class validated Codex executable override), show the effective
   runtime/version before launch, and test a personal cache that is newer than the packaged CLI.
 
-- **Must fix** — J2: incompatible CLI status is presented as a credential failure.
-  **Where:** `internal/backend/credcheck/claude.go:25-45`, surfaced by
-  `ui/src/features/onboarding/steps/BackendStep.tsx:44-46`. **Normal-use trigger:** from a fresh
-  onboarding home, an installed `claude-agent-acp` that prints `error: unknown option --cli` and
-  exits 2. **Why it matters:** the wizard tells the operator to repair credentials when the
-  provider is actually incompatible or un-interrogable, leaving the wrong setup gate and no useful
-  compatibility diagnosis. **Requirement:** `FS-04.A14`, `INV §12`. **Suggested fix/test:** classify
-  unsupported CLI/status failures separately from credential failures, keep setup retryable, and
-  add a J2 fixture test for an unknown option. Reproduced in
-  `.review/usability-20260907/run/shots/J2-old-cli-spot-replay.png`.
-- **Must fix** — J5: lower-row card context menus hide lifecycle actions below the viewport.
-  **Where:** dashboard card context menu at the default 1280×720 viewport. **Normal-use trigger:**
-  right-click a lower-row stopped card in a three-column grid. **Why it matters:** the fixed menu
-  starts at y=640, placing Resume at y=754 and Archive at y=907 with no clipping correction or menu
-  scroll; lifecycle actions become a dead-end until the operator finds a pointer-position workaround.
-  **Requirement:** J5, `FS-12.A8`, `INV §8`. **Suggested fix/test:** clamp or flip the menu into the viewport
-  and exercise lower-row menus across menu heights and the supported desktop floor. Reproduced in
-  `.review/usability-20260907/run/shots/J5-context-menu-clipped.png`.
 - **Must fix** — BR-1 finding state was not durable across concurrent roles (**confirmed**).
   **Where:** `docs/archive/reviews/live-provider-acceptance-2026-07-26.md` recorded the exact Codex
   model failure as a Must-fix on July 26, but the live acceptance session could not edit HANDOFF

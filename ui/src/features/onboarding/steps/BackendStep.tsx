@@ -33,6 +33,9 @@ function credentialGuidance(status: string, detail: string | null, type: Backend
   if (detail === "cli_not_installed") {
     return `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then check again.`;
   }
+  if (detail === "cli_incompatible") {
+    return `The installed ${BACKEND_TYPE_LABELS[type]} adapter is too old for AgentDeck's readiness check, so its sign-in could not be confirmed. Update the adapter, then check again.`;
+  }
   if (detail === "not_logged_in") {
     return `${BACKEND_TYPE_LABELS[type]} is not signed in. Complete its sign-in below, then check again.`;
   }

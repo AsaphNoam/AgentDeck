@@ -271,8 +271,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   outside AgentDeck, then offers **Check again** to refresh readiness. AgentDeck does not launch,
   proxy, display, receive, or store a native sign-in flow or credential. Unready, unavailable, and
   failed readiness results leave the wizard open with retryable guidance and the Set up later action.
-  Codex retains OpenAI API-key configuration as an alternative to native sign-in; it is not required
-  for a successfully signed-in Codex CLI.
+  An installed adapter that cannot answer the readiness check is an unavailable result with
+  compatibility guidance, never a credential failure, so the wizard does not send the operator to
+  repair credentials that are fine. Codex retains OpenAI API-key configuration as an alternative to
+  native sign-in; it is not required for a successfully signed-in Codex CLI.
 
 ## 5. Acceptance criteria
 
@@ -312,9 +314,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   project create, backend save, catalog/default-model change, or session launch; a completion-write
   failure remains visible and retryable. *Verified:* `OnboardingGate.test.tsx` and journey J2.
 - **A14** — Claude/Codex provider-specific sign-in guidance and Check again safely
-  report unready/unavailable/failed/ready states; Codex can instead validate an API key. The Backend
+  report unready/unavailable/failed/ready states; Codex can instead validate an API key. An adapter
+  that rejects the readiness argv reports the unavailable compatibility state rather than a
+  credential failure, and its guidance stays retryable. The Backend
   step contains neither an editable model id nor provider model string. *Verified:* `BackendStep.test.tsx`,
-  credential-check tests, and journey J2 with a fake provider.
+  `TestClaudeProberReportsIncompatibleCLIAsSkipped`, other credential-check tests, and journey J2
+  with a fake provider.
 - **A15.** Project archive state round-trips through the project config API and survives
   restart; an older project file without the field is active by default. — config/server/UI regressions.
 - **A16.** When `default_project` names an archived project, launch selectors show only

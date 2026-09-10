@@ -8,6 +8,7 @@ import { CardGrid } from "../../components/grid/CardGrid";
 import { archiveProject, getWorktreeStatus } from "../../api/client";
 import type { CheckoutConsent } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
+import { useMenuPlacement } from "../../lib/menuPlacement";
 import { ConfirmDialog, ProjectColorPicker } from "../../components/ui";
 import { ProjectForm } from "../settings/ProjectForm";
 import { WorktreeForkDialog } from "./WorktreeForkDialog";
@@ -29,6 +30,8 @@ export function ProjectDashboard() {
   const createProject = useCreateProject();
   const [contextMenu, setContextMenu] = useState<ProjectMenu | null>(null);
   const [bgMenu, setBgMenu] = useState<BackgroundMenu | null>(null);
+  const cardMenuPlacement = useMenuPlacement(contextMenu);
+  const bgMenuPlacement = useMenuPlacement(bgMenu);
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState("");
   const [edit, setEdit] = useState<ProjectEdit | null>(null);
@@ -116,7 +119,7 @@ export function ProjectDashboard() {
         {unavailable.map((id) => <article className="project-card unavailable" key={id} onClick={() => navigate(`/project/${id}`)}><strong>{id}</strong><span>Project unavailable</span></article>)}
       </div>
       {contextMenu && projects.data?.[contextMenu.id] && createPortal(
-        <div className="context-menu" data-ui="context-menu" role="menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+        <div className="context-menu" data-ui="context-menu" role="menu" ref={cardMenuPlacement.ref} style={cardMenuPlacement.style}>
           <button type="button" data-slot="item" onClick={() => { setEdit({ id: contextMenu.id, project: projects.data![contextMenu.id] }); setContextMenu(null); }}>Rename</button>
           <div className="context-menu-color" role="menuitem">
             <span>Change color</span>
@@ -130,7 +133,7 @@ export function ProjectDashboard() {
         document.body,
       )}
       {bgMenu && createPortal(
-        <div className="context-menu" data-ui="context-menu" role="menu" style={{ left: bgMenu.x, top: bgMenu.y }}>
+        <div className="context-menu" data-ui="context-menu" role="menu" ref={bgMenuPlacement.ref} style={bgMenuPlacement.style}>
           <button type="button" data-slot="item" onClick={openCreate}>New project</button>
         </div>,
         document.body,

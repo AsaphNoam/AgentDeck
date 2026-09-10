@@ -77,7 +77,9 @@ readiness probe. The onboarding UI supplies only static provider guidance and re
 backend save/check (TS-03.R15); the server never starts or proxies a login command. Each probe uses
 an explicit allowlisted executable and argv through `exec.CommandContext` (never a shell), a bounded
 deadline, inherited provider environment, and sanitized bounded diagnostics. Claude retains its
-adapter-delegated `auth status` probe and no-color compatibility retry. Codex first asks the pinned
+adapter-delegated `auth status` probe and no-color compatibility retry; when the executable rejects
+the probe argv itself, the bounded result is `skipped`/`cli_incompatible`, not a credential failure
+(INV §12). Codex first asks the pinned
 private Codex CLI for `login status`; a successful native result is sufficient, otherwise a
 configured `OPENAI_API_KEY` is checked through the existing models endpoint. Raw status output,
 account identity, and credential values never cross the process/log/API boundary.

@@ -440,7 +440,11 @@
   border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
   box-shadow: var(--ad-shadow-offset);
   display: grid;
+  /* A menu taller than the short viewport is clamped to the top margin by
+     useMenuPlacement and scrolls from there, so no item is unreachable (J5). */
+  max-block-size: calc(100vh - 16px);
   min-width: 210px;
+  overflow-y: auto;
   padding: var(--ad-space-1);
   position: fixed;
   z-index: 30;

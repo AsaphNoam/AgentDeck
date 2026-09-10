@@ -210,3 +210,25 @@ describe("CardContextMenu error surfacing", () => {
     expect(calls).toBe(0);
   });
 });
+
+// J5 (FS-12.A8, INV §8): jsdom reports zero-size rects, so the geometry itself
+// is proved in menuPlacement.test.ts. This proves the wiring — the card menu
+// really measures itself and renders the clamped position rather than the raw
+// pointer coordinates (INV §10).
+describe("CardContextMenu viewport placement", () => {
+  it("keeps a lower-row menu inside the viewport instead of below it", async () => {
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(720);
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(1280);
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 210, height: 290, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    useUiStore.setState({ contextMenu: { agentId: "a_1", x: 400, y: 640 }, toasts: [] });
+
+    renderMenu();
+    const menu = await screen.findByRole("menu");
+
+    // 720 - 290 - 8: the whole menu, Archive included, fits above the fold.
+    await waitFor(() => expect(menu.style.top).toBe("422px"));
+    expect(menu.style.left).toBe("400px");
+  });
+});

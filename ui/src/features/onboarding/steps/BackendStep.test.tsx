@@ -161,6 +161,27 @@ describe("BackendStep", () => {
     expect(screen.queryByText(/cli_not_installed/)).toBeNull();
   });
 
+  // J2 (FS-04.A14): an adapter that cannot answer the readiness check is a
+  // compatibility problem, so the wizard must not send the operator to repair
+  // credentials that are fine.
+  it("distinguishes an incompatible adapter from a credential failure", async () => {
+    server.use(
+      http.put("/api/backends", () =>
+        HttpResponse.json({
+          ...seededBackendsDoc,
+          credentials: { claude: { status: "skipped", detail: "cli_incompatible" } },
+        }),
+      ),
+    );
+    renderWithQuery(<BackendStep onDone={vi.fn()} />);
+    await waitForLoaded();
+    fireEvent.click(screen.getByText("Validate & Continue"));
+    expect(await screen.findByText(/too old for AgentDeck's readiness check/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sign-in or API key/i)).toBeNull();
+    expect(screen.queryByText(/cli_incompatible/)).toBeNull();
+    expect(screen.getByText("Check again")).toBeInTheDocument();
+  });
+
   // FS-04.R34: Claude and Codex sign in with their own tooling, and an unready
   // result must leave a retryable Check again rather than a dead end.
   it("names the provider sign-in command and offers Check again when unready", async () => {
