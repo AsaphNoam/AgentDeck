@@ -529,6 +529,29 @@ record is actually in, so the surface can explain what happened and refresh rath
 mutation already publishes; neither adds an event type, a payload, or a subscription, and a client
 reloads the collections through this route rather than reconstructing them from the event.
 
+- **R40 (planned) — One session-scoped file read, returning JSON.** FS-03.R52 adds
+  `GET /api/sessions/{id}/file?path=<p>` beside the shipped `.../files`, `.../commands`, and
+  `.../file-search` reads (FS-05.R15, FS-03.R30). `path` is interpreted relative to the working
+  directory recorded on that agent's session; an absolute path is accepted only when it resolves
+  inside that directory. The caller supplies a path, never a root. Success is `200` with
+  `{agent_id, path, size, mod_time, line_count, content, truncated, language}`, where `path` is the
+  relative form the viewer displays, `content` is UTF-8 text, `truncated` marks a bounded partial
+  read of a larger file, and `language` is a highlighting hint derived from the file extension —
+  never from sniffing content. The response is `application/json` like every other API route: no
+  route serves file bytes under a caller-influenced content type, so a browser cannot be induced to
+  render a read file as a document. Refusals use R3's envelope with codes that say which boundary
+  was hit rather than one flat validation error: `path_refused` (422) for a path outside the working
+  directory or inside `.git`, decided on the path's form before any filesystem access so the route
+  cannot report whether a file exists elsewhere; `not_a_file` (422) for a directory or other
+  non-regular file; `not_text` (422) for content that is not valid UTF-8;
+  `workspace_unavailable` (422) when the recorded working directory is missing or unreadable;
+  `not_found` (404) for an unknown agent and for a file absent inside the directory; and
+  `validation` (422) for a missing or malformed `path`. Unlike `file-search`, the read is **not**
+  gated on a running record — FS-03.R55 makes an archived session's links work — so it is gated on
+  the session row that records the directory, and a non-chat agent is refused as `file-search`
+  already refuses one. No route is added for directory listing, writing, or downloading, and the
+  existing tracking and search routes are unchanged.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

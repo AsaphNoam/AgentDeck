@@ -151,6 +151,31 @@ sensitive-context sharing is a practical problem.
   and is unchanged. Provider- and user-configured MCP servers gain nothing from this requirement;
   their tools keep the gate.
 
+- **R21 (planned) — Serving a file's contents is a new boundary with its own stated
+  policy.** No shipped route returns the contents of a caller-named file: R15 keeps that closed for
+  folder selection, R13 forbids it for project resources, R16 refuses a filesystem path as authority
+  for a context read, and R6 makes path policy boundary-specific. FS-03.R55's viewer therefore
+  inherits nothing and needs its own policy, which is this. The only readable root is the working
+  directory recorded on that agent's own session snapshot, read from server-side state; the request
+  supplies a path and can never supply or influence a root. That path is cleaned and refused before
+  any filesystem access when it escapes the root, cannot be expressed inside it, or names `.git`.
+  The candidate is then resolved with `filepath.EvalSymlinks` and re-checked inside the resolved
+  root, so a symlink inside the directory cannot lead out of it. That resolve-and-recheck is
+  `internal/server/filesearch.go`'s shipped `withinRoot` containment: the read and the composer
+  search share one spelling of it rather than growing a second copy of a rule that must not drift
+  (`INV §2`). Only a regular file is opened, the read is bounded by an explicit byte limit rather
+  than by the file's size, and non-UTF-8 content is refused rather than transcoded or escaped. The
+  route is registered inside `routes()` so it sits behind `localOnly` like every other route
+  (R2, `INV §14`); loopback is not authentication (R3), which is precisely why the root comes from
+  session state instead of the request. AgentDeck's own home tree stays out of reach unless a
+  session working directory is itself inside it, and R13's project-resources rule is untouched
+  because this feature never makes that directory a readable root. Files Git ignores **are**
+  readable inside the root: a deliberate product decision (FS-03.R55) that accepts a linked `.env`
+  inside the working directory would display, on the grounds that the supervised agent already had
+  that reach and a person is the one activating the link. R11 applies — traversal, absolute-path
+  escape, symlink escape, `.git`, non-regular file, oversized, and non-UTF-8 each need an
+  adversarial test.
+
 ## 3. Interfaces & data shapes
 
 Security-relevant interfaces are the single listener, Host/Origin middleware, launch token

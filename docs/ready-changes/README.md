@@ -45,6 +45,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`queue-a-follow-up-while-busy.md`](queue-a-follow-up-while-busy.md) — Send queues a follow-up and
   Steer injects it into the running turn; its adapter prerequisite is complete.
+- [`open-a-file-from-chat.md`](open-a-file-from-chat.md) — a filepath link an agent wrote opens a
+  read-only file viewer beside the transcript instead of navigating away to the dashboard.
 
 ## Paused changes
 

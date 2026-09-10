@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -368,6 +368,73 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   reachable (TS-03.R31).
 
 
+### 2.9 Opening a file from the conversation (planned)
+
+- **R51 (planned)** — **A file link an agent wrote opens the file.** In assistant
+  Markdown, a link whose target is a local filesystem path — relative
+  (`internal/state/messages.go`), absolute, or `file://`, optionally suffixed `:line` or
+  `:line:col` — opens that file in AgentDeck's file viewer (R52) instead of navigating the browser.
+  Today such a link is an ordinary relative anchor, so activating it leaves the agent screen, fails
+  to resolve as an application route, and lands on the dashboard after a full reload, losing the
+  reader's place in the conversation; that is the defect this closes. `http`, `https`, and `mailto`
+  links are untouched. AgentDeck adds no path detection over plain transcript text: a path an agent
+  mentions without marking it as a link stays text, so the product never invents a link that
+  resolves to nothing. Link handling is presentation of an existing event — it changes no durable
+  event, no sequence, no fold boundary (R4), and no annotation target (FS-13.R4), so a message
+  replays identically after a reload and in an archived transcript (FS-05.R14).
+- **R52 (planned)** — **The viewer is read-only and holds one file.** Its header
+  names the file by its path relative to the session working directory and offers **Reload** and
+  **Close**. Its body shows the file's text with line numbers and the same syntax highlighting the
+  transcript applies to fenced code (R2). A link carrying a line anchor scrolls that line into view
+  and marks it, so a cited line is found rather than hunted for. A Markdown file additionally offers
+  **Rendered** and **Source**; the rendered form uses the same sanitized Markdown and diagram
+  rendering an assistant message uses (R20, R37, R38) and gains no capability beyond it. Opening
+  another file replaces the open one: there is one panel, with no tabs and no history. Content is
+  read when the file is opened and when **Reload** is chosen — AgentDeck does not watch or poll the
+  file — so the panel states when its content was read, and a file the agent rewrites afterwards
+  keeps showing the earlier read until it is reloaded. The viewer never writes, creates, renames,
+  deletes, downloads, or runs anything, and offers no directory browsing.
+- **R53 (planned)** — **The viewer sits beside the transcript, never inside it.**
+  While a file is open on the agent screen or the archived-agent screen, the viewer is a full-height
+  column along the **left** edge of the transcript region and the transcript reflows into the
+  remaining width instead of being overlapped; no file content is ever inserted into the
+  conversation. When the surrounding region has room, the screen's bounded content width relaxes
+  while the viewer is open, so the column occupies width that is empty today and the transcript
+  keeps its reading measure; when it does not, the column takes width from the transcript. The left
+  edge is deliberate: FS-13.R20's annotation tray docks on the right, so a docked tray and an open
+  file can be present at once without contending for the same track. Width follows the transcript
+  region itself rather than the browser window, exactly as FS-13.R20 does. In an expanded dashboard
+  chat pane (R39, FS-02.R55) no viewer opens — the pane is one grid column wide and deliberately
+  carries less than the screen — and a file link there opens the agent screen with that file already
+  showing, which is the pane's existing route to the full surface.
+- **R54 (planned)** — **The open file is part of the screen's address.** Opening a
+  file sets `?file=` (the path relative to the session working directory) and, when a line was
+  cited, `?fileLine=`, on the agent or archived-agent route beside the existing `?tab=` (R27).
+  Closing the viewer clears them. The consequences are intended: reloading reopens the same file,
+  browser Back closes it, and the address can be handed to another browser on the same machine.
+  These parameters only request an open and confer nothing — every read is authorized server-side
+  against that agent's own recorded working directory (R55), so a hand-edited parameter cannot widen
+  what is readable. A parameter that cannot be resolved opens the viewer in its stated-refusal form
+  rather than failing silently, and never blocks the transcript.
+- **R55 (planned)** — **Reads are confined, and every refusal is stated.** A file is
+  readable only inside the working directory recorded for that agent's session — the same
+  containment R34 already applies to composer file search — so no link, however written, reads a
+  path outside it, and a symlink leading out of that directory is refused. A path that resolves
+  outside the directory is refused on its form before any file is opened, so the viewer cannot be
+  used to test whether a file exists elsewhere on the machine. `.git` is excluded. Files Git ignores
+  **are** readable: an agent that wrote a generated file or a log and linked to it produces a link
+  that works, with the same reach the agent itself already had and with the person doing the
+  clicking. The viewer names the reason for each refusal in its own surface, leaving the transcript
+  readable: a path outside the working directory, a file that no longer exists, a recorded working
+  directory that is gone (as a long-archived session's may be), a directory rather than a file,
+  content that is not text, and a file whose beginning is shown because it exceeds the read limit —
+  labelled as a partial read rather than presented as the whole file. A stopped or archived agent
+  reads from its recorded working directory exactly as a running one does, because reading back
+  through what an agent did is when these links matter most. Nothing here is durable: no database
+  row, transcript event, archive content, search document, or browser-stored value is added, and no
+  agent-facing surface changes — an agent cannot open the viewer, be shown it, or learn it exists.
+
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -633,6 +700,33 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   renders its fast mode as static text with no toggle. *Verify by* `ChatPanel.test.tsx` and
   `ArchiveAgentPage` header tests.
 
+- **A34 (planned)** (R51) — In an assistant message, a link whose target is a
+  relative path, an absolute path, and a `file://` path each open the viewer with no browser
+  navigation and no route change, a `:line` suffix is carried through to the viewer, an `https:`
+  link keeps its ordinary behavior, and a bare path written in prose renders as text with no link.
+  *Verify by* `ui/src/components/chat/renderers/AssistantText.test.tsx`.
+- **A35 (planned)** (R52) — Opening a file renders its text with line numbers,
+  scrolls to and marks a cited line, replaces the open file when a second is opened, re-reads on
+  **Reload**, and offers **Rendered**/**Source** only for a Markdown file with the rendered form
+  going through the sanitized renderer. *Verify by* `ui/src/components/chat/FileViewer.test.tsx`.
+- **A36 (planned)** (R53, R54) — With a file open, a wide transcript region renders
+  the viewer as a docked left column beside a reflowed transcript and a narrow one takes the width
+  from the transcript, with the conversation's own content unchanged in both; a file link inside an
+  expanded dashboard chat pane navigates to the agent screen with that file open instead of opening
+  a panel in the pane; and `?file=`/`?fileLine=` survive a reload and are cleared by **Close**.
+  *Verify by* `ui/src/components/chat/FileViewer.test.tsx`,
+  `ui/src/components/grid/DashboardChatPane.test.tsx`, and
+  `ui/src/components/chat/ChatPanel.test.tsx`, with the rendered docked/reflowed forms exercised in
+  journey J3.
+- **A37 (planned)** (R55) — A path outside the session working directory, a symlink
+  escaping it, a `.git` path, a missing file, a directory, non-text content, and an absent working
+  directory each return their typed refusal without opening anything outside the directory; an
+  oversized file returns its labelled partial read; a Git-ignored file inside the directory reads
+  successfully; and each outcome renders as its stated reason in the viewer while the transcript
+  stays usable. *Verify by* `internal/server/fileread_test.go` and
+  `ui/src/components/chat/FileViewer.test.tsx`.
+
+
 ## 6. Deviations & open decisions
 
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is
@@ -680,6 +774,18 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   record; `Composer.tsx` restores and writes it, and `ui/src/api/sse.ts` removes it only with the
   existing deleted-agent event. `drafts.test.ts`, `Composer.test.tsx`, and `sse.test.ts` cover
   restore, pruning, send outcomes, malformed/unavailable storage, and deletion cleanup.
+- **File links and the file viewer (R51–R55, planned):** the `a` component override
+  `ui/src/components/chat/renderers/AssistantText.tsx` does not have today, beside its existing
+  `code` override, decides link handling; `renderers/filePath.ts` owns the one place a link target
+  is classified as a local path and its `:line` suffix parsed. `ui/src/components/chat/FileViewer.tsx`
+  is the panel and renders through the shipped `renderers/CodeBlock.tsx` and the shared Markdown
+  component extracted from `AssistantText.tsx`, so sanitization and diagram rules stay
+  single-sourced. `TranscriptView.tsx` places the panel in `.transcript-wrap`'s grid opposite
+  `AnnotationTray.tsx` and carries the pane's navigate-instead behavior as one more per-surface prop
+  beside `annotationsEnabled`. The read is `internal/server/fileread.go` sharing
+  `internal/server/filesearch.go`'s `withinRoot` containment, with `getFileContent` beside
+  `getTrackedFiles` in `ui/src/api/client.ts`. No durable event, store, or persisted browser key is
+  added; `?file=`/`?fileLine=` on the route is the open-file state.
 - **Key regression tests:** `TestChatStreamText`, `TestChatToolFlow`,
   `TestLaunchPromptPermissionFlow`, `TestPermissionApprove`, `TestPermissionTimeout`,
   `TestCancelDuringPendingPermission`, `TestCrashMidTurnPersistsDeliveredTranscript`,

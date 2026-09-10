@@ -24,9 +24,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   other unit through this release is closed. The remaining open findings belong to the BR-1 and BR-2
   investigations, not to a review unit awaiting closure. Review records, finding-fix commits,
   release records, and handoff/archive bookkeeping are administrative closure.
-- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its
-  transport blocker; the ACP wait-list in `docs/ideas.md` records the other capabilities held behind
-  an adapter contract.
+- **Work units:** `open-a-file-from-chat.md` is waiting to start with nothing unresolved.
+  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker; the ACP wait-list in
+  `docs/ideas.md` records the other capabilities held behind an adapter contract.
 - **Design units:** Entries under `Ideas being defined` may resume, and entries under `New ideas` are
   available to start. Streaming agent thinking stays part-decided (live-only decided; rendering
   default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
@@ -53,6 +53,23 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None. `v0.4.3` is cut.
+
+**Changelog — 2026-09-10 (design):** Designed **open a file an agent mentioned** and made it ready
+to start: [`open-a-file-from-chat.md`](../ready-changes/open-a-file-from-chat.md). A filepath link an
+agent already wrote opens a read-only viewer beside the transcript instead of navigating to a
+non-route, which the SPA fallback and the router catch-all currently turn into a full reload onto the
+dashboard. Planned requirements: FS-03.R51–R55/A34–A37 (link classification, the one-file viewer, the
+left-docked and transcript-width forms, `?file=`/`?fileLine=` as the open-file state, and confined
+reads with stated refusals), FS-05.R37/A20 (tracked-file rows and diff headings open the same
+viewer), TS-03.R40 (`GET /api/sessions/{id}/file`, JSON, typed boundary refusals, not gated on a
+running record), TS-05.R21 (the new file-content boundary and its policy, sharing `filesearch.go`'s
+`withinRoot` containment), and TS-08.R57 (a leading track on `.transcript-wrap`'s shipped container
+query, with the width cap relaxed by a `data-file-open` state attribute rather than measurement).
+FS-03, FS-05, and TS-08 moved Current → Partial for the planned items; journey J3 carries the
+rendered steps. Decisions recorded: only agent-authored links are upgraded (no prose path
+detection), the readable root is the session working directory alone, Git-ignored files inside it are
+readable, a dashboard-pane link opens the agent screen, and archived sessions read from their
+recorded directory. No product code changed.
 
 **Changelog — 2026-09-10 (workflow):** Code review and bug investigation now attach one exact fix
 model recommendation to each grouped fix unit: trivial/easy uses Claude Sonnet or Codex Luna, medium
@@ -86,8 +103,8 @@ remain, listed under **Review findings**, and none was closed by the release its
 Codex journeys under **Acceptance gates** are owed and this release did not run them — real steering
 in particular has never been exercised against a provider.
 
-**Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no unit waiting to
-start; `/fix` may select any one open finding unit — `prompt-echo-race` (medium, Terra/Opus),
+**Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
+`open-a-file-from-chat.md`; `/fix` may select any one open finding unit — `prompt-echo-race` (medium, Terra/Opus),
 `duplicate-steer-submission` (trivial/easy, Sonnet/Luna), `queue-a-follow-up-while-busy` (difficult,
 Sol), BR-1 (difficult, Sol), or BR-2 (medium, Terra/Opus); `/design-feature` may choose an available
 or resumable idea. Role queues are independent.

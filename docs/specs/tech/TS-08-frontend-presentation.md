@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -567,6 +567,41 @@ primitive seam; the rejected alternatives are recorded in §5.
   (INV §8). Release on stop reuses the existing per-agent draft store rather than a second text
   store, and applies R36's newer-draft rule: write the released text only into an empty composer for
   that agent, never over text typed since (INV §2).
+
+### 2.9 File viewer beside the transcript (planned)
+
+- **R57 (planned)** — **The viewer docks through the transcript region's own grid,
+  and the width cap relaxes by state rather than by measurement.** FS-03.R53 extends the mechanism
+  R53 already established for the annotation tray instead of adding a second panel primitive
+  (`INV §2`): `.transcript-wrap`'s grid gains a **leading** track that exists only while a file is
+  open, and the `@container transcript` condition decides the docked form and the
+  transcript-width form. No `ResizeObserver`, element measurement, or JavaScript-applied width
+  participates (`INV §1`). The tray keeps the trailing track, so a docked tray and an open file
+  coexist rather than compete. One thing a container query cannot express is FS-03.R53's relaxed
+  content width, because `.chat-panel`'s `max-width` is set outside the transcript container: the
+  panel therefore carries a `data-file-open` state attribute and CSS keys the relaxed cap off it.
+  That is a state attribute of the same kind `annotation-tray`'s `data-state` already is, not a
+  measurement, so R53's no-measuring rule stands. The viewer is one component in two CSS states
+  rather than two components, so the open file, its line anchor, and its refusal state cannot
+  diverge between the forms (`INV §2`).
+
+  Content rendering reuses what ships. The file's text is drawn by `renderers/CodeBlock.tsx`, and
+  its rendered Markdown form by the same `ReactMarkdown` configuration `AssistantText.tsx` uses —
+  extracted into one shared Markdown component in the same change, so `rehypeSanitize`, the `code`
+  override, and the diagram rules stay single-sourced and no second raw-markup insertion path is
+  created (FS-03.R20/R37/R38, `INV §2`). The open file is not new client state: `?file=` and
+  `?fileLine=` on the route are its single source of truth (FS-03.R54), so no store, context, or
+  persisted browser key is added, and the pane's navigate-instead behavior (FS-03.R53) rides one
+  more per-surface `TranscriptView` prop beside the shipped `annotationsEnabled` rather than a
+  provider. The content read is an imperative call beside `getTrackedFiles`/`searchSessionFiles` in
+  `ui/src/api/client.ts`, carrying the per-agent request token `FilesTab`/`CommandsTab` already use
+  so a slow read cannot overwrite a newer one (`INV §1`). Every className shipped has a defined
+  selector in `ui/src/styles/features/agent.css` in the same change, because the build and Testing
+  Library are both blind to CSS (`INV §13`), and the viewer joins the curated contract as one
+  registered `file-viewer` component in `contract.json` carrying no `data-variant` for the
+  docked-versus-reflowed form, since nothing in the client observes which form is on screen (R53,
+  R8, R14).
+
 
 ## 3. Interfaces & data shapes
 
