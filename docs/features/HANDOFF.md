@@ -14,9 +14,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None.
 - **Release:** `v0.4.2` is published and verified on tag `f56755a`; its release and CI runs passed and
   the distributable reports `0.4.2` with `sqlite_fts5`. Range details are in the state archive.
-- **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) is available and
-  unreviewed. `chat-session-configuration` was explicitly re-reviewed through its finding-fix commit;
-  one Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
+- **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) was explicitly
+  reviewed through its implementation commit and has three Must-fix and two Worth-fixing findings
+  open. `chat-session-configuration` was explicitly re-reviewed through its finding-fix commit; one
+  Worth-fixing protocol replacement finding is open. The BR-3 resume-replay unit,
   `dock-the-annotation-tray-and-quiet-its-prompt`, and all earlier units through this release are
   closed. Review records, finding-fix commits, release records, and handoff/archive/queue
   bookkeeping are administrative closure.
@@ -27,12 +28,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   part-decided and resumable: streaming agent thinking (decided live-only; rendering default and
   whether `plan` ships with it still open). The permanently unaddressable pipeline
   agent remains the newest `New ideas` entry and needs `/design-feature` before code.
-- **Open findings:** Two usability findings from the 2026-09-07 v0.4.2 review plus the open
-  bug/session-configuration findings: J2 incompatible CLI status, J5 clipped
-  lower-row card menus, live-gate finding durability, provider-contract oracles, explicit-empty ACP
-  option-list replacement, and the unverified OpenCode/OpenHands paths. The six original
-  `chat-session-configuration` findings are closed. The claimed Claude model-delivery finding was
-  retracted after a provider-authoritative prompt probe disproved it.
+- **Open findings:** The queue/steer review found untracked adapter-started turns, a browser-reload
+  hold visibility/data-loss gap, stale identical-text delivery matching, optimistic sent rendering
+  before the server decides to hold, and a turn-end ordering race. Two usability findings from the
+  2026-09-07 v0.4.2 review plus the open bug/session-configuration findings also remain: J2
+  incompatible CLI status, J5 clipped lower-row card menus, live-gate finding durability,
+  provider-contract oracles, explicit-empty ACP option-list replacement, and the unverified
+  OpenCode/OpenHands paths. The six original `chat-session-configuration` findings are closed. The
+  claimed Claude model-delivery finding was retracted after a provider-authoritative prompt probe
+  disproved it.
 - **Bug reports:** BR-1 through BR-3 are investigated. BR-1: Codex chat silently ignored the selected
   model from its first release and later ignored effort too; its implementation is reviewed with
   open findings. BR-2: v0.4.2 can import GPT-6-Astra from a newer personal Codex cache while its
@@ -60,9 +64,21 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None.
 
-**Available by role:** `/review` may select `queue-a-follow-up-while-busy`; `/work` has no unit
-waiting to start; `/fix` may select any one open finding unit; `/design-feature` may choose an
-available or resumable idea. Role queues are independent.
+**Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
+may select any one open finding unit, including `queue-a-follow-up-while-busy`; `/design-feature` may
+choose an available or resumable idea. Role queues are independent.
+
+**Changelog — 2026-09-10 (review):** Reviewed `queue-a-follow-up-while-busy` through `ae3740e` and
+kept the unit open with three Must-fix and two Worth-fixing findings. The bundled adapters confirm
+that `startedNewTurn` starts detached work whose completion is not represented by the steering RPC,
+while AgentDeck records no corresponding turn gate or completion owner; the fake peer only returns
+the outcome and therefore cannot prove the acceptance contract. The client-only hold mirror also
+cannot survive a browser reload, transcript-wide text matching can clear a new repeated hold from an
+old event, an idle-looking composer can optimistically render a message the server actually holds,
+and turn completion releases its gate before claiming the existing hold. Focused runtime and UI
+tests pass; focused server tests pass when loopback listeners are permitted. The invariant-index
+sweep found applicable surfaces in §1–§5 and §8–§17, no new interface/runtime checklist surface in
+§6, and no iterative read/repair surface in §7; no other invariant finding was found.
 
 **Changelog — 2026-09-10 (work):** Finished `queue-a-follow-up-while-busy` (FS-03.R48–R50,
 TS-01.R29, TS-02.R31, TS-03.R38/R39, TS-04.R48/R49, TS-08.R56; INV §1, §2, §4, §5, §8, §12, §16).
@@ -123,6 +139,74 @@ sessions and disposable local configuration homes, but the operator chose not to
 let it block any role.
 
 ## Review findings
+
+- **Must fix** — An adapter-started steering turn escapes AgentDeck's turn lifecycle
+  (**confirmed implementation and test-contract gap**). **Where:** `internal/runtime/chat.go:437-484`
+  accepts `startedNewTurn`, emits only the user event, and leaves `turnActive` and status ownership
+  unchanged; `internal/runtime/queue_steer_test.go:243-255` checks only the returned enum, while
+  `internal/runtime/testdata/fakeacp/main.go:170-189` starts no turn. The bundled Claude 0.75.1 and
+  Codex 1.10.0 sources both return `startedNewTurn` as soon as detached work starts, before it
+  completes. **Normal-use trigger:** the active turn settles between a Steer click and adapter
+  delivery, which is the fallback `FS-03.R50` explicitly promises. **Why it matters:** AgentDeck has
+  no owner for that new turn's completion: it can show idle while the agent works, omit the waiting
+  indicator, and let the next Send call ordinary `session/prompt` concurrently instead of holding
+  it; Claude may native-queue it and Codex may supersede the detached turn. The current specs also
+  forbid AgentDeck's own retry but do not define how the adapter-started turn rejoins the host gate.
+  **Requirement:** `FS-03.R48/R50/A33`, `TS-01.R29`, `TS-04.R49`; `INV §5`, `INV §11`, `INV §12`,
+  `INV §17`. **Suggested fix/test:** first specify the ownership/completion contract for
+  `startedNewTurn` (or use the adapters' host-owned `promptRequired` mode and an ordinary host turn),
+  then make the fake peer keep that turn active through output and completion and assert status,
+  Send-holding, Cancel, and exactly one terminal event.
+
+- **Must fix** — Reloading the browser makes a still-held server message invisible and can lose it
+  on the next stop (**confirmed spec gap**). **Where:** `ui/src/store/heldStore.ts:3-29` is memory-only
+  and no agent/session response exposes the runtime's `held` value; release back into the draft
+  exists only in the mounted composer's `ui/src/components/chat/Composer.tsx:91-105`. **Normal-use
+  trigger:** queue a follow-up, reload the page while the turn remains active, then withdraw it or
+  stop/crash/archive the agent. **Why it matters:** the server continues to hold and later deliver a
+  message the UI no longer shows, offers no Withdraw control for, and cannot return to the composer
+  when the runtime discards it on stop; that last path silently loses submitted text. `TS-08.R56`
+  requires a client-only mirror yet claims live render and reload cannot disagree, so the governing
+  requirements do not currently describe a viable cross-reload contract. **Requirement:**
+  `FS-03.R48/R49/A31/A32`, `TS-01.R29`, `TS-08.R56`; `INV §1`, `INV §4`, `INV §8`, `INV §11`.
+  **Suggested fix/test:** define one authoritative way to rehydrate or release a live hold without
+  turning it into transcript history, then test page remount plus withdraw and stop with a held
+  message.
+
+- **Must fix** — Any older identical prompt clears a newly queued message before it is delivered.
+  **Where:** `ui/src/components/chat/ChatPanel.tsx:85-94` scans the entire transcript for any
+  sequenced `user_text` whose text equals the current hold. **Normal-use trigger:** send a common
+  prompt such as `continue`, later queue exactly `continue` during another turn. **Why it matters:**
+  the old durable event immediately removes the new pending tail and both Withdraw controls even
+  though the server still holds the new message; a subsequent stop also cannot restore it to the
+  composer. The positive test replaces the whole transcript with the matching new event and never
+  includes an older identical event. **Requirement:** `FS-03.R48/R49/A31/A32`, `TS-08.R56`;
+  `INV §1`, `INV §5`, `INV §8`, `INV §17`. **Suggested fix/test:** associate the client hold with a
+  delivery boundary or identity rather than text alone (at minimum, capture the last sequence when
+  the hold is accepted), and add a regression with an older identical sequenced prompt.
+
+- **Worth fixing** — The composer can render a server-held prompt as already sent while state is
+  changing. **Where:** `ui/src/components/chat/Composer.tsx:173-199` decides whether to append the
+  optimistic transcript event from the pre-request `busy` prop, then correctly trusts the server's
+  later `delivery` result only for the hold badge. **Normal-use trigger:** the UI still renders idle
+  while an activation or another client starts a turn; the person submits and the server answers
+  `delivery: held`. **Why it matters:** until actual delivery, the transcript shows a normal sent
+  bubble and a pending tail for the same text, contradicting the feature's central not-yet-seen
+  distinction. **Requirement:** `FS-03.R48/A31`, `TS-03.R38`, `TS-08.R56`; `INV §1`, `INV §5`,
+  `INV §8`. **Suggested fix/test:** reconcile the optimistic event from the server outcome (or delay
+  it until `sent`) and test an idle-rendered composer whose POST response says `held`.
+
+- **Worth fixing** — Turn completion opens the gate before it claims the already-held next message.
+  **Where:** `internal/runtime/chat.go:617-649` clears `turnActive` before `finishTurn`, while
+  `deliverHeld` does not atomically take the hold and reclaim the gate until lines 657-672.
+  **Normal-use trigger:** a new Send arrives after the provider result clears the gate but before the
+  completion goroutine reaches `deliverHeld`. **Why it matters:** the newer submission can claim and
+  start the next turn first, leaving the earlier held correction to run after it; the API response
+  also reports `sent` even though the UI may still show the previous turn as busy. A race-detector
+  run cannot catch this ordering error because each individual access is locked. **Requirement:**
+  `FS-03.R48/R49/A31`, `TS-01.R29`; `INV §2`, `INV §5`, `INV §15`. **Suggested fix/test:** settle the
+  completed turn and atomically reserve its held successor under one gate transition, with a
+  deterministic barrier test that submits during completion and asserts provider prompt order.
 
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
