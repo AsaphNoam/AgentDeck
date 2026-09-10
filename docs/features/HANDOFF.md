@@ -31,7 +31,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   default and whether `plan` ships with it still open). The permanently unaddressable pipeline agent
   is the newest `New ideas` entry and needs `/design-feature` before code.
 - **Open findings:** One Must-fix on the queue/steer unit — the adapter-started steering turn escapes
-  AgentDeck's turn lifecycle — blocked on the compatibility choice below. Also open: live-gate
+  AgentDeck's turn lifecycle. No longer blocked: the operator decided on 2026-09-10 not to hide
+  Steer, which selects host ownership of the adapter-started turn; see the finding for the
+  resulting approach and the structural work it implies. Also open: live-gate
   finding durability, provider-contract oracles, the Codex discovery-versus-execution version
   authority left by BR-2, and the unverified OpenCode/OpenHands paths. The `usability-20260907`
   J2 and J5 Must-fixes are closed and removed. See **Review findings**.
@@ -76,10 +78,9 @@ Codex journeys under **Acceptance gates** are owed and this release did not run 
 in particular has never been exercised against a provider.
 
 **Available by role:** `/review` has no unreviewed unit; `/work` has no unit waiting to start; `/fix`
-may select any one open finding unit — `queue-a-follow-up-while-busy` is blocked on the
-compatibility choice below, leaving the BR-1 durability, provider-oracle, and BR-2 Codex
-version-authority findings; `/design-feature` may
-choose an available or resumable idea. Role queues are independent.
+may select any one open finding unit — `queue-a-follow-up-while-busy` is now unblocked and is the
+largest, alongside the BR-1 durability, provider-oracle, and BR-2 Codex version-authority findings;
+`/design-feature` may choose an available or resumable idea. Role queues are independent.
 
 ## Decisions needing your input
 
@@ -108,11 +109,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 
 ## Blocked on human
 
-- **Steering fallback compatibility:** choose whether AgentDeck should temporarily hide Steer for
-  Codex until its adapter offers a host-owned idle fallback, or whether this fix should include an
-  upstream/local adapter contract change. Keeping `startedNewTurn` is unsafe because it starts work
-  whose completion the host cannot own. Claude already supports the required `promptRequired` mode;
-  `codex-acp` 1.10.0, currently the latest published version, does not.
+- None.
 
 ## Review findings
 
@@ -133,6 +130,21 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   `startedNewTurn` (or use the adapters' host-owned `promptRequired` mode and an ordinary host turn),
   then make the fake peer keep that turn active through output and completion and assert status,
   Send-holding, Cancel, and exactly one terminal event.
+  **Operator decision — 2026-09-10: do not hide Steer.** Steer stays available on every adapter that
+  advertises it, including Codex. That rules out the hide-for-Codex option and, with it, the
+  `promptRequired`-only fix: the pinned adapters are npm-pinned published packages with no vendored
+  source (`scripts/release/package.json`), so a local adapter contract change would mean forking or
+  publishing `codex-acp`, and `codex-acp` 1.10.0's `startNewTurnFromSteering` returns
+  `startedNewTurn` unconditionally with no `promptRequired` mode. Claude 0.75.1 gates
+  `promptRequired` behind opt-in request `_meta.steering.idleBehavior`, so opting in there would
+  still leave Codex on the detached path and would add a second contract rather than removing one.
+  **Therefore the remaining fix is host ownership of the adapter-started turn:** claim the existing
+  turn gate on `startedNewTurn` and complete it from the session's turn-end notification instead of
+  an RPC result. Note the structural work this implies — `runPromptTurn` currently owns completion by
+  blocking on its own `session/prompt` Call (`internal/runtime/chat.go:599-625`), and a detached turn
+  has no such outstanding request, so the gate needs a notification-driven release path that still
+  yields exactly one terminal event and an answerable Cancel (`INV §2`, `INV §5`, `INV §17`; needs
+  focused `-race` coverage).
 
 - **Worth fixing** — Codex model discovery and execution use different version authorities
   (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
