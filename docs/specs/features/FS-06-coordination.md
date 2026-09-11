@@ -318,6 +318,11 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 ## 6. Deviations & open decisions
 
+- **Pipeline replacement:** FS-14.R74 replaces R22's permanent exclusion of stopped agents with
+  pipeline history when shipped. A waiting assigned agent resumes its task through TS-10.R29 before
+  queued mail delivery, and a former run orchestrator becomes ordinarily wakeable after ownership
+  ends. Delivery never bypasses an active task's capacity or run-closure boundary.
+
 - **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
   migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.
   Recipient resolution, budgets, wake behavior, ordering, authorization, outcomes, and retention

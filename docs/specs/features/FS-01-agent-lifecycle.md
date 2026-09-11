@@ -305,6 +305,11 @@ transitions:
 
 ## 6. Deviations & open decisions
 
+- **Pipeline replacement:** FS-14.R74 replaces R33's historical pipeline-association wake veto
+  with current ownership when the task-backed pipeline ships. TS-10.R28–R30 route waits and resumes
+  through existing lifecycle seams; TS-10.R32 adds a generation/turn-guarded cancellation call for
+  borrowed task turns. Normal identity, snapshot, archive, project and orphan checks remain.
+
 - **Terminal support boundary.** Claude terminal launches
   receive model/directory/system-prompt flags, but that live CLI mapping is not credential-tested;
   Codex (and additional-backend) terminal launches are rejected (R15); and terminal agents cannot

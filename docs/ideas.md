@@ -75,13 +75,26 @@ the relevant feature and technical specifications; it does not change product co
   outputs, while the orchestrator dynamically owns decomposition, reviews, repair, and replacement.
   Dedicated stage orchestrators are explicit exceptions. No predefined child graph or child-state
   completion gate; simplify the engines rather than layering them.
-  **Feature draft:** FS-14.R60–R68/A35–A38 and FS-16.R30–R32/A20, pending scope confirmation.
+  **Confirmed 2026-09-11:** discard old pipeline templates/runs without migration or a legacy
+  engine; Stop cancels all run descendants; keep existing AgentDeck project boundaries.
+  **Technical draft:** FS-14.R60–R74/A35–A42, FS-16.R30–R36/A20–A22,
+  TS-09.R35–R48, TS-10.R25–R34 and TS-05.R22. The pipeline is an ordered cursor over task
+  assignments; one task dispatcher, one accepting result transaction, inherited durable lineage,
+  run/stage cancellation fences, and explicit agent work inspection/repair. Normal task stop/resume
+  retains orchestrator identity and attempts native conversation restoration. A new unfinished wait
+  state releases task-owned runtime capacity while preserving the assignment, so a parent cannot
+  consume the only slot its child needs. The replacement adds no pipeline dependency DAG.
   Task work inspection, agent-side Retry/Re-arm, and durable child-result delivery while the stage
   assignment remains active are necessary capabilities. The shipped pipeline already permits
   dynamic delegated tasks; its rigidity is the outer stage lifecycle, not a mandatory child DAG.
-  **Next:** confirm old-template/run compatibility, Stop run's effect on descendants, and whether
-  cross-repository work spans AgentDeck projects. FS-14 §6 records the remaining routing, setup,
-  recovery-authority, and retention decisions for technical design. No ready change or product code.
+  **Evidence:** `internal/server/task_dispatcher.go` already supplies created/woke/borrowed claims,
+  normal resume and turn-end release; `internal/runtime/activation_kinds.go` supplies task activation;
+  `internal/runtime/chat.go` Resume attempts session/load and can fall back to a fresh native session.
+  `internal/runtime/runtime.go` Cancel is agent-scoped and needs an expected generation/turn guard
+  for borrowed task cancellation. No provider limitation is assumed and no provider upgrade is needed.
+  **One pending choice:** the same orchestrator identity/conversation with ordinary stop/resume
+  (recommended), versus keeping its process alive across stages/waits. The technical draft assumes
+  stop/resume but is explicitly contingent; no ready change or product code until that choice.
 
 - **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
   the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text

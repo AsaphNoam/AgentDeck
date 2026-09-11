@@ -348,8 +348,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R30** (planned) — An orchestrator can inspect the durable state, assignee, and reported
   results of work it created, including after it resumes. Assignment context makes relevant prior
   results available without requiring an out-of-band completion message. Discovery is bounded and
-  does not require repeatedly polling for completion. Broader run-level access after orchestrator
-  replacement remains a product/security decision, not an implicit expansion of creator authority.
+  does not require repeatedly polling for completion. A current run orchestrator additionally reads
+  and manages its run's work under FS-14.R73; this is scoped run authority, not project-wide control.
 - **R31** (planned) — An agent can perform the existing Retry and Re-arm repairs on work it
   created, with the same state validation and immutable-result rules as the human operations. It can
   cancel its unfinished work and create replacement or additional tasks, including tasks addressed
@@ -358,6 +358,30 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   outcomes and continue coordinating that same assignment without completing it merely to free its
   assignment slot. It can await relevant work without polling or creating a second active task for
   itself. A child failure is information it can act on, not an automatic failure of its stage task.
+- **R33** (planned) — An assigned agent can durably wait for a bounded set of work revisions to
+  change. Waiting leaves its assignment unfinished and exclusively assigned, records no outcome,
+  and resumes it when any watched task changes to a result or needs attention. Already-changed work
+  is returned immediately. No satisfying-outcome predicate is needed: the orchestrator decides what
+  a failure, interruption, or cancellation means. Waiting on its own task or work targeting the
+  same exclusively assigned agent is refused with an actionable error; waiting is not a task arm.
+- **R34** (planned) — A task that waits yields after its current reporting/tool turn ends.
+  AgentDeck stops only a runtime that task created or woke and releases its capacity slot while
+  retaining assignment identity and attached-context membership. Wake resumes the same task and
+  agent through normal admission; it never creates a second task or fabricates completion. A
+  borrowed runtime stays up. Waiting and ready-to-resume are visible states distinct from an
+  unexpected interruption. This stop/resume design is contingent on FS-14 §6's runtime choice.
+- **R35** (planned) — Work created from an assigned task inherits durable parent and run/stage
+  provenance. Creating or repairing work checks its owner's closure atomically, so stopping a run
+  cannot race with a delegate that adds escaping work. Reports keep source task identity, summary,
+  details, and named outputs available for supervision and later assignments without copying full
+  transcripts. Stage tasks use the same result operation as ordinary tasks, with the extra stage
+  output and current-assignment checks required by FS-14.R64.
+- **R36** (planned) — Pipeline ownership specializes generic task controls only where required:
+  stages cannot be directly re-armed, manually passed, or deleted out from under retained run history;
+  run controls provide their valid recovery path. Cancelling a run's borrowed task cancels its
+  matching executing turn before release, while preserving the borrowed runtime and unrelated turns.
+  Ordinary unowned task behavior remains unchanged except for the explicit new inspection, repair,
+  and wait capabilities.
 
 ## 5. Acceptance criteria
 
@@ -366,6 +390,14 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   interrupted child, repairs an unsatisfiable arm, and creates replacement work. Verify no polling
   turn or second active self-assignment is needed; restart retains outcomes, and the creator cannot
   use these operations to control unrelated work. Check that old results remain immutable.
+- **A21** (planned; R33–R34) — With task capacity one, a parent creates a child, yields, receives
+  the child's failure without polling, repairs the work, and finishes. Repeat with nested parents,
+  a borrowed runtime, a child completed before wait registration, and completion during parent
+  release. Assert exclusive assignment, no lost wake or second prompt, and preserved conversation.
+- **A22** (planned; R33–R36) — Restart before/after wait registration, turn-end yield, stop, and
+  wake admission; inject stale results and cleanup failures. Assert no false success, no capacity
+  leak, no orphan adoption, and no stopped-run wake. Deleting a watched task wakes with retained
+  result/deletion evidence; a same-assignee wait is refused instead of deadlocking.
 
 Each names the verification that demonstrates it.
 
@@ -480,13 +512,12 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-- **Persistent pipeline orchestration draft.** R30–R32 and A20 support FS-14.R60–R68; scope
-  confirmation and technical design remain pending. When shipped, these replace the exclusions on
-  inspecting created work and pipeline convergence only at the result layer below. They do not
-  require cyclic task graphs. Stage runtime ownership, durable outcome delivery during an active
-  assignment, cross-project delegation, replacement-orchestrator authority, and stage-task outcome
-  and deletion rules still need reconciliation with the existing contracts. No protocol shape or
-  security expansion is selected by this draft.
+- **Persistent pipeline orchestration.** R30–R36 and A20–A22 support FS-14.R60–R74. TS-10.R25–R34
+  define the technical design and TS-05.R22 defines scoped work authority. Runtime continuity remains
+  contingent on FS-14 §6. On shipping they replace the no-inspection and result-only-convergence
+  exclusions below, specialize R2/R4/R6/R7/R17/R19 for retained waiting assignments, extend
+  R11/R12/R20/R24 for inspection/repair/results, and specialize R18/R22 for retained stage history and
+  agent-reported stage outcomes. They require no cyclic task graph or cross-project authority.
 
 - **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
   migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.

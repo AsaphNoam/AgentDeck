@@ -20,8 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Requirements without a planned marker reflect shipped behavior. R60–R68 describe the proposed
-task-backed replacement, pending the product decisions in §6; they do not change legacy runs yet.
+Requirements without a planned marker reflect shipped behavior. R60–R74 describe the task-backed
+replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 2.1 Templates and starting a run
 
@@ -540,15 +540,59 @@ task-backed replacement, pending the product decisions in §6; they do not chang
   recovery action and its consequence. The same orchestrator is the normal continuation target;
   any necessary replacement is explicit and receives the durable handoff. Persistence of identity
   does not promise that a provider process survives restart.
+  If normal provider resume starts a fresh native session, the agent receives its durable assignment
+  and work results again and supervision explicitly says native conversation context was not restored.
 - **R67** (planned) — Stage outputs live in AgentDeck's durable run/task records and remain
-  inspectable after completion. Existing no-automatic-expiry and transcript-preservation guarantees
-  remain the baseline; this design introduces no automatic deletion. Deletion dependencies and
-  migration of existing records remain decisions in §6, not permission to discard history.
+  inspectable after completion with no automatic expiry. Deleting a new-model run requires terminal
+  state and completed cleanup; it removes the run's template snapshot and named-value projection,
+  not tasks, their results, agents, or transcripts. Stage task deletion is refused while retained
+  run history needs it; ordinary child task deletion retains its result and lineage tombstone.
+  The one-time legacy reset in R69 is the explicit exception to retaining old pipeline records.
 - **R68** (planned) — The implementation stage can delegate across multiple repositories and pass
   the resulting repository, implementor, decision, and concern context to review. Review can assign
   the appropriate reviewers, return fixes to original implementors, add replacement or additional
-  work, and decide completion. Whether those repositories must share an AgentDeck project or may
-  span projects remains explicitly unresolved; this requirement grants no cross-project access.
+  work, and decide completion. All such repositories must be accessible under the run's existing
+  AgentDeck project configuration. Task targets, dependency arms, and context reads keep existing
+  project boundaries; the pipeline grants no cross-project access or additional filesystem roots.
+- **R69** (planned) — This is a clean replacement: old pipeline templates, runs, attempts, values,
+  and pipeline proposals are discarded when the replacement is installed, without conversion or
+  a legacy execution engine. Old pipeline runtimes are safely stopped before ownership records are
+  removed. Unrelated tasks, projects, agents, transcripts, configuration, and credentials are not
+  deleted. A task waiting on a removed unfinished run receives a cancelled prerequisite outcome,
+  rather than waiting forever. The operator explicitly authorized this reset on 2026-09-11.
+- **R70** (planned) — Stop run closes the run to further work and cancels every unfinished stage
+  task and descendant, including queued, waiting, retrying, and nested delegated work. Associated
+  executing turns are stopped through normal lifecycle controls. Cleanup is durable and retryable;
+  the run shows stopping until it is complete. No delegated work continues independently after Stop.
+  Completed results remain immutable and unrelated work on a borrowed agent is not terminated.
+- **R71** (planned) — Templates define an ordered list of required stages, without conditional
+  skips, backward routes, loop counters, or a child-task graph. Success advances to the next stage;
+  failure or blocked pauses the current stage for recovery. A stage may retain an explicit human
+  approval gate before advancement. Ordinary repair and re-review happen before the orchestrator
+  reports the stage outcome. At accepted completion the stage closes to new work and its unfinished
+  descendants are cancelled, rather than becoming independent work or a success-condition gate.
+  Cleanup must finish before the next stage starts; cleanup errors are distinct from failed work.
+  A failed cleanup exposes Retry cleanup, which retries only cancellation/release, not stage work.
+- **R72** (planned) — A template chooses the standing orchestrator's role. Run setup supplies one
+  backend/model/optional effort/fast-mode selection for it; dedicated stages explicitly select their
+  own role and runtime. Ordinary stages supply task instructions without changing the standing
+  orchestrator's role/runtime. Configuration and effective runtime settings are frozen and validated
+  through the existing launch rules, and supervision reports what actually ran. Templates remain
+  model-neutral. Run and stage membership is durable task provenance, never a dashboard group label.
+- **R73** (planned) — Continue supplies new input after failure/blocked and creates another stage
+  assignment on the same orchestrator; Retry of an interrupted assignment retries that task on its
+  existing assignee. Neither operation rewrites an accepted result. An explicit Replace orchestrator
+  action cancels any unfinished old stage assignment, retains existing child work and its history,
+  and creates a replacement assignment with durable stage context; subsequent ordinary stages use
+  the replacement. The current orchestrator can inspect and manage work belonging to its run,
+  including work created by a predecessor, but not unrelated project work. Child agents retain
+  their own assignment/descendant scope. People may stop, provide input, retry, or replace; they
+  cannot mark a stage passed without its orchestrator's report.
+- **R74** (planned) — Active run ownership does not permanently make an agent unaddressable.
+  During a run, waking its orchestrator for stage work goes through its current durable assignment;
+  unrelated task assignments cannot take over that agent. When run ownership ends, normal messaging,
+  resume, archive, and task-target rules apply again. Run-created agents use one ordinary run-name
+  group initially; a user's group edits have no control-plane effect.
 
 ## 5. Acceptance criteria
 
@@ -561,7 +605,8 @@ task-backed replacement, pending the product decisions in §6; they do not chang
   tasks and adds one for a discovered dependency. Review uses the implementation outputs to choose
   reviewers, sends fixes to original implementors, replaces failed work, and re-reviews. Assert that
   no template child graph is needed and no obsolete child outcome prevents the orchestrator from
-  reporting the completed objective. Project layout follows the decision in §6.
+  reporting the completed objective. Repositories share one configured project; cross-project task
+  targets, arms, and unauthorized context reads fail without mutation.
 - **A37** (planned; R62, R64, R66) — Fault-injection tests restart before and after assignment,
   report acceptance, and stage advancement. Assert one durable current stage, no guessed success or
   duplicate progression, retained child work and outputs, and a recoverable interrupted assignment.
@@ -570,6 +615,20 @@ task-backed replacement, pending the product decisions in §6; they do not chang
   orchestrator, stage-specific delegated work, a completed stage's outputs, and an interrupted run's
   recovery action. Verify that completed work remains inspectable and the page distinguishes waiting
   from interruption without requiring the person to infer either from a transcript.
+- **A39** (planned; R69) — Upgrade a fixture containing old templates, active and completed runs,
+  pending proposals, and unrelated tasks/transcripts. Verify the authorized pipeline reset is
+  replay-safe, old owned runtimes are stopped, waiting arms resolve, and unrelated data survives.
+- **A40** (planned; R70–R71) — Race Stop and stage completion with nested child creation, admission,
+  Retry/Re-arm, result reporting, and an in-flight launch. Restart during cleanup. Assert that no
+  work escapes the committed closure boundary, no next stage starts early, old results remain
+  unchanged, and a borrowed agent's unrelated subsequent turn is not stopped.
+- **A41** (planned; R72–R74) — UI/API tests start with one normal runtime selection and a dedicated
+  review override; recover a blocked, interrupted, and replaced orchestrator; verify replacement
+  sees prior run results and can repair run work but cannot control unrelated tasks. After run end,
+  message and task-target its former orchestrator successfully under ordinary lifecycle gates.
+- **A42** (planned; R67, R73) — Refuse a person-authored stage success and deletion of a stage
+  task referenced by a retained run. Delete a terminal fully-cleaned run and verify task results,
+  lineage, agents, and transcripts survive; deletion of a child preserves readable result evidence.
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
   once with Codex Work and Claude Review and again with those runtime assignments reversed, and
@@ -781,32 +840,21 @@ task-backed replacement, pending the product decisions in §6; they do not chang
 
 ## 6. Deviations & open decisions
 
-**Persistent-orchestrator design, 2026-09-11.** R60–R68 and A35–A38 are a feature draft based on the
-operator's request, awaiting scope confirmation before technical design. They supersede conflicting
-new-run behavior only when the replacement ships; existing R1–R59 and A1–A34 still describe the
-shipped implementation. Technical requirements have not yet changed. In particular the old
-per-stage model/role setup, stop-at-boundary behavior, immutable agent/stage association, fresh-agent
-retry, routing loops, grouping, and one-hop task display need explicit reconciliation.
+**Persistent-orchestrator replacement, 2026-09-11.** The operator approved the feature direction,
+discarding old pipelines without migration, cancelling all delegated work on Stop, and existing
+project boundaries. R60–R74 and A35–A42 define the replacement; TS-09 and TS-10 define its technical
+design. Unmarked requirements still describe shipped behavior until implementation.
 
-Remaining product decisions:
+On shipping, new requirements supersede conflicting portions of R1–R3/R31/R59 (setup), R5–R10
+(assignment, result, routing), R12–R14/R20/R47–R48/R53/R55 (recovery and completion), R16/R38–R40/R58
+(association and presentation), R17/R24/R27 (validation and builder schema), and corresponding old
+acceptance items. Existing role permissions, normal context authority, opaque bounded text outputs,
+proposal confirmations, browser/CLI access, notifications, and project isolation rules remain.
+TS-09.R46 records the required removal of obsolete code and knowledge rather than a parallel mode.
 
-- Compatibility: convert existing templates/runs, preserve old runs as history with an explicit
-  template conversion, or temporarily execute both models. No record deletion or automatic semantic
-  conversion is authorized. Existing conditional routes and repair loops may not map to a simple
-  ordered-stage template.
-- New-template routing: recommended default is ordered required stages, ordinary success progression,
-  and failure/blocked recovery within the current stage; whether conditional skips or explicit
-  backward transitions remain supported is not yet confirmed. Existing approval gates need a decision.
-- Stop and completion: whether Stop run cancels all associated descendant work or just the active
-  orchestrator, and what happens to outstanding children when an orchestrator reports stage success.
-  Child outcomes must not become an automatic completion gate. Run-end runtime handling also needs
-  an explicit decision; retaining the conversation does not decide whether its process stays up.
-- Run setup: recommend a run-level orchestrator role/runtime selection, with explicit dedicated-stage
-  overrides. Whether ordinary stages can change the standing orchestrator's runtime is unresolved.
-- Cross-repository scope: multiple repositories within one project versus tasks across existing
-  AgentDeck projects; project and attached-context authority must be confirmed before expansion.
-- Recovery/retention: replacement-orchestrator authority over existing child work and context,
-  human-authored stage outcomes, and deletion of stage tasks while run history references them.
+**Technical choice pending:** whether persistence means the same identity/conversation with ordinary
+task stop/resume at stage and wait boundaries (recommended), or a continuously live process. The
+technical draft uses the former, contingent on that choice; no legacy-data decision remains open.
 
 The shipped first version deliberately keeps these product boundaries:
 

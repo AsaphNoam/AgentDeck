@@ -1,6 +1,6 @@
 # TS-09 — Pipeline control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines`
 **Absorbed:** —
 
@@ -16,6 +16,9 @@ The first version is deliberately an in-process sequential state machine. It is 
 workflow service, background job system, arbitrary expression engine, or parallel graph executor.
 
 ## 2. Design & constraints
+
+R35–R48 are the planned replacement for the old stage-agent engine. They are contingent on the
+runtime-continuity choice in FS-14 §6. Unmarked requirements describe the shipped engine until then.
 
 **R1 — One in-process authority.** `internal/pipeline` owns template validation and one
 server-resident manager/reconciler. The server process is the only pipeline-state writer and invokes
@@ -364,7 +367,160 @@ unchanged by them.
   unchanged: the pipeline-state join stays the sole authority for run/stage association, and no read
   path infers membership from a group label.
 
+### 2.1 Task-backed ordered progression
+
+- **R35** (planned) — **The pipeline is a cursor over stage tasks, not an execution engine.**
+  `internal/pipeline` owns template validation, frozen run inputs, ordered stage selection, approval,
+  and final run outcome. `internal/state` owns transactional run/task writes; the existing task
+  dispatcher owns every stage/child start, resume, wait, result release, and stop. The pipeline
+  controller never prompts or launches an agent itself and never evaluates a child dependency graph.
+  It may create the current stage task and observe that task's committed result and completed release.
+- **R36** (planned) — **Version 2 is ordered and model-neutral.** A template contains a standing
+  orchestrator role, declared run inputs, and at most 32 ordered stages. Each stage has id/title,
+  objective/instruction, input bindings, declared text outputs, optional approval after success, and
+  `executor: run` by default or `executor: dedicated` with a role. There are no outcome routes,
+  `max_visits`, child definitions, or runtime model fields. One validator serves file reads, CRUD,
+  builder proposals, and start. Input bindings name run inputs or earlier stage outputs; duplicate
+  stage ids, future bindings, missing roles, or runtime overrides for ordinary stages are refused.
+  Output value keys have one producer, removing mutable last-writer semantics and repair-loop values.
+- **R37** (planned) — **One durable stage task per attempt.** Start commits the immutable template,
+  project, inputs, standing runtime selection and dedicated overrides, run revision, stage cursor,
+  and first task together before any external effect. `(run_id, stage_index, attempt_number)` uniquely
+  names a stage task. Only the current stage is admitted; future stage tasks are not pre-created.
+  The first ordinary stage launches from the frozen standing spec; admission reserves and records
+  its agent id in the run before launch. Once the standing identity is confirmed, later ordinary
+  stages and its retries target that id; a dedicated agent is never promoted to standing identity.
+  An unconfirmed failed launch can release its reservation; a confirmed identity is never silently
+  replaced. If a dedicated stage comes first, the standing orchestrator is shown as not started until
+  its first assignment. Dedicated stages use their own task launch specs, not another pipeline run.
+- **R38** (planned) — **Persistence is task identity plus normal conversation resume.** Successive
+  ordinary stage tasks use the same confirmed agent id and normal session-load/resume seam. They
+  retain no process across a task-owned release, require no run-owned runtime lease, and consume the
+  same capacity as ordinary tasks when creating/waking a runtime. Waiting follows TS-10.R27–R29.
+  Pipeline participation is a durable run/stage/task association, not an immutable agent-to-stage
+  row. Active-run orchestrator reservation prevents unrelated task admission; authorized stage
+  dispatch and wait continuation use the ordinary lifecycle seam through that reservation. Once the
+  run is terminal and cleaned, the reservation ends; historical membership cannot prevent wake.
+  The shared resume seam currently falls back from a rejected native session load to session/new
+  (`internal/runtime/chat.go`, Resume). Preserve that existing fallback with the same agent identity,
+  supply the persisted assignment/results again, and surface that native context was not restored;
+  never describe a fresh provider session as successful conversation restoration. No new provider
+  capability is assumed and no resume/registration logic is duplicated inside the pipeline.
+- **R39** (planned) — **Assignments are persisted, bounded handoffs.** Stage task creation freezes
+  its objective, named input values, relevant prior report summaries, output declarations, and
+  attachment references. Store the renderer version and digest; deliver through `get_assigned_task`
+  and the ordinary dependency activation, never a role/system-prompt mutation. The current assignment
+  response names the run/stage, task and execution handle, expected outputs, and authoritative prior
+  output sources. Large inputs remain bounded pull data: the activation carries only the code-owned
+  instruction to read the assignment. Full provider transcripts and the entire template are not
+  stage inputs. Dedicated/replacement orchestrators receive the same durable handoff contract.
+- **R40** (planned) — **One report write, one result.** Extend task result acceptance with an
+  optional pipeline association inside the same state transaction. Validate current agent,
+  generation, execution handle, run revision/current task, outcome and output declarations; on
+  success require this stage's declared required outputs. Commit the immutable task result, named
+  outputs, `pending_release`, stage closure intent and run projection revision together. The task is
+  the sole report authority: no separate pipeline report or success row is written. Failure/blocked
+  may retain partial outputs and pauses after cleanup. An invalid report commits nothing. The
+  controller advances only after reporting turn-end and all closure releases finish; it never
+  treats a child outcome or a lifecycle event as a stage result.
+- **R41** (planned) — **Progression and controls are compare-and-set transactions.** After accepted
+  success and release, either record the configured approval pause or create the next stage task and
+  move the cursor in one transaction with a unique task key. Last-stage success commits final run
+  success and its shared `pipeline_run` result atomically. Continue releases approval or creates a
+  new attempt after failure/blocked, retaining old results and bounded recovery input. Retry an
+  interrupted task uses ordinary task retry on its current assignee. Replace first closes the old
+  assignment to reports/creation, cancels/releases it, then creates one new task with the frozen
+  context and prior work index; it does not reassign a finished task or change task creator history.
+  Replacement keeps current-stage descendants owned by the run and manageable by the new
+  orchestrator. Run controls use expected revision and request ids; replay cannot create two tasks.
+  Generic task controls reject pipeline stage mutations that bypass these transactions.
+- **R42** (planned) — **Closure fences creation before cleanup.** Stop commits `stopping` and a
+  closure revision before stopping any process. Stage completion similarly closes that stage to new
+  work. Task creation, admission, wait wake, Retry and Re-arm all check the inherited run/stage
+  closure in their write transaction. Cleanup keyset-pages unfinished members, records host-cancelled
+  outcomes and release intents through the shared task cancellation helper, and executes existing
+  stop/turn-cancel seams. In-flight starts either lose their claim or are immediately released; no
+  list-then-stop race can admit escaping children. Cleanup failure retains stopping/finishing with a
+  repairable reason and Retry cleanup action (the existing retry control dispatches by run phase,
+  without rerunning stage work); only completed cleanup permits next-stage creation or terminal `stopped` and
+  its shared cancelled result. Immutable completed child results remain untouched. This is lifecycle
+  cleanup, not a requirement that every child succeed. Replacement in R41 closes only the old
+  assignment, not the stage; generic descendant cancellation does not erase remaining useful work.
+- **R43** (planned) — **Recovery composes task recovery with the cursor.** Startup first resolves
+  task reservations, yield/release intents and stale runtimes under TS-10, then reconciles runs from
+  current stage tasks. Missing reports leave interrupted stages paused for explicit Retry; recorded
+  reports finish release/closure and can advance once. A settled waiting task remains waiting and
+  can resume on its persisted watch; it is not a failed stage. A controller crash after next-task
+  insertion discovers that same unique task. Never adopt an orphan, infer success, replay an
+  ambiguous in-progress assignment automatically, or restart an already stopped run.
+- **R44** (planned) — **Run supervision reads task provenance.** Keep Runs/Templates routes and
+  existing API/CLI start/show/continue/retry/stop seams, adapting their payloads to version 2. Add the
+  explicit replacement control. A run read joins current task state and persisted lineage for stage
+  and descendant pages; it does not follow `created_by_agent` across a reused agent's whole history.
+  Show standing/dedicated assignees, effective runtime settings, waiting versus interruption,
+  accepted outputs, finishing/stopping cleanup and valid recovery actions. UI and API receive the
+  same derived eligibility/reason fields. Existing post-commit `pipeline_update`/`task_update` events
+  are invalidation hints; REST hydration reconstructs all state after reconnect.
+- **R45** (planned) — **New history and authorized legacy reset have different rules.** New run
+  deletion is terminal-and-cleanup-only and cannot cascade into tasks, work results, lineage,
+  context references, or agents/transcripts. Retained runs pin their stage tasks; child deletion
+  leaves bounded result/provenance tombstones. For the authorized one-time reset, block legacy
+  execution, durably mark unfinished old runs cancelled, resolve their result arms, and stop/reap
+  recorded legacy runtimes before removing legacy run/attempt/value/request/proposal records.
+  Remove only version-1 template files under the canonical pipeline config directory, using the
+  config store's validated paths. A durable reset checkpoint makes filesystem cleanup replayable;
+  reset failure cannot enable either old execution or partial new execution. Preserve unrelated
+  task history, result registrations, agent sessions and transcripts. This is schema installation
+  and targeted reset, not data conversion, whole-home deletion, or a compatibility engine.
+- **R46** (planned) — **Ship replacement wiring and remove the old engine.** Remove the old
+  per-stage launch/reconcile/report paths, route/loop validators and UI, stage-only tool, historical
+  pipeline wake veto, and creator-based one-hop projection after a call-site audit. Register new task
+  operations on the existing MCP authority; do not depend on the separately blocked direct-action
+  transport project. Update builder proposals/preview, UI start/editor/run views, CLI schema/help,
+  operator knowledge and seed instructions, mocked API shapes, spec supersessions, and generated UI
+  through their existing seams. No legacy mode, parallel task scheduler, cyclic task graph, or
+  independent provider-session implementation remains.
+- **R47** (planned) — **Verify boundaries, not only happy-path orchestration.** FS-14.A35–A42 and
+  FS-16.A20–A22 require real serialized tool/HTTP tests, task/run state race and fault-injection
+  tests, fake-provider conversation continuity, and rendered start/supervision/recovery journeys.
+  Include budget-one nested waiting, Stop versus creation/wake/report, stale report on the same
+  agent, replacement context/authority, and reset/deletion isolation. Run TS-06's applicable Go,
+  tagged build, UI and spec closure checks once after final implementation. A bounded packaged
+  Claude and Codex task→wait→resume→stage-result probe is a required live-provider acceptance gate;
+  code inspection/fake providers cannot be labelled proof that real conversation resume works.
+- **R48** (planned) — **Context report sharing keeps one source.** Preserve the existing friendly
+  current-pipeline-report selector and `pipeline_attempt_report` canonical source kind. For new runs
+  its immutable locator names the stage task; the context service resolves and renders that task's
+  accepted result through the task result store. The share window remains accepted report through
+  matching reporting turn-end, and creation still derives source identity from the caller. Existing
+  legacy references resolve to honest deleted-source tombstones after reset; no reference is rebound
+  to a new report. Keep direct grants, task attachments, bounded reads, and canonical identity rules
+  unchanged. This adapts the store seam used by FS-15.R2/R4/R5, not a second artifact service.
+
 ## 3. Interfaces & data shapes
+
+**Planned version-2 shapes (R35–R48):**
+
+```text
+template: version=2, title, orchestrator_role, inputs[], stages[]
+stage: id, title, instruction, inputs[], outputs[{name,value,description,required}],
+       executor=run|dedicated, dedicated_role?, approval_after_success=false
+run start: request_id, template_id, name, project, goal, inputs{},
+           orchestrator{backend,model,effort?,fast?}, dedicated_assignments{stage_id: runtime}
+pipeline_runs: id, immutable snapshot, revision, state, stage_index,
+               current_task_id, orchestrator_agent_id?, closure_revision?, pending_control?
+pipeline_stage_tasks: (run_id,stage_index,attempt_number) UNIQUE, task_id UNIQUE,
+                      executor, assignment digest/version, closure state
+pipeline_values: run/stage/name -> source task's immutable output (projection, not another result)
+```
+
+Run states remain queued/running/paused/completed/stopped, with durable finishing/stopping phases
+for outstanding closure. Active-stage execution state is projected from its task; it is not stored
+as another launching/running/reported state machine. `pipeline_stage_tasks` is ordering/provenance,
+not an attempts table with duplicate outcomes. Start/control request deduplication and pipeline
+proposals remain bounded existing concepts. Task and continuation shapes are in TS-10 §3.
+
+The version-1 shapes below document only the shipped schema pending replacement.
 
 **Template JSON (logical version-1 shape):**
 
@@ -444,6 +600,12 @@ new durable run revision or a structured validation/conflict result.
   not rewrite history or decrement visit/attempt counters.
 
 ## 5. Deviations & open decisions
+
+- **Replacement contract.** R35–R48 supersede old R1–R14/R20/R24/R27–R28/R33–R34 wherever they
+  require stage-specific processes, duplicate reports, routes/revisits, old state tables, per-stage
+  runtime setup, creator-derived projections, or stage grouping. R15–R19/R21–R23/R25–R26/R29–R32
+  retain their shared boundary/interaction behavior with version-2 payloads. FS-14 §6 holds the one
+  pending runtime-continuity choice; old-engine exclusions below describe shipped behavior only.
 
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated
   same-user loopback API. Hard per-agent API capabilities remain outside this feature.

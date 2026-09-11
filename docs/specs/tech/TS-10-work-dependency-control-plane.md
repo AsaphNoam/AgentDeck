@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -246,7 +246,127 @@ parallel copy of them.
   applied value on the created agent and never treats it as a start failure or a reason to consume a
   start attempt.
 
+### 2.1 Persistent assignment, dynamic work and durable waiting
+
+- **R25** (planned) — **Task lineage is durable and server-derived.** Add immutable parent task,
+  run, stage and creation-attempt provenance when a token-bound assignee creates work. Derive it from
+  the caller's current assignment/managed execution, never caller-supplied ownership fields. Run
+  members remain in one project and cannot detach from a live run. A reporting turn whose assignment
+  has closed cannot fall back to creating unowned work. Store lineage separately from erasable task
+  detail so a deleted intermediate task cannot hide descendants from cancellation or authorization.
+  Lineage is provenance, not a dependency edge, and introduces no cycles into arms.
+- **R26** (planned) — **Inspection and repair share one authority.** Bounded list/read operations
+  expose state/revision, assignee selector, result, outputs, parent/run/stage and valid repair
+  actions for owned work. Retry/Re-arm reuse existing state helpers. Creator authority survives
+  resume; an assigned task can inspect/manage its descendants; the current run orchestrator can
+  inspect/manage that run under TS-05.R22. No API supplies a creator, reporter, project override,
+  or arbitrary context source. Unknown and unauthorized work share the same refusal. Results and
+  lineage survive task-detail deletion, but deleted work cannot be re-armed/retried.
+- **R27** (planned) — **Waiting is an unfinished assignment, not another task.** Add `waiting`
+  plus a continuation-pending marker on ready/starting tasks, and a distinct `pending_yield` intent.
+  `wait_for_tasks` accepts at most 64 `{task_id,after_revision}` observations of readable work; it
+  atomically checks current assignment/execution, reads results/attention/deletion changes, and
+  either returns those changes or persists the wait set and yield intent. The trigger is any watched
+  task reaching a result or actionable interruption/park/deletion, not a conjunction of success
+  predicates. An immutable terminal result is returned immediately rather than waited on forever.
+  A self wait or wait on work targeted to the same reserved assignee returns `wait_conflict` with
+  a repair message. Watch creation and result registration serialize in one state transaction, so
+  completion between read and subscribe cannot be lost. Ordinary dependency arms remain unchanged.
+- **R28** (planned) — **Yield releases runtime capacity, not assignment authority.** At matching
+  turn-end, apply `pending_yield` through the existing release/stop seam. A created/woke runtime is
+  stopped before clearing its capacity claim; a borrowed runtime is left intact. Preserve assignee
+  membership, task identity and watch version. Represent runtime ownership/release separately from
+  the exclusive assignment claim, which also covers waiting and continuation-ready work; ordinary
+  ready tasks do not acquire that claim early. Outcome `pending_release` and unfinished
+  `pending_yield` are distinct, mutually exclusive intents. Return the wait tool response before
+  any stop, fence further task mutations from the yielded execution, and never set a task outcome.
+  The existing task budget continues to count created/woke runtimes, with no pipeline exemption.
+- **R29** (planned) — **Wake is ordinary admission of the same assignment.** A watched change
+  commits a resume-needed marker keyed by task/wait version, checking the current execution handle,
+  assignment generation and run/stage closure in the same CAS. Only after yield cleanup completes
+  may one CAS return the waiting task to ready with continuation pending. Multiple changes coalesce;
+  none may launch another task or resume while the old runtime still owns a capacity claim. Admission
+  re-plans created/woke/borrowed ownership and generation and uses the shared resume plus dependency
+  activation seam. Confirmation replaces the prior released runtime ownership; subsequent yield,
+  cancellation and terminal release use this newly confirmed ownership, never the old claim.
+  `get_assigned_task` exposes the saved assignment and watched changes; successful
+  confirmation settles that continuation version. Prompt interruption before the agent acts leaves
+  the assignment interrupted with results still readable. Wake/read do not delete the source results.
+  Manual input or mail for a waiting assignee routes through this same assignment continuation before
+  ordinary turn delivery; it must not create an untracked wake or bypass capacity/closure checks.
+- **R30** (planned) — **Wait recovery never adopts processes.** Startup finishes pending yields
+  through the existing generation/PID-checked reaper, retains settled waits, re-evaluates watched
+  facts, and recomputes capacity from outstanding runtime claims. A settled stopped wait can become
+  ready automatically. A pre-crash running/ambiguous borrowed assignment becomes interrupted under
+  the existing recovery rules. Unexpected exit while running remains interruption; an exit matching
+  committed yield is not interruption. Failed yield cleanup retains intent/claim and blocks wake
+  until repaired. Cancellation wins over pending yield/wake and prevents any later continuation.
+- **R31** (planned) — **Stages use the task result authority.** Add bounded named text outputs
+  and shared checks to the task result store/read shape; preserve them in immutable result storage
+  after task detail deletion. `report_task_result` uses one shared accepting transaction; a
+  pipeline-associated task additionally applies TS-09.R40's output/closure writes there. No second
+  stage report is registered. A non-secret execution handle combines task id and start/continuation
+  attempt id and is rechecked with token identity/generation. It is required for stage reports and
+  waits, and validated when supplied for ordinary task reports; existing standalone report clients
+  remain valid without it. This closes same-agent/same-runtime stale-report races without treating
+  an opaque id as authorization.
+- **R32** (planned) — **Cancellation is scoped and replayable.** Task create/admit/repair/wake
+  joins run/stage closure in its transaction. Run cleanup pages lineage, not agent creator history,
+  and commits cancellations and release intents through the shared helper before effects. For a
+  borrowed runtime, cancel only the task's generation/turn-scoped executing turn, wait for its
+  settlement, then release the assignment without killing subsequent unrelated turns. Created/woke
+  runtimes use the ordinary stop path. A task in terminal cleanup or yield cannot be deleted.
+  Cancel and yield share one effect claim so they cannot stop a later resumed generation.
+  Extend the existing agent-scoped cancellation seam with an expected generation/turn guard checked
+  under its turn lock before both the initial cancel and escalation; an unguarded check followed by
+  `Cancel(agentID)` is insufficient. Reuse the existing cancel→SIGINT grace policy, then bound the
+  release attempt to ten seconds. Failure retains ownership/intent and exposes `cleanup_failed`
+  with Retry cleanup, rather than silently waiting forever or hard-killing a later unrelated turn.
+- **R33** (planned) — **Waiting and observation are bounded durable data.** Work list pages have
+  a maximum of 100 items (default 25), waits 64 sources, result summaries/details/checks use existing
+  shared limits, and named outputs reuse TS-09's text limits with a 256 KiB aggregate result limit.
+  Scan/cancel/recovery batches are at most 100 rows with a shared in-flight cap of eight effects;
+  cursors are stable keysets. Store one active wait set per assignment, replacing it by version;
+  discard watches after completed continuation, terminal cancellation or task deletion. Source results
+  and lineage retain existing history semantics. No periodic provider prompt, unbounded graph walk,
+  in-memory event history or extra broker is introduced. A dropped bus hint changes only latency;
+  startup and bounded state sweeps discover unsettled work.
+- **R34** (planned) — **Expose changes through the existing surfaces.** On the current MCP
+  authority add `list_tasks`, `get_task`, `retry_task`, `rearm_task`, `wait_for_tasks`; extend
+  `get_assigned_task` and `report_task_result` as above. Control reads return explicit action
+  eligibility and reasons; task HTTP/UI states include waiting and ready-to-resume, and stage
+  controls link to the governing run action instead of presenting a guaranteed refusal. All tools
+  share FS-17 structured results/classification and TS-04 registration/redaction. The paused direct
+  transport migration is not a prerequisite. Mutation effects precede neither committed intent nor
+  the tool's safe reply boundary. No new provider capability or ACP extension is required.
+
 ## 3. Interfaces & data shapes
+
+**Planned additions (R25–R34, contingent on FS-14 §6's runtime choice):**
+
+```text
+task_lineage: task_id PK, parent_task_id?, run_id?, stage_index?, stage_attempt?, project
+task result: task_id, immutable outcome/summary/details/checks/outputs{}, lineage tombstone
+task execution: existing assignment + execution_handle, continuation_pending, pending_yield,
+                wait_version, resume_needed, runtime-release ownership separate from assignment
+task_waits: (waiting_task_id,wait_version,source_task_id) UNIQUE, after_revision
+list_tasks: optional parent_task_id, cursor, limit; server-derived permitted scope
+get_task: task_id; bounded result and provenance, including deleted-result tombstone
+retry_task: task_id, expected_revision
+rearm_task: task_id, expected_revision, arms[]
+wait_for_tasks: execution_handle, observations[{task_id,after_revision}]
+report_task_result: outcome, summary, details?, checks?, outputs?, execution_handle?
+get_assigned_task: existing fields + execution_handle, stage?, inputs{}, output_declarations[],
+                   prior_results[], observed_changes[], continuation_reason?
+```
+
+Reads page oversized collections; task ids/handles select records but never grant access. The
+runtime-only activation instruction remains a fixed request to read the current assignment. No
+general event stream, arbitrary condition expression, automatic task graph or child workflow DSL.
+New refusal codes include `wait_conflict`, `assignment_stale`, `scope_closed`, and
+`pipeline_control_required`; they are classified once under FS-17. Existing task creation and
+ordinary HTTP routes keep their shapes; added fields are optional where compatibility requires it.
+Result registration for a pipeline run remains distinct from its stage task's own result.
 
 **Durable rows** (`internal/state`, one forward-only migration):
 
@@ -323,6 +443,14 @@ object carries the derived boolean `retry_eligible` (R22) beside its stored fiel
   ahead of the effect it authorizes and recovery can always finish an interrupted release (R19).
 
 ## 5. Deviations & open decisions
+
+- **Task-backed pipeline replacement.** R25–R34 extend this plane under FS-14.R60–R74 and
+  FS-16.R30–R36. They replace R7's separate pipeline acceptance transaction, R8's prohibition on
+  pipeline/task coordination, R13's no-query surface, and R18's starting/running-only assignment
+  index. They specialize R4/R6/R15/R17/R19 for unfinished waits while preserving normal task result
+  and release semantics, and extend R16 for retained result/lineage tombstones. Acyclic task arms
+  remain unchanged; the old result-only-convergence and no-query exclusions below end when the
+  replacement ships. Runtime continuity remains contingent on FS-14 §6.
 
 - **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
   but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a

@@ -189,6 +189,12 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
+- **Pipeline replacement:** TS-09.R48 adapts R2/R4/R5's pipeline report selector to the accepted
+  stage task result after `report_task_result`, preserving its reporting-turn share window and
+  canonical source kind. Legacy report references become deleted-source tombstones on the explicitly
+  authorized reset. TS-05.R22 grants run work inspection without granting unrelated transcript or
+  context-source access; attachments still use existing work-derived membership.
+
 - **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
   migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.
   Reference identity, grants, authorization, bounded reads, source handling, outcomes, and retention

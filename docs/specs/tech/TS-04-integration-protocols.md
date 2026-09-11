@@ -721,6 +721,13 @@ global resource list.
 
 ## 5. Deviations & open decisions
 
+- **Pipeline replacement:** TS-10.R31/R34 replace R17's standalone stage-result tool and R29's
+  no-query exclusion when shipped. Stage reports use `report_task_result` with the current execution
+  handle; generic task list/read/repair/wait operations use the existing scoped MCP server and
+  activation/lifecycle seams. The direct-action migration remains independently blocked and is not
+  a dependency. Update registration, result classification, runtime knowledge and contract tests
+  together; task waiting does not require a new ACP method.
+
 - HTTP-only MCP registration is shipped; a stdio proxy exists only as a possible compatibility
   response if a pinned CLI rejects HTTP. It must proxy to the same in-process authority.
 - **Planned supersession:** R32–R40 replace the preceding internal-MCP transport clauses only after

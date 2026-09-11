@@ -458,6 +458,13 @@ R1–R26 and must be reflected here when its contract changes.
 
 ## 5. Deviations & open decisions
 
+- **Pipeline replacement:** TS-09.R37/R40/R45 and TS-10.R25/R27–R33 define the forward-only schema
+  update and authorized legacy reset that replace R17's old pipeline rows, R26's creator projection,
+  and extend R25's task storage when shipped. Source selectors in R24 retain canonical context
+  identity through TS-09.R48; old report references become tombstones rather than being rebound.
+  Task outputs, retained lineage and wait intents are state-owned records, not transcript-derived
+  reconstructions. The legacy reset removes no unrelated configuration, tasks or transcripts.
+
 - Turn-document indexing deliberately cannot satisfy a query whose terms occur only in
   different documents. That product limitation is specified by FS-05.R25–R27 and tracked for
   evidence-based reconsideration in `ideas.md`; it does not change raw transcript authority.

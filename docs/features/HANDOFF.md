@@ -28,10 +28,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration has a feature draft in FS-14.R60–R68/A35–A38 and
-  FS-16.R30–R32/A20. Resume with product confirmation of legacy compatibility, descendant stop
-  behavior, and cross-project scope; remaining choices are in FS-14 §6. Technical design has not
-  started and this is not a ready work unit.
+  Persistent pipeline orchestration has feature and technical drafts in FS-14.R60–R74/A35–A42,
+  FS-16.R30–R36/A20–A22, TS-09.R35–R48, TS-10.R25–R34 and TS-05.R22. The operator approved a
+  clean legacy reset, cancellation of all run descendants, and existing project boundaries.
+  One technical choice remains in FS-14 §6: same identity/conversation with task stop/resume
+  (recommended), versus a continuously live process. Draft assumes the former; no ready work unit.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
@@ -53,6 +54,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (design-feature):** Designed pipeline progression over the shared task
+dispatcher and result transaction, dynamic lineage, scoped inspection/repair, durable child waiting,
+run-wide cancellation fences, same-agent recovery, and the authorized legacy reset. Reconciled
+context, lifecycle, protocol, persistence and security contracts. A focused design check caught and
+resolved dedicated-agent identity promotion, borrowed-turn cancellation races, and wake/release
+ownership edges. Spec checks, twin skills and diff checks pass. No code changed; the sole pending
+runtime-lifetime choice above prevents ready-change promotion.
 
 **Changelog — 2026-09-11 (design-feature):** Drafted persistent pipeline orchestration as durable
 stage assignments, with dynamic child work and explicit stage outcomes. Added feature acceptance

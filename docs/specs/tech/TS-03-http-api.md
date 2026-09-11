@@ -598,6 +598,14 @@ integers instead of silently applying defaults.
 
 ## 5. Deviations & open decisions
 
+- **Pipeline replacement:** TS-09.R44 changes pipeline template/start/detail payloads to version 2
+  without retaining old pipeline payload compatibility, under FS-14.R69. Existing route families,
+  envelope, revision/refetch and proposal-confirmation contracts remain; add
+  `POST /api/pipeline-runs/{id}/replace-orchestrator` with expected run revision, request id and
+  optional bounded recovery input. Task state/control additions follow TS-10.R34; stage task
+  mutations return `pipeline_control_required` and name the run action. R16/R29's old attempt and
+  one-hop projection shapes are superseded when this replacement ships.
+
 - Error envelopes remain mixed as described by R3–R4. Standardization is a compatibility change,
   not cleanup that may be done opportunistically.
 - JSON handlers do not yet apply a shared maximum request-body size. Field-level limits protect

@@ -177,6 +177,23 @@ sensitive-context sharing is a practical problem.
   escape, symlink escape, concurrent target replacement, `.git`, non-regular file, oversized, and
   non-UTF-8 each need an adversarial test.
 
+- **R22 (planned) — Run work authority is bounded by durable membership.** On the existing
+  per-launch token/identity boundary, the assignee of the current pipeline stage may list/read and
+  perform valid repair/cancel operations on tasks in that run. A normal task assignee may inspect
+  and manage descendants of its own task; stable creator authority continues for its own work.
+  These scopes are server-derived from immutable lineage and the current stage assignment, not a
+  caller-supplied run/project/role. Superseded orchestrators lose current-stage authority atomically;
+  creator rights cannot revive work in a closed stage/run. Task controls never allow child agents
+  to report for an ancestor or mutate the stage cursor. Reads/arms/targets remain in the existing
+  project boundary, and unknown/unauthorized ids share one error. Opaque execution handles guard
+  staleness but are not credentials. This specializes R17's creator-only control for run-owned work;
+  it does not create project-wide or cross-project access.
+  Run membership grants access to bounded task reports and their deliberately supplied outputs,
+  not arbitrary agent transcripts, filesystem paths, or every context reference another participant
+  can read. Stage/replacement task attachments retain only the prior stage assignment's explicit
+  references through normal work-derived membership; unrelated grants are never copied. Context
+  reads still re-authorize through the context service, and deleted sources remain tombstones.
+
 ## 3. Interfaces & data shapes
 
 Security-relevant interfaces are the single listener, Host/Origin middleware, launch token
