@@ -186,9 +186,10 @@ func resolveWorkspaceRoot(cwd string) (string, *runtime.APIError) {
 }
 
 // readWorkspaceFile opens rel inside the already-resolved root and returns its
-// bounded text. OpenInRoot keeps path resolution and opening inside the root;
-// metadata and content then come from that same descriptor so a concurrent path
-// replacement cannot redirect the read outside the workspace (TS-05.R21).
+// bounded text. The root handle keeps path resolution and opening inside the
+// root; metadata and content then come from the opened descriptor so a
+// concurrent path replacement cannot redirect the read outside the workspace
+// (TS-05.R21).
 func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
 	return readWorkspaceFileAfterValidation(root, rel, nil)
 }
@@ -200,7 +201,24 @@ func readWorkspaceFileAfterValidation(root, rel string, afterValidation func()) 
 	if afterValidation != nil {
 		afterValidation()
 	}
-	f, err := os.OpenInRoot(root, filepath.FromSlash(rel))
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return fileContent{}, apiError(runtime.CodeWorkspaceUnavailable, "this agent's working directory is no longer available")
+	}
+	defer dir.Close()
+	name := filepath.FromSlash(rel)
+	// Classify the target's kind through the root before opening it. Opening is
+	// what distinguishes a non-regular file on some platforms but not others: a
+	// socket refuses the open on Linux and accepts it on macOS, and a FIFO would
+	// block the open until a writer appears. Stat resolves symlinks inside the
+	// root and refuses ones that leave it, so containment is unchanged.
+	if info, statErr := dir.Stat(name); statErr == nil && !info.Mode().IsRegular() {
+		if info.IsDir() {
+			return fileContent{}, apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
+		}
+		return fileContent{}, apiError(runtime.CodeNotAFile, "that path does not name a regular file")
+	}
+	f, err := dir.Open(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
