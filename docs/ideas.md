@@ -52,6 +52,37 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Rethink the pipeline experience on top of durable tasks.** Requested 2026-09-11: a pipeline run
+  is klunky because FS-14 launches one fresh agent per stage and stops it at the stage boundary, so
+  every stage is its own short-lived orchestrator. The operator usually wants **one** standing
+  orchestrator owning the whole run — sometimes with sub-orchestrators, but not one per stage by
+  construction. Their real development pipeline is: orchestrator breaks a spec into per-microservice
+  tasks and fans them out to implementors → implementors finish → orchestrator creates a review agent
+  per microservice → reviewers report back → orchestrator validates and sends fixes back to *the
+  original implementors*. FS-14 cannot express any of it: no parallel fan-out or join (R9, §6), a
+  fresh agent per stage visit (R12), and no way to route work back to a specific earlier agent.
+  FS-16 durable tasks already supply the missing execution primitives — agent-authored `create_task`
+  with a launch spec (fan-out), a conjunction of task arms (join), and a task targeting an existing
+  agent (the fix round-trip back to the same implementor). This is the evidence FS-16 §6's
+  "Pipelines converge only at the result layer" clause asked for before revisiting the two run
+  layers. Verified 2026-09-11 against code, not memory: the one primitive genuinely missing is that
+  a woken orchestrator cannot read what its prerequisites reported — `get_assigned_task`
+  (`internal/messaging/task_tools.go:57`) returns only `instruction` and `attachments`, and FS-16 §6
+  deliberately excludes any task-graph query, so today the only way a reviewer's findings reach the
+  orchestrator is an out-of-band FS-06 message.
+  **Decided by the expanded request, 2026-09-11:** one persistent run orchestrator by default;
+  stages are durable task assignments; AgentDeck owns coarse ordered progression and durable
+  outputs, while the orchestrator dynamically owns decomposition, reviews, repair, and replacement.
+  Dedicated stage orchestrators are explicit exceptions. No predefined child graph or child-state
+  completion gate; simplify the engines rather than layering them.
+  **Feature draft:** FS-14.R60–R68/A35–A38 and FS-16.R30–R32/A20, pending scope confirmation.
+  Task work inspection, agent-side Retry/Re-arm, and durable child-result delivery while the stage
+  assignment remains active are necessary capabilities. The shipped pipeline already permits
+  dynamic delegated tasks; its rigidity is the outer stage lifecycle, not a mandatory child DAG.
+  **Next:** confirm old-template/run compatibility, Stop run's effect on descendants, and whether
+  cross-repository work spans AgentDeck projects. FS-14 §6 records the remaining routing, setup,
+  recovery-authority, and retention decisions for technical design. No ready change or product code.
+
 - **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
   the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text
   only. Verified 2026-09-07: this is a deliberate drop, not a provider gap —

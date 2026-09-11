@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -20,8 +20,8 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Every requirement here reflects shipped behavior. The product boundaries deliberately outside this
-feature are recorded in §6.
+Requirements without a planned marker reflect shipped behavior. R60–R68 describe the proposed
+task-backed replacement, pending the product decisions in §6; they do not change legacy runs yet.
 
 ### 2.1 Templates and starting a run
 
@@ -502,7 +502,74 @@ feature are recorded in §6.
   away. This adds no new field to the run payload: `report_outputs` already ships and is currently
   drawn nowhere, so a person whose run declares a final report has no place to read it.
 
+### 4.6 Persistent orchestration and bounded stage assignments
+
+- **R60** (planned) — A new-model run normally has one persistent orchestrator identity and
+  conversation across its stages. A stage boundary ends an assignment, not that orchestrator's
+  participation in the run. Each active stage is durable task work assigned to that orchestrator.
+  A template may explicitly select a dedicated orchestrator for a stage; that exception does not
+  replace the standing run orchestrator for subsequent stages.
+- **R61** (planned) — The pipeline guarantees the required major phases and their intended order,
+  permits at most one active stage, and durably records activation, accepted completion, and workflow
+  position. Agents cannot activate a later stage by creating ordinary tasks or changing task arms.
+  The template does not prescribe a child task graph, review topology, or deterministic repair plan.
+- **R62** (planned) — Each stage assignment supplies the run goal, a bounded stage objective,
+  relevant context and instructions, expected output, and useful durable outputs from earlier
+  stages. Assignment delivery does not require copying the entire pipeline definition or earlier
+  transcripts into the conversation. Conversation continuity is useful context, never the authority
+  for workflow position or a substitute for persisted stage outputs.
+- **R63** (planned) — Within the active stage, its orchestrator decides decomposition, delegation,
+  repository-specific work, reviewer selection, repair routing, and whether re-review is necessary.
+  It can create additional durable tasks as facts emerge and manage, retry, or replace its work.
+  A failed, blocked, cancelled, or replaced child task does not itself block or advance the pipeline.
+  Repair loops normally stay within the stage. Ordinary task dependency arms remain available when
+  the orchestrator chooses them, without becoming mandatory pipeline completion gates.
+- **R64** (planned) — Only an explicit outcome accepted from the active stage's assigned
+  orchestrator can complete that stage. Idle, process exit, and the aggregate states of child work
+  cannot substitute for its judgment. The report includes a durable summary and the declared outputs
+  needed by subsequent stages. A rejected report leaves the assignment actionable; duplicate or
+  stale reports cannot complete a later assignment on the same orchestrator. Application checks
+  enforce assignment authority and the declared output contract, not an inferred child-work plan.
+- **R65** (planned) — The run view shows the standing orchestrator, the current stage and its
+  assignee, completed stage outcomes and outputs, and work associated with each stage. Reusing one
+  agent across stages does not attribute all of its tasks to every stage. The person can open the
+  orchestrator's conversation and inspect durable work without reconstructing progress from chat.
+- **R66** (planned) — Restart or interruption retains the stage position, accepted reports,
+  outputs, and associated work. Recovery never assumes success or activates the next stage twice.
+  The person sees whether work is executing, waiting for work or input, or interrupted, with a valid
+  recovery action and its consequence. The same orchestrator is the normal continuation target;
+  any necessary replacement is explicit and receives the durable handoff. Persistence of identity
+  does not promise that a provider process survives restart.
+- **R67** (planned) — Stage outputs live in AgentDeck's durable run/task records and remain
+  inspectable after completion. Existing no-automatic-expiry and transcript-preservation guarantees
+  remain the baseline; this design introduces no automatic deletion. Deletion dependencies and
+  migration of existing records remain decisions in §6, not permission to discard history.
+- **R68** (planned) — The implementation stage can delegate across multiple repositories and pass
+  the resulting repository, implementor, decision, and concern context to review. Review can assign
+  the appropriate reviewers, return fixes to original implementors, add replacement or additional
+  work, and decide completion. Whether those repositories must share an AgentDeck project or may
+  span projects remains explicitly unresolved; this requirement grants no cross-project access.
+
 ## 5. Acceptance criteria
+
+- **A35** (planned; R60–R64) — Run spec → implementation → correctness review → additional
+  review → final validation against a fake provider. Assert one normal orchestrator identity,
+  distinct durable stage assignments, ordered activation, stage-local inputs, and persisted outputs.
+  Idle alone and a replayed earlier report do not advance. A dedicated review-stage configuration
+  assigns that stage to its explicit exception and returns the next to the standing orchestrator.
+- **A36** (planned; R63–R64, R68) — In a multi-repository fixture, implementation creates several
+  tasks and adds one for a discovered dependency. Review uses the implementation outputs to choose
+  reviewers, sends fixes to original implementors, replaces failed work, and re-reviews. Assert that
+  no template child graph is needed and no obsolete child outcome prevents the orchestrator from
+  reporting the completed objective. Project layout follows the decision in §6.
+- **A37** (planned; R62, R64, R66) — Fault-injection tests restart before and after assignment,
+  report acceptance, and stage advancement. Assert one durable current stage, no guessed success or
+  duplicate progression, retained child work and outputs, and a recoverable interrupted assignment.
+  Resume with durable context even when conversation context is unavailable.
+- **A38** (planned; R65–R67) — A rendered supervision journey opens an active run, its standing
+  orchestrator, stage-specific delegated work, a completed stage's outputs, and an interrupted run's
+  recovery action. Verify that completed work remains inspectable and the page distinguishes waiting
+  from interruption without requiring the person to infer either from a transcript.
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
   once with Codex Work and Claude Review and again with those runtime assignments reversed, and
@@ -713,6 +780,33 @@ feature are recorded in §6.
   `RunBrowser` tests.
 
 ## 6. Deviations & open decisions
+
+**Persistent-orchestrator design, 2026-09-11.** R60–R68 and A35–A38 are a feature draft based on the
+operator's request, awaiting scope confirmation before technical design. They supersede conflicting
+new-run behavior only when the replacement ships; existing R1–R59 and A1–A34 still describe the
+shipped implementation. Technical requirements have not yet changed. In particular the old
+per-stage model/role setup, stop-at-boundary behavior, immutable agent/stage association, fresh-agent
+retry, routing loops, grouping, and one-hop task display need explicit reconciliation.
+
+Remaining product decisions:
+
+- Compatibility: convert existing templates/runs, preserve old runs as history with an explicit
+  template conversion, or temporarily execute both models. No record deletion or automatic semantic
+  conversion is authorized. Existing conditional routes and repair loops may not map to a simple
+  ordered-stage template.
+- New-template routing: recommended default is ordered required stages, ordinary success progression,
+  and failure/blocked recovery within the current stage; whether conditional skips or explicit
+  backward transitions remain supported is not yet confirmed. Existing approval gates need a decision.
+- Stop and completion: whether Stop run cancels all associated descendant work or just the active
+  orchestrator, and what happens to outstanding children when an orchestrator reports stage success.
+  Child outcomes must not become an automatic completion gate. Run-end runtime handling also needs
+  an explicit decision; retaining the conversation does not decide whether its process stays up.
+- Run setup: recommend a run-level orchestrator role/runtime selection, with explicit dedicated-stage
+  overrides. Whether ordinary stages can change the standing orchestrator's runtime is unresolved.
+- Cross-repository scope: multiple repositories within one project versus tasks across existing
+  AgentDeck projects; project and attached-context authority must be confirmed before expansion.
+- Recovery/retention: replacement-orchestrator authority over existing child work and context,
+  human-authored stage outcomes, and deletion of stage tasks while run history references them.
 
 The shipped first version deliberately keeps these product boundaries:
 

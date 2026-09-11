@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -343,7 +343,29 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   or an unfinished release (R18), firing a signal outside the caller's project, or attaching a
   reference the caller cannot read returns a stable typed error and mutates nothing.
 
+### 4.1 Work management for a persistent orchestrator
+
+- **R30** (planned) — An orchestrator can inspect the durable state, assignee, and reported
+  results of work it created, including after it resumes. Assignment context makes relevant prior
+  results available without requiring an out-of-band completion message. Discovery is bounded and
+  does not require repeatedly polling for completion. Broader run-level access after orchestrator
+  replacement remains a product/security decision, not an implicit expansion of creator authority.
+- **R31** (planned) — An agent can perform the existing Retry and Re-arm repairs on work it
+  created, with the same state validation and immutable-result rules as the human operations. It can
+  cancel its unfinished work and create replacement or additional tasks, including tasks addressed
+  to earlier implementors. Replacing work does not erase its history or rewrite an accepted result.
+- **R32** (planned) — An orchestrator holding an active stage task can receive durable child-work
+  outcomes and continue coordinating that same assignment without completing it merely to free its
+  assignment slot. It can await relevant work without polling or creating a second active task for
+  itself. A child failure is information it can act on, not an automatic failure of its stage task.
+
 ## 5. Acceptance criteria
+
+- **A20** (planned; R30–R32) — A fake-provider orchestrator holds one stage assignment while
+  children complete or fail, receives their durable outcomes, inspects reported details, retries an
+  interrupted child, repairs an unsatisfiable arm, and creates replacement work. Verify no polling
+  turn or second active self-assignment is needed; restart retains outcomes, and the creator cannot
+  use these operations to control unrelated work. Check that old results remain immutable.
 
 Each names the verification that demonstrates it.
 
@@ -457,6 +479,14 @@ Each names the verification that demonstrates it.
   test that the fast-mode field round trips through create.
 
 ## 6. Deviations & open decisions
+
+- **Persistent pipeline orchestration draft.** R30–R32 and A20 support FS-14.R60–R68; scope
+  confirmation and technical design remain pending. When shipped, these replace the exclusions on
+  inspecting created work and pipeline convergence only at the result layer below. They do not
+  require cyclic task graphs. Stage runtime ownership, durable outcome delivery during an active
+  assignment, cross-project delegation, replacement-orchestrator authority, and stage-task outcome
+  and deletion rules still need reconciliation with the existing contracts. No protocol shape or
+  security expansion is selected by this draft.
 
 - **Planned transport supersession.** If and only if FS-17.R20 passes and the direct-action
   migration ships, FS-17.R13–R19 replace only this specification's internal-MCP transport wording.

@@ -28,6 +28,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
+  Persistent pipeline orchestration has a feature draft in FS-14.R60–R68/A35–A38 and
+  FS-16.R30–R32/A20. Resume with product confirmation of legacy compatibility, descendant stop
+  behavior, and cross-project scope; remaining choices are in FS-14 §6. Technical design has not
+  started and this is not a ready work unit.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
@@ -49,6 +53,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (design-feature):** Drafted persistent pipeline orchestration as durable
+stage assignments, with dynamic child work and explicit stage outcomes. Added feature acceptance
+for continuity, dedicated-stage exceptions, review/fix loops, and recovery. Recorded the need for
+agent work inspection/repair and child-result delivery during an active assignment. Awaiting product
+decisions in FS-14 §6 before technical design; no product code or ready change. The pre-existing
+pipeline idea was preserved and extended rather than duplicated.
 
 **Changelog — 2026-09-11 (fix):** Fixed the CI failure in the chat file viewer's kind check
 (FS-03.A37, TS-05.R21; `INV §14`, `INV §17`). The read classified its target by opening it, so a
