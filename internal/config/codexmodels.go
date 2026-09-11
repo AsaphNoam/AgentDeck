@@ -7,6 +7,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -14,7 +15,38 @@ import (
 // codexModelsCache is the subset of models_cache.json we consume; the file has
 // many more fields per model that are irrelevant to the AgentDeck catalog.
 type codexModelsCache struct {
-	Models []codexModelEntry `json:"models"`
+	ClientVersion string            `json:"client_version"`
+	Models        []codexModelEntry `json:"models"`
+}
+
+// CodexRuntime describes the release-owned Codex executable used for launch and
+// whether the personal model cache was produced by that exact runtime. Version
+// is intentionally unknown for source launches and explicit overrides: reading
+// configuration must not execute arbitrary user-selected tooling (FS-09.R59).
+type CodexRuntime struct {
+	Path          string `json:"path,omitempty"`
+	Version       string `json:"version,omitempty"`
+	CacheVersion  string `json:"cache_version,omitempty"`
+	CatalogStatus string `json:"catalog_status"`
+}
+
+func CurrentCodexRuntime() CodexRuntime {
+	info := CodexRuntime{Path: os.Getenv("CODEX_PATH"), Version: os.Getenv("AGENTDECK_CODEX_VERSION"), CatalogStatus: "unverified"}
+	data, err := os.ReadFile(CodexModelCatalogPath())
+	if err == nil {
+		var cache codexModelsCache
+		if json.Unmarshal(data, &cache) == nil {
+			info.CacheVersion = cache.ClientVersion
+		}
+	}
+	if info.Version != "" {
+		if info.CacheVersion == info.Version {
+			info.CatalogStatus = "compatible"
+		} else {
+			info.CatalogStatus = "mismatch"
+		}
+	}
+	return info
 }
 
 type codexModelEntry struct {
@@ -55,6 +87,9 @@ func ReadCodexModelCatalog(path string) (map[string]Model, error) {
 	var cache codexModelsCache
 	if err := json.Unmarshal(data, &cache); err != nil {
 		return nil, err
+	}
+	if runtimeVersion := os.Getenv("AGENTDECK_CODEX_VERSION"); runtimeVersion != "" && cache.ClientVersion != runtimeVersion {
+		return nil, fmt.Errorf("Codex model cache version %q does not match packaged runtime %q; models were not imported", cache.ClientVersion, runtimeVersion)
 	}
 	out := make(map[string]Model, len(cache.Models))
 	for _, m := range cache.Models {

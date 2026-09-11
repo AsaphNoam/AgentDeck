@@ -201,7 +201,7 @@ export function useDeleteProject() {
 export function useBackends() {
   return useQuery({
     queryKey: QUERY_KEYS.backends,
-    queryFn: () => jsonWithCatalogETag<BackendsConfig>("/api/backends"),
+    queryFn: () => jsonWithCatalogETag<BackendsResponse>("/api/backends"),
   });
 }
 

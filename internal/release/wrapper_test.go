@@ -30,7 +30,11 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"claude-agent-acp", "codex-acp", "codex"} {
-		if err := os.WriteFile(filepath.Join(adapters, a), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		body := "#!/bin/sh\n"
+		if a == "codex" {
+			body += "echo 'codex-cli 0.153.4'\n"
+		}
+		if err := os.WriteFile(filepath.Join(adapters, a), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -38,7 +42,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	if err := os.MkdirAll(libexec, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"ARGS=$*\"\n"
+	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"CODEX_VERSION=$AGENTDECK_CODEX_VERSION\"\necho \"ARGS=$*\"\n"
 	if err := os.WriteFile(filepath.Join(libexec, "agentdeck"), []byte(report), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +108,9 @@ func TestShimRunsPrivateRuntime(t *testing.T) {
 				t.Fatalf("CODEX_PATH = %q, want the private %q", got, filepath.Join(wantAdapterDir, "codex"))
 			}
 		}
+		if strings.HasPrefix(line, "CODEX_VERSION=") && strings.TrimPrefix(line, "CODEX_VERSION=") != "0.153.4" {
+			t.Fatalf("packaged Codex version not exported: %s", line)
+		}
 		if strings.HasPrefix(line, "ARGS=") {
 			if got := strings.TrimPrefix(line, "ARGS="); got != "extra-arg" {
 				t.Fatalf("args not forwarded: %q", got)
@@ -125,13 +132,16 @@ func TestShimPreservesExplicitCodexPath(t *testing.T) {
 	}
 
 	cmd := exec.Command(l.ShimPath())
-	cmd.Env = append(os.Environ(), "CODEX_PATH=/custom/codex")
+	cmd.Env = append(os.Environ(), "CODEX_PATH=/custom/codex", "AGENTDECK_CODEX_VERSION=stale")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("shim run: %v\n%s", err, out)
 	}
 	if !strings.Contains(string(out), "CODEX_PATH=/custom/codex\n") {
 		t.Fatalf("explicit CODEX_PATH was not preserved:\n%s", out)
+	}
+	if !strings.Contains(string(out), "CODEX_VERSION=\n") {
+		t.Fatalf("explicit CODEX_PATH must not claim the packaged version:\n%s", out)
 	}
 }
 

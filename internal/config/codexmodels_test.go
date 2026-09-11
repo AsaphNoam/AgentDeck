@@ -11,6 +11,7 @@ import (
 const codexCacheFixture = `{
   "fetched_at": "2026-07-14T00:00:00Z",
   "etag": "abc",
+  "client_version": "0.153.4",
   "models": [
     {"slug": "gpt-5.6-sol",  "display_name": "GPT-5.6-Sol",  "visibility": "list"},
     {"slug": "gpt-5.5",      "display_name": "GPT-5.5",       "visibility": "list"},
@@ -27,6 +28,30 @@ func writeCache(t *testing.T, body string) string {
 		t.Fatalf("write fixture: %v", err)
 	}
 	return path
+}
+
+// FS-09.A29: a packaged runtime must not import models advertised by a cache
+// produced by a different Codex version.
+func TestReadCodexModelCatalogRequiresPackagedRuntimeVersion(t *testing.T) {
+	t.Setenv("AGENTDECK_CODEX_VERSION", "0.153.4")
+	if _, err := ReadCodexModelCatalog(writeCache(t, codexCacheFixture)); err != nil {
+		t.Fatalf("matching cache rejected: %v", err)
+	}
+	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	if _, err := ReadCodexModelCatalog(writeCache(t, codexCacheFixture)); err == nil {
+		t.Fatal("newer personal cache must not be imported by the older packaged runtime")
+	}
+}
+
+func TestCurrentCodexRuntimeReportsMismatch(t *testing.T) {
+	cache := writeCache(t, codexCacheFixture)
+	t.Setenv("CODEX_HOME", filepath.Dir(cache))
+	t.Setenv("CODEX_PATH", "/private/runtime/codex")
+	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	got := CurrentCodexRuntime()
+	if got.Path != "/private/runtime/codex" || got.Version != "0.144.0" || got.CacheVersion != "0.153.4" || got.CatalogStatus != "mismatch" {
+		t.Fatalf("runtime info = %+v", got)
+	}
 }
 
 func TestReadCodexModelCatalog(t *testing.T) {
@@ -167,5 +192,27 @@ func TestAutoSyncBackendsPersistsOnlyWhenChanged(t *testing.T) {
 	}
 	if _, ok := after.Backends["codex"].Models["gpt-5.6-sol"]; !ok {
 		t.Errorf("expected synced model persisted, got %v", after.Backends["codex"].Models)
+	}
+}
+
+func TestAutoSyncBackendsSkipsNewerCacheForPackagedRuntime(t *testing.T) {
+	store := newTestStore(t)
+	bc := BackendsConfig{Version: 2, Backends: map[string]Backend{
+		"codex": {Type: "codex-acp", AutoSyncModels: true, DefaultModel: "gpt-4o", Models: map[string]Model{"gpt-4o": {Name: "GPT-4o", Model: "gpt-4o"}}},
+	}}
+	if err := store.WriteBackends(bc); err != nil {
+		t.Fatalf("seed backends: %v", err)
+	}
+	t.Setenv("CODEX_HOME", filepath.Dir(writeCache(t, codexCacheFixture)))
+	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	if err := store.AutoSyncBackends(); err != nil {
+		t.Fatalf("mismatch must remain non-blocking: %v", err)
+	}
+	after, err := store.ReadBackends()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := after.Backends["codex"].Models["gpt-5.6-sol"]; ok {
+		t.Fatal("newer-cache model was imported for the older packaged runtime")
 	}
 }

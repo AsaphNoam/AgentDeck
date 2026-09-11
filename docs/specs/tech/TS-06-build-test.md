@@ -133,6 +133,11 @@ private Codex readiness command and adapter override resolve without a globally 
 Existing installed release directories remain immutable: a command absent from an older version
 requires an explicit reinstall/update to a newer release.
 
+The private wrapper also exports that validated executable's reported version as
+`AGENTDECK_CODEX_VERSION`. It does so only when selecting the packaged default, not when preserving
+an explicit `CODEX_PATH`; configuration uses this release-owned version authority to gate FS-09.R59
+model-cache import and describe the effective runtime before launch.
+
 **R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
 launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version
 path for chat actions; they do not depend on `PATH`, a global install, or a second artifact. Source,

@@ -539,7 +539,8 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 // backendsResponse is the §5.3 200 body: normalized doc + cred results.
 type backendsResponse struct {
 	config.BackendsConfig
-	Credentials map[string]credcheck.CredResult `json:"credentials"`
+	Credentials  map[string]credcheck.CredResult `json:"credentials,omitempty"`
+	CodexRuntime config.CodexRuntime             `json:"codex_runtime"`
 }
 
 // handlePutBackends implements PUT /api/backends (§5.3).
@@ -624,6 +625,7 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, backendsResponse{
 		BackendsConfig: body,
 		Credentials:    credentials,
+		CodexRuntime:   config.CurrentCodexRuntime(),
 	})
 }
 

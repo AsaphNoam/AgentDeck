@@ -31,12 +31,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
 - **Open findings:** The separate injected-steer lifetime edge case remains outside the closed
-  host-owned fallback unit. Also open: live-gate finding durability, provider-contract oracles, the Codex
-  discovery-versus-execution version authority left by BR-2, and the unverified OpenCode/OpenHands
-  paths. See **Review findings**.
+  host-owned fallback unit. Also open: live-gate finding durability, provider-contract oracles, and
+  the unverified OpenCode/OpenHands paths. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
-  fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed and BR-2's release pin is
-  fixed by the adapter bump; their still-open findings are listed above. Pinned Claude model delivery
+  fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed; BR-2 is fixed and closed.
+  BR-1's still-open findings are listed above. Pinned Claude model delivery
   through `_meta` works; an ACP model `currentValue` can be stale and is no execution-model oracle.
 - **State:** The file viewer's credentialed rendered forms are owed: journey J3 now carries the
   file-link steps (docked and transcript-width forms, the refusal branch, the dashboard-pane
@@ -49,6 +48,16 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (fix):** Closed BR-2's remaining Codex discovery-versus-execution
+authority finding (FS-09.R59/A29, TS-06.R22; `INV §8`, `INV §10`, `INV §12`). The packaged wrapper
+now reports the exact private Codex version it selected; model autosync compares that authority with
+the cache's existing `client_version` and skips a mismatched personal cache instead of importing
+models the packaged CLI may not understand. New Agent shows the effective packaged path/version and
+an actionable mismatch before launch, while a backend/model executable override is identified as
+unverified. Matching caches, source launches, and explicit process overrides retain their prior
+behavior. The full Go matrix, tagged build, all 450 UI tests, UI production build, spec checks, and
+diff check pass. The BR-2 unit is closed; BR-1's three findings remain open.
 
 **Changelog — 2026-09-11 (fix):** Closed **open a file an agent mentioned** (FS-03.R55/A37,
 TS-05.R21; `INV §14`, `INV §17`). File reads now use `os.OpenInRoot`, then inspect and read the
@@ -170,8 +179,7 @@ are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no waiting unit;
-`/fix` may take BR-1 (difficult, Sol) or BR-2
-(medium, Terra/Opus);
+`/fix` may take BR-1 (difficult, Sol);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.
 
@@ -205,24 +213,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### BR-2 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Worth fixing** — Codex model discovery and execution use different version authorities
-  (**confirmed spec gap**). **Where:** `internal/config/codexmodels.go:31-86` imports every visible
-  model from `${CODEX_HOME:-~/.codex}/models_cache.json`, while `internal/release/wrapper.go:10-25`
-  and the pinned adapter execute the release-private Codex. `FS-09.R47` explicitly says import does
-  not claim future availability but defines no compatibility check or actionable degraded state.
-  **Normal-use trigger:** the personal Codex CLI/cache advances beyond AgentDeck's pinned runtime
-  and advertises a newly introduced model. **Why it matters:** this can recur after any model/runtime
-  rollout: AgentDeck presents the model as selectable and discovers incompatibility only after an
-  attempted session or prompt. A local workaround exists but is obscure: `codex-acp` 1.1.2 honors
-  `CODEX_PATH`, AgentDeck preserves that variable, and Settings' generic **Backend env** editor can
-  set it to an absolute compatible Codex executable. **Requirement:** coverage gap between
-  `FS-09.R28/R47` and `TS-06.R14/R15/R22`; `INV §8`, `INV §10`, `INV §12`. **Suggested fix/test:**
-  specify one compatibility policy (discover from the execution runtime, filter/mark models by the
-  packaged version, or expose a first-class validated Codex executable override), show the effective
-  runtime/version before launch, and test a personal cache that is newer than the packaged CLI.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 

@@ -103,6 +103,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
   const selectedModel = selectedBackend?.models[modelId];
   const effortLevels = selectedModel?.efforts ?? [];
+  const codexPathOverride = selectedModel?.env?.CODEX_PATH || selectedBackend?.env?.CODEX_PATH;
 
   useEffect(() => {
     setEffort(resetRuntimeForModel(backendsData, backendId, modelId).effort);
@@ -212,6 +213,16 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                   <option key={id} value={id}>{b.name} ({id})</option>
                 ))}
               </select>
+              {selectedBackend?.type === "codex-acp" && codexPathOverride && (
+                <small>Codex runtime override: {codexPathOverride} (version not verified).</small>
+              )}
+              {selectedBackend?.type === "codex-acp" && !codexPathOverride && backendsData?.codex_runtime?.version && (
+                <small className={backendsData.codex_runtime.catalog_status === "mismatch" ? "form-warning" : undefined}>
+                  Codex runtime {backendsData.codex_runtime.version} ({backendsData.codex_runtime.path}).
+                  {backendsData.codex_runtime.catalog_status === "mismatch" &&
+                    ` Model auto-sync skipped cache from ${backendsData.codex_runtime.cache_version || "an unknown version"}; use a matching Codex runtime or cache.`}
+                </small>
+              )}
             </div>
 
             <div className="form-field">

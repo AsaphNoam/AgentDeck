@@ -133,7 +133,7 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 			s.log.Warn("backends: falling back to default", "err", err)
 			b = config.DefaultBackends()
 			w.Header().Set("ETag", backendCatalogETag(b))
-			writeJSON(w, http.StatusOK, b)
+			writeJSON(w, http.StatusOK, backendsResponse{BackendsConfig: b, CodexRuntime: config.CurrentCodexRuntime()})
 			return
 		}
 		s.log.Error("backends: read", "err", err)
@@ -141,7 +141,7 @@ func (s *Server) handleBackends(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", backendCatalogETag(b))
-	writeJSON(w, http.StatusOK, b)
+	writeJSON(w, http.StatusOK, backendsResponse{BackendsConfig: b, CodexRuntime: config.CurrentCodexRuntime()})
 }
 
 // handleLayout returns layout.json, falling back to the default on missing/corrupt.

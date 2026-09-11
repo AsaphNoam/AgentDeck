@@ -24,7 +24,13 @@ PATH="$root/runtime/node/bin:$root/runtime/node_modules/.bin:$PATH"
 # codex-acp otherwise resolves its own semver-pinned Codex dependency, which can
 # lag behind AgentDeck's direct private Codex pin. Keep the direct executable as
 # the release default while allowing an explicit process/backend/model override.
-CODEX_PATH="${CODEX_PATH:-$root/runtime/node_modules/.bin/codex}"
+if [ -z "${CODEX_PATH:-}" ]; then
+  CODEX_PATH="$root/runtime/node_modules/.bin/codex"
+  AGENTDECK_CODEX_VERSION="$("$CODEX_PATH" --version | awk '{print $NF}')"
+  export AGENTDECK_CODEX_VERSION
+else
+  unset AGENTDECK_CODEX_VERSION
+fi
 export PATH CODEX_PATH
 exec "$root/libexec/agentdeck" "$@"
 `

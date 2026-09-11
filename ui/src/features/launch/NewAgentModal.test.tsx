@@ -45,6 +45,12 @@ const server = setupServer(
           },
         },
       },
+      codex_runtime: {
+        path: "/private/runtime/codex",
+        version: "0.144.0",
+        cache_version: "0.153.4",
+        catalog_status: "mismatch",
+      },
     }),
   ),
   http.post("/api/sessions", () =>
@@ -77,6 +83,14 @@ describe("NewAgentModal", () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     expect(await screen.findByText(/Implementer/)).toBeInTheDocument();
     expect(await screen.findByText(/My App/)).toBeInTheDocument();
+  });
+
+  it("warns before launch when the Codex cache is newer than the packaged runtime", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByText(/Implementer/);
+    const backendSelect = screen.getAllByRole("combobox")[2];
+    fireEvent.change(backendSelect, { target: { value: "codex" } });
+    expect(await screen.findByText(/Codex runtime 0\.144\.0/)).toHaveTextContent("Model auto-sync skipped cache from 0.153.4");
   });
 
   it("shows project titles without internal project ids in the chooser", async () => {

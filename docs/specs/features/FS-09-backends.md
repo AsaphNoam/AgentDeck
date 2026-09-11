@@ -111,6 +111,14 @@ Configuration-source federation for Claude/Codex is FS-08.
   existing entry, or changes a default. The ordinary Settings control can later turn continuing sync
   off. TS-07.R17 owns the accepted best-effort residue when catalog persistence precedes binding.
 
+- **R59** — When a packaged release supplies the exact Codex runtime version it will execute,
+  Codex model autosync imports a personal `models_cache.json` only when its `client_version` exactly
+  matches that runtime. A missing or different cache version is a non-blocking skipped import, and
+  New Agent shows the effective packaged Codex path/version plus the cache mismatch before launch.
+  Source launches and explicit `CODEX_PATH` overrides keep the existing best-effort import because
+  AgentDeck has no verified runtime version for them and must not execute user-selected tooling just
+  to render configuration.
+
 - **R50** — A model entry may declare optional **fast-mode capability**:
   `fast`, a boolean. Absent or `false` means the model has no fast-mode capability and AgentDeck
   offers no fast-mode choice for it anywhere, exactly as a model declaring no `efforts` gets no
@@ -502,6 +510,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   agent running fast that switches model within its backend is still running fast afterwards, and a
   switch body carrying a fast-mode field does not change it. *Verify by* launch validation tests and
   switch-runtime tests.
+- **A29** (R28, R47, R59) — A personal Codex cache produced by a newer client than the packaged
+  runtime adds no models; a matching cache still imports normally; and New Agent identifies the
+  packaged executable/version and explains the mismatch before launch. *Verified by* Codex catalog,
+  startup autosync, release-wrapper, backend-response, and New Agent UI tests.
 
 ## 6. Deviations & open decisions
 
@@ -544,8 +556,11 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Codex role delivery remains credential-gated.** Automated tests pin the documented
   `CODEX_CONFIG` overlay used by the installed adapter, but A7 must still confirm role adherence on
   a real new turn and native resume.
-- **Model/API compatibility remains partial.** The ACP adapter may ignore AgentDeck's requested
-  model in favor of its own identifiers, and older endpoints do not yet share one error envelope.
+- **Model/API compatibility remains partial.** Packaged Codex model import is version-matched under
+  R59, but source launches and explicit executable overrides remain best-effort because probing an
+  arbitrary executable during configuration reads would add side effects. The ACP adapter may ignore
+  AgentDeck's requested model in favor of its own identifiers, and older endpoints do not yet share
+  one error envelope.
 
 ## 7. Traceability
 
