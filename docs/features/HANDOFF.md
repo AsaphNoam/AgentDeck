@@ -16,8 +16,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
 - **Review units:** `fix-model-recommendations` awaits independent review once committed.
-  `open-a-file-from-chat` has been reviewed and remains open with one Must-fix filesystem-boundary
-  finding. Every other unit through this release is closed, including `queue-a-follow-up-while-busy`,
+  `open-a-file-from-chat` is fixed and closed. Every other unit through this release is closed,
+  including `queue-a-follow-up-while-busy`,
   its `steering-host-owned-fallback` continuation, and `usability-20260907`.
   `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
@@ -49,6 +49,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (fix):** Closed **open a file an agent mentioned** (FS-03.R55/A37,
+TS-05.R21; `INV §14`, `INV §17`). File reads now use `os.OpenInRoot`, then inspect and read the
+returned descriptor, so a concurrent file or symlink replacement cannot redirect an accepted path
+outside the recorded working directory. A deterministic regression replaces the checked file with
+an outside symlink immediately before open and proves outside bytes are refused. The full Go matrix,
+tagged build, focused file-read tests, spec checks, and diff check pass. The originating unit is
+closed; BR-1 and BR-2 findings remain open.
 
 **Changelog — 2026-09-11 (review):** Reviewed **open a file an agent mentioned**. The route refuses
 lexical and resolved symlink escapes, but it checks the pathname and then resolves that pathname
@@ -162,7 +170,7 @@ are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no waiting unit;
-`/fix` may take `open-a-file-from-chat` (medium, Terra/Opus), BR-1 (difficult, Sol), or BR-2
+`/fix` may take BR-1 (difficult, Sol) or BR-2
 (medium, Terra/Opus);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.
@@ -197,21 +205,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### open-a-file-from-chat — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — the file-read containment check and the file open resolve the pathname separately
-  (**confirmed**). **Where:** `internal/server/fileread.go:192-217` calls `withinRoot(root, rel)`,
-  then reaches the same pathname again through `os.Stat(full)` and `os.Open(full)`.
-  **Normal-use trigger:** an agent, build, or other workspace process replaces the accepted file or
-  an in-root symlink after containment is checked but before it is opened. **Why it matters:** the
-  second resolution can follow the replacement outside the recorded working directory, breaking
-  the viewer's filesystem boundary even though the ordinary static-symlink tests pass.
-  **Requirement:** FS-03.R55, TS-05.R21, `INV §14`, `INV §17`. **Suggested fix/test:** keep the
-  form-first refusal, open through a descriptor-rooted API such as `os.OpenInRoot`, and inspect and
-  read that returned descriptor rather than resolving the pathname again; add a deterministic
-  regression that replaces the target after the pre-open containment check and proves no outside
-  bytes are returned.
 
 ### BR-2 — **Fix model:** medium — Codex Terra or Claude Opus.
 

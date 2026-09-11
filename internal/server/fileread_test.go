@@ -216,6 +216,32 @@ func TestFileReadRefusesSymlinkEscape(t *testing.T) {
 	readFileRefused(t, h, "a_symlink", "escape.txt", runtime.CodePathRefused, http.StatusUnprocessableEntity)
 }
 
+// TestFileReadRefusesTargetReplacedBeforeOpen proves containment is enforced by
+// the open itself: replacing an accepted in-root file with an outside symlink
+// after the preliminary check cannot return outside bytes (TS-05.R21, INV §17).
+func TestFileReadRefusesTargetReplacedBeforeOpen(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "report.txt")
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	writeFile(t, target, "safe\n")
+	writeFile(t, outside, "secret\n")
+
+	got, apiErr := readWorkspaceFileAfterValidation(root, "report.txt", func() {
+		if err := os.Remove(target); err != nil {
+			t.Fatalf("remove checked target: %v", err)
+		}
+		if err := os.Symlink(outside, target); err != nil {
+			t.Skipf("symlink unsupported: %v", err)
+		}
+	})
+	if apiErr == nil {
+		t.Fatalf("replacement read succeeded with content %q", got.Content)
+	}
+	if apiErr.Code != runtime.CodePathRefused {
+		t.Fatalf("code = %q, want %q", apiErr.Code, runtime.CodePathRefused)
+	}
+}
+
 // TestFileReadRefusesNonFileAndMissing covers the directory, missing-file, and
 // non-regular outcomes (FS-03.A37).
 func TestFileReadRefusesNonFileAndMissing(t *testing.T) {

@@ -159,12 +159,13 @@ sensitive-context sharing is a practical problem.
   directory recorded on that agent's own session snapshot, read from server-side state; the request
   supplies a path and can never supply or influence a root. That path is cleaned and refused before
   any filesystem access when it escapes the root, cannot be expressed inside it, or names `.git`.
-  The candidate is then resolved with `filepath.EvalSymlinks` and re-checked inside the resolved
-  root, so a symlink inside the directory cannot lead out of it. That resolve-and-recheck is
-  `internal/server/filesearch.go`'s shipped `withinRoot` containment: the read and the composer
-  search share one spelling of it rather than growing a second copy of a rule that must not drift
-  (`INV §2`). Only a regular file is opened, the read is bounded by an explicit byte limit rather
-  than by the file's size, and non-UTF-8 content is refused rather than transcoded or escaped. The
+  The candidate is then opened with `os.OpenInRoot`, so pathname resolution and opening are one
+  root-confined operation: a symlink inside the directory cannot lead out of it, and a concurrent
+  replacement after the form check cannot redirect the open outside the root. File type, size,
+  modification time, and content are all read from that returned descriptor rather than resolving
+  the pathname again. Only a regular file is accepted, the read is bounded by an explicit byte
+  limit rather than by the file's size, and non-UTF-8 content is refused rather than transcoded or
+  escaped. The
   route is registered inside `routes()` so it sits behind `localOnly` like every other route
   (R2, `INV §14`); loopback is not authentication (R3), which is precisely why the root comes from
   session state instead of the request. AgentDeck's own home tree stays out of reach unless a
@@ -173,8 +174,8 @@ sensitive-context sharing is a practical problem.
   readable inside the root: a deliberate product decision (FS-03.R55) that accepts a linked `.env`
   inside the working directory would display, on the grounds that the supervised agent already had
   that reach and a person is the one activating the link. R11 applies — traversal, absolute-path
-  escape, symlink escape, `.git`, non-regular file, oversized, and non-UTF-8 each need an
-  adversarial test.
+  escape, symlink escape, concurrent target replacement, `.git`, non-regular file, oversized, and
+  non-UTF-8 each need an adversarial test.
 
 ## 3. Interfaces & data shapes
 

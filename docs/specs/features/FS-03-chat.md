@@ -728,8 +728,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/chat/ChatPanel.test.tsx`, with the rendered docked/reflowed forms exercised in
   journey J3.
 - **A37** (R55) — A path outside the session working directory, a symlink
-  escaping it, a `.git` path, a missing file, a directory, non-text content, and an absent working
-  directory each return their typed refusal without opening anything outside the directory; an
+  escaping it, a target replaced with an escaping symlink after validation, a `.git` path, a
+  missing file, a directory, non-text content, and an absent working directory each return their
+  typed refusal without opening anything outside the directory; an
   oversized file returns its labelled partial read; a Git-ignored file inside the directory reads
   successfully; and each outcome renders as its stated reason in the viewer while the transcript
   stays usable. *Verify by* `internal/server/fileread_test.go` and

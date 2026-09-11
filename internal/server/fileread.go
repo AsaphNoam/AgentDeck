@@ -186,26 +186,31 @@ func resolveWorkspaceRoot(cwd string) (string, *runtime.APIError) {
 }
 
 // readWorkspaceFile opens rel inside the already-resolved root and returns its
-// bounded text. Containment is re-checked after symlink resolution through
-// filesearch.go's shipped withinRoot, so a symlink inside the directory cannot
-// lead out of it and the read shares one spelling of that rule with the composer
-// search (TS-05.R21, INV §2).
+// bounded text. OpenInRoot keeps path resolution and opening inside the root;
+// metadata and content then come from that same descriptor so a concurrent path
+// replacement cannot redirect the read outside the workspace (TS-05.R21).
 func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
-	full := filepath.Join(root, filepath.FromSlash(rel))
-	if _, err := os.Lstat(full); err != nil {
+	return readWorkspaceFileAfterValidation(root, rel, nil)
+}
+
+// readWorkspaceFileAfterValidation exposes the instant after the path's form
+// has been checked for the deterministic replacement regression.
+// Production callers never supply a hook.
+func readWorkspaceFileAfterValidation(root, rel string, afterValidation func()) (fileContent, *runtime.APIError) {
+	if afterValidation != nil {
+		afterValidation()
+	}
+	f, err := os.OpenInRoot(root, filepath.FromSlash(rel))
+	if err != nil {
 		if os.IsNotExist(err) {
 			return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
 		}
-		return fileContent{}, apiError(runtime.CodeNotFound, "that file could not be opened")
-	}
-	if !withinRoot(root, rel) {
-		// EvalSymlinks failing here means the link target is gone; either way the
-		// path is not proven inside the root, so it is refused as such.
 		return fileContent{}, apiError(runtime.CodePathRefused, "that path is outside this agent's working directory")
 	}
-	info, err := os.Stat(full)
+	defer f.Close()
+	info, err := f.Stat()
 	if err != nil {
-		return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
+		return fileContent{}, apiError(runtime.CodeNotAFile, "that file could not be read")
 	}
 	if info.IsDir() {
 		return fileContent{}, apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
@@ -213,11 +218,6 @@ func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
 	if !info.Mode().IsRegular() {
 		return fileContent{}, apiError(runtime.CodeNotAFile, "that path does not name a regular file")
 	}
-	f, err := os.Open(full)
-	if err != nil {
-		return fileContent{}, apiError(runtime.CodeNotAFile, "that file could not be read")
-	}
-	defer f.Close()
 	// One byte past the limit distinguishes "exactly at the limit" from "larger",
 	// so the partial read is labelled only when content was actually cut.
 	buf := make([]byte, fileReadLimit+1)
