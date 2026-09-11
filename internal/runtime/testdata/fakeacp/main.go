@@ -182,6 +182,42 @@ func handle(msg *rpcMessage) {
 		if outcome == "" {
 			outcome = "injected"
 		}
+		if outcome == "promptRequired" {
+			var params struct {
+				Meta struct {
+					Steering struct {
+						IdleBehavior string `json:"idleBehavior"`
+					} `json:"steering"`
+				} `json:"_meta"`
+			}
+			_ = json.Unmarshal(msg.Params, &params)
+			if params.Meta.Steering.IdleBehavior != "promptRequired" {
+				respondErr(*msg.ID, -32602, "promptRequired was not requested")
+				return
+			}
+			// Reproduce the idle race rather than merely returning a canned enum:
+			// release the original prompt and wait until its response is on the wire
+			// before reporting that this steer consumed nothing.
+			if hold := os.Getenv("FAKEACP_HOLD_FILE"); hold != "" {
+				_ = os.WriteFile(hold, []byte("go"), 0o600)
+			}
+			if ended := os.Getenv("FAKEACP_PROMPT_END_FILE"); ended != "" {
+				for {
+					if _, err := os.Stat(ended); err == nil {
+						break
+					}
+					time.Sleep(time.Millisecond)
+				}
+			}
+			if wait := os.Getenv("FAKEACP_STEER_WAIT_FILE"); wait != "" {
+				for {
+					if _, err := os.Stat(wait); err == nil {
+						break
+					}
+					time.Sleep(time.Millisecond)
+				}
+			}
+		}
 		if outcome == "reject" {
 			respondErr(*msg.ID, -32602, "unsupported steering input")
 			return
@@ -216,6 +252,12 @@ func handle(msg *rpcMessage) {
 					"cachedReadTokens": 1200, "cachedWriteTokens": 0, "totalTokens": 44000,
 				},
 			})
+			if ended := os.Getenv("FAKEACP_PROMPT_END_FILE"); ended != "" {
+				if hold := os.Getenv("FAKEACP_HOLD_FILE"); hold != "" {
+					_ = os.Remove(hold)
+				}
+				_ = os.WriteFile(ended, []byte("ended"), 0o600)
+			}
 		}()
 	default:
 		respondErr(*msg.ID, -32601, "method not found: "+msg.Method)

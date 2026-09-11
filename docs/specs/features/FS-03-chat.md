@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -434,7 +434,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   row, transcript event, archive content, search document, or browser-stored value is added, and no
   agent-facing surface changes — an agent cannot open the viewer, be shown it, or learn it exists.
 
-- **R56 (planned) — A steer that loses the active turn remains host-owned.** If the
+- **R56 — A steer that loses the active turn remains host-owned.** If the
   adapter handles a Steer request after no provider turn is still active, it returns a
   no-consumption `promptRequired` outcome instead of launching a detached turn. AgentDeck then sends
   the unchanged message through the ordinary prompt path exactly once, so the normal busy,
@@ -734,7 +734,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   successfully; and each outcome renders as its stated reason in the viewer while the transcript
   stays usable. *Verify by* `internal/server/fileread_test.go` and
   `ui/src/components/chat/FileViewer.test.tsx`.
-- **A38 (planned)** (R56) — A fake adapter whose active turn settles before it
+- **A38** (R56) — A fake adapter whose active turn settles before it
   handles a Steer request returns `promptRequired` without emitting a detached turn; AgentDeck
   submits the unchanged text once through the ordinary prompt path, reports `new_turn`, keeps the
   agent busy until that prompt's terminal event, and lets Send and Cancel arbitrate against that

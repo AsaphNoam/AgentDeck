@@ -553,12 +553,12 @@ reloads the collections through this route rather than reconstructing them from 
   already refuses one. No route is added for directory listing, writing, or downloading, and the
   existing tracking and search routes are unchanged.
 
-**R41 (planned) — The steer route preserves one host-owned lifecycle.** When the
+**R41 — The steer route preserves one host-owned lifecycle.** When the
 adapter returns `promptRequired`, `POST /api/sessions/{id}/steer` submits the unchanged text through
 the ordinary prompt path exactly once and returns the existing `202 {accepted, agent_id,
 outcome:new_turn}` shape. The route does not retry `startedNewTurn`, because that adapter outcome may
 already have consumed the text and started work outside AgentDeck's turn gate. A runtime that cannot
-provide the no-consumption idle fallback is not compatible with the planned steering lifecycle;
+provide the no-consumption idle fallback is not compatible with the steering lifecycle;
 Steer availability remains capability-advertised rather than inferred from the adapter version.
 
 ## 3. Interfaces & data shapes
@@ -606,7 +606,7 @@ integers instead of silently applying defaults.
 ## 6. Traceability
 
 - Route inventory: `internal/server/routes.go`.
-- **Steer lifecycle (R39/R41, planned):** `internal/server/sessions.go`
+- **Steer lifecycle (R39/R41):** `internal/server/sessions.go`
   preserves the existing steer response shape while routing `promptRequired` through the ordinary
   prompt seam; `internal/server/queue_steer_test.go` covers the public `new_turn` outcome.
 - Errors/middleware: `internal/server/apierror.go`, `middleware.go`, `security.go`.

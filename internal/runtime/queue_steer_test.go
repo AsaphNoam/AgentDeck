@@ -116,6 +116,21 @@ func waitForPrompts(t *testing.T, logPath string, want int) []string {
 	}
 }
 
+func waitForRuntimeStatus(t *testing.T, c *ChatRuntime, agentID, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got, err := c.store.ReadStatus(agentID)
+		if err == nil && got.State == want {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for status %q (last %+v err %v)", want, got, err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // TestSendPromptOrHoldQueuesOneFollowUpAndDeliversItAsTheNextTurn is FS-03.A31's
 // core: the person's send to a busy agent is accepted rather than refused, holds
 // exactly one message, a second send replaces rather than stacks, the held
@@ -266,9 +281,9 @@ func TestSteerInjectsIntoTheRunningTurn(t *testing.T) {
 	}
 }
 
-// TestSteerReportsTheAdapterStartedANewTurn covers the turn that ends between the
-// click and the delivery: the adapter starts a fresh turn from the same message
-// and the runtime reports which of the two happened rather than inferring it.
+// TestSteerReportsTheAdapterStartedANewTurn keeps the incompatible legacy
+// contract distinct: AgentDeck reports it but never retries text the adapter may
+// already have consumed (FS-03.R56).
 func TestSteerReportsTheAdapterStartedANewTurn(t *testing.T) {
 	c, h, _, _, _ := busyAgent(t, "FAKEACP_STEERING=1", "FAKEACP_STEER_OUTCOME=startedNewTurn")
 	outcome, err := c.Steer(context.Background(), h.AgentID, "late")
@@ -277,6 +292,91 @@ func TestSteerReportsTheAdapterStartedANewTurn(t *testing.T) {
 	}
 	if outcome != SteerNewTurn {
 		t.Fatalf("outcome = %q, want %q", outcome, SteerNewTurn)
+	}
+}
+
+// TestSteerPromptRequiredRunsAHostOwnedTurn reproduces FS-03.A38's completion
+// race. The fake releases the original prompt and puts its response on the wire
+// before returning promptRequired without consuming the steer. AgentDeck then
+// owns the replacement through the ordinary gate, so Send holds behind it,
+// Cancel settles it, and every accepted prompt has one transcript terminal.
+func TestSteerPromptRequiredRunsAHostOwnedTurn(t *testing.T) {
+	ended := filepath.Join(t.TempDir(), "prompt-ended")
+	steerReply := filepath.Join(t.TempDir(), "steer-reply")
+	c, h, ch, _, promptLog := busyAgent(t,
+		"FAKEACP_STEERING=1",
+		"FAKEACP_STEER_OUTCOME=promptRequired",
+		"FAKEACP_PROMPT_END_FILE="+ended,
+		"FAKEACP_STEER_WAIT_FILE="+steerReply,
+	)
+
+	steerDone := make(chan struct{})
+	var outcome SteerOutcome
+	var err error
+	go func() {
+		outcome, err = c.Steer(context.Background(), h.AgentID, "late correction")
+		close(steerDone)
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, statErr := os.Stat(ended); statErr == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for the original prompt to settle")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if held, sendErr := c.SendPromptOrHold(context.Background(), h.AgentID, "after fallback"); sendErr != nil || !held {
+		t.Fatalf("SendPromptOrHold while steering reply waits = held %v err %v, want held", held, sendErr)
+	}
+	if writeErr := os.WriteFile(steerReply, []byte("reply"), 0o600); writeErr != nil {
+		t.Fatalf("release steer reply: %v", writeErr)
+	}
+	<-steerDone
+	if err != nil {
+		t.Fatalf("Steer: %v", err)
+	}
+	if outcome != SteerNewTurn {
+		t.Fatalf("outcome = %q, want %q", outcome, SteerNewTurn)
+	}
+	if got := waitForPrompts(t, promptLog, 2); got[1] != "late correction" {
+		t.Fatalf("provider prompts = %v, want unchanged fallback once", got)
+	}
+	waitForChunk(t, ch, "working")
+	waitForRuntimeStatus(t, c, h.AgentID, "busy")
+
+	if cancelled, err := c.Cancel(context.Background(), h.AgentID); err != nil || !cancelled {
+		t.Fatalf("Cancel fallback = %v err %v, want cancelled", cancelled, err)
+	}
+	if got := waitForPrompts(t, promptLog, 3); got[2] != "after fallback" {
+		t.Fatalf("post-cancel prompts = %v, want held Send as successor", got)
+	}
+	waitForRuntimeStatus(t, c, h.AgentID, "idle")
+
+	events, err := c.Transcript(h.AgentID)
+	if err != nil {
+		t.Fatalf("Transcript: %v", err)
+	}
+	userCounts := map[string]int{}
+	turnEnds := 0
+	for _, ev := range events {
+		switch ev.Type {
+		case EvUserPrompt:
+			var prompt UserPromptData
+			if err := json.Unmarshal(ev.Data, &prompt); err != nil {
+				t.Fatalf("decode user prompt: %v", err)
+			}
+			userCounts[prompt.Text]++
+		case EvTurnEnd:
+			turnEnds++
+		}
+	}
+	if userCounts["late correction"] != 1 || userCounts["after fallback"] != 1 {
+		t.Fatalf("user prompt counts = %v, want each host-owned prompt once", userCounts)
+	}
+	if turnEnds != 3 {
+		t.Fatalf("turn_end count = %d, want one for each of three accepted prompts", turnEnds)
 	}
 }
 
@@ -391,7 +491,10 @@ func TestMapSteerResultRejectsAnythingButTheTwoOutcomes(t *testing.T) {
 	if got, err := mapSteerResult(json.RawMessage(`{"outcome":"startedNewTurn"}`), nil); err != nil || got != SteerNewTurn {
 		t.Fatalf("startedNewTurn = %q err %v", got, err)
 	}
-	for _, body := range []string{`{"outcome":"failed"}`, `{"outcome":"promptRequired"}`, `{}`, `nope`} {
+	if got, err := mapSteerResult(json.RawMessage(`{"outcome":"promptRequired","reason":"noRunningTurn"}`), nil); err != nil || got != steerPromptRequired {
+		t.Fatalf("promptRequired = %q err %v", got, err)
+	}
+	for _, body := range []string{`{"outcome":"failed"}`, `{}`, `nope`} {
 		if got, err := mapSteerResult(json.RawMessage(body), nil); err == nil {
 			t.Fatalf("mapSteerResult(%s) = %q, want an error", body, got)
 		}

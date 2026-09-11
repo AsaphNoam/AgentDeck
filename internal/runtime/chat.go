@@ -232,11 +232,18 @@ type agentState struct {
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
 	// — there is nothing to persist and nothing to reap (INV §4, §16).
 	held heldMessage
+	// steerFallback is the one no-consumption steer waiting to become the next
+	// host-owned turn. It is separate from held so a Send accepted while the
+	// adapter decides the race remains queued behind the fallback rather than
+	// being overwritten or overtaking it (FS-03.R56, INV §5).
+	steerFallback heldMessage
 }
 
 type heldMessage struct {
 	Text     string
 	AfterSeq int64
+	Ready    bool
+	TurnID   string
 }
 
 // pendingPerm is a withheld session/request_permission awaiting a decision.
@@ -476,29 +483,40 @@ func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOut
 		text = as.held.Text
 		as.held = heldMessage{}
 	}
+	if as.steerFallback.Text != "" {
+		as.mu.Unlock()
+		return "", ErrTurnInFlight
+	}
+	as.steerFallback = heldMessage{Text: text, AfterSeq: as.seq}
+	if !as.turnActive {
+		turnID, _ := as.claimTurnLocked()
+		as.steerFallback.TurnID = turnID
+	}
 	as.mu.Unlock()
 
 	res, callErr := as.transport.Call(ctx, steeringMethod, map[string]any{
 		"sessionId": as.sessionID,
 		"prompt":    []map[string]any{{"type": "text", "text": text}},
+		"_meta": map[string]any{
+			"steering": map[string]any{"idleBehavior": "promptRequired"},
+		},
 	})
 	outcome, err := mapSteerResult(res, callErr)
+	nextText, nextTurnID := as.resolveSteerFallback(outcome, err, promoted)
+	if nextText != "" {
+		if runErr := c.runPromptTurn(as, nextText, nextTurnID); runErr != nil {
+			err = runErr
+		}
+	}
+	if err == nil && outcome == steerPromptRequired {
+		return SteerNewTurn, nil
+	}
 	if err == nil {
 		// The agent really did receive it — injected into the running turn or as
 		// the turn the adapter started — so it belongs in the durable transcript
 		// as an ordinary user message on the same path every other prompt takes
 		// (FS-03.R50, INV §2). A refusal deliberately writes nothing.
 		c.emit(as, EvUserPrompt, UserPromptData{Text: text})
-	}
-	if err != nil && promoted {
-		// A refusal must leave the person's message where they can still see and
-		// act on it. The composer holds a message the person typed; a promoted one
-		// only exists here, so put it back unless something newer took its place.
-		as.mu.Lock()
-		if as.held.Text == "" {
-			as.held = heldMessage{Text: text, AfterSeq: as.seq}
-		}
-		as.mu.Unlock()
 	}
 	return outcome, err
 }
@@ -507,11 +525,15 @@ func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOut
 // handshake as initialize._meta.steering.supported (TS-04.R49).
 const steeringMethod = "_session/steering"
 
+// steerPromptRequired is adapter-facing only. The public API still reports
+// new_turn after AgentDeck has accepted the no-consumption fallback through its
+// ordinary prompt gate.
+const steerPromptRequired SteerOutcome = "prompt_required"
+
 // mapSteerResult turns the adapter's answer into the two outcomes the product
-// reports. Anything else — the adapter's own "failed", the "promptRequired"
-// fallback AgentDeck deliberately never opts into, a missing field, or an
-// unreadable body — is an error carrying what the adapter said, never a silent
-// downgrade to a queue (FS-03.R50, INV §12).
+// reports or handles. promptRequired is retry-safe only because the negotiated
+// adapter contract guarantees that the text was not consumed; startedNewTurn
+// remains a distinct legacy success and is never retried (FS-03.R56, INV §11).
 func mapSteerResult(res json.RawMessage, callErr error) (SteerOutcome, error) {
 	if callErr != nil {
 		return "", callErr
@@ -527,6 +549,8 @@ func mapSteerResult(res json.RawMessage, callErr error) (SteerOutcome, error) {
 		return SteerInjected, nil
 	case "startedNewTurn":
 		return SteerNewTurn, nil
+	case "promptRequired":
+		return steerPromptRequired, nil
 	case "":
 		return "", fmt.Errorf("runtime: steering returned no outcome")
 	default:
@@ -579,6 +603,46 @@ func (as *agentState) claimTurnOrHold(text string) (string, bool) {
 	// than stacking a second queued turn (FS-03.R48, INV §16).
 	as.held = heldMessage{Text: text, AfterSeq: as.seq}
 	return "", true
+}
+
+// resolveSteerFallback commits the reservation only after the adapter guarantees
+// it consumed nothing. Until then turn settlement transfers the gate to the
+// reservation without firing it, so a concurrent Send remains behind it.
+func (as *agentState) resolveSteerFallback(outcome SteerOutcome, callErr error, promoted bool) (string, string) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	fallback := as.steerFallback
+	if fallback.Text == "" {
+		return "", ""
+	}
+	if callErr == nil && outcome == steerPromptRequired {
+		as.steerFallback.Ready = true
+		if fallback.TurnID == "" {
+			return "", ""
+		}
+		as.steerFallback = heldMessage{}
+		return fallback.Text, fallback.TurnID
+	}
+	as.steerFallback = heldMessage{}
+	restoredPromoted := false
+	if callErr != nil && promoted && as.held.Text == "" {
+		as.held = heldMessage{Text: fallback.Text, AfterSeq: as.seq}
+		restoredPromoted = true
+	}
+	if fallback.TurnID == "" {
+		return "", ""
+	}
+	if restoredPromoted {
+		as.turnActive = false
+		return "", ""
+	}
+	if as.held.Text == "" {
+		as.turnActive = false
+		return "", ""
+	}
+	text := as.held.Text
+	as.held = heldMessage{}
+	return text, fallback.TurnID
 }
 
 func (as *agentState) claimTurnLocked() (string, bool) {
@@ -687,12 +751,31 @@ func (c *ChatRuntime) deliverHeld(as *agentState) {
 // window in which a newer Send can overtake the earlier held message (INV §5,
 // §15). Caller must hold as.mu.
 func (as *agentState) reserveHeldSuccessorLocked() (string, string) {
-	if as.held.Text == "" || as.stopped {
+	if as.stopped {
 		as.turnActive = false
 		return "", ""
 	}
-	text := as.held.Text
-	as.held = heldMessage{}
+	text := as.steerFallback.Text
+	if text != "" {
+		if as.steerFallback.TurnID == "" {
+			as.steerFallback.TurnID = as.nextTurnIDLocked()
+		}
+		if !as.steerFallback.Ready {
+			return "", ""
+		}
+		turnID := as.steerFallback.TurnID
+		as.steerFallback = heldMessage{}
+		as.cancelEscalated = false
+		as.resolved = map[string]struct{}{}
+		return text, turnID
+	} else {
+		text = as.held.Text
+		as.held = heldMessage{}
+	}
+	if text == "" {
+		as.turnActive = false
+		return "", ""
+	}
 	as.cancelEscalated = false
 	as.resolved = map[string]struct{}{}
 	return text, as.nextTurnIDLocked()

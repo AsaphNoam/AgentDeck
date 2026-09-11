@@ -16,6 +16,9 @@ NODE_VERSION="${NODE_VERSION:-22.22.0}"
 NODE_SHA256="5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640"
 CLAUDE_ACP_VERSION="0.75.1"
 CODEX_ACP_VERSION="1.10.0"
+CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+agentdeck.1"
+CODEX_ACP_SOURCE_SHA256="4602784c5896fbf05a7d89b09655bacc768d0bf281e0d03a10333ff81da45268"
+CODEX_ACP_PATCHED_SHA256="003e57494e9cfdc0f688b329d75f159ac03a74a0299ce60ff807fd62443e965e"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
 # one: it is the executable that performs `codex login` and answers
 # `codex login status`, so onboarding readiness must not depend on where the
@@ -58,6 +61,18 @@ cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtim
 [ -x "$stage/runtime/node_modules/.bin/codex-acp" ] || die "Codex ACP adapter was not installed"
 [ -x "$stage/runtime/node_modules/.bin/codex" ] || die "Codex CLI was not installed"
 
+# Codex ACP 1.10.0 advertises steering but its idle branch starts a detached
+# turn. Keep AgentDeck's no-consumption fallback explicit and version-locked
+# until an upstream release provides the same request-level contract.
+codex_acp_source="$stage/runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js"
+codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
+[ "$codex_acp_sum" = "$CODEX_ACP_SOURCE_SHA256" ] \
+  || die "Codex ACP ${CODEX_ACP_VERSION} source does not match the reviewed patch input"
+patch --fuzz=0 -p1 -d "$stage/runtime" < scripts/release/patches/codex-acp-1.10.0-steering-prompt-required.patch
+codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
+[ "$codex_acp_sum" = "$CODEX_ACP_PATCHED_SHA256" ] \
+  || die "Codex ACP steering patch did not produce the complete reviewed output"
+
 # The direct Codex pin and codex-acp's range must dedupe. A nested second copy
 # recreates the catalog/runtime contradiction that the private pin closes.
 codex_package_count="$(find "$stage/runtime/node_modules" -path '*/@openai/codex/package.json' -type f | wc -l | tr -d ' ')"
@@ -75,7 +90,7 @@ esac
 
 "$stage/libexec/agentdeck" release wrapper --dir "$stage"
 "$stage/libexec/agentdeck" release manifest --dir "$stage" --version "$VERSION" \
-  --node "$NODE_VERSION" --claude-acp "$CLAUDE_ACP_VERSION" --codex-acp "$CODEX_ACP_VERSION" \
+  --node "$NODE_VERSION" --claude-acp "$CLAUDE_ACP_VERSION" --codex-acp "$CODEX_ACP_COMPONENT_VERSION" \
   --codex "$CODEX_CLI_VERSION"
 
 mkdir -p "$OUT_DIR"

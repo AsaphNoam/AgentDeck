@@ -63,7 +63,10 @@ built with `sqlite_fts5`; an untagged binary is never packaged as a release runt
 lockfile that pin the Node distribution, `@agentclientprotocol/claude-agent-acp`,
 `@agentclientprotocol/codex-acp`, `@openai/codex`, and their runtime dependency closure. The release
 job verifies those pinned inputs before it creates an archive; an installer never runs npm, resolves a
-package range, builds the UI, or compiles Go on a recipient's Mac.
+package range, builds the UI, or compiles Go on a recipient's Mac. A version-locked patch may amend
+one pinned adapter only when its filename identifies that exact package version, clean-install
+application is fail-closed, the required output is checked before packaging, and the manifest's
+component version carries an AgentDeck patch suffix rather than presenting upstream bytes.
 
 **R15** — A release archive contains only this versioned layout:
 

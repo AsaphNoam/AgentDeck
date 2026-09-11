@@ -43,8 +43,7 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`steering-host-owned-fallback.md`](steering-host-owned-fallback.md) — an idle Steer fallback
-  returns control to AgentDeck so the replacement turn has a normal host-owned lifecycle.
+- None.
 
 ## Paused changes
 

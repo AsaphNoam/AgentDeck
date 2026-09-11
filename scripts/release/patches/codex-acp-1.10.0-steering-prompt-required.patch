@@ -1,0 +1,36 @@
+--- a/node_modules/@agentclientprotocol/codex-acp/dist/index.js
++++ b/node_modules/@agentclientprotocol/codex-acp/dist/index.js
+@@ -33287,6 +33287,9 @@
+         return { outcome: "injected" };
+       }
+     }
++    if (params._meta?.steering?.idleBehavior === "promptRequired") {
++      return { outcome: "promptRequired", reason: "noRunningTurn" };
++    }
+     return await this.startNewTurnFromSteering(params);
+   }
+   /**
+@@ -33421,12 +33424,22 @@
+   parseSessionSteerParams(params) {
+     const sessionId = params["sessionId"];
+     const prompt = params["prompt"];
++    const meta = params["_meta"];
+     if (typeof sessionId !== "string" || !Array.isArray(prompt)) {
+       throw RequestError.invalidParams();
+     }
++    const steering = meta && typeof meta === "object" ? meta["steering"] : void 0;
++    const idleBehavior = steering && typeof steering === "object" ? steering["idleBehavior"] : void 0;
++    if (idleBehavior !== void 0 && idleBehavior !== "promptRequired") {
++      throw RequestError.invalidParams(
++        void 0,
++        "unsupported steering idleBehavior"
++      );
++    }
+     return {
+       sessionId,
+-      prompt
++      prompt,
++      _meta: meta
+     };
+   }
+   createSessionConfigOptions(sessionState) {

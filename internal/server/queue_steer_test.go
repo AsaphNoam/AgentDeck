@@ -201,6 +201,32 @@ func TestSteerRouteReportsTheAdapterOutcome(t *testing.T) {
 	}
 }
 
+// TestSteerRouteReportsHostOwnedFallback is TS-03.R41's public contract: an
+// adapter's no-consumption result is accepted through the ordinary prompt gate,
+// while the route keeps the existing new_turn response shape.
+func TestSteerRouteReportsHostOwnedFallback(t *testing.T) {
+	ended := filepath.Join(t.TempDir(), "prompt-ended")
+	srv, ts, id, _ := busyChatServer(t, map[string]string{
+		"FAKEACP_STEERING":        "1",
+		"FAKEACP_STEER_OUTCOME":   "promptRequired",
+		"FAKEACP_PROMPT_END_FILE": ended,
+	})
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/steer", map[string]string{"text": "late"})
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("promptRequired steer status = %d: %s", resp.StatusCode, body)
+	}
+	if got := fieldOf(t, body, "outcome"); got != "new_turn" {
+		t.Fatalf("outcome = %q, want new_turn", got)
+	}
+	waitStatus(t, srv, id, "busy")
+
+	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "after"})
+	if resp.StatusCode != http.StatusAccepted || fieldOf(t, body, "delivery") != "held" {
+		t.Fatalf("Send during fallback = %d: %s, want held", resp.StatusCode, body)
+	}
+}
+
 // TestSteerRouteConflictsWhereThereIsNothingToSteer covers TS-03.R39's two
 // conflicts: an adapter that does not advertise the extension, and an empty steer
 // with no held message.

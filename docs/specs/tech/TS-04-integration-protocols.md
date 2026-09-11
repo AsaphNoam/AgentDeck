@@ -337,15 +337,16 @@ during load as normal. `session/new` replays nothing, so the launch path holds n
 suppressed frames is logged once per resume, because a provider that replays is otherwise invisible
 in AgentDeck's own records.
 
-**R51 (planned) — Idle steering returns control to the host.** The active-turn
+**R51 — Idle steering returns control to the host.** The active-turn
 `_session/steering` path returns `injected`, and its completion stays attached to the outstanding
 `session/prompt`. If the adapter receives steering when no turn is active, it returns
 `promptRequired` and guarantees that it did not enqueue, inject, or otherwise consume the supplied
 content; AgentDeck resubmits that exact content through `session/prompt`. `startedNewTurn` is a
 legacy detached-turn outcome and is not a safe retry signal or a completion owner for AgentDeck.
-The pinned Codex adapter must gain this equivalent contract (through a compatible release or an
-explicitly maintained adapter patch) before the planned host-owned behavior can ship; the steering
-advertisement still controls whether Steer is shown.
+Claude 0.75.1 provides the request opt-in directly. The private release applies the version-locked
+`codex-acp-1.10.0-steering-prompt-required.patch` after its clean install and records that patched
+component as `1.10.0+agentdeck.1`; patch drift fails release assembly. The steering advertisement
+still controls whether Steer is shown.
 
 **R23 `(planned)` — Optional-integration version tolerance is probed.** An adapter flag or metadata
 extension known to vary by pinned CLI version will use an explicit capability probe or a documented
@@ -751,7 +752,7 @@ global resource list.
 - Adapters: `internal/backend/adapter.go`; credential checks in `internal/backend/credcheck`;
   official Claude session metadata and Codex `CODEX_CONFIG` prompt delivery are pinned by runtime
   parameter/environment tests.
-- **Steering lifecycle (R49/R51, planned):** `_session/steering` handling in
+- **Steering lifecycle (R49/R51):** `_session/steering` handling in
   `internal/runtime/chat.go`, adapter capability and response mapping in `internal/runtime/acpmap.go`,
   and the fake ACP steering scenarios prove active injection, no-consumption idle fallback, and
   rejection of detached `startedNewTurn` as a host completion contract.

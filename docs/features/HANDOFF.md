@@ -15,12 +15,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None; the next role picks from the queues below.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `queue-a-follow-up-while-busy` (Send queues, Steer injects) stays open because
-  review of its fix, `steering-host-owned-fallback`, found a Must-fix. That fix unit is reviewed and
-  awaits repair (**Fix model:** medium — Codex Terra or Claude Opus).
-  `fix-model-recommendations` awaits independent review once committed, and
+- **Review units:** `fix-model-recommendations` awaits independent review once committed, and
   `open-a-file-from-chat` is newly available for review. Every other unit through this release is
-  closed, including `usability-20260907`. `stop-telling-agents-to-poll` shipped without entering
+  closed, including `queue-a-follow-up-while-busy`, its `steering-host-owned-fallback` continuation,
+  and `usability-20260907`. `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
@@ -31,11 +29,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
-- **Open findings:** Review of the implemented host-owned `promptRequired` fallback found that a
-  Send accepted while the adapter decides can still overtake the fallback; release patch strictness
-  and stale `(planned)` traceability are also open on `steering-host-owned-fallback`. The separate
-  injected-steer lifetime edge case is outside that unit. Also
-  open: live-gate finding durability, provider-contract oracles, the Codex
+- **Open findings:** The separate injected-steer lifetime edge case remains outside the closed
+  host-owned fallback unit. Also open: live-gate finding durability, provider-contract oracles, the Codex
   discovery-versus-execution version authority left by BR-2, and the unverified OpenCode/OpenHands
   paths. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
@@ -53,6 +48,18 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (fix):** Closed **keep steering inside AgentDeck's turn lifecycle**
+(FS-03.R56/A38, TS-01.R30, TS-03.R41, TS-04.R51, TS-06.R14; `INV §5`, `INV §10`, `INV §12`,
+`INV §15`, `INV §17`). Steer now reserves its possible host-owned successor before the adapter call;
+turn settlement transfers the gate to that reservation without firing it, and the adapter result
+atomically commits `promptRequired` or unwinds injected, legacy, and refusal outcomes. The wire-level
+regression holds the steering reply after the old prompt settles, accepts a concurrent Send, and
+proves provider order remains old prompt, correction, then held Send. Release assembly now checks
+exact pre- and post-patch SHA-256 fingerprints and disables patch fuzz, and shipped traceability no
+longer says planned. The originating `queue-a-follow-up-while-busy` unit and its fallback continuation
+are closed. The full Go matrix, tagged build, focused race tests, spec lint, shell syntax, patch
+applicability, and diff check pass.
 
 **Changelog — 2026-09-11 (review):** Reviewed **keep steering inside AgentDeck's turn lifecycle**.
 The host-owned fallback works in the covered lifecycle, but the reservation is created only after
@@ -140,14 +147,13 @@ settled entries were archived for budget.
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
 darwin/arm64 archive, `install.sh`, and a manifest declaring `0.4.3` with its SHA-256.
-The release shipped with five open Must-fix findings on the operator's explicit decision; one
-remains, listed under **Review findings**. The credentialed Claude and Codex journeys under
+The release shipped with five open Must-fix findings on the operator's explicit decision; all five
+are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` may take `fix-model-recommendations` or `open-a-file-from-chat`;
-`/work` has no waiting unit; `/fix` may take one open finding unit —
-`steering-host-owned-fallback` (medium, Terra/Opus), `queue-a-follow-up-while-busy` (difficult, Sol),
-BR-1 (difficult, Sol), or BR-2 (medium, Terra/Opus); `/design-feature` may choose an available or
+`/work` has no waiting unit; `/fix` may take BR-1 (difficult, Sol) or BR-2 (medium, Terra/Opus);
+`/design-feature` may choose an available or
 resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -180,73 +186,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### steering-host-owned-fallback — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — A Send accepted while the adapter decides the idle race can overtake the steering
-  fallback (**confirmed implementation and test-contract gap**). **Where:**
-  `internal/runtime/chat.go:486-500` waits for `_session/steering` to return before creating
-  `steerFallback`, while `internal/runtime/chat.go:741-746` promotes an already-held Send whenever
-  the fallback slot is still empty. The fake deliberately ends the old prompt before replying at
-  `internal/runtime/testdata/fakeacp/main.go:198-217`, but
-  `internal/runtime/queue_steer_test.go:334-347` submits Send only after `Steer` has returned; the
-  state-only ordering test at lines 208-228 constructs the fallback before settlement and cannot
-  reproduce the wire order. **Normal-use trigger:** a person Steers near turn completion and another
-  tab or API client presses Send before the adapter returns `promptRequired`. The old turn can
-  reserve that Send as its successor first; the later steer fallback then waits behind it.
-  **Why it matters:** the ordinary follow-up reaches the model before the correction that was meant
-  to redirect it, contradicting the stated priority and the one-owner fallback contract.
-  **Requirement:** `FS-03.R56/A38`, `TS-01.R30`; `INV §5`, `INV §15`, `INV §17`.
-  **Suggested fix/test:** reserve the pending steer intent under the turn lock before calling the
-  adapter, then atomically commit or unwind it for `promptRequired`, `injected`, refusal, and
-  promoted-held-message outcomes. Add a wire-level regression that runs Steer asynchronously,
-  submits Send while the fake waits for the old prompt to end, and asserts provider order is old
-  prompt, steer fallback, then held Send.
-- **Worth fixing** — Release patching does not fully fail closed on source drift (**confirmed**).
-  **Where:** `scripts/release/assemble.sh:65-68` invokes `patch` with its default fuzz/offset
-  tolerance, then checks only that one inserted result string exists. **Normal-use trigger:** a
-  future pinned Codex adapter refresh changes nearby bundled source while retaining enough context
-  for a fuzzy or offset application. **Why it matters:** assembly can report a patched component
-  even though the maintained patch was not applied to the exact reviewed source shape required by
-  the release contract. **Requirement:** `TS-04.R51`, `TS-06.R14`; `INV §12`, `INV §17`.
-  **Suggested fix/test:** reject fuzz and unexpected offsets and verify an exact pre-patch source
-  fingerprint plus the complete post-patch contract before writing the patched component version.
-- **Worth fixing** — Shipped steering traceability still labels the lifecycle planned
-  (**confirmed spec drift**). **Where:** `TS-01` traceability at
-  `docs/specs/tech/TS-01-architecture.md:490`, `TS-03` traceability at
-  `docs/specs/tech/TS-03-http-api.md:609`, and `TS-04` traceability at
-  `docs/specs/tech/TS-04-integration-protocols.md:755`. **Normal-use trigger:** the next design,
-  review, or investigation follows those anchors to determine whether host-owned steering shipped.
-  **Why it matters:** each governing requirement was promoted to current in this change, but the
-  same specifications still describe its implementation and tests as planned. **Requirement:**
-  `TS-01.R30`, `TS-03.R41`, `TS-04.R51`; `INV §10`. **Suggested fix:** remove the three stale
-  `(planned)` labels and keep their traceability wording aligned with the implemented contract.
-
-### queue-a-follow-up-while-busy — **Fix model:** difficult — Codex Sol. Addressed by
-`steering-host-owned-fallback`; that fix unit remains open on the findings above.
-
-- **Must fix** — An adapter-started steering turn escapes AgentDeck's turn lifecycle
-  (**confirmed implementation and test-contract gap**). **Where:** `internal/runtime/chat.go:437-484`
-  accepts `startedNewTurn`, emits only the user event, and leaves `turnActive` and status ownership
-  unchanged; `internal/runtime/queue_steer_test.go:243-255` checks only the returned enum, while
-  `internal/runtime/testdata/fakeacp/main.go:170-189` starts no turn. The bundled Claude 0.75.1 and
-  Codex 1.10.0 sources both return `startedNewTurn` as soon as detached work starts, before it
-  completes. **Normal-use trigger:** the active turn settles between a Steer click and adapter
-  delivery, which is the fallback `FS-03.R50` explicitly promises. **Why it matters:** AgentDeck has
-  no owner for that new turn's completion: it can show idle while the agent works, omit the waiting
-  indicator, and let the next Send call ordinary `session/prompt` concurrently instead of holding
-  it; Claude may native-queue it and Codex may supersede the detached turn. The current specs also
-  forbid AgentDeck's own retry but do not define how the adapter-started turn rejoins the host gate.
-  **Requirement:** `FS-03.R48/R50/R56/A33/A38`, `TS-01.R29/R30`, `TS-03.R39/R41`,
-  `TS-04.R49/R51`; `INV §2`, `INV §5`, `INV §11`, `INV §12`, `INV §17`.
-  **Implemented fix/test:** when the adapter handles Steer with no active provider turn, it returns
-  no-consumption `promptRequired`; AgentDeck resubmits the unchanged text through the ordinary
-  prompt seam and reports the public `new_turn` outcome. Do not retry `startedNewTurn`, because its
-  content may already be consumed. Steer stays available on every adapter that advertises it,
-  including Codex; release assembly now applies an explicitly maintained 1.10.0 patch and labels
-  that component `1.10.0+agentdeck.1`. The fake peer exercises the completion race and asserts
-  status, Send-holding, Cancel, and exactly one terminal event. A separate
-  injected-steer-outlives-prompt case is not part of this finding.
 
 ### BR-2 — **Fix model:** medium — Codex Terra or Claude Opus.
 
