@@ -15,10 +15,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None; the next role picks from the queues below.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `fix-model-recommendations` awaits independent review once committed, and
-  `open-a-file-from-chat` is newly available for review. Every other unit through this release is
-  closed, including `queue-a-follow-up-while-busy`, its `steering-host-owned-fallback` continuation,
-  and `usability-20260907`. `stop-telling-agents-to-poll` shipped without entering
+- **Review units:** `fix-model-recommendations` awaits independent review once committed.
+  `open-a-file-from-chat` has been reviewed and remains open with one Must-fix filesystem-boundary
+  finding. Every other unit through this release is closed, including `queue-a-follow-up-while-busy`,
+  its `steering-host-owned-fallback` continuation, and `usability-20260907`.
+  `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
@@ -48,6 +49,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-11 (review):** Reviewed **open a file an agent mentioned**. The route refuses
+lexical and resolved symlink escapes, but it checks the pathname and then resolves that pathname
+again for `Stat` and `Open`; a concurrent workspace change can swap an accepted file or symlink for
+an outside target between those operations. The unit remains open with one Must-fix finding.
+**Fix model:** medium — Codex Terra or Claude Opus. The full Go matrix and tagged build, all 449 UI
+tests, style and presentation-contract checks, focused file-read tests, and diff check pass.
+Invariant classes 1, 2, 8, 10, 11, 13, 14, 16, and 17 apply; classes 3, 4, 5, 6, 7, 9, 12, and 15
+have no applicable surface.
 
 **Changelog — 2026-09-11 (fix):** Closed **keep steering inside AgentDeck's turn lifecycle**
 (FS-03.R56/A38, TS-01.R30, TS-03.R41, TS-04.R51, TS-06.R14; `INV §5`, `INV §10`, `INV §12`,
@@ -151,8 +161,9 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `fix-model-recommendations` or `open-a-file-from-chat`;
-`/work` has no waiting unit; `/fix` may take BR-1 (difficult, Sol) or BR-2 (medium, Terra/Opus);
+**Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no waiting unit;
+`/fix` may take `open-a-file-from-chat` (medium, Terra/Opus), BR-1 (difficult, Sol), or BR-2
+(medium, Terra/Opus);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.
 
@@ -186,6 +197,21 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
+
+### open-a-file-from-chat — **Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix** — the file-read containment check and the file open resolve the pathname separately
+  (**confirmed**). **Where:** `internal/server/fileread.go:192-217` calls `withinRoot(root, rel)`,
+  then reaches the same pathname again through `os.Stat(full)` and `os.Open(full)`.
+  **Normal-use trigger:** an agent, build, or other workspace process replaces the accepted file or
+  an in-root symlink after containment is checked but before it is opened. **Why it matters:** the
+  second resolution can follow the replacement outside the recorded working directory, breaking
+  the viewer's filesystem boundary even though the ordinary static-symlink tests pass.
+  **Requirement:** FS-03.R55, TS-05.R21, `INV §14`, `INV §17`. **Suggested fix/test:** keep the
+  form-first refusal, open through a descriptor-rooted API such as `os.OpenInRoot`, and inspect and
+  read that returned descriptor rather than resolving the pathname again; add a deterministic
+  regression that replaces the target after the pre-open containment check and proves no outside
+  bytes are returned.
 
 ### BR-2 — **Fix model:** medium — Codex Terra or Claude Opus.
 
