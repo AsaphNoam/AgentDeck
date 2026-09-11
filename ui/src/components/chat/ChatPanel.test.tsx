@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
   getHeldPrompt: vi.fn(async (id: string) => ({ agent_id: id, text: "", after_seq: 0 })),
   setSessionConfig: vi.fn(),
   switchRuntime: vi.fn(),
+  getFileContent: vi.fn(async (agent_id: string, path: string) => ({
+    agent_id, path, size: 14, mod_time: "2026-09-10T10:00:00Z",
+    line_count: 1, content: "package state\n", truncated: false, language: "go",
+  })),
   useBackends: vi.fn(),
   useProjects: vi.fn(),
 }));
@@ -23,6 +27,7 @@ vi.mock("../../api/client", () => ({
   getHeldPrompt: mocks.getHeldPrompt,
   setSessionConfig: mocks.setSessionConfig,
   switchRuntime: mocks.switchRuntime,
+  getFileContent: mocks.getFileContent,
 }));
 
 vi.mock("../../api/config", async (importOriginal) => ({
@@ -73,11 +78,11 @@ describe("initialTab", () => {
   });
 });
 
-function renderPanel(id: string) {
+function renderPanel(id: string, search = "") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={[`/agent/${id}`]}>
+      <MemoryRouter initialEntries={[`/agent/${id}${search}`]}>
         <Routes><Route path="/agent/:id" element={<ChatPanel />} /></Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -365,5 +370,32 @@ describe("ChatPanel queued follow-up and steering", () => {
 
     expect(await screen.findByRole("button", { name: "Steer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
+  });
+});
+
+// FS-03.A36 (R53, R54) — the address is the open file's single source of truth,
+// so a reload reopens it and Close clears it, and the panel carries the state
+// attribute the relaxed content width keys off.
+describe("the open file on the agent route", () => {
+  it("reopens the file named by ?file= and clears it on Close", async () => {
+    useAgentStore.setState({ agents: { a_1: liveAgent("a_1") }, order: ["a_1"], hydrated: true });
+    renderPanel("a_1", "?file=internal/state/messages.go&fileLine=12");
+
+    // Reopening from the address is the reload case: the viewer reads the file
+    // itself, so its header is the witness that the parameter was honored.
+    expect(await screen.findByText("internal/state/messages.go")).toBeInTheDocument();
+    expect(document.querySelector('[data-ui="agent-workspace"]')).toHaveAttribute("data-file-open", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByText("internal/state/messages.go")).not.toBeInTheDocument());
+    expect(document.querySelector('[data-ui="agent-workspace"]')).not.toHaveAttribute("data-file-open");
+  });
+
+  it("opens no viewer without ?file=", () => {
+    useAgentStore.setState({ agents: { a_1: liveAgent("a_1") }, order: ["a_1"], hydrated: true });
+    renderPanel("a_1");
+
+    expect(screen.queryByRole("button", { name: "Reload" })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-ui="agent-workspace"]')).not.toHaveAttribute("data-file-open");
   });
 });

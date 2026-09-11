@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -568,9 +568,9 @@ primitive seam; the rejected alternatives are recorded in §5.
   store, and applies R36's newer-draft rule: write the released text only into an empty composer for
   that agent, never over text typed since (INV §2).
 
-### 2.9 File viewer beside the transcript (planned)
+### 2.9 File viewer beside the transcript
 
-- **R57 (planned)** — **The viewer docks through the transcript region's own grid,
+- **R57** — **The viewer docks through the transcript region's own grid,
   and the width cap relaxes by state rather than by measurement.** FS-03.R53 extends the mechanism
   R53 already established for the annotation tray instead of adding a second panel primitive
   (`INV §2`): `.transcript-wrap`'s grid gains a **leading** track that exists only while a file is

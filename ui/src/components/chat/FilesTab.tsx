@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { getTrackedFiles } from "../../api/client";
 import type { TrackedFile } from "../../api/types";
+import type { FileLink } from "./renderers/filePath";
 
 function copyToClipboard(text: string) {
   void navigator.clipboard.writeText(text);
 }
 
-function FileRow({ file, onDiffClick }: { file: TrackedFile; onDiffClick: (seq: number) => void }) {
+function FileRow({ file, onDiffClick, onOpenFile }: { file: TrackedFile; onDiffClick: (seq: number) => void; onOpenFile?: (link: FileLink) => void }) {
   return (
     <li className="tracked-row" data-ui="tracked-list" data-slot="row" data-variant="files">
       <div className="tracked-row-top" data-slot="metadata">
-        <span className="tracked-path">{file.path}</span>
+        {/* The path becomes an additional affordance onto the same viewer; Copy
+            and Diff are unchanged beside it (FS-05.R37). */}
+        {onOpenFile ? (
+          <button type="button" className="tracked-path file-link" data-file-path={file.path} title="Open file" onClick={() => onOpenFile({ path: file.path })}>{file.path}</button>
+        ) : (
+          <span className="tracked-path">{file.path}</span>
+        )}
         <div className="tracked-row-actions" data-slot="actions">
           <button
             type="button"
@@ -38,7 +45,7 @@ function FileRow({ file, onDiffClick }: { file: TrackedFile; onDiffClick: (seq: 
   );
 }
 
-export function FilesTab({ agentId, onReveal }: { agentId: string; onReveal?: (seq: number) => void }) {
+export function FilesTab({ agentId, onReveal, onOpenFile }: { agentId: string; onReveal?: (seq: number) => void; onOpenFile?: (link: FileLink) => void }) {
   const [files, setFiles] = useState<TrackedFile[]>([]);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -92,7 +99,7 @@ export function FilesTab({ agentId, onReveal }: { agentId: string; onReveal?: (s
       ) : (
         <ul className="tracked-list" data-slot="items">
           {filtered.map((f) => (
-            <FileRow key={f.path} file={f} onDiffClick={handleDiff} />
+            <FileRow key={f.path} file={f} onDiffClick={handleDiff} onOpenFile={onOpenFile} />
           ))}
         </ul>
       )}

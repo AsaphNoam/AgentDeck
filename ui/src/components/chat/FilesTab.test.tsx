@@ -94,3 +94,30 @@ describe("FilesTab", () => {
     await screen.findByText(/No files tracked yet/);
   });
 });
+
+// FS-05.A20 (R37) — a tracked-file row opens the same viewer a chat file link
+// does, and Copy/Diff keep working beside it rather than being replaced.
+describe("tracked rows as a file-viewer entry point", () => {
+  it("opens the named file while Copy and Diff still work", async () => {
+    const onOpenFile = vi.fn();
+    const onReveal = vi.fn();
+    const writeText = vi.fn();
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<FilesTab agentId="a_1" onReveal={onReveal} onOpenFile={onOpenFile} />);
+
+    const path = await screen.findByRole("button", { name: "src/auth.ts" });
+    fireEvent.click(path);
+    expect(onOpenFile).toHaveBeenCalledWith({ path: "src/auth.ts" });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Copy" })[0]);
+    expect(writeText).toHaveBeenCalledWith("src/auth.ts");
+    fireEvent.click(screen.getByRole("button", { name: "Diff" }));
+    expect(onReveal).toHaveBeenCalledWith(5);
+  });
+
+  it("leaves the path inert on a surface with no viewer", async () => {
+    render(<FilesTab agentId="a_1" />);
+    expect(await screen.findByText("src/auth.ts")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "src/auth.ts" })).not.toBeInTheDocument();
+  });
+});

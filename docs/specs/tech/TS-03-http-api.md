@@ -530,7 +530,7 @@ record is actually in, so the surface can explain what happened and refresh rath
 mutation already publishes; neither adds an event type, a payload, or a subscription, and a client
 reloads the collections through this route rather than reconstructing them from the event.
 
-- **R40 (planned) — One session-scoped file read, returning JSON.** FS-03.R52 adds
+- **R40 — One session-scoped file read, returning JSON.** FS-03.R52 adds
   `GET /api/sessions/{id}/file?path=<p>` beside the shipped `.../files`, `.../commands`, and
   `.../file-search` reads (FS-05.R15, FS-03.R30). `path` is interpreted relative to the working
   directory recorded on that agent's session; an absolute path is accepted only when it resolves

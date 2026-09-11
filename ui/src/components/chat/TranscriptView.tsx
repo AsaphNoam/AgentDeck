@@ -11,11 +11,18 @@ import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
+import { FileViewer } from "./FileViewer";
+import type { FileLink } from "./renderers/filePath";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useHeldStore } from "../../store/heldStore";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
 
-export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean }) {
+// openFile/onOpenFile are per-surface, exactly as annotationsEnabled already is
+// (TS-08.R57). The agent and archived-agent screens pass the file their route
+// carries and a handler that writes it back to the route; the dashboard chat pane
+// passes no open file and a handler that navigates to the agent screen instead,
+// which is that pane's existing route to the full surface (FS-03.R53).
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null) => void }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -60,6 +67,9 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
 
   return (
     <div className="transcript-wrap" data-ui="transcript">
+      {openFile && onOpenFile && (
+        <FileViewer agentId={agentId} link={openFile} onClose={() => onOpenFile(null)} onOpenFile={onOpenFile} />
+      )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
         {groupTranscriptRows(events).map((row, index) => row.kind === "tool-run" ? (
           <ToolRun
@@ -72,6 +82,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
                 key={keyOf(event, eventIndex)}
                 onAnnotate={(draft) => addAnnotation(agentId, draft)}
                 onContextMenu={openMenu}
+                onOpenFile={onOpenFile}
                 className="tool-run-event"
               />
             )}
@@ -83,6 +94,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
             key={keyOf(row.event, index)}
             onAnnotate={(draft) => addAnnotation(agentId, draft)}
             onContextMenu={openMenu}
+            onOpenFile={onOpenFile}
           />
         ))}
         {busy && (
@@ -130,11 +142,12 @@ function HeldMessage({ agentId, text }: { agentId: string; text: string }) {
   );
 }
 
-function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, className = "transcript-item" }: {
+function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, onOpenFile, className = "transcript-item" }: {
   agentId: string;
   event: TranscriptEvent;
   onAnnotate: (draft: AnnotationDraft) => void;
   onContextMenu: (mouse: MouseEvent<HTMLDivElement>, event: TranscriptEvent) => void;
+  onOpenFile?: (link: FileLink | null) => void;
   className?: string;
 }) {
   return (
@@ -151,7 +164,7 @@ function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, class
         label="message"
         fallback={<pre className="tool-block tool-result-error">Failed to render this event.</pre>}
       >
-        <TranscriptItem agentId={agentId} event={event} onAnnotate={onAnnotate} />
+        <TranscriptItem agentId={agentId} event={event} onAnnotate={onAnnotate} onOpenFile={onOpenFile} />
       </ErrorBoundary>
     </div>
   );
@@ -230,13 +243,13 @@ function keyOf(event: TranscriptEvent, index: number) {
   return `i${index}`;
 }
 
-function TranscriptItem({ agentId, event, onAnnotate }: { agentId: string; event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
+function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: string; event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void; onOpenFile?: (link: FileLink | null) => void }) {
   const kind = String(event.kind ?? event.type ?? "");
-  if (kind === "assistant_text") return <AssistantText event={event} />;
+  if (kind === "assistant_text") return <AssistantText event={event} onOpenFile={onOpenFile} />;
   if (kind === "user_text")
     return <article className="message user-message" data-ui="transcript" data-variant="user">{String(event.text ?? "")}</article>;
   if (kind === "permission_request") return <PermissionPrompt agentId={agentId} event={event} />;
-  if (kind === "diff") return <DiffBlock event={event} onAnnotate={onAnnotate} />;
+  if (kind === "diff") return <DiffBlock event={event} onAnnotate={onAnnotate} onOpenFile={onOpenFile} />;
   if (kind === "tool_call") return <ToolCall event={event} />;
   if (kind === "tool_result") return <ToolResult event={event} />;
   if (kind === "error") return <TurnError event={event} />;

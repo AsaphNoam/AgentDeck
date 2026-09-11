@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getTranscript, restoreAgent, resumeAgent } from "../../api/client";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useAgentStore } from "../../store/agentStore";
 import { TranscriptView } from "../../components/chat/TranscriptView";
+import type { FileLink } from "../../components/chat/renderers/filePath";
+import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
 
 export function ArchiveAgentPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
   const agent = useAgentStore((state) => state.agents[id]);
@@ -17,6 +20,10 @@ export function ArchiveAgentPage() {
   // uses the most recent one. Reading the first record would show the original
   // backend/model beside Resume for a switched session (FS-05.R31/A15).
   const metadata = latestSessionMeta(events);
+  // An archived session reads from the working directory it recorded, so its file
+  // links open the same viewer through the same address (FS-03.R54/R55).
+  const openFile = fileLinkFromParams(params);
+  const openFileInViewer = (link: FileLink | null) => setParams((current) => writeFileLinkParams(current, link));
   const archivedName = textField(metadata?.name) || "Archived session";
   const project = textField(metadata?.project);
   const backend = textField(metadata?.backend);
@@ -54,7 +61,7 @@ export function ArchiveAgentPage() {
   };
 
   return (
-    <section className="chat-panel" data-ui="agent-workspace" data-state="archived" data-variant="chat">
+    <section className="chat-panel" data-ui="agent-workspace" data-state="archived" data-file-open={openFile ? "true" : undefined} data-variant="chat">
       <header className="chat-header" data-slot="header">
         <Link to="/archive">Back to Archive</Link>
         <div data-slot="identity">
@@ -75,7 +82,7 @@ export function ArchiveAgentPage() {
         </button>
       </header>
       {error && <p className="archive-error">{error}</p>}
-      <div data-slot="content"><TranscriptView agentId={id} events={events} sourceActive={false} annotationsEnabled={agent?.interface !== "terminal"} /></div>
+      <div data-slot="content"><TranscriptView agentId={id} events={events} sourceActive={false} annotationsEnabled={agent?.interface !== "terminal"} openFile={openFile} onOpenFile={openFileInViewer} /></div>
       {/* No Composer — read-only view */}
       <div />
     </section>

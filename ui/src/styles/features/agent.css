@@ -8,6 +8,15 @@
   max-width: 1440px;
 }
 
+/* The one thing a container query cannot express: this cap is set outside the
+   transcript container, so the relaxed width an open file needs keys off a state
+   attribute instead — the same kind of attribute the annotation tray's data-state
+   already is, not a measurement (FS-03.R53, TS-08.R57). The viewer then occupies
+   width that is empty today and the transcript keeps its reading measure. */
+.chat-panel[data-file-open="true"] {
+  max-width: 2000px;
+}
+
 .chat-header {
   align-items: center;
   background: var(--ad-surface-panel);
@@ -138,7 +147,13 @@
 .transcript-wrap {
   container: transcript / inline-size;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Leading track: the file viewer. Middle: the transcript. Trailing: the docked
+     annotation tray. An empty auto track is zero wide, so each panel's track
+     exists only while that panel does. The three in-flow children are placed
+     explicitly rather than by auto-placement, which with a leading track would
+     otherwise drop the transcript into the viewer's content-sized column
+     (FS-03.R53, FS-13.R20, TS-08.R57). */
+  grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-rows: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -147,6 +162,7 @@
 
 .transcript-view {
   background: var(--ad-surface-raised);
+  grid-column: 2;
   border: var(--ad-border-thin) solid var(--ad-border-strong);
   border-radius: 0 0 var(--ad-radius-large) var(--ad-radius-large);
   height: 100%;
@@ -498,6 +514,7 @@
 
 .annotation-tray {
   bottom: var(--ad-space-4);
+  grid-column: 3;
   box-shadow: var(--ad-shadow-keyline);
   display: flex;
   flex-direction: column;
@@ -612,6 +629,117 @@
   transform: translateX(-50%);
 }
 
+/* File viewer (FS-03.R52/R53, TS-08.R57). One component in two CSS states, not
+   two components: it occupies .transcript-wrap's leading track — the track is
+   zero wide while nothing is open — opposite the annotation tray's trailing one,
+   so a docked tray and an open file coexist rather than compete. This narrow
+   form takes its width from the transcript; the container query below moves that
+   width to the space the relaxed content cap opens instead. Nothing is measured
+   in JavaScript. */
+.file-viewer {
+  background: var(--ad-surface-panel);
+  grid-column: 1;
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-small) var(--ad-radius-large);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin-right: var(--ad-space-4);
+  min-height: 0;
+  overflow: hidden;
+  width: min(46cqi, 520px);
+}
+
+.file-viewer-header {
+  align-items: center;
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+  display: flex;
+  flex: none;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+  padding: var(--ad-space-3);
+}
+
+.file-viewer-path {
+  direction: rtl;
+  font-family: var(--ad-font-mono);
+  font-size: 0.72rem;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-viewer-actions,
+.file-viewer-form {
+  align-items: center;
+  display: flex;
+  flex: none;
+  gap: var(--ad-space-2);
+}
+
+.file-viewer-actions button {
+  font-size: 0.72rem;
+  min-height: auto;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.file-viewer-form button[aria-pressed="true"] {
+  background: var(--ad-action-secondary);
+  color: var(--ad-surface-canvas);
+}
+
+/* The panel says when it read the file, because it deliberately does not watch or
+   poll one: a file the agent rewrites keeps showing the earlier read until
+   Reload (FS-03.R52). */
+.file-viewer-meta {
+  color: var(--ad-text-muted);
+  flex: none;
+  font-family: var(--ad-font-mono);
+  font-size: 0.66rem;
+  margin: 0;
+  padding: var(--ad-space-2) var(--ad-space-3);
+}
+
+.file-viewer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--ad-space-3);
+}
+
+.file-viewer-rendered {
+  font-size: 0.86rem;
+}
+
+/* Every refusal names its reason here and leaves the transcript readable
+   (FS-03.R55, INV §8). */
+.file-viewer-error {
+  color: var(--ad-state-error);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* The cited line is marked so it is found rather than hunted for (FS-03.R52). */
+.file-viewer-body [data-file-marked="true"] {
+  background: var(--ad-highlight);
+  display: block;
+}
+
+/* A path an agent marked as a link, and the tracked-file and diff headings that
+   open the same viewer (FS-03.R51, FS-05.R37). It reads as the link it replaces,
+   not as a button. */
+.file-link {
+  background: transparent;
+  border: 0;
+  color: var(--ad-action-secondary);
+  font-family: var(--ad-font-mono);
+  min-height: auto;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
 /* Docked form (FS-13.R20–R22). Everything below is the same tray in a wider
    place: the drafts, the target selection, and the send path are untouched, and
    the transcript's outer padding shrinks so the reflowed text column keeps its
@@ -619,6 +747,10 @@
 @container transcript (min-width: 860px) {
   .transcript-view {
     padding-inline: var(--ad-space-6);
+  }
+
+  .file-viewer {
+    width: min(38cqi, 640px);
   }
 
   .annotation-tray {

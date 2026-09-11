@@ -96,6 +96,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/sessions/{id}/files", s.handleFiles)
 	api("GET /api/sessions/{id}/commands", s.handleCommands)
 	api("GET /api/sessions/{id}/file-search", s.handleFileSearch)
+	api("GET /api/sessions/{id}/file", s.handleFileRead)
 	api("GET /api/sessions/{id}/available-commands", s.handleAvailableCommands)
 	api("GET /api/sessions/{id}/messages", s.handleMessages)
 

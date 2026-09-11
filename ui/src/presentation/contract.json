@@ -266,6 +266,20 @@
         "unknown"
       ]
     },
+    "file-viewer": {
+      "slots": [
+        "header",
+        "actions",
+        "metadata",
+        "content"
+      ],
+      "states": [
+        "loading",
+        "loaded",
+        "error"
+      ],
+      "variants": []
+    },
     "annotation-tray": {
       "slots": [],
       "states": [

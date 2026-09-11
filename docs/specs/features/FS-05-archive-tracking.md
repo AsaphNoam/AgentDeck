@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -83,14 +83,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   command's exit status. Terminal sessions capture the same via `POST /api/hook`
   (`CaptureHookFile`/`CaptureHookCommand`), which allocates a synthetic seq when the hook omits one.
 - **R18.** The session's `files_touched` and `commands_run` rollup counts reported in the archive
-  agent rows (the current R1 listing and the planned R36 project-detail/search results) reflect the
+  agent rows (the R1 listing and the R36 project-detail/search results) reflect the
   distinct tracked-file count and tracked-command count. The chat path refreshes them at turn
   boundaries; the hook path refreshes them directly on capture.
 - **R19.** Both requests return `404 not_found` for an unknown `agent_id`.
 - **R20.** Both Files and Commands lists are exposed in the chat panel as tabs; their contents are
   copyable by the user.
 
-- **R37 (planned).** A tracked-file row (R20) and a transcript diff's file heading
+- **R37.** A tracked-file row (R20) and a transcript diff's file heading
   (FS-03.R2) each open that file in the chat file viewer (FS-03.R52) instead of presenting its path
   as inert text. The row keeps its existing Copy and Diff actions and the heading keeps the diff's
   own content and line-selection behavior (FS-13.R4); the path becomes an additional affordance
@@ -288,7 +288,7 @@ R22's `active` validation remain binding.
   `ArchivePage.test.tsx` "reaches every agent when a per-project page is reordered" and
   "loads the next result page using the rendered count as offset"; J8.
 
-- **A20 (planned)** (R37) — A tracked-file row and a diff file heading each open the
+- **A20** (R37) — A tracked-file row and a diff file heading each open the
   named file in the viewer while Copy and Diff keep working, and a tracked path outside the session
   working directory or since deleted renders its stated refusal:
   `ui/src/components/chat/FilesTab.test.tsx` and
@@ -324,7 +324,7 @@ R22's `active` validation remain binding.
 - **Resume:** `internal/server/resume.go`, `internal/server/switch.go` (`composeResumeSpec`).
 - **UI:** `ui/src/features/archive/ArchivePage.tsx` (list + search), `ArchiveAgentPage.tsx` (read-only
   transcript + Resume), `ui/src/components/chat/{FilesTab,CommandsTab}.tsx`.
-- **Tracked paths as file links (R37, planned):** `FilesTab.tsx`'s path cell and
+- **Tracked paths as file links (R37):** `FilesTab.tsx`'s path cell and
   `ui/src/components/chat/renderers/DiffBlock.tsx`'s heading call the same open-file affordance the
   transcript's own links use (FS-03.R51), so there is one path-opening path rather than three
   (`INV §2`). No tracking query, endpoint, or stored path form changes.

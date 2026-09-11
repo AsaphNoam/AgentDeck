@@ -1,4 +1,4 @@
-import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, FileContent, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
 import type { ProjectResponse, WorktreeStatus } from "../schemas/project";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -236,6 +236,16 @@ export function getTrackedCommands(agentId: string) {
 export function searchSessionFiles(agentId: string, query: string) {
   return json<{ agent_id: string; files: string[] }>(
     `/api/sessions/${agentId}/file-search?q=${encodeURIComponent(query)}`,
+  );
+}
+
+// getFileContent backs the chat file viewer: one bounded, read-only text read
+// confined server-side to the session's own working directory (TS-03.R40,
+// FS-03.R52/R55). The caller supplies a path and never a root, and the response
+// is JSON — no route serves file bytes under a caller-influenced content type.
+export function getFileContent(agentId: string, path: string) {
+  return json<FileContent>(
+    `/api/sessions/${agentId}/file?path=${encodeURIComponent(path)}`,
   );
 }
 

@@ -151,7 +151,7 @@ sensitive-context sharing is a practical problem.
   and is unchanged. Provider- and user-configured MCP servers gain nothing from this requirement;
   their tools keep the gate.
 
-- **R21 (planned) — Serving a file's contents is a new boundary with its own stated
+- **R21 — Serving a file's contents is a new boundary with its own stated
   policy.** No shipped route returns the contents of a caller-named file: R15 keeps that closed for
   folder selection, R13 forbids it for project resources, R16 refuses a filesystem path as authority
   for a context read, and R6 makes path policy boundary-specific. FS-03.R55's viewer therefore

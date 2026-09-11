@@ -16,6 +16,8 @@ import { FilesTab } from "./FilesTab";
 import { CommandsTab } from "./CommandsTab";
 import { TerminalTab } from "./TerminalTab";
 import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
+import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
+import type { FileLink } from "./renderers/filePath";
 
 function runtimeSelection(agent: AgentState): RuntimeSelection {
   return { backend: agent.backend, model: agent.model, effort: agent.effort ?? "" };
@@ -39,7 +41,7 @@ export function initialTab(tabParam: string | null, agentInterface?: string): st
 
 export function ChatPanel() {
   const { id = "" } = useParams();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const agent = useAgentStore((state) => state.agents[id]);
   const agentsHydrated = useAgentStore((state) => state.hydrated);
   const pendingAnnotations = useAnnotationStore((state) => state.bySource[id]?.length ?? 0);
@@ -105,6 +107,15 @@ export function ChatPanel() {
       (event.kind ?? event.type) === "user_text" && event.seq != null && event.seq > heldAfterSeq && String(event.text ?? "") === held);
     if (delivered) releaseHeld(id);
   }, [events, held, heldAfterSeq, id, releaseHeld]);
+
+  // ?file=/?fileLine= are the open file's single source of truth, so a reload
+  // reopens it and browser Back closes it (FS-03.R54). Opening from the Files tab
+  // also switches to the transcript, where the viewer's grid track lives.
+  const openFile = fileLinkFromParams(params);
+  const openFileInViewer = (link: FileLink | null) => {
+    setTab("transcript");
+    setParams((current) => writeFileLinkParams(current, link));
+  };
 
   // Reveal a transcript event from the Files tab's "Diff" action: switch to the
   // transcript tab (its content is unmounted while another tab is active), then
@@ -193,7 +204,11 @@ export function ChatPanel() {
   };
 
   return (
-    <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
+    // data-file-open relaxes the panel's bounded content width in CSS while a file
+    // is open. .chat-panel's max-width is set outside the transcript container, so
+    // a container query cannot reach it; this is a state attribute of the kind the
+    // annotation tray already carries, not a measurement (FS-03.R53, TS-08.R57).
+    <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-file-open={openFile ? "true" : undefined} data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
       <header className="chat-header" data-slot="header">
         <Link to={backTarget}>Back</Link>
         <div data-slot="identity">
@@ -262,10 +277,10 @@ export function ChatPanel() {
           {agent.interface === "terminal" && <Tabs.Trigger value="terminal">Terminal</Tabs.Trigger>}
         </Tabs.List>
         <Tabs.Content value="transcript" className="chat-tab-content" data-slot="content">
-          <TranscriptView agentId={id} events={events} sourceActive={agent.running && agent.state === "idle"} annotationsEnabled={agent.interface === "chat"} busy={agent.state === "busy"} />
+          <TranscriptView agentId={id} events={events} sourceActive={agent.running && agent.state === "idle"} annotationsEnabled={agent.interface === "chat"} busy={agent.state === "busy"} openFile={openFile} onOpenFile={openFileInViewer} />
         </Tabs.Content>
         <Tabs.Content value="files" className="chat-tab-content" data-slot="content">
-          <FilesTab agentId={id} onReveal={revealInTranscript} />
+          <FilesTab agentId={id} onReveal={revealInTranscript} onOpenFile={openFileInViewer} />
         </Tabs.Content>
         <Tabs.Content value="commands" className="chat-tab-content" data-slot="content">
           <CommandsTab agentId={id} />

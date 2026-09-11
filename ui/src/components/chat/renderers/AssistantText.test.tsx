@@ -323,3 +323,58 @@ describe("assistant diagram safety", () => {
     expect(seams).toEqual(["components/chat/renderers/MermaidDiagram.tsx"]);
   });
 });
+
+// FS-03.A34 (R51) — a link an agent wrote is classified once, in one place, and a
+// local path opens the viewer instead of navigating the browser. Today such a
+// link is an ordinary relative anchor: activating it leaves the agent screen and
+// lands on the dashboard after a full reload, which is the defect this closes.
+describe("file links in assistant Markdown", () => {
+  const renderText = (markdown: string, onOpenFile = vi.fn()) => {
+    render(<AssistantText event={{ kind: "assistant_text", text: markdown }} onOpenFile={onOpenFile} />);
+    return onOpenFile;
+  };
+
+  it("opens a relative, absolute, or file:// path in the viewer with no navigation", () => {
+    for (const [markdown, expected] of [
+      ["See [messages](internal/state/messages.go).", { path: "internal/state/messages.go" }],
+      ["See [messages](/Users/me/app/main.go).", { path: "/Users/me/app/main.go" }],
+      ["See [messages](file:///Users/me/app/main.go).", { path: "/Users/me/app/main.go" }],
+    ] as const) {
+      const onOpenFile = renderText(markdown);
+      const trigger = screen.getByRole("button", { name: "messages" });
+      expect(trigger.tagName).toBe("BUTTON");
+      fireEvent.click(trigger);
+      expect(onOpenFile).toHaveBeenCalledWith(expected);
+      cleanup();
+    }
+  });
+
+  it("carries a :line suffix through to the viewer and keeps it out of the path", () => {
+    const onOpenFile = renderText("See [here](ui/src/routes.tsx:56).");
+    fireEvent.click(screen.getByRole("button", { name: "here" }));
+    expect(onOpenFile).toHaveBeenCalledWith({ path: "ui/src/routes.tsx", line: 56 });
+    cleanup();
+
+    const withColumn = renderText("See [here](ui/src/routes.tsx:56:12).");
+    fireEvent.click(screen.getByRole("button", { name: "here" }));
+    expect(withColumn).toHaveBeenCalledWith({ path: "ui/src/routes.tsx", line: 56 });
+  });
+
+  it("leaves an https link its ordinary behavior", () => {
+    const onOpenFile = renderText("Read [the docs](https://example.com/guide).");
+    const anchor = screen.getByRole("link", { name: "the docs" });
+    expect(anchor).toHaveAttribute("href", "https://example.com/guide");
+    fireEvent.click(anchor);
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+
+  it("invents no link for a path written in prose", () => {
+    // AgentDeck adds no path detection over plain text, so a path the agent only
+    // mentioned stays text and never resolves to nothing (FS-03.R51).
+    const onOpenFile = renderText("I edited internal/state/messages.go just now.");
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText(/I edited internal\/state\/messages\.go just now\./)).toBeInTheDocument();
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+});

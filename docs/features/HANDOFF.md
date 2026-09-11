@@ -20,10 +20,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   through this release is closed, including `usability-20260907`; the remaining open findings belong
   to BR-1 and BR-2, not to a unit awaiting closure. `stop-telling-agents-to-poll` shipped without
   entering this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `open-a-file-from-chat.md` is waiting to start with nothing unresolved.
-  `steering-host-owned-fallback.md` is waiting to start with the Codex adapter contract as its only
-  implementation dependency. `migrate-internal-actions-from-mcp.md` stays paused on its transport
+  `open-a-file-from-chat` is newly available for review.
+- **Work units:** `steering-host-owned-fallback.md` is waiting to start with the Codex adapter
+  contract as its only implementation dependency. `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
+  Queue hygiene: `bump-pinned-acp-adapters.md` reads `State: Finished` but is still in
+  `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
+  file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
@@ -40,7 +43,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed and BR-2's release pin is
   fixed by the adapter bump; their still-open findings are listed above. Pinned Claude model delivery
   through `_meta` works; an ACP model `currentValue` can be stale and is no execution-model oracle.
-- **State:** Automated MCP contract verification is green. The full post-fix Claude/Codex acceptance
+- **State:** The file viewer's credentialed rendered forms are owed: journey J3 now carries the
+  file-link steps (docked and transcript-width forms, the refusal branch, the dashboard-pane
+  navigation), and none of them has been exercised against a real browser.
+  Automated MCP contract verification is green. The full post-fix Claude/Codex acceptance
   matrix remains open and must not be called verified; the 2026-09-08/09 probes were limited contract
   and model-delivery checks, not that matrix. Real Claude and Codex steering is unexercised.
 - **Branch:** `main`.
@@ -48,6 +54,36 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None. `v0.4.3` is cut.
+
+**Changelog — 2026-09-11 (work):** Shipped **open a file an agent mentioned**
+(FS-03.R51–R55/A34–A37, FS-05.R37/A20, TS-03.R40, TS-05.R21, TS-08.R57; `INV §1`, `INV §2`,
+`INV §13`, `INV §14`, `INV §16`, `INV §17`). A filepath link an agent wrote now opens a read-only
+viewer beside the transcript instead of navigating to a non-route that the SPA fallback and router
+catch-all turned into a full reload onto the dashboard.
+
+`GET /api/sessions/{id}/file` (`internal/server/fileread.go`) reads one bounded UTF-8 text file
+confined to the working directory recorded on that agent's own session snapshot, sharing
+`filesearch.go`'s `withinRoot` resolve-and-recheck rather than copying it. The requested path is
+decided on its form before that path is ever touched on disk, so traversal, absolute-path escape,
+and `.git` are refused identically whether or not the target exists — `fileread_test.go` asserts an
+existing and an absent outside path produce byte-identical responses. New typed codes
+`path_refused`, `not_a_file`, `not_text`, and `workspace_unavailable` (all 422) join the shared
+vocabulary in `internal/runtime/errors.go`. The read is deliberately **not** gated on a running
+record, so archived sessions work; Git-ignored files inside the root read successfully by decision.
+
+On the UI, `renderers/filePath.ts` is the one place a link target is classified and its
+`:line`/`:line:col` suffix parsed, and `renderers/SanitizedMarkdown.tsx` is now the single
+sanitized Markdown renderer shared by assistant messages and the viewer's rendered form. Two
+separate gates were dropping `file://` links before classification — the sanitizer's allowed link
+protocols and react-markdown's own `urlTransform`; both were widened for `file:` alone, and a local
+path still never reaches an `href` because the override renders a control instead. `.transcript-wrap`
+gained a leading grid track for the viewer opposite the tray's trailing one; with three tracks the
+three in-flow children are now placed explicitly, because auto-placement would drop the transcript
+into the viewer's content-sized column. `?file=`/`?fileLine=` are the open file's only state — no
+store, context, or persisted key. `react-syntax-highlighter` overwrites a line's `className` with
+its own token classes, so the cited-line mark is a `data-file-marked` attribute, not a class.
+
+Not done and owed: every rendered form is unverified in a real browser. J3 carries the steps.
 
 **Changelog — 2026-09-10 (fix):** Closed the `duplicate-steer-submission` Must-fix
 (FS-03.R50/A33, TS-03.R39; `INV §5`, `INV §17`). Steer now takes a synchronous per-agent in-flight
@@ -61,23 +97,6 @@ reconciliation now handles both arrival orders: a durable sequenced event replac
 optimistic echo, while an optimistic echo is suppressed when the durable event already arrived.
 The regression test was confirmed failing before the fix and now asserts the single retained event
 has its durable sequence. The originating investigation unit is closed.
-
-**Changelog — 2026-09-10 (design):** Designed **open a file an agent mentioned** and made it ready
-to start: [`open-a-file-from-chat.md`](../ready-changes/open-a-file-from-chat.md). A filepath link an
-agent already wrote opens a read-only viewer beside the transcript instead of navigating to a
-non-route, which the SPA fallback and the router catch-all currently turn into a full reload onto the
-dashboard. Planned requirements: FS-03.R51–R55/A34–A37 (link classification, the one-file viewer, the
-left-docked and transcript-width forms, `?file=`/`?fileLine=` as the open-file state, and confined
-reads with stated refusals), FS-05.R37/A20 (tracked-file rows and diff headings open the same
-viewer), TS-03.R40 (`GET /api/sessions/{id}/file`, JSON, typed boundary refusals, not gated on a
-running record), TS-05.R21 (the new file-content boundary and its policy, sharing `filesearch.go`'s
-`withinRoot` containment), and TS-08.R57 (a leading track on `.transcript-wrap`'s shipped container
-query, with the width cap relaxed by a `data-file-open` state attribute rather than measurement).
-FS-03, FS-05, and TS-08 moved Current → Partial for the planned items; journey J3 carries the
-rendered steps. Decisions recorded: only agent-authored links are upgraded (no prose path
-detection), the readable root is the session working directory alone, Git-ignored files inside it are
-readable, a dashboard-pane link opens the agent screen, and archived sessions read from their
-recorded directory. No product code changed.
 
 **Changelog — 2026-09-10 (design + work):** Shipped **stop telling agents to poll for work**
 (FS-18.R12/R13/A9, FS-04.R47/A27, TS-11.R13; `INV §2`, `INV §7`, `INV §8`, `INV §10`, `INV §17`).
@@ -100,8 +119,8 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 remains, listed under **Review findings**. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `fix-model-recommendations`; `/work` may start
-`steering-host-owned-fallback.md` or `open-a-file-from-chat.md`; `/fix` may take one open finding unit
+**Available by role:** `/review` may take `fix-model-recommendations` or `open-a-file-from-chat`;
+`/work` may start `steering-host-owned-fallback.md`; `/fix` may take one open finding unit
 — `queue-a-follow-up-while-busy` (difficult, Sol), BR-1 (difficult, Sol), or BR-2 (medium,
 Terra/Opus); `/design-feature` may choose an available or resumable idea. Queues are independent.
 

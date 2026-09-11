@@ -368,9 +368,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   reachable (TS-03.R31).
 
 
-### 2.9 Opening a file from the conversation (planned)
+### 2.9 Opening a file from the conversation
 
-- **R51 (planned)** — **A file link an agent wrote opens the file.** In assistant
+- **R51** — **A file link an agent wrote opens the file.** In assistant
   Markdown, a link whose target is a local filesystem path — relative
   (`internal/state/messages.go`), absolute, or `file://`, optionally suffixed `:line` or
   `:line:col` — opens that file in AgentDeck's file viewer (R52) instead of navigating the browser.
@@ -382,7 +382,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   resolves to nothing. Link handling is presentation of an existing event — it changes no durable
   event, no sequence, no fold boundary (R4), and no annotation target (FS-13.R4), so a message
   replays identically after a reload and in an archived transcript (FS-05.R14).
-- **R52 (planned)** — **The viewer is read-only and holds one file.** Its header
+- **R52** — **The viewer is read-only and holds one file.** Its header
   names the file by its path relative to the session working directory and offers **Reload** and
   **Close**. Its body shows the file's text with line numbers and the same syntax highlighting the
   transcript applies to fenced code (R2). A link carrying a line anchor scrolls that line into view
@@ -394,7 +394,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   file — so the panel states when its content was read, and a file the agent rewrites afterwards
   keeps showing the earlier read until it is reloaded. The viewer never writes, creates, renames,
   deletes, downloads, or runs anything, and offers no directory browsing.
-- **R53 (planned)** — **The viewer sits beside the transcript, never inside it.**
+- **R53** — **The viewer sits beside the transcript, never inside it.**
   While a file is open on the agent screen or the archived-agent screen, the viewer is a full-height
   column along the **left** edge of the transcript region and the transcript reflows into the
   remaining width instead of being overlapped; no file content is ever inserted into the
@@ -407,7 +407,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   chat pane (R39, FS-02.R55) no viewer opens — the pane is one grid column wide and deliberately
   carries less than the screen — and a file link there opens the agent screen with that file already
   showing, which is the pane's existing route to the full surface.
-- **R54 (planned)** — **The open file is part of the screen's address.** Opening a
+- **R54** — **The open file is part of the screen's address.** Opening a
   file sets `?file=` (the path relative to the session working directory) and, when a line was
   cited, `?fileLine=`, on the agent or archived-agent route beside the existing `?tab=` (R27).
   Closing the viewer clears them. The consequences are intended: reloading reopens the same file,
@@ -416,7 +416,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   against that agent's own recorded working directory (R55), so a hand-edited parameter cannot widen
   what is readable. A parameter that cannot be resolved opens the viewer in its stated-refusal form
   rather than failing silently, and never blocks the transcript.
-- **R55 (planned)** — **Reads are confined, and every refusal is stated.** A file is
+- **R55** — **Reads are confined, and every refusal is stated.** A file is
   readable only inside the working directory recorded for that agent's session — the same
   containment R34 already applies to composer file search — so no link, however written, reads a
   path outside it, and a symlink leading out of that directory is refused. A path that resolves
@@ -709,16 +709,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   renders its fast mode as static text with no toggle. *Verify by* `ChatPanel.test.tsx` and
   `ArchiveAgentPage` header tests.
 
-- **A34 (planned)** (R51) — In an assistant message, a link whose target is a
+- **A34** (R51) — In an assistant message, a link whose target is a
   relative path, an absolute path, and a `file://` path each open the viewer with no browser
   navigation and no route change, a `:line` suffix is carried through to the viewer, an `https:`
   link keeps its ordinary behavior, and a bare path written in prose renders as text with no link.
   *Verify by* `ui/src/components/chat/renderers/AssistantText.test.tsx`.
-- **A35 (planned)** (R52) — Opening a file renders its text with line numbers,
+- **A35** (R52) — Opening a file renders its text with line numbers,
   scrolls to and marks a cited line, replaces the open file when a second is opened, re-reads on
   **Reload**, and offers **Rendered**/**Source** only for a Markdown file with the rendered form
   going through the sanitized renderer. *Verify by* `ui/src/components/chat/FileViewer.test.tsx`.
-- **A36 (planned)** (R53, R54) — With a file open, a wide transcript region renders
+- **A36** (R53, R54) — With a file open, a wide transcript region renders
   the viewer as a docked left column beside a reflowed transcript and a narrow one takes the width
   from the transcript, with the conversation's own content unchanged in both; a file link inside an
   expanded dashboard chat pane navigates to the agent screen with that file open instead of opening
@@ -727,7 +727,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/grid/DashboardChatPane.test.tsx`, and
   `ui/src/components/chat/ChatPanel.test.tsx`, with the rendered docked/reflowed forms exercised in
   journey J3.
-- **A37 (planned)** (R55) — A path outside the session working directory, a symlink
+- **A37** (R55) — A path outside the session working directory, a symlink
   escaping it, a `.git` path, a missing file, a directory, non-text content, and an absent working
   directory each return their typed refusal without opening anything outside the directory; an
   oversized file returns its labelled partial read; a Git-ignored file inside the directory reads
@@ -791,7 +791,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   record; `Composer.tsx` restores and writes it, and `ui/src/api/sse.ts` removes it only with the
   existing deleted-agent event. `drafts.test.ts`, `Composer.test.tsx`, and `sse.test.ts` cover
   restore, pruning, send outcomes, malformed/unavailable storage, and deletion cleanup.
-- **File links and the file viewer (R51–R55, planned):** the `a` component override
+- **File links and the file viewer (R51–R55):** the `a` component override
   `ui/src/components/chat/renderers/AssistantText.tsx` does not have today, beside its existing
   `code` override, decides link handling; `renderers/filePath.ts` owns the one place a link target
   is classified as a local path and its `:line` suffix parsed. `ui/src/components/chat/FileViewer.tsx`

@@ -111,6 +111,16 @@ const (
 	// diagnostics or a filesystem path into the response (TS-05.R15).
 	CodeDirectoryPickerBusy   = "directory_picker_busy"   // 409
 	CodeDirectoryPickerFailed = "directory_picker_failed" // 500
+
+	// session file-read codes (TS-03.R40). Each names the boundary that was hit
+	// rather than collapsing into one flat validation error, so the viewer can
+	// state the actual reason (FS-03.R55). PathRefused is decided on the path's
+	// form before any filesystem access, so it never reveals whether a file
+	// exists outside the working directory (TS-05.R21).
+	CodePathRefused          = "path_refused"          // 422
+	CodeNotAFile             = "not_a_file"            // 422
+	CodeNotText              = "not_text"              // 422
+	CodeWorkspaceUnavailable = "workspace_unavailable" // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -135,7 +145,8 @@ func (e *APIError) HTTPStatus() int {
 // statusForCode maps an error code to its HTTP status. Unknown codes map to 500.
 func statusForCode(code string) int {
 	switch code {
-	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid:
+	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
+		CodePathRefused, CodeNotAFile, CodeNotText, CodeWorkspaceUnavailable:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400

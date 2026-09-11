@@ -58,17 +58,20 @@ describe("AnnotationTray", () => {
   it("docks through the transcript region's own container query and falls back to the overlay", () => {
     const css = agentStylesheet();
     expect(css).toMatch(/\.transcript-wrap \{[^}]*container: transcript \/ inline-size/);
-    expect(css).toMatch(/\.transcript-wrap \{[^}]*grid-template-columns: minmax\(0, 1fr\) auto/);
+    expect(css).toMatch(/\.transcript-wrap \{[^}]*grid-template-columns: auto minmax\(0, 1fr\) auto/);
     // The fallback is the shipped presentation itself, not a second one.
     expect(css).toMatch(/\.annotation-tray \{[^}]*position: absolute/);
     const docked = css.match(/@container transcript \(min-width: 860px\) \{([\s\S]*?)\n\}/);
     expect(docked).not.toBeNull();
     expect(docked![1]).toMatch(/\.annotation-tray \{[^}]*position: static/);
     expect(docked![1]).toMatch(/\.annotation-tray \{[^}]*width: min\(30cqi, 460px\)/);
-    // Auto-placement is what puts the transcript in the first column and the
-    // docked tray in the second, so every other child of the region has to stay
-    // out of flow. Giving the jump button a grid area of its own displaced the
-    // transcript into the tray's column — invisible to jsdom, obvious in Chrome.
+    // The region has a leading file-viewer track (FS-03.R53), so the in-flow
+    // children are placed explicitly: auto-placement would drop the transcript
+    // into the viewer's content-sized column. Every other child still has to stay
+    // out of flow — giving the jump button a grid area of its own displaced the
+    // transcript into the tray's column, invisible to jsdom and obvious in Chrome.
+    expect(css).toMatch(/\.transcript-view \{[^}]*grid-column: 2/);
+    expect(css).toMatch(/\.annotation-tray \{[^}]*grid-column: 3/);
     expect(css).toMatch(/\.jump-to-latest \{[^}]*position: absolute/);
     expect(css).not.toMatch(/\.jump-to-latest \{[^}]*grid-area/);
     // The collapse control belongs to the docked form only (FS-13.R21).

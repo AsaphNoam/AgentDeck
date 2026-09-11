@@ -3,8 +3,9 @@ import ReactDiffViewer from "react-diff-viewer-continued";
 import type { AnnotationDraft, TranscriptEvent } from "../../../api/types";
 import { clipAnnotationExcerpt } from "../../../lib/annotations";
 import { diffTheme } from "../../../presentation/integrations";
+import type { FileLink } from "./filePath";
 
-export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
+export function DiffBlock({ event, onAnnotate, onOpenFile }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void; onOpenFile?: (link: FileLink) => void }) {
   const [selection, setSelection] = useState<{ side: "old" | "new"; start: number; end: number } | null>(null);
   const chooseLine = (lineId: string) => {
     const match = /^([LR])-(\d+)$/.exec(lineId);
@@ -24,7 +25,13 @@ export function DiffBlock({ event, onAnnotate }: { event: TranscriptEvent; onAnn
   };
   return (
     <article className="diff-block" data-ui="transcript" data-variant="diff">
-      <div className="diff-heading"><strong>{String(event.path ?? "diff")}</strong><small>Click line numbers to select a range.</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
+      <div className="diff-heading">{/* The heading path opens the same viewer a chat file link does, while the
+          diff keeps its own content and line-selection behavior (FS-05.R37). */}
+        {onOpenFile && event.path ? (
+          <button type="button" className="file-link" data-file-path={String(event.path)} onClick={() => onOpenFile({ path: String(event.path) })}><strong>{String(event.path)}</strong></button>
+        ) : (
+          <strong>{String(event.path ?? "diff")}</strong>
+        )}<small>Click line numbers to select a range.</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
       <ReactDiffViewer oldValue={String(event.old_text ?? event.old ?? "")} newValue={String(event.new_text ?? event.new ?? "")} splitView={false} styles={diffTheme} onLineNumberClick={chooseLine} />
     </article>
   );

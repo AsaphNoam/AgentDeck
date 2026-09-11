@@ -181,6 +181,21 @@ export interface TrackedFile {
   diff_refs: DiffRef[];
 }
 
+// FileContent is GET /api/sessions/{id}/file's success payload (TS-03.R40).
+// `path` is the relative form the viewer displays, `truncated` marks a bounded
+// partial read of a larger file, and `language` is an extension-derived
+// highlighting hint — empty when the extension is unknown.
+export interface FileContent {
+  agent_id: string;
+  path: string;
+  size: number;
+  mod_time: string;
+  line_count: number;
+  content: string;
+  truncated: boolean;
+  language: string;
+}
+
 export interface TrackedCommand {
   command: string;
   seq: number;
