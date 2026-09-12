@@ -60,10 +60,12 @@ the relevant feature and technical specifications; it does not change product co
   `docs/ready-changes/persistent-pipeline-orchestration.md`, now paused for design, rather than
   selecting an unrelated work unit. Feature draft: FS-00.R17, FS-06.R30–R36/A20–A25,
   FS-14.R78/A45. Existing hierarchy, dynamic task work, same-identity stop/resume and automatic
-  cleanup remain confirmed. **Pending:** unread deferred retention (recommend until delivery,
-  then existing read cleanup; current mail otherwise expires after seven days) and the feature/
-  technical confirmation checkpoint. Technical receipt/recovery/budget details remain to be written
-  after that decision. Verified seams: `internal/state/messages.go` currently always inserts a mail
+  cleanup remain confirmed. **Mail scope confirmed:** unread deferred mail survives until delivery/read,
+  then uses existing read cleanup; uncertain delivery may repeat with stable ids on a later authorized
+  turn; whole messages are bounded with durable overflow. FYIs are best effort with no atomic capture;
+  the standing owner supplies replacement context through assignment/mail, with no inbox transfer.
+  **Pending:** precise technical receipt/recovery/budget mechanics; no product question remains.
+  Verified seams: `internal/state/messages.go` currently always inserts a mail
   activation; `internal/runtime/chat.go` runPromptTurn/StartActivation share turn execution and can
   carry bounded content; no new provider method or separate synchronization engine is needed.
 

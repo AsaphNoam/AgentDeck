@@ -458,8 +458,8 @@ lost.
 - **Mail delivery extension in design:** FS-00.R17 and FS-06.R30–R36 intentionally replace the
   payload-free mail prompt/pull-only requirement associated with R19–R21. Mail remains durable
   source-domain data; a deferred message creates no activation or task continuation. The shared
-  prompt boundary will supply bounded mail to an already authorized turn. Feature retention and
-  technical confirmation/recovery design remain pending in FS-06 §6; no second prompt engine is
+  prompt boundary will supply bounded mail to an already authorized turn. Feature scope and retention
+  are confirmed in FS-06 §6; technical confirmation/recovery mechanics remain pending. No second prompt engine is
   approved as a substitute.
 
 - **Pipeline replacement:** TS-09.R35–R50 and TS-10.R25–R37 replace R11's direct pipeline

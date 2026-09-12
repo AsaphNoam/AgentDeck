@@ -21,7 +21,7 @@ coordinator FYIs reuse deferred mail without an extra synchronization turn.
 - Replace the old pipeline execution engine with the shared task dispatcher/result path; add durable
   wait/yield, scoped task inspection/repair, managed-child provenance and coordinator handoffs.
 - Keep run-wide authority with the standing owner; preserve subordinate coordination and durable
-  awareness of material direct interventions through deferred mail, not a separate notice queue,
+  best-effort updates about material direct interventions through deferred mail, not a separate notice queue,
   wake or coordinator delivery watermark. Use ordinary same-identity stop/resume and re-deliver
   assignments/results, visibly reporting native context restoration failure.
 - Fence stage/run closure before descendant cancellation; retry cleanup durably with bounded
@@ -54,13 +54,15 @@ borrowed-work cancellation needs the guarded generation/turn seam specified by T
 Existing pipeline delegation is already dynamic: its constraint is stage-agent lifecycle, not a
 mandatory child DAG. `internal/state/messages.go` currently unconditionally coalesces an activation
 with each send; `runPromptTurn`/`StartActivation` in `internal/runtime/chat.go` are the direct-content
-delivery seams. Mail is currently deleted 24 hours after read or seven days after creation, requiring
-the explicit deferred-retention decision below. These verified local seams motivate convergence; no unverified provider
+delivery seams. The confirmed extension exempts unread deferred mail from the existing seven-day
+expiry and applies 24-hour cleanup after read. These verified local seams motivate convergence; no unverified provider
 limitation or provider upgrade motivates another execution mechanism.
 
 ## Waiting on
 
-The 2026-09-12 efficient-mail extension's feature confirmation, deferred-mail retention decision
-in FS-06 §6, and matching technical delivery/confirmation contract. The earlier hierarchy, cleanup
-and runtime-lifetime decisions remain confirmed. TS-09.R50 and TS-10.R36's old separate notice
-design is withdrawn and must not be implemented while this unit is paused.
+Only the precise technical delivery/confirmation contract for the mail extension. The operator
+confirmed retention until delivery/read, stable-id recovery of uncertain delivery on a later
+authorized turn, bounded whole messages and durable overflow. FYIs are best effort; replacement
+context comes from the standing owner through assignment/mail, with no automatic inbox transfer.
+No product question remains. The earlier hierarchy, cleanup and runtime-lifetime decisions remain
+confirmed. TS-09.R50 and TS-10.R36's old separate notice design is withdrawn.

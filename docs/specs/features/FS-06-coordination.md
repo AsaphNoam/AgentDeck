@@ -237,20 +237,22 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   delivery remains recoverable on a later authorized turn or explicit read, with stable ids for
   any repeat. It never creates a wake solely to replay deferred mail. Successfully supplied content
   updates the ordinary read/unread surface; delivery does not assert comprehension or execution.
-  Exact confirmation mechanics belong to technical design. Deferred-mail expiry remains open in
-  §6; shipped R8 is unchanged until that decision is resolved.
+  Exact confirmation mechanics belong to technical design. Unread deferred mail is retained until
+  delivery or explicit mailbox read, exempt from R8's seven-day expiry. Once read, it uses the
+  existing 24-hour read-mail cleanup policy. Waking-mail retention is unchanged.
 - **R35** (planned) — Deferred mail can address an existing non-archived chat recipient in an
   active project even when current task/run ownership prevents an immediate wake. Sending grants
   no right to bypass that ownership. Terminal, unknown and archived targets retain their refusals,
   as do existing project/context boundaries. Discovery and send results distinguish addressability
-  from wake eligibility. Replacing an agent never redirects arbitrary personal mail; only the
-  explicit scoped coordinator handoff in FS-14.R78 carries relevant intervention mail forward.
-- **R36** (planned) — Stage-coordinator synchronization uses this mailbox primitive. Observable
-  material standing-owner interventions persist a bounded, attributed deferred-mail update with
-  the affected operation, without relying on a later recollection. FYIs and summaries of changes
-  outside observable controls use ordinary deferred send. Requests needing a response may explicitly
-  use waking mail. No separate coordinator inbox/protocol, authority transfer, task reopening or
-  acknowledgment gate is introduced.
+  from wake eligibility. Replacing an agent never redirects or transfers its inbox. The standing
+  owner supplies replacement context through its assignment or ordinary mail under FS-14.R78.
+- **R36** (planned) — Stage-coordinator updates use ordinary deferred mail on a best-effort basis.
+  The standing owner should send material intervention FYIs promptly. There is no atomic
+  intervention/mail transaction, automatic change capture, retry workflow for missing FYIs or
+  later reconstruction guarantee. Once a send succeeds, normal mail durability and delivery apply.
+  A missing or failed FYI does not block the intervention or stage progression. Requests needing a
+  response may explicitly use waking mail. No separate coordinator inbox/protocol, authority
+  transfer, task reopening or acknowledgment gate is introduced.
 
 ## 5. Acceptance criteria
 
@@ -268,12 +270,13 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   not redundantly charge supplied mail. Manual read order remains unchanged.
 - **A23** (planned; R34) — Inject failures before dispatch, during resume/delivery and before
   confirmation, then restart. Verify recoverable content, stable ids for uncertain repeats, no
-  false delivery/read claim and no deferred-mail-only replay turn. Verify expiry against the
-  retention decision in §6.
+  false delivery/read claim and no deferred-mail-only replay turn. Keep unread deferred mail beyond
+  seven days, then deliver/read it and verify cleanup after 24 hours; waking retention is unchanged.
 - **A24** (planned; R35–R36) — A standing owner corrects a worker beneath a sleeping coordinator.
-  The change and deferred update survive restart without waking that coordinator. Its next natural
-  turn includes the update; an explicit waking action request wakes when eligible. Coordinator
-  succession carries relevant intervention mail without unrelated inbox access or run-wide authority.
+  After a successful best-effort send, the deferred update survives restart without waking that
+  coordinator and arrives on its next natural turn. A failed or omitted FYI does not roll back or
+  block the intervention. An explicit waking action request wakes when eligible. A replacement
+  receives standing-owner-supplied assignment/mail context without automatic inbox transfer.
 - **A25** (planned; R30, R34–R36) — A supervision journey distinguishes queued-deferred from
   waking mail and updates read/unread state after direct delivery. Run cancellation does not start
   completed tasks for FYIs. Deferred addressability bypasses no task admission/archive/closure gate.
@@ -390,17 +393,18 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 ## 6. Deviations & open decisions
 
 - **Efficient durable mail extension, 2026-09-12.** R30–R36/A20–A25 are the requested feature
-  draft within the pipeline refactor. On shipping they supersede conflicting parts of R4/R8/R22/R27
+  scope confirmed within the pipeline refactor. On shipping they supersede conflicting parts of R4/R8/R22/R27
   (eligibility), R9/R24 (every send wakes), R10/R25 (payload-free/pull-only delivery), and R6/R11/R14
   (direct receipt/read projection). Waking opportunity ownership and mailbox tools remain; unread
   counts never become wake triggers. Unmarked requirements still describe shipped behavior.
-  Technical confirmation/recovery design follows feature confirmation; the separate planned
+  Technical delivery/confirmation mechanics remain to be specified; the separate planned
   coordinator-notice protocol in TS-10.R36 is withdrawn.
-- **Open retention decision:** R8 expires all mail after seven days, potentially losing a deferred
-  FYI before its recipient runs. Recommend retaining unread deferred mail until delivery, then
-  applying the existing read-mail cleanup policy; alternatively keep the seven-day expiry for both
-  modes. No retention change is settled yet. Resolve this before promoting the expanded pipeline
-  change back to Waiting to start.
+- **Confirmed 2026-09-12:** Retain unread deferred mail until delivery/read, then use existing
+  read-mail cleanup; preserve uncertain messages for a later authorized turn with stable ids;
+  deliver bounded whole messages with durable overflow. Intervention FYIs are best effort through
+  ordinary send, with no atomic capture requirement. Replacement context is supplied by the
+  standing owner through assignment or mail, with no automatic inbox/history transfer. No product
+  decision remains open; finish the technical delivery contract before implementation.
 
 - **Pipeline replacement:** FS-14.R74 replaces R22's permanent exclusion of stopped agents with
   pipeline history when shipped. A waiting assigned agent resumes its task through TS-10.R29 before

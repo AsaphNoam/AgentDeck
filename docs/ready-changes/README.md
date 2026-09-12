@@ -49,8 +49,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 ## Paused changes
 
 - [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — core direction
-  confirmed; defining waking/deferred inline mail in place of separate coordinator notices, with
-  deferred retention and technical delivery confirmation still to resolve.
+  and mail scope confirmed, including retention and best-effort FYIs; precise technical delivery
+  confirmation remains to be specified.
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
   AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
   provider/user MCP support; waiting for a safe direct transport supported by packaged Codex/ACP.

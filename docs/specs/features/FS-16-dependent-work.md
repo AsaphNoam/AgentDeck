@@ -385,9 +385,10 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R37** (planned) — A dedicated stage coordinator is managed child work under FS-14.R75–R76,
   never the authoritative stage task. It reports its own result upward and manages its delegated
   descendants; only the standing owner holds run-wide authority and reports the stage outcome.
-  Deferred durable mail under FS-14.R78 makes material standing-owner interventions visible to the coordinator
-  without requiring its permission. An explicit standing-owner-created successor can continue the
-  coordinator's delegated scope and inherit reports/relevant intervention mail, preserving original task lineage and
+  Best-effort deferred mail under FS-14.R78 communicates material standing-owner interventions
+  without requiring coordinator permission. An explicit standing-owner-created successor can continue
+  the delegated scope with context supplied by its owner through assignment or ordinary mail,
+  without automatic inbox/history transfer, preserving original task lineage and
   immutable results. Automatic child creation and replay create no duplicate coordinator.
 - **R38** (planned) — Pending yield, stop and release cleanup retries transient failures
   automatically under FS-14.R77. Waiting/finishing/stopping remain honest about outstanding cleanup;
@@ -412,10 +413,11 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   result/deletion evidence; a same-assignee wait is refused instead of deadlocking.
 - **A23** (planned; R37) — Task/MCP tests prove a managed stage coordinator can manage its
   delegated subtree but cannot inspect unrelated run work or report for the standing stage task.
-  Inject a standing intervention concurrently with coordinator wait, replacement and stage closure;
-  its deferred mail is delivered at the correct current/successor coordinator's next natural turn or the operation is
-  refused atomically. No implicit ownership transfer, duplicate effect or second assignment occurs.
-  An explicit successor inherits only the prior coordinator's scope and immutable history.
+  Send a best-effort FYI about a standing intervention while the coordinator waits; queued mail
+  arrives on its next natural turn. Missing mail never blocks an otherwise valid intervention.
+  Replacement transfers no inbox; the standing owner supplies context through assignment or mail.
+  No implicit ownership transfer, duplicate effect or second assignment occurs. An explicit
+  successor inherits only the prior coordinator's scope; immutable history stays intact.
 - **A24** (planned; R38) — Inject transient and persistent yield/release/stop failures with a
   fake clock and restart. Assert persisted backoff, one effect owner, eventual automatic success,
   no premature claim release and no provider polling turns. Only persistent/non-recoverable cases

@@ -519,8 +519,9 @@ unchanged by them.
   Restart/Retry reuses the same child; an explicit replacement or follow-up made by the standing
   owner records its successor binding before dispatch without rewriting old task provenance/results.
   Current coordinator scope follows that explicit binding, never agent names or `executor` metadata.
-  Such successor work remains managed beneath the same standing stage ownership and receives prior
-  reports and intervention context. This single optional child is a delegation choice, not a
+  Such successor work remains managed beneath the same standing stage ownership; the standing owner
+  supplies its context through assignment or ordinary mail, without automatic inbox/history transfer.
+  This single optional child is a delegation choice, not a
   template-authored execution graph; all of its internal work remains dynamically agent-authored.
 - **R50 — superseded 2026-09-12 by FS-14.R78:** The coordinator-specific update/continuation
   mechanism is withdrawn in favor of durable deferred mail. Normal coordinator responsibility,
@@ -638,8 +639,9 @@ new durable run revision or a structured validation/conflict result.
   confirmed stop/resume and subordinate-coordination decisions. R49 overrides the initial
   draft's dedicated-assignee interpretation; TS-10.R35 replaces manual-first cleanup. The later
   mail extension withdraws R50 and TS-10.R36: FS-14.R78 uses deferred mail for intervention FYIs,
-  with no separate notice queue or wake. FS-06 §6 records its open retention/design checkpoint;
-  the expanded change is paused. Old-engine exclusions below describe shipped behavior only.
+  with no separate notice queue or wake. FS-06 §6 records confirmed retention and best-effort FYIs;
+  the expanded change is paused only for technical delivery design. Old-engine exclusions below
+  describe shipped behavior only.
 
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated
   same-user loopback API. Hard per-agent API capabilities remain outside this feature.

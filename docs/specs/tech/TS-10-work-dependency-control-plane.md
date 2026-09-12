@@ -368,7 +368,8 @@ parallel copy of them.
   Create a child beneath the standing assignment and CAS its coordinator binding in one transaction;
   a unique successor key makes request replay return the same child. Normal Retry retains the
   same coordinator task and identity. A successor may target the original agent for follow-up or a
-  new launch spec; it receives the preceding bounded reports/relevant intervention mail and inherits only
+  new launch spec; its standing owner supplies context through the assignment or ordinary mail,
+  without automatic inbox or intervention-history transfer. It inherits only
   that coordinator's delegated scope under TS-05.R22. Neither operation changes the standing stage
   assignee, accepted reports, or immutable parent lineage. A cancelled/closed stage refuses it.
 
@@ -488,7 +489,7 @@ object carries the derived boolean `retry_eligible` (R22) beside its stored fiel
   manual-first cleanup policy; R37 provides explicit succession. R36's separate coordinator
   awareness protocol is withdrawn for FS-06.R30–R36's mail extension. Deferred mail must not request
   a task continuation or satisfy a task wait by its mere arrival; R29's mail wake applies to waking
-  sends only. Mail feature confirmation and technical delivery design remain open in FS-06 §6.
+  sends only. Mail scope is confirmed in FS-06 §6; technical delivery design remains outstanding.
 
 - **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
   but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a

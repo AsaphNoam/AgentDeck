@@ -609,9 +609,9 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   corrections and completion normally flow through it; the standing owner retains the final stage
   decision. The standing owner may inspect descendants, communicate directly or intervene when
   useful. Direct interaction grants no implicit ownership transfer. Material intervention — changes
-  to assignments, task control, instructions, findings or completion decisions — is durably supplied
-  to the responsible sub-orchestrator so it can update its understanding, including after wait,
-  resume or restart. Read-only inspection needs no notification. A fresh follow-up assignment may
+  to assignments, task control, instructions, findings or completion decisions — should be sent
+  promptly as best-effort deferred mail under R78. Successfully queued mail survives wait, resume
+  or restart; atomic change capture is not required. Read-only inspection needs no notification. A fresh follow-up assignment may
   return corrections to a completed sub-orchestrator without rewriting its earlier result. This is
   a coordination default, not a communication barrier or an automatic child-result acceptance gate.
 - **R77** (planned) — Cleanup normally reconciles itself. Transient stop, release and bookkeeping
@@ -625,13 +625,14 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **R78** (planned) — Material coordinator updates use the waking/deferred mailbox in
   FS-06.R30–R36. FYIs are saved immediately as deferred mail and arrive on the coordinator's next
   natural turn with bounded content already supplied; they do not trigger a synchronization turn.
-  Requests needing a response may explicitly use waking mail. Observable changes and their deferred
-  updates are durable together, preserving R76's awareness requirement without a separate notice
-  stream, coordinator delivery watermark, acknowledgment or polling protocol. Explicit coordinator
-  succession carries only relevant stage intervention mail in its bounded handoff with original
-  sender/message provenance; it does not transfer arbitrary personal mail or create an FYI-only
-  turn. R76 promises awareness on the next natural turn, not immediate notification or implicit
-  restart of a completed task.
+  Requests needing a response may explicitly use waking mail. Sending intervention FYIs is best
+  effort under FS-06.R36; changes and mail need not commit together, and missing FYIs do not block
+  work. R76's awareness requirement is this coordination practice, not guaranteed change capture.
+  No separate notice stream, coordinator delivery watermark, acknowledgment or polling protocol is
+  required. On explicit replacement, the standing owner supplies context through the new assignment
+  or ordinary mail; no inbox or intervention-history transfer is automatic. Stop/resume preserves
+  the same identity and inbox. Successfully queued FYIs arrive on a natural turn without implicitly
+  restarting a completed task.
 
 ## 5. Acceptance criteria
 
@@ -673,7 +674,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   Assert standing stage ownership from the start, exactly one managed coordinator despite replay,
   upward result delivery and no advancement on child success/failure alone. The coordinator normally
   directs its descendants and lacks run-wide or ancestor-report authority. Exercise direct standing
-  intervention: material corrections remain visible to the coordinator after wait/resume/restart,
+  intervention: successfully sent correction mail remains visible after wait/resume/restart,
   ownership is unchanged, and a later standing stage result alone closes the stage. Render both
   roles and distinguish the child report from the accepted stage result in run supervision.
 - **A44** (planned; R70–R71, R77) — Inject transient stop and release failures, restart during
@@ -682,7 +683,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   a classified non-recoverable failure alone produce actionable attention. Repair and Retry cleanup
   complete only cleanup, without repeating the accepted work or resetting backoff on every restart.
 - **A45** (planned; R76, R78) — Make direct standing-owner interventions while the stage coordinator
-  is stopped or waiting. Assert durable deferred mail and no extra model turn. Resume for child
+  is stopped or waiting and send best-effort FYIs. Assert durable deferred mail and no extra model turn. Resume for child
   results or a user assignment and verify inline intervention messages, normal scoped coordination
   and unchanged stage-report authority. An explicit action request uses waking mail; exercise the
   overflow/restart/successor cases in FS-06.A22–A25.
@@ -985,8 +986,9 @@ The shipped first version deliberately keeps these product boundaries:
 
 **Mail extension requested later on 2026-09-12:** R78/A45 and FS-06.R30–R36/A20–A25 replace
 the separate coordinator-notice design with deferred mailbox delivery. The previously confirmed
-pipeline direction remains; the expanded change is paused for FS-06 §6's retention decision and
-the mail feature/technical design checkpoint. It is not yet ready to implement with this extension.
+pipeline direction remains. Mail scope and retention are confirmed in FS-06 §6, including best-effort
+FYIs and owner-supplied replacement context. The expanded change remains paused only for the
+technical delivery contract; no further product decision is required.
 
 ## 7. Traceability
 

@@ -24,7 +24,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** `persistent-pipeline-orchestration.md` is Paused for its deferred/inline mail
-  extension: feature confirmation, unread-mail retention and matching technical delivery design. Its exact
+  extension: only the precise technical delivery/confirmation contract remains. Its exact
   requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
   `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
@@ -36,7 +36,7 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
   Persistent pipeline orchestration has resumed design for efficient durable mail: deferred FYIs
   never wake a coordinator, and authorized turns receive bounded message bodies directly. The
-  retention decision is in FS-06 §6; the extension's technical contract remains to be designed.
+  mail scope is confirmed in FS-06 §6; the extension's technical contract remains to be designed.
   The clean legacy reset, descendant cancellation, project boundaries, subordinate stage
   coordination and ordinary stop/resume remain confirmed.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
@@ -61,6 +61,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (design-feature):** Recorded confirmed mail decisions: unread deferred
+mail survives until delivery/read then uses 24-hour cleanup; uncertain delivery remains recoverable
+with stable ids on a later authorized turn; inline batches contain bounded whole messages with
+durable overflow. Intervention FYIs are best effort, with no atomic change/mail requirement.
+Replacement context is supplied by the standing owner through assignment or ordinary mail; no
+automatic inbox/history transfer. Updated FS/TS and acceptance criteria consistently. No product
+question remains; the unit stays paused only for technical delivery mechanics. Spec checks, twin
+skills and diff checks pass; no product code changed.
 
 **Changelog — 2026-09-12 (design-feature):** Drafted waking/deferred durable mail and bounded
 inline delivery in FS-06.R30–R36/A20–A25, FS-00.R17 and FS-14.R78/A45. Withdrew the separate
@@ -113,9 +122,6 @@ resumable idea. Queues are independent.
 
 ## Decisions needing your input
 
-- **Deferred-mail retention:** Keep unread deferred mail until delivery (recommended), or retain
-  the existing seven-day expiry? FS-06 §6 records the consequence; pipeline mail design resumes
-  from `docs/ideas.md` after feature confirmation.
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
 - **Failed pipeline-stage chat:** Confirm whether a pause after a failed launch or resume should
