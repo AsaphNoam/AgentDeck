@@ -156,6 +156,18 @@ steps remain available without claiming the broader knowledge package is install
 launches receive neither signal (FS-17.R15/R18, TS-04.R36–R37).
 No direct-action pointer is injected while the migration is paused.
 
+**R14 (planned) — The published skill is renamed by the publisher, and the old directory is retired
+by the same pass.** `SkillName` becomes `operating-deckhand` and the embedded package directory is
+renamed with it, so the skill id, its frontmatter name, and the published directory continue to have
+one source (INV §2). Publication keeps R9/R10's verify-then-activate shape and additionally removes
+a leftover `operating-agentdeck` directory under the managed root it owns — only there, and only for
+the exact directory this product previously published — after the renamed skill verifies, never
+before (INV §15). Removal failure is warned and retried on a later start rather than blocking
+publication or startup (INV §7), and a directory the product did not publish is out of scope. The
+pre-rename seed prompts join `supersededRolePromptDigests` under R13 so the Deckhand wording reaches
+an existing install through the same exact-match rule, and the renamed role id (FS-04.R48) is keyed
+in that table as its own role rather than inheriting the old id's digests.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:

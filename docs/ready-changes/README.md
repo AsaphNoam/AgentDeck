@@ -45,6 +45,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — one standing
   stage owner, managed stage sub-orchestrators, shared durable-task execution and automatic cleanup.
+- [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
+  across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 
 ## Paused changes
 

@@ -1,6 +1,6 @@
 # FS-10 — macOS installation, setup & updates
 
-**Status:** Current
+**Status:** Partial
 **Code:** `scripts/release/`, `internal/release/`, `internal/cli/`, `.github/workflows/release.yml`, `README.md` · **Journeys:** J1, J2
 **Absorbed:** The regular AgentDeck installer idea from `docs/ideas.md`.
 
@@ -57,6 +57,42 @@ person's provider credentials or AgentDeck configuration.
   that macOS may require the person to approve an unidentified developer on first open; AgentDeck
   never attempts to bypass Gatekeeper or asks for an administrator password.
 
+- **R15 — The installed product is Deckhand.** (planned) The release installs the `deckhand`
+  command into a Deckhand-named install tree (`~/Library/Application Support/Deckhand` by default,
+  `$DECKHAND_APP_ROOT` to override), publishes `deckhand-<version>-<target>.tar.gz`, and names its
+  manifest component `deckhand`. `agentdeck` is not installed, aliased, or kept on PATH; a person
+  who typed it gets their shell's ordinary command-not-found. Everything R1–R14 promises about
+  fresh install, private runtime, provider sign-in, explicit update and rollback holds unchanged
+  under the new name.
+- **R16 — An existing AgentDeck install moves over by running the Deckhand installer once.**
+  (planned) There is no in-place `agentdeck update` path onto Deckhand: the update command in an
+  installed AgentDeck resolves releases from the pre-rename GitHub repository, and this
+  specification does not depend on that repository redirecting. The Deckhand installer is a normal
+  fresh install (R2) that additionally detects an AgentDeck install tree and reports that it found
+  one. It never modifies, moves, or deletes that tree — the previous install stays runnable as a
+  fallback — and documentation gives the exact command to remove it once the person is satisfied.
+- **R17 — First start migrates the state directory once.** (planned) When `deckhand` starts and
+  `$DECKHAND_HOME` (default `~/.deckhand`) does not exist while an AgentDeck home does
+  (`$AGENTDECK_HOME` if set, else `~/.agentdeck`), it moves that directory to the Deckhand home and
+  reports the source path, the destination path, and that the move happened. Everything inside
+  comes across unchanged and keeps working: the SQLite state database with its agents, sessions,
+  tasks, pipelines and context links; transcripts; `backends.json`, `config.json`,
+  `config-sources.json` and `layout.json`; project resources; and owned worktrees. `AGENTDECK_HOME`
+  is read for this one purpose and has no other effect. Once a Deckhand home exists the check does
+  not run again.
+- **R18 — Migration refuses rather than guesses.** (planned) It does not run, and start proceeds
+  against the Deckhand home alone while saying why, when: both homes already exist (it never merges
+  two states, and names which one it is using); a dashboard is running against either home; the
+  AgentDeck home is unreadable, is not a directory, or is not the owner's; or the destination cannot
+  be created. A refusal is reported with the path and a retryable action, never swallowed, and never
+  leaves the person guessing which state they are running on.
+- **R19 — The environment is renamed with the product.** (planned) Every variable the product
+  defines or injects is `DECKHAND_*` — `DECKHAND_HOME`, `DECKHAND_APP_ROOT`, `DECKHAND_HOOK_URL`,
+  `DECKHAND_HOOK_TOKEN`, `DECKHAND_AGENT_ID`, `DECKHAND_INTERFACE`, `DECKHAND_SKILL_DIR`,
+  `DECKHAND_PROJECT_RESOURCES`, `DECKHAND_LOG_LEVEL`, `DECKHAND_CODEX_VERSION`, the provider
+  login-command overrides, and the installer's own variables. No `AGENTDECK_*` variable is honored
+  except `AGENTDECK_HOME` under R17.
+
 ## 3. States & transitions
 
 - **R10** — A release runtime is either absent, staged, current, previous, or retained.
@@ -105,6 +141,22 @@ person's provider credentials or AgentDeck configuration.
   sign-in requirement, and explicit update/rollback commands. *Verified:* release-documentation
   review against this specification.
 
+- **A7** (R15, R19) — (planned) A fresh install on a clean macOS arm64 home produces a runnable
+  `deckhand --version` and dashboard, installs nothing named `agentdeck` on PATH or in the install
+  tree, and the launched agent environment contains only `DECKHAND_*` variables. *Verified:*
+  fresh-home installer integration test extended to assert the absent old command, plus a
+  launch-environment test asserting no `AGENTDECK_` prefix is injected.
+- **A8** (R17, R18) — (planned) A populated `~/.agentdeck` containing agents, transcripts,
+  config files, project resources and a worktree becomes `~/.deckhand` on first start with every
+  one of those readable afterward and the dashboard serving the same agents; a home that already
+  exists at both paths, a running dashboard, and an unreadable source each refuse with a named path
+  and leave both directories untouched. *Verified:* state-migration integration tests covering the
+  success path and each refusal branch.
+- **A9** (R16) — (planned) Release documentation states that moving from AgentDeck is a one-time
+  installer run rather than `agentdeck update`, that the previous install tree is left in place, and
+  gives the exact command to remove it. *Verified:* release-documentation review against this
+  specification.
+
 ## 6. Deviations & open decisions
 
 - This MVP intentionally excludes Intel macOS, Windows, Linux, Homebrew, signing, notarization,
@@ -125,3 +177,4 @@ person's provider credentials or AgentDeck configuration.
 - Regression coverage: `internal/release/{archive,install,wrapper}_test.go`; release CLI and
   fresh-home bootstrap coverage: `internal/cli/{release,update,auth,installer}_test.go`; release
   publication: `.github/workflows/release.yml`; product documentation: `README.md`.
+- Rename identity, install tree, and state migration (R15–R19): TS-06.R24, TS-02.R32–R33.

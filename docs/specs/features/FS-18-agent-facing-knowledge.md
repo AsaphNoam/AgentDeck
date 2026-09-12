@@ -1,6 +1,6 @@
 # FS-18 — Agent-Facing AgentDeck Knowledge
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/agentknowledge`, `internal/config`, `internal/server`, `internal/runtime`, `internal/cli` · **Journeys:** —
 **Absorbed:** the AgentDeck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
 
@@ -114,6 +114,16 @@ keyed to bytes AgentDeck itself shipped: it does not make roles managed, does no
 user edits a prompt, and produces no unsolicited provider prompt, transcript event, restart, or
 lifecycle transition (R8). FS-04.R47 owns the seeding exception and TS-11.R13 owns its mechanics.
 
+**R14 — The knowledge an agent reads says Deckhand.** (planned) With the rename (FS-00.R16) the
+shared operating skill is published as `operating-deckhand`, its frontmatter name and description
+say Deckhand, and its body, the four seeded role prompts, every MCP tool description, the
+backend-switch history primer, and the rendered-context error strings an agent reads say Deckhand
+and FirstMate. A migrated home's previously published `operating-agentdeck` skill directory is
+removed as part of publishing the renamed one, so an agent is never offered two skills describing
+the same product; a directory the product did not publish is left alone. The corrected prompt text
+reaches existing installs only through R13's exact-match digest rule, so the pre-rename prompts this
+product shipped join the digest table and a prompt the user edited stays untouched.
+
 **R8 — Knowledge refresh is process-bound, not a hot reload.** A verified package is
 refreshed when the dashboard starts. AgentDeck does not restart a running process, inject a new
 turn, mutate its transcript, or replace provider state when the package or role migration changes.
@@ -197,6 +207,13 @@ directory, pointer, or environment variable and leaves an exact historical Agent
 unchanged. A successful later startup restores the full R1/R6 overlay and performs the exact
 migration once. Package refresh or role migration causes no unsolicited provider prompt, transcript
 event, restart, or lifecycle transition.
+
+**A10** (R14) — (planned) A dashboard start publishes `operating-deckhand` and leaves no
+`operating-agentdeck` directory it had previously published, and no string an agent can read — skill
+frontmatter and body, seeded prompts, MCP tool descriptions, the history primer, rendered-context
+errors — contains `AgentDeck` or `AgentDecker`. *Verified:* a package-publication test asserting the
+renamed directory replaces the old one, plus a repository-wide assertion over the agent-facing string
+constants, in the same spirit as `TestSeededPromptsDoNotInstructPolling`.
 
 **A9** (R12, R13) — The four corrected seed prompts contain no instruction to
 open a turn by checking coordination state, to check mail when woken without an instruction, or to

@@ -148,6 +148,24 @@ Implementation is also blocked until the exact packaged Codex and ACP adapter pr
 the default sandbox. Enabling broad network access or substituting a filesystem transport does not
 pass this build gate.
 
+**R24 (planned) — The rename is one cut through build, release, and distribution identity.** The Go
+module becomes `github.com/deckhand/deckhand` with every internal import path following it and the
+version `-ldflags -X` target tracking the change; the command directory becomes `cmd/deckhand`; the
+built binary, the wrapper shim at `bin/deckhand`, the FTS5 binary at `libexec/deckhand`, the
+manifest's required layout and its component key, the archive name
+`deckhand-<version>-<target>.tar.gz`, the staging and versioned release directory names, the
+assembled runtime's package name, the install tree default
+`~/Library/Application Support/Deckhand`, the installer's `DECKHAND_*` variables, and the release
+workflow's smoke test all rename together. There is no transitional release that publishes both
+names and no compatibility alias, because FS-10.R16 moves an existing install through a fresh
+installer run rather than through an in-place update, so no already-installed client has to parse a
+manifest or resolve an archive under the new name. The release repository constant moves to the
+renamed GitHub repository; renaming that repository is an operational step, and this specification
+deliberately does not rely on GitHub redirecting REST API calls or release-asset downloads, because
+GitHub documents redirects only for web links and git clone/fetch/push. Verification is a
+repository-wide assertion that no build, release, or packaging artifact still spells the old name,
+run in CI alongside the existing archive-content checks (INV §10).
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

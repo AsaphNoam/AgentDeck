@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -197,6 +197,18 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   remains a bounded catch-up rather than managed roles or recurring seed synchronization.
   FS-18.R12–R13 own the corrected prompt content and its user-visible limits; TS-11.R13 owns the
   comparison, the digest table, and the atomic write.
+- **R48 — The seeded resident-operator role becomes `firstmate`.** (planned) With the rename
+  (FS-00.R16), the role AgentDeck seeded as `agentdecker` is seeded as `firstmate` and displayed as
+  **FirstMate**, and the authorization gate on proposing pipeline templates and runs keys on the new
+  id. On a migrated home (FS-10.R17) startup renames an existing `roles/agentdecker.json` to
+  `roles/firstmate.json`, carrying every field across unchanged, and rewrites the stored role id;
+  agents already launched under the old role keep working and show the new name. If a
+  `firstmate` role already exists, or the old file is unreadable, startup leaves both alone and says
+  so rather than merging or overwriting. The role's prompt text then follows R47 exactly as any
+  other seeded role: it is replaced only when its bytes match a digest of a prompt this product
+  previously shipped for that role, so a person who edited it keeps their edit under the new id.
+
+
 
 ### 2.7 Onboarding wizard
 
@@ -391,6 +403,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   (R14, A7) is otherwise unchanged, so a populated home is still never clobbered. *Verified:*
   `TestMigrateSupersededRolePromptsExactOnly`, `TestMigrateSupersededRolePromptsSkipsUnseededRole`;
   FS-18.A9 covers the per-role failure isolation and package gating.
+- **A28** (R48) — (planned) A migrated home whose `roles/agentdecker.json` carries user-edited
+  fields comes up with `roles/firstmate.json` holding those fields byte-for-byte under the new id,
+  the pipeline-proposal gate accepting the renamed role and rejecting the old id, and an existing
+  agent that was launched as `agentdecker` still addressable and displayed as FirstMate. A home that
+  already has both roles leaves both files untouched. *Verified:* role-rename migration tests plus
+  a pipeline-tool authorization test on the new id.
 
 ## 6. Deviations & open decisions
 

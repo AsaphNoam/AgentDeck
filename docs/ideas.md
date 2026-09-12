@@ -52,7 +52,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-
 - **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
   the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text
   only. Verified 2026-09-07: this is a deliberate drop, not a provider gap —

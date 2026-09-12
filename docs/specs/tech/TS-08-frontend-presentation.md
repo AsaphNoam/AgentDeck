@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -601,7 +601,18 @@ primitive seam; the rejected alternatives are recorded in §5.
   registered `file-viewer` component in `contract.json` carrying no `data-variant` for the
   docked-versus-reflowed form, since nothing in the client observes which form is on screen (R53,
   R8, R14).
-
+- **R58 — Browser-local identifiers rename with a one-time copy-forward.** (planned) With
+  FS-00.R16 the document title, the header wordmark component, the built-in skin name, and every
+  on-screen product string say Deckhand. The identifiers the browser itself keys on rename too:
+  `deckhand-chat-drafts`, `deckhand-annotation-tray`, `deckhand.pipeline-builder-agent`, and the
+  `deckhand-events` SharedWorker. Because that storage is per-origin and holds text a person has not
+  sent yet, one module owns a startup copy-forward that reads each old key, writes the new key only
+  when it is absent, and then removes the old one — never merging, never overwriting newer state,
+  and tolerating unreadable or absent storage without blocking the app (INV §1, §7). The renamed
+  SharedWorker name deliberately gets no copy-forward: a worker is live state, and a browser holding
+  a page from before the rename simply starts a second worker until it reloads. The copy-forward is
+  written so that running it twice is a no-op, since it runs on every mount rather than behind a
+  persisted flag.
 
 ## 3. Interfaces & data shapes
 

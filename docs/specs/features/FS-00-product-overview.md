@@ -1,6 +1,6 @@
 # FS-00 — Product Overview
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/config`, `ui/src` · **Journeys:** J1, J3
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) §§1–3, §7
 
@@ -27,6 +27,16 @@ past work — without juggling a dozen terminal tabs.
   show live status at a glance; provide a full streaming chat view per agent; persist and
   search/resume every session; let agents message each other; and support multiple
   backends/models switchable on a live agent without losing history.
+- **R16 — The product is named Deckhand.** (planned) One name governs every surface a person, an
+  agent, or an operator's shell can observe: the application and its documentation, the `deckhand`
+  command, the `$DECKHAND_HOME` state directory, the release artifacts and install tree, the MCP
+  server identity and its token header, the agent-facing operating skill and seeded prompts, and
+  every on-screen string. The seeded resident-operator role is **FirstMate**. `AgentDeck` survives
+  only where the rename would destroy meaning already written down: historical records under
+  `docs/archive/`, and the two named read-compatibility paths in FS-13.R24 and FS-10.R17. The rename
+  changes no behavior, API shape, schema, or permission; a person who has migrated can do exactly
+  what they could before, under a different name. FS-10.R15–R19 own installation and the one-time
+  state migration; FS-04.R48 owns the role-id change; FS-18.R14 owns the agent-facing wording.
 
 **Non-goals (v1):** no cloud sync, no remote/multi-user access, no auth layer; no built-in code
 editor (AgentDeck observes and orchestrates, it does not replace the IDE); no support for agent

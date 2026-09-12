@@ -1,6 +1,6 @@
 # TS-02 — Data & persistence
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config`, `internal/state`, `internal/transcript`, `internal/index`, `internal/archive`, `internal/configsource`, `internal/contextref`
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -181,6 +181,35 @@ enters the durable transcript and the search index through the ordinary user-pro
 is actually sent, so replay and search never contain a message the agent never received. Persisting it
 would also put one-shot request data into a field the recording path reads back, which is INV §3's
 rule in the same structural form R30 applies to requested-versus-applied fast mode.
+
+**R32 — One helper resolves the home, and one helper migrates it.** (planned) The rename
+(FS-00.R16) keeps a single home-resolution function: it reads `$DECKHAND_HOME`, else
+`~/.deckhand`. Nothing else in the tree spells either the variable or the directory name, so the
+product cannot half-rename its own state root (INV §2, §10). Migration (FS-10.R17/R18) is a separate
+helper called once at start, before the layout is ensured, the database is opened, or any agent
+state is read, and it is the only code that mentions `AGENTDECK_HOME` or `~/.agentdeck`. It performs
+`os.Rename` of the source home onto the destination — atomic on one filesystem, so there is no
+partially copied home to detect or discard — under the same start-up exclusion that already prevents
+two dashboards (`dashboard.pid`), which is the atomic claim INV §5 requires for a check-then-act on
+a path that another process could create between the check and the move. `os.Rename` across
+filesystems, a destination that already exists, a non-directory or non-owner source, and an
+unwritable parent each abort the migration and surface the error with both paths rather than being
+swallowed (INV §7); start then continues against the destination home alone. A migration that
+aborted leaves both directories exactly as they were, so the next start retries the same decision
+from the same inputs.
+
+**R33 — In-home identity rewrites happen after the move and are independently recoverable.**
+(planned) The renamed home's own contents carry two old identifiers: the seeded role file
+`roles/agentdecker.json` (FS-04.R48) and the published skill directory `operating-agentdeck`
+(FS-18.R14). Each is rewritten by its existing owner — role seeding and knowledge publication
+respectively — not by the migration helper, so a home renamed by hand, a fresh Deckhand home, and a
+migrated home all converge through one code path per identifier rather than a migration-only branch
+(INV §2). The role rename writes `roles/firstmate.json` through the same atomic
+write-temp-then-rename the seed path already uses, declines when a `firstmate` role already exists
+or the old file is unreadable, and records the decision; it never deletes the old file until the new
+one is durable (INV §15). Both rewrites are per-item failure-isolated and retried on a later start,
+exactly as TS-11.R13 already requires for prompt correction. No SQLite migration is involved: no
+column or row stores the product name.
 
 **R19 — Codex's isolated runtime profile is private, managed filesystem state.**
 `$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).

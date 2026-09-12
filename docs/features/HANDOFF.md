@@ -26,6 +26,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start: standing stage ownership,
   managed subordinate coordinators, shared task execution/waiting and automatic cleanup. Its exact
   requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
+  `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
+  one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
   Queue hygiene: `bump-pinned-acp-adapters.md` reads `State: Finished` but is still in
@@ -37,7 +39,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   subordinate stage coordination and ordinary stop/resume are confirmed.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
-  entry and needs `/design-feature` before code.
+  entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
+  to the work queue; no design decision remains open for it.
 - **Open findings:** The separate injected-steer lifetime edge case remains outside the closed
   host-owned fallback unit. Also open: live-gate finding durability, provider-contract oracles, and
   the unverified OpenCode/OpenHands paths. See **Review findings**.
@@ -56,6 +59,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (design-feature):** Designed the **Deckhand** rename: one cut through every
+identity, `~/.agentdeck` migrated by `os.Rename` at first start, `agentdecker` → **FirstMate**, clean
+CLI swap, dual-read annotation prefix, browser-key copy-forward. Existing installs move over by
+running the installer once, not `agentdeck update` — GitHub documents rename redirects only for web
+links and git clone/fetch/push. MCP tool names were never branded and do not change. Added
+FS-00.R16, FS-04.R48/A28, FS-10.R15–R19/A7–A9, FS-13.R24/A15, FS-18.R14/A10, TS-02.R32–R33,
+TS-04.R52, TS-06.R24, TS-08.R58, TS-11.R14; seven specs moved Current → Partial with the index.
+Promoted to `docs/ready-changes/rename-product-to-deckhand.md`. Checks pass; no product code changed.
 
 **Changelog — 2026-09-12 (design-feature):** Revised persistent orchestration so the standing
 agent always owns and reports the stage; configured dedicated coordinators are managed children and
@@ -77,63 +89,6 @@ surface.
 **Changelog — 2026-09-12 (fix):** Hardened the New Agent modal tests to wait for the Launch
 button to become enabled before clicking it, closing a CI timing race around asynchronously loaded
 role and project state. All 450 UI tests pass; product behavior is unchanged.
-
-**Changelog — 2026-09-11 (design-feature):** Designed pipeline progression over the shared task
-dispatcher and result transaction, dynamic lineage, scoped inspection/repair, durable child waiting,
-run-wide cancellation fences, same-agent recovery, and the authorized legacy reset. Reconciled
-context, lifecycle, protocol, persistence and security contracts. A focused design check caught and
-resolved dedicated-agent identity promotion, borrowed-turn cancellation races, and wake/release
-ownership edges. Spec checks, twin skills and diff checks pass. No code changed; the sole pending
-runtime-lifetime choice above prevents ready-change promotion.
-
-**Changelog — 2026-09-11 (design-feature):** Drafted persistent pipeline orchestration as durable
-stage assignments, with dynamic child work and explicit stage outcomes. Added feature acceptance
-for continuity, dedicated-stage exceptions, review/fix loops, and recovery. Recorded the need for
-agent work inspection/repair and child-result delivery during an active assignment. Awaiting product
-decisions in FS-14 §6 before technical design; no product code or ready change. The pre-existing
-pipeline idea was preserved and extended rather than duplicated.
-
-**Changelog — 2026-09-11 (fix):** Fixed the CI failure in the chat file viewer's kind check
-(FS-03.A37, TS-05.R21; `INV §14`, `INV §17`). The read classified its target by opening it, so a
-non-regular file's verdict followed the platform: Linux refuses the open of a Unix socket and was
-told the path was outside the workspace, while macOS accepted it and reported `not_a_file`; a FIFO
-would have blocked the handler until a writer appeared. The read now opens the root once and
-classifies the target through that handle before opening it, so non-regular files refuse as
-`not_a_file` everywhere. Containment is unchanged: the root handle still refuses symlinks that leave
-the workspace, and the post-open check on the descriptor still guards replacement. The full Go
-matrix, tagged build, focused file-read race tests, a Linux-target vet, and spec checks pass; the
-Linux behavior itself is covered by the CI rerun, not locally.
-
-**Changelog — 2026-09-11 (fix):** Closed BR-2's remaining Codex discovery-versus-execution
-authority finding (FS-09.R59/A29, TS-06.R22; `INV §8`, `INV §10`, `INV §12`). The packaged wrapper
-now reports the exact private Codex version it selected; model autosync compares that authority with
-the cache's existing `client_version` and skips a mismatched personal cache instead of importing
-models the packaged CLI may not understand. New Agent shows the effective packaged path/version and
-an actionable mismatch before launch, while a backend/model executable override is identified as
-unverified. Matching caches, source launches, and explicit process overrides retain their prior
-behavior. The full Go matrix, tagged build, all 450 UI tests, UI production build, spec checks, and
-diff check pass. The BR-2 unit is closed; BR-1's three findings remain open.
-
-**Changelog — 2026-09-11 (fix):** Closed **keep steering inside AgentDeck's turn lifecycle**
-(FS-03.R56/A38, TS-01.R30, TS-03.R41, TS-04.R51, TS-06.R14; `INV §5`, `INV §10`, `INV §12`,
-`INV §15`, `INV §17`). Steer now reserves its possible host-owned successor before the adapter call;
-turn settlement transfers the gate to that reservation without firing it, and the adapter result
-atomically commits `promptRequired` or unwinds injected, legacy, and refusal outcomes. The wire-level
-regression holds the steering reply after the old prompt settles, accepts a concurrent Send, and
-proves provider order remains old prompt, correction, then held Send. Release assembly now checks
-exact pre- and post-patch SHA-256 fingerprints and disables patch fuzz, and shipped traceability no
-longer says planned. The originating `queue-a-follow-up-while-busy` unit and its fallback continuation
-are closed. The full Go matrix, tagged build, focused race tests, spec lint, shell syntax, patch
-applicability, and diff check pass.
-
-**Changelog — 2026-09-11 (review):** Reviewed **keep steering inside AgentDeck's turn lifecycle**.
-The host-owned fallback works in the covered lifecycle, but the reservation is created only after
-the adapter returns; a Send accepted during that wait can therefore become the next turn first.
-Release assembly also allows patch fuzz, and three technical-spec traceability entries still call
-the shipped lifecycle planned. The unit remains open with one Must-fix and two Worth-fixing findings.
-**Fix model:** medium — Codex Terra or Claude Opus. The full Go matrix, tagged build, focused race
-tests, spec lint, patch applicability, shell syntax, and diff check pass. Invariant classes 1, 2, 4,
-5, 8, 10, 11, 12, 15, 16, and 17 apply; classes 3, 6, 7, 9, 13, and 14 have no applicable surface.
 
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
