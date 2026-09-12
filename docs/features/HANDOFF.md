@@ -16,8 +16,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None; the next role picks from the queues below.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `fix-model-recommendations` and `file-read-nonregular-kind` await independent
-  review. `open-a-file-from-chat` is fixed and closed. Every other unit through this release is closed,
+- **Review units:** `file-read-nonregular-kind` awaits independent review.
+  `fix-model-recommendations` and `open-a-file-from-chat` are closed. Every other unit through this
+  release is closed,
   including `queue-a-follow-up-while-busy`,
   its `steering-host-owned-fallback` continuation, and `usability-20260907`.
   `stop-telling-agents-to-poll` shipped without entering
@@ -54,6 +55,14 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (review):** Reviewed `fix-model-recommendations` across its workflow,
+mirrored role launchers, validation scripts, mutation tests, and build wiring. The change consistently
+records one recommendation per grouped fix unit at the level of its most difficult open fix, and the
+tests independently reject missing, duplicate, per-item, mismatched, or weakened routing. No findings;
+the unit is closed. Focused finding-contract, launcher-contract, mutation, handoff-spec, and diff checks
+pass. Invariant classes 2, 4, 7, 10, and 17 apply; classes 1, 3, 5, 6, 8, 9, and 11–16 have no applicable
+surface.
 
 **Changelog — 2026-09-12 (fix):** Hardened the New Agent modal tests to wait for the Launch
 button to become enabled before clicking it, closing a CI timing race around asynchronously loaded
@@ -123,7 +132,7 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `fix-model-recommendations`; `/work` has no waiting unit;
+**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` has no waiting unit;
 `/fix` may take BR-1 (difficult, Sol);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.
