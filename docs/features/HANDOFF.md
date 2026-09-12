@@ -1,14 +1,15 @@
 # AgentDeck — Implementation handoff
 
 **Live agent state.** Read the **Current position** and **Active change** below, then open the
-requirements they name. Settled state is archived in
-[`../archive/state/HANDOFF-through-2026-09-11.md`](../archive/state/HANDOFF-through-2026-09-11.md),
-[`../archive/state/HANDOFF-through-2026-09-10.md`](../archive/state/HANDOFF-through-2026-09-10.md),
-[`../archive/state/HANDOFF-through-2026-09-09.md`](../archive/state/HANDOFF-through-2026-09-09.md),
-[`../archive/state/HANDOFF-through-2026-09-07.md`](../archive/state/HANDOFF-through-2026-09-07.md),
-[`../archive/state/HANDOFF-through-2026-09-06.md`](../archive/state/HANDOFF-through-2026-09-06.md),
-[`../archive/state/HANDOFF-through-2026-09-03.md`](../archive/state/HANDOFF-through-2026-09-03.md),
-and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md). Follow
+requirements they name. Settled state is archived in `../archive/state/`: the dated
+[`HANDOFF-through-2026-09-12`](../archive/state/HANDOFF-through-2026-09-12.md),
+[`-11`](../archive/state/HANDOFF-through-2026-09-11.md),
+[`-10`](../archive/state/HANDOFF-through-2026-09-10.md),
+[`-09`](../archive/state/HANDOFF-through-2026-09-09.md),
+[`-07`](../archive/state/HANDOFF-through-2026-09-07.md),
+[`-06`](../archive/state/HANDOFF-through-2026-09-06.md) and
+[`-03`](../archive/state/HANDOFF-through-2026-09-03.md) files, plus
+[`HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md). Follow
 [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md); this file holds resumable current state only.
 
 ## Current position
@@ -16,13 +17,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 - **Active change:** None; the next role picks from the queues below.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `file-read-nonregular-kind` awaits independent review.
-  `fix-model-recommendations` and `open-a-file-from-chat` are closed. Every other unit through this
-  release is closed,
-  including `queue-a-follow-up-while-busy`,
-  its `steering-host-owned-fallback` continuation, and `usability-20260907`.
-  `stop-telling-agents-to-poll` shipped without entering
-  this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
+- **Review units:** `file-read-nonregular-kind` is reviewed and stays open on four findings;
+  `/review` has no available unit. Every other unit through this release is closed.
+  `stop-telling-agents-to-poll` shipped without entering this queue on the operator's explicit
+  2026-09-10 instruction; it can be added later.
 - **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start, including the completed
   deferred/inline mail technical contract. Its exact
   requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
@@ -85,14 +83,14 @@ uses ordinary deferred mail. The expanded pipeline unit is paused for unread def
 retention, feature confirmation and the matching technical contract. Spec checks, twin skills and
 diff checks pass; no product code changed.
 
-**Changelog — 2026-09-12 (design-feature):** Designed the **Deckhand** rename: one cut through every
-identity, `~/.agentdeck` migrated by `os.Rename` at first start, `agentdecker` → **FirstMate**, clean
-CLI swap, dual-read annotation prefix, browser-key copy-forward. Existing installs move over by
-running the installer once, not `agentdeck update` — GitHub documents rename redirects only for web
-links and git clone/fetch/push. MCP tool names were never branded and do not change. Added
-FS-00.R16, FS-04.R48/A28, FS-10.R15–R19/A7–A9, FS-13.R24/A15, FS-18.R14/A10, TS-02.R32–R33,
-TS-04.R52, TS-06.R24, TS-08.R58, TS-11.R14; seven specs moved Current → Partial with the index.
-Promoted to `docs/ready-changes/rename-product-to-deckhand.md`. Checks pass; no product code changed.
+**Changelog — 2026-09-12 (review):** Reviewed `file-read-nonregular-kind` (`22d77dc`), which
+classifies a target through `os.Root` before opening it. Containment holds: `Root.Stat` refuses an
+escaping symlink and the post-open descriptor check still guards replacement. Four findings — no
+test fails without the fix and its one non-regular case silently skips on macOS; TS-05.R21 still
+names `os.OpenInRoot`; an unreadable in-root file reports as outside the workspace; `filesearch.go`
+keeps the superseded containment spelling. **Fix model:** medium — Codex Terra or Claude Opus.
+Classes 2, 7, 8, 10, 14, 16, 17 apply; 1, 3–6, 9, 11–13, 15 have no surface. Archived three settled
+entries for header budget; the slice is still over it.
 
 **Changelog — 2026-09-12 (design-feature):** Revised persistent orchestration so the standing
 agent always owns and reports the stage; configured dedicated coordinators are managed children and
@@ -103,18 +101,6 @@ FS-14.R61–R77/A35–A44, FS-16.R30–R38/A20–A24, TS-09.R35–R50, TS-10.R25
 R60 is superseded by R75. Promoted the source idea to the waiting ready change. Spec checks, twin
 skills and diff checks pass; no product code changed and no implementation is active.
 
-**Changelog — 2026-09-12 (review):** Reviewed `fix-model-recommendations` across its workflow,
-mirrored role launchers, validation scripts, mutation tests, and build wiring. The change consistently
-records one recommendation per grouped fix unit at the level of its most difficult open fix, and the
-tests independently reject missing, duplicate, per-item, mismatched, or weakened routing. No findings;
-the unit is closed. Focused finding-contract, launcher-contract, mutation, handoff-spec, and diff checks
-pass. Invariant classes 2, 4, 7, 10, and 17 apply; classes 1, 3, 5, 6, 8, 9, and 11–16 have no applicable
-surface.
-
-**Changelog — 2026-09-12 (fix):** Hardened the New Agent modal tests to wait for the Launch
-button to become enabled before clicking it, closing a CI timing race around asynchronously loaded
-role and project state. All 450 UI tests pass; product behavior is unchanged.
-
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
 darwin/arm64 archive, `install.sh`, and a manifest declaring `0.4.3` with its SHA-256.
@@ -122,10 +108,9 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take
-`persistent-pipeline-orchestration` or `rename-product-to-deckhand`;
-`/fix` may take BR-1 (difficult, Sol);
-`/design-feature` may choose an available or
+**Available by role:** `/review` has none; `/work` may take
+`persistent-pipeline-orchestration` or `rename-product-to-deckhand`; `/fix` may take
+`file-read-nonregular-kind` or BR-1; `/design-feature` may choose an available or
 resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -158,6 +143,66 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
+
+### `file-read-nonregular-kind` — **Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix** — the change ships with no test that fails without it, and its only non-regular case
+  silently skips on macOS (**confirmed**, `INV §17`). **Where:** `22d77dc` adds no test;
+  `internal/server/fileread_test.go`'s `TestFileReadRefusesNonFileAndMissing` builds its non-regular
+  fixture with `net.Listen("unix", filepath.Join(root, "sock"))` under `t.TempDir()`.
+  **Normal-use trigger:** running the suite on macOS. The `t.TempDir()` path exceeds the 104-byte
+  `sun_path` limit, so the listen fails with `bind: invalid argument`, the case `t.Logf`s and
+  returns, and the test reports PASS. Verified by running that test at `100d1cd` (pre-fix) and at
+  `a632f3b` in clean worktrees: both pass, both log the skip. **Why it matters:** TS-05.R21's R11
+  list requires an adversarial test per refusal class, and the non-regular class has no effective
+  coverage on the development platform — the fix and the defect are indistinguishable locally. The
+  FIFO hang the commit message names as the severe symptom has no test on any platform; a
+  regression that restores open-then-classify would hang the suite rather than fail it.
+  **Requirement:** TS-05.R21, FS-03.A37, `INV §17`. **Suggested fix/test:** build the socket under a
+  short root (`os.MkdirTemp("/tmp", …)`) and fail rather than return when the platform does support
+  it; add a `syscall.Mkfifo` case behind a bounded timeout. Both were confirmed to work here —
+  `Root.Stat` reports a FIFO as `p---------` and non-regular, while `Root.Open` on it blocked
+  indefinitely.
+- **Must fix** — TS-05.R21 describes a mechanism the code no longer uses (**confirmed**,
+  `INV §10`). **Where:** `docs/specs/tech/TS-05-security.md` R21 states the candidate "is then
+  opened with `os.OpenInRoot`, so pathname resolution and opening are one root-confined operation"
+  and that "File type, size, modification time, and content are all read from that returned
+  descriptor rather than resolving the pathname again". `internal/server/fileread.go:204–227` now
+  uses `os.OpenRoot` plus `Root.Stat(name)` plus `Root.Open(name)`: two resolutions, and file type
+  is decided primarily by the pre-open `Root.Stat`, which is exactly "resolving the pathname
+  again". **Why it matters:** the commit cites TS-05.R21 and FS-03.A37 and changed neither, so the
+  security spec's containment argument now contradicts the shipped code; a later reader restoring
+  "one root-confined operation" literally would reintroduce the platform-dependent verdict and the
+  FIFO hang. FS-03.A37 also enumerates the refusal cases without naming the non-regular kind this
+  change exists to make deterministic, while the test cites A37 for precisely that.
+  **Requirement:** TS-05.R21, FS-03.A37, workflow §2.1, `INV §10`. **Suggested fix/test:** restate
+  R21 as classify-through-the-root-then-open, with the post-open descriptor check as the
+  replacement guard, and add the non-regular kind to A37.
+- **Worth fixing** — an unreadable file inside the workspace is reported as outside it
+  (**confirmed**, `INV §8`). **Where:** `internal/server/fileread.go:222–227` maps every `Root.Open`
+  error that is not `os.IsNotExist` to `CodePathRefused` / "that path is outside this agent's
+  working directory". **Normal-use trigger:** a root-owned or mode-`0000` file another process left
+  in the working directory. Verified directly: such a file passes `Root.Stat` as regular, then
+  `Root.Open` returns `openat …: permission denied` with `os.IsNotExist` false, so the viewer tells
+  the person the file is outside the agent's working directory when it is plainly inside it.
+  **Why it matters:** `INV §8` requires in-vocabulary data on user-facing surfaces, and this
+  refusal misdirects the person to a containment problem that does not exist. The mapping entered
+  in `100d1cd`, but this change keeps it as the fall-through for every stat failure.
+  **Requirement:** FS-03.A37, `INV §8`. **Suggested fix/test:** branch on
+  `errors.Is(err, fs.ErrPermission)` to an unreadable-file refusal and reserve path_refused for the
+  root escape, which `os.Root` reports distinguishably as "path escapes from parent".
+- **Worth fixing** — two containment spellings now coexist with no stated authority
+  (**confirmed**, `INV §2`). **Where:** `internal/server/filesearch.go:171` `withinRoot` still uses
+  `filepath.EvalSymlinks` resolve-and-recheck, the spelling the read abandoned in `100d1cd`; TS-05.R21
+  previously stated the two shared one spelling under `INV §2` and that sentence was removed without
+  saying which is now authoritative. **Normal-use trigger:** the composer offers a path its
+  containment accepts that the read's containment then refuses. **Why it matters:** the consequence
+  is bounded — `rankFiles` filters path names and never returns bytes, so the TOCTOU that motivated
+  the read's change does not leak content through search — but `INV §2` exists to stop exactly this
+  divergence in what "inside the root" means. **Requirement:** TS-05.R21, TS-03.R24, `INV §2`.
+  **Suggested fix/test:** state in TS-05.R21 that `os.Root` is the authoritative containment for
+  content reads while `withinRoot` remains a listing filter, or move the search onto `Root.Stat`
+  too.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 
