@@ -199,7 +199,7 @@ sensitive-context sharing is a practical problem.
   run-wide authority. Coordinator bindings are server-derived and revision-checked. A successor
   inherits only the preceding coordinator's delegated scope and supplied context, not all work
   created by the same agent in other stages. Standing interventions do not change this boundary.
-  TS-10.R36's material coordination updates are deliberately supplied same-scope data; source
+  FS-14.R78's material intervention mail is deliberately supplied same-scope data; source
   references remain subject to ordinary context checks, not blanket access to private conversations.
 
 ## 3. Interfaces & data shapes

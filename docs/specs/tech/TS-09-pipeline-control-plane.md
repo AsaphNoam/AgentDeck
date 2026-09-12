@@ -522,19 +522,10 @@ unchanged by them.
   Such successor work remains managed beneath the same standing stage ownership and receives prior
   reports and intervention context. This single optional child is a delegation choice, not a
   template-authored execution graph; all of its internal work remains dynamically agent-authored.
-- **R50** (planned) — **Normal coordination stays through the sub-orchestrator; intervention is
-  visible.** Assignment instructions and supervision identify the bound coordinator as the normal
-  stage contact and coherent source of stage-work findings. The standing owner keeps run-wide
-  inspection, direct communication and control; no read-only inspection notice or mandatory
-  coordinator permission/acknowledgment is introduced. Standing mutations or direct corrective
-  communications affecting that scope persist a bounded coordination update with the effect under
-  TS-10.R36. The coordinator reads it on its next turn/continuation, with a durable wake when idle
-  or waiting; an executing turn is not forcibly interrupted. Completed coordinator tasks are not
-  reopened: updates remain available to the standing owner and a successor/follow-up assignment.
-  For work outside AgentDeck's observable controls, the standing assignment instructs the agent to
-  send a material-change summary through the same durable coordination path. Ownership changes only
-  through an explicit coordinator/standing replacement; a direct intervention does not reparent
-  work, select a new coordinator, or grant descendant access to the whole run.
+- **R50 — superseded 2026-09-12 by FS-14.R78:** The coordinator-specific update/continuation
+  mechanism is withdrawn in favor of durable deferred mail. Normal coordinator responsibility,
+  standing intervention authority and explicit ownership changes remain TS-09.R49/TS-05.R22.
+  Expanded mail technical design is pending; no coordinator-only delivery protocol is retained.
 
 ## 3. Interfaces & data shapes
 
@@ -644,9 +635,11 @@ new durable run revision or a structured validation/conflict result.
   require stage-specific processes, duplicate reports, routes/revisits, old state tables, per-stage
   runtime setup, creator-derived projections, or stage grouping. R15–R19/R21–R23/R25–R26/R29–R32
   retain their shared boundary/interaction behavior with version-2 payloads. FS-14 §6 records the
-  confirmed stop/resume and subordinate-coordination decisions. R49–R50 override the initial
-  draft's dedicated-assignee interpretation; TS-10.R35 replaces manual-first cleanup. Old-engine
-  exclusions below describe shipped behavior only; no design decision remains open for this change.
+  confirmed stop/resume and subordinate-coordination decisions. R49 overrides the initial
+  draft's dedicated-assignee interpretation; TS-10.R35 replaces manual-first cleanup. The later
+  mail extension withdraws R50 and TS-10.R36: FS-14.R78 uses deferred mail for intervention FYIs,
+  with no separate notice queue or wake. FS-06 §6 records its open retention/design checkpoint;
+  the expanded change is paused. Old-engine exclusions below describe shipped behavior only.
 
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated
   same-user loopback API. Hard per-agent API capabilities remain outside this feature.

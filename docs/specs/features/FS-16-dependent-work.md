@@ -385,9 +385,9 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R37** (planned) — A dedicated stage coordinator is managed child work under FS-14.R75–R76,
   never the authoritative stage task. It reports its own result upward and manages its delegated
   descendants; only the standing owner holds run-wide authority and reports the stage outcome.
-  Durable coordination updates make material standing-owner interventions visible to the coordinator
+  Deferred durable mail under FS-14.R78 makes material standing-owner interventions visible to the coordinator
   without requiring its permission. An explicit standing-owner-created successor can continue the
-  coordinator's delegated scope and inherit reports/updates, preserving original task lineage and
+  coordinator's delegated scope and inherit reports/relevant intervention mail, preserving original task lineage and
   immutable results. Automatic child creation and replay create no duplicate coordinator.
 - **R38** (planned) — Pending yield, stop and release cleanup retries transient failures
   automatically under FS-14.R77. Waiting/finishing/stopping remain honest about outstanding cleanup;
@@ -413,7 +413,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **A23** (planned; R37) — Task/MCP tests prove a managed stage coordinator can manage its
   delegated subtree but cannot inspect unrelated run work or report for the standing stage task.
   Inject a standing intervention concurrently with coordinator wait, replacement and stage closure;
-  its durable update is delivered to the correct current/successor coordinator or the operation is
+  its deferred mail is delivered at the correct current/successor coordinator's next natural turn or the operation is
   refused atomically. No implicit ownership transfer, duplicate effect or second assignment occurs.
   An explicit successor inherits only the prior coordinator's scope and immutable history.
 - **A24** (planned; R38) — Inject transient and persistent yield/release/stop failures with a

@@ -168,6 +168,14 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   share. Future activation kinds require their own feature requirements rather than inheriting mail
   semantics or using conversation as an implicit coordination API.
 
+- **R17** (planned) — **Mail delivery does not require an extra turn or pull.** Under
+  FS-06.R30–R36, an independently authorized turn may receive bounded, attributed durable mail
+  as intentional peer input. This extends R14–R15's input boundary without making unread mail or
+  deferred-send facts an authorization to run. Waking mail owns an explicit activation opportunity;
+  deferred mail owns none. The activation remains a control record, while its source inbox owns
+  message content and retention. Neither task graphs nor unrelated artifacts become eager prompt
+  content through this exception. Verify through FS-06.A20–A25.
+
 ## 4. Glossary
 
 - **ACP (Agent Communication Protocol)** — the JSON-RPC / NDJSON protocol the chat runtime speaks to

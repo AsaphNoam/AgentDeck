@@ -23,8 +23,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   its `steering-host-owned-fallback` continuation, and `usability-20260907`.
   `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start: standing stage ownership,
-  managed subordinate coordinators, shared task execution/waiting and automatic cleanup. Its exact
+- **Work units:** `persistent-pipeline-orchestration.md` is Paused for its deferred/inline mail
+  extension: feature confirmation, unread-mail retention and matching technical delivery design. Its exact
   requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
   `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
@@ -34,9 +34,11 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration is fully specified and promoted to the work queue; no design
-  decision remains open for it. The clean legacy reset, descendant cancellation, project boundaries,
-  subordinate stage coordination and ordinary stop/resume are confirmed.
+  Persistent pipeline orchestration has resumed design for efficient durable mail: deferred FYIs
+  never wake a coordinator, and authorized turns receive bounded message bodies directly. The
+  retention decision is in FS-06 §6; the extension's technical contract remains to be designed.
+  The clean legacy reset, descendant cancellation, project boundaries, subordinate stage
+  coordination and ordinary stop/resume remain confirmed.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
@@ -59,6 +61,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (design-feature):** Drafted waking/deferred durable mail and bounded
+inline delivery in FS-06.R30–R36/A20–A25, FS-00.R17 and FS-14.R78/A45. Withdrew the separate
+coordinator-update queue and delivery watermark in TS-09.R50 / TS-10.R36; intervention awareness
+uses ordinary deferred mail. The expanded pipeline unit is paused for unread deferred-mail
+retention, feature confirmation and the matching technical contract. Spec checks, twin skills and
+diff checks pass; no product code changed.
 
 **Changelog — 2026-09-12 (design-feature):** Designed the **Deckhand** rename: one cut through every
 identity, `~/.agentdeck` migrated by `os.Rename` at first start, `agentdecker` → **FirstMate**, clean
@@ -97,13 +106,16 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take `persistent-pipeline-orchestration`;
+**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take `rename-product-to-deckhand`;
 `/fix` may take BR-1 (difficult, Sol);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.
 
 ## Decisions needing your input
 
+- **Deferred-mail retention:** Keep unread deferred mail until delivery (recommended), or retain
+  the existing seven-day expiry? FS-06 §6 records the consequence; pipeline mail design resumes
+  from `docs/ideas.md` after feature confirmation.
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
   provider model-ID ownership. Standardizing either is a compatibility change.
 - **Failed pipeline-stage chat:** Confirm whether a pause after a failed launch or resume should

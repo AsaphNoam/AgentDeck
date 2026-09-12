@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -205,7 +205,78 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   their existing exclusions; an opportunity that becomes excluded after mail was inserted is retired
   without attempting a wake.
 
+### 4.2 Durable waking and deferred mail
+
+- **R30** (planned) — Each send chooses waking or deferred delivery; existing sends default to
+  waking. Waking mail may request/coalesce a turn under existing lifecycle and budget controls.
+  Deferred mail is saved immediately and visible in the mailbox but creates no wake, prompt, task
+  continuation or retry opportunity. Idle, turn-end, restart and unread count cannot promote it into
+  waking mail. The send result explicitly says it was queued without waking.
+- **R31** (planned) — The next independently authorized reasoning turn receives a bounded batch
+  of pending mail directly in its prompt: user prompt/held follow-up, task assignment/continuation,
+  or a turn already requested by waking mail. Starting a process or becoming idle without a turn
+  is not delivery. Deferred mail arriving during a turn waits for a later natural turn; it never
+  steers that turn or creates a follow-up just to deliver an FYI. An agent may still explicitly
+  read its mailbox during a turn through `check_messages`.
+- **R32** (planned) — A mail-triggered turn includes bounded message content, not a payload-free
+  instruction to call `check_messages`. Each message carries stable id, sender, timestamp,
+  subject/body, reply link when present and waking/deferred intent. Peer text remains attributed
+  input, not a system instruction or forged user prompt. The normal path needs no mailbox tool
+  round trip; `check_messages` remains for intentional reads, older mail and overflow.
+- **R33** (planned) — Direct delivery is bounded by whole-message count, total prompt size and
+  the existing inbound turn budget. Never silently clip a message or delete overflow; show remaining
+  pending counts and retain overflow for explicit retrieval or a later authorized turn. Deferred
+  backlog alone never starts more turns. When waking mail caused a turn, include its actionable
+  mail ahead of deferred FYIs so deferred backlog cannot hide the cause of activation. Selected
+  messages are chronological within each class; manual mailbox reads retain R7's order. Direct
+  receipt consumes the existing inbound budget without charging again merely for a default check
+  of already supplied messages in that turn. Existing outbound limits remain.
+- **R34** (planned) — Mail stays durable across stop/resume and restart. Selecting it for a
+  prompt is not proof of delivery: failed or ambiguous delivery must not erase pending content or
+  require its sender to reconstruct it. Delivery identifies message and receiving turn; uncertain
+  delivery remains recoverable on a later authorized turn or explicit read, with stable ids for
+  any repeat. It never creates a wake solely to replay deferred mail. Successfully supplied content
+  updates the ordinary read/unread surface; delivery does not assert comprehension or execution.
+  Exact confirmation mechanics belong to technical design. Deferred-mail expiry remains open in
+  §6; shipped R8 is unchanged until that decision is resolved.
+- **R35** (planned) — Deferred mail can address an existing non-archived chat recipient in an
+  active project even when current task/run ownership prevents an immediate wake. Sending grants
+  no right to bypass that ownership. Terminal, unknown and archived targets retain their refusals,
+  as do existing project/context boundaries. Discovery and send results distinguish addressability
+  from wake eligibility. Replacing an agent never redirects arbitrary personal mail; only the
+  explicit scoped coordinator handoff in FS-14.R78 carries relevant intervention mail forward.
+- **R36** (planned) — Stage-coordinator synchronization uses this mailbox primitive. Observable
+  material standing-owner interventions persist a bounded, attributed deferred-mail update with
+  the affected operation, without relying on a later recollection. FYIs and summaries of changes
+  outside observable controls use ordinary deferred send. Requests needing a response may explicitly
+  use waking mail. No separate coordinator inbox/protocol, authority transfer, task reopening or
+  acknowledgment gate is introduced.
+
 ## 5. Acceptance criteria
+
+- **A20** (planned; R30–R32, R35) — Serialized MCP/fake-provider tests send waking mail to an
+  eligible stopped agent and observe one turn containing its body without `check_messages`. Send
+  deferred mail to idle, busy, stopped and task-waiting agents: verify durable mail and zero extra
+  prompt/activation/wake after sweeps, turn-end and restart. Invalid targets cause no insertion.
+- **A21** (planned; R31–R34) — Exercise user prompt, held follow-up, task assignment/continuation
+  and waking-mail activation with deferred mail queued. Verify the same attributed inline content,
+  preserved original objective, one inbound charge per supplied message and no mandatory mailbox
+  round trip. Late arrivals stay pending; explicit mailbox reads during a turn remain possible.
+- **A22** (planned; R32–R34) — Fill an inbox beyond count/size/budget limits with both send modes
+  and a maximum-size valid message. Verify whole-message delivery, waking-cause priority, class
+  ordering, remaining counts, retained overflow and no deferred-overflow wake. Default checks do
+  not redundantly charge supplied mail. Manual read order remains unchanged.
+- **A23** (planned; R34) — Inject failures before dispatch, during resume/delivery and before
+  confirmation, then restart. Verify recoverable content, stable ids for uncertain repeats, no
+  false delivery/read claim and no deferred-mail-only replay turn. Verify expiry against the
+  retention decision in §6.
+- **A24** (planned; R35–R36) — A standing owner corrects a worker beneath a sleeping coordinator.
+  The change and deferred update survive restart without waking that coordinator. Its next natural
+  turn includes the update; an explicit waking action request wakes when eligible. Coordinator
+  succession carries relevant intervention mail without unrelated inbox access or run-wide authority.
+- **A25** (planned; R30, R34–R36) — A supervision journey distinguishes queued-deferred from
+  waking mail and updates read/unread state after direct delivery. Run cancellation does not start
+  completed tasks for FYIs. Deferred addressability bypasses no task admission/archive/closure gate.
 
 - **A1** (R2–R6) — Two token-bound agents discover, send, and read over the real HTTP MCP
   transport, with sender identity derived from session:
@@ -317,6 +388,19 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   and `internal/state` budget tests.
 
 ## 6. Deviations & open decisions
+
+- **Efficient durable mail extension, 2026-09-12.** R30–R36/A20–A25 are the requested feature
+  draft within the pipeline refactor. On shipping they supersede conflicting parts of R4/R8/R22/R27
+  (eligibility), R9/R24 (every send wakes), R10/R25 (payload-free/pull-only delivery), and R6/R11/R14
+  (direct receipt/read projection). Waking opportunity ownership and mailbox tools remain; unread
+  counts never become wake triggers. Unmarked requirements still describe shipped behavior.
+  Technical confirmation/recovery design follows feature confirmation; the separate planned
+  coordinator-notice protocol in TS-10.R36 is withdrawn.
+- **Open retention decision:** R8 expires all mail after seven days, potentially losing a deferred
+  FYI before its recipient runs. Recommend retaining unread deferred mail until delivery, then
+  applying the existing read-mail cleanup policy; alternatively keep the seven-day expiry for both
+  modes. No retention change is settled yet. Resolve this before promoting the expanded pipeline
+  change back to Waiting to start.
 
 - **Pipeline replacement:** FS-14.R74 replaces R22's permanent exclusion of stopped agents with
   pipeline history when shipped. A waiting assigned agent resumes its task through TS-10.R29 before

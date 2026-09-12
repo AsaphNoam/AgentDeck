@@ -359,34 +359,16 @@ parallel copy of them.
   another guarded attempt. Retry cleanup revalidates safety and retries only the retained effect;
   task execution attempts, outcomes, stage position and immutable reports are untouched. Never
   discard claims, advance a stage or declare Stop complete while a required effect remains unresolved.
-- **R36** (planned) — **Material intervention reaches the responsible coordinator durably.**
-  The standing owner's task control writes and direct messages/instructions to managed descendants
-  join the current coordinator binding/revision and persist a coordination update in the same state
-  transaction as the changed fact or delivery intent. Key it by the idempotent operation id plus
-  coordinator scope; duplicate requests cannot duplicate effects or notices. Each update identifies
-  actor, affected task/revision, action and bounded material instruction/summary, with existing
-  message/result references where appropriate. Same-project scoped recipients only; this creates
-  no general transcript grant. An explicit `send_message` to the coordinator is the existing path
-  for an agent's summary of material changes made outside observable AgentDeck task controls.
-  A pending update requests one coalesced same-task continuation at a safe turn boundary, preserving
-  the current assignment and using R29's generation/wait/closure checks and ordinary activation
-  seam; it never interrupts an executing turn or creates a second active assignment. For waiting
-  tasks, updates are an additional wake reason. Include unread coordination updates in bounded
-  assignment reads and successor handoffs; retention follows their task lineage/history, and a
-  completed task's notice does not reopen it. No coordinator acknowledgment gates intervention or
-  stage completion. Read-only inspection produces no update. Use the existing message field bounds
-  for instruction text, at most 100 updates per read, bounded keyset sweeps, and no in-memory log.
-  Assignment reads record a per-execution observed sequence; only matching turn-end settles that
-  delivery watermark. A crash before settlement replays the updates, while updates beyond the
-  watermark retain their continuation request. This prevents both lost delivery and repeated wake
-  for an already delivered update. Pagination exposes a cursor without dropping unseen updates.
+- **R36 — superseded 2026-09-12 by FS-14.R78 and FS-06.R30–R36:** Separate coordinator-update
+  records, continuation requests and delivery watermarks are withdrawn. Intervention awareness uses
+  ordinary deferred mail; its direct delivery/confirmation design is being defined in the mail plane.
 - **R37** (planned) — **Coordinator replacement is explicit managed work.** Extend `create_task`
   with optional `replaces_coordinator_task_id`, accepted only from the current standing owner for
   its bound coordinator and only after the predecessor is terminal and its release is settled.
   Create a child beneath the standing assignment and CAS its coordinator binding in one transaction;
   a unique successor key makes request replay return the same child. Normal Retry retains the
   same coordinator task and identity. A successor may target the original agent for follow-up or a
-  new launch spec; it receives the preceding bounded reports/coordination updates and inherits only
+  new launch spec; it receives the preceding bounded reports/relevant intervention mail and inherits only
   that coordinator's delegated scope under TS-05.R22. Neither operation changes the standing stage
   assignee, accepted reports, or immutable parent lineage. A cancelled/closed stage refuses it.
 
@@ -401,8 +383,6 @@ task execution: existing assignment + execution_handle, continuation_pending, pe
                 wait_version, resume_needed, runtime-release ownership separate from assignment
 task_waits: (waiting_task_id,wait_version,source_task_id) UNIQUE, after_revision
 task cleanup intent: effect_key, phase, failure_count, first_failure_at?, next_retry_at?, last_error?
-task_coordination_updates: scope_task_id, operation_id, sequence, actor, affected_task_id,
-                           affected_revision, action, bounded instruction/summary, source_refs[]
 create_task: existing fields + replaces_coordinator_task_id?
 list_tasks: optional parent_task_id, cursor, limit; server-derived permitted scope
 get_task: task_id; bounded result and provenance, including deleted-result tombstone
@@ -411,7 +391,7 @@ rearm_task: task_id, expected_revision, arms[]
 wait_for_tasks: execution_handle, observations[{task_id,after_revision}]
 report_task_result: outcome, summary, details?, checks?, outputs?, execution_handle?
 get_assigned_task: existing fields + execution_handle, stage?, inputs{}, output_declarations[],
-                   prior_results[], observed_changes[], coordination_updates[], continuation_reason?
+                   prior_results[], observed_changes[], continuation_reason?
 ```
 
 Reads page oversized collections; task ids/handles select records but never grant access. The
@@ -505,7 +485,10 @@ object carries the derived boolean `retry_eligible` (R22) beside its stored fiel
   and release semantics, and extend R16 for retained result/lineage tombstones. Acyclic task arms
   remain unchanged; the old result-only-convergence and no-query exclusions below end when the
   replacement ships. Runtime continuity is confirmed in FS-14 §6. R35 replaces the initial
-  manual-first cleanup policy; R36–R37 provide scoped coordinator awareness and explicit succession.
+  manual-first cleanup policy; R37 provides explicit succession. R36's separate coordinator
+  awareness protocol is withdrawn for FS-06.R30–R36's mail extension. Deferred mail must not request
+  a task continuation or satisfy a task wait by its mere arrival; R29's mail wake applies to waking
+  sends only. Mail feature confirmation and technical delivery design remain open in FS-06 §6.
 
 - **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
   but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a

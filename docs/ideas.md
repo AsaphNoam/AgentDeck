@@ -52,6 +52,21 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Efficient durable mail within the pipeline refactor.** Requested 2026-09-12: save waking or
+  deferred mail immediately; supply bounded message content directly at the next eligible turn
+  instead of a payload-free activation followed by `check_messages`. Coordinator intervention FYIs
+  use deferred mail and do not wake the stage coordinator. Reuse one inbox/delivery primitive and
+  withdraw the separate coordinator-update queue and watermark. This extends
+  `docs/ready-changes/persistent-pipeline-orchestration.md`, now paused for design, rather than
+  selecting an unrelated work unit. Feature draft: FS-00.R17, FS-06.R30–R36/A20–A25,
+  FS-14.R78/A45. Existing hierarchy, dynamic task work, same-identity stop/resume and automatic
+  cleanup remain confirmed. **Pending:** unread deferred retention (recommend until delivery,
+  then existing read cleanup; current mail otherwise expires after seven days) and the feature/
+  technical confirmation checkpoint. Technical receipt/recovery/budget details remain to be written
+  after that decision. Verified seams: `internal/state/messages.go` currently always inserts a mail
+  activation; `internal/runtime/chat.go` runPromptTurn/StartActivation share turn execution and can
+  carry bounded content; no new provider method or separate synchronization engine is needed.
+
 - **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
   the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text
   only. Verified 2026-09-07: this is a deliberate drop, not a provider gap —

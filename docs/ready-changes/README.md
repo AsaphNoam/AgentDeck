@@ -43,13 +43,14 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — one standing
-  stage owner, managed stage sub-orchestrators, shared durable-task execution and automatic cleanup.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 
 ## Paused changes
 
+- [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — core direction
+  confirmed; defining waking/deferred inline mail in place of separate coordinator notices, with
+  deferred retention and technical delivery confirmation still to resolve.
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
   AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
   provider/user MCP support; waiting for a safe direct transport supported by packaged Codex/ACP.

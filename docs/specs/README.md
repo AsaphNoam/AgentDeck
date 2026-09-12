@@ -32,7 +32,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact per-role seed-prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
-| FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent-to-agent messaging, explicit mail activation, budgets, unread indicators, stopped-agent wake |
+| FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Partial | Agent mail; planned waking/deferred delivery with bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
 | FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, per-backend capability matrix |
@@ -84,9 +84,9 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 |---|---|---|
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
-| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped |
-| Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped; persistent orchestration replacement ready |
-| Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped; orchestration extensions ready |
+| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped; efficient mail delivery in design |
+| Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped; persistent replacement paused for mail extension design |
+| Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped; orchestration extensions planned |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
 | Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |
 | Isolated parallel work | FS-19 worktree projects (fork, disposable checkout, consented cleanup) | Shipped |

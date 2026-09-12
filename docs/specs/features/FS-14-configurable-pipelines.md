@@ -622,6 +622,16 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   attention, with the cause, affected work and a useful repair action. Retry cleanup is available
   then, retries only cleanup, and never reruns accepted stage work. Task launch-attempt limits do
   not turn transient cleanup failures into failed work or consume a stage retry.
+- **R78** (planned) — Material coordinator updates use the waking/deferred mailbox in
+  FS-06.R30–R36. FYIs are saved immediately as deferred mail and arrive on the coordinator's next
+  natural turn with bounded content already supplied; they do not trigger a synchronization turn.
+  Requests needing a response may explicitly use waking mail. Observable changes and their deferred
+  updates are durable together, preserving R76's awareness requirement without a separate notice
+  stream, coordinator delivery watermark, acknowledgment or polling protocol. Explicit coordinator
+  succession carries only relevant stage intervention mail in its bounded handoff with original
+  sender/message provenance; it does not transfer arbitrary personal mail or create an FYI-only
+  turn. R76 promises awareness on the next natural turn, not immediate notification or implicit
+  restart of a completed task.
 
 ## 5. Acceptance criteria
 
@@ -671,6 +681,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   once without a user action; no child escapes and no slot releases early. Persistent failure and
   a classified non-recoverable failure alone produce actionable attention. Repair and Retry cleanup
   complete only cleanup, without repeating the accepted work or resetting backoff on every restart.
+- **A45** (planned; R76, R78) — Make direct standing-owner interventions while the stage coordinator
+  is stopped or waiting. Assert durable deferred mail and no extra model turn. Resume for child
+  results or a user assignment and verify inline intervention messages, normal scoped coordination
+  and unchanged stage-report authority. An explicit action request uses waking mail; exercise the
+  overflow/restart/successor cases in FS-06.A22–A25.
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
   once with Codex Work and Claude Review and again with those runtime assignments reversed, and
@@ -967,6 +982,11 @@ The shipped first version deliberately keeps these product boundaries:
   human surface action only: it never reaches the proposing agent, never blocks content from being
   proposed again, and adds no per-content refusal list, no decline reason, no confirmation dialog,
   no separate retention bound for declined records, and no agent-facing tool or payload change.
+
+**Mail extension requested later on 2026-09-12:** R78/A45 and FS-06.R30–R36/A20–A25 replace
+the separate coordinator-notice design with deferred mailbox delivery. The previously confirmed
+pipeline direction remains; the expanded change is paused for FS-06 §6's retention decision and
+the mail feature/technical design checkpoint. It is not yet ready to implement with this extension.
 
 ## 7. Traceability
 

@@ -736,6 +736,12 @@ found, adopted, and torn down rather than orphaned (INV §4).
 
 ## 5. Deviations & open decisions
 
+- **Mail delivery extension in design:** FS-06.R30–R36 replace R27's mandatory payload-free
+  mail instruction with bounded direct message content. The existing `send_message` and
+  `check_messages` tools remain; deferred send requests no model turn. Exact delivery/read/budget
+  transactions and tool payload additions will follow feature confirmation. The separate planned
+  direct-action migration must not reintroduce a mandatory mailbox-fetch prompt when it ships.
+
 - **Pipeline replacement:** TS-10.R31/R34 replace R17's standalone stage-result tool and R29's
   no-query exclusion when shipped. Stage reports use `report_task_result` with the current execution
   handle; generic task list/read/repair/wait operations use the existing scoped MCP server and
