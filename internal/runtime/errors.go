@@ -115,11 +115,14 @@ const (
 	// session file-read codes (TS-03.R40). Each names the boundary that was hit
 	// rather than collapsing into one flat validation error, so the viewer can
 	// state the actual reason (FS-03.R55). PathRefused is decided on the path's
-	// form before any filesystem access, so it never reveals whether a file
-	// exists outside the working directory (TS-05.R21).
+	// form or on the root refusing to resolve it, so it never reveals whether a
+	// file exists outside the working directory; FileUnreadable keeps a file that
+	// is plainly inside the root but cannot be opened out of that containment
+	// vocabulary (TS-05.R21, INV §8).
 	CodePathRefused          = "path_refused"          // 422
 	CodeNotAFile             = "not_a_file"            // 422
 	CodeNotText              = "not_text"              // 422
+	CodeFileUnreadable       = "file_unreadable"       // 422
 	CodeWorkspaceUnavailable = "workspace_unavailable" // 422
 )
 
@@ -146,7 +149,7 @@ func (e *APIError) HTTPStatus() int {
 func statusForCode(code string) int {
 	switch code {
 	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
-		CodePathRefused, CodeNotAFile, CodeNotText, CodeWorkspaceUnavailable:
+		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400

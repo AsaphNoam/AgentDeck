@@ -167,7 +167,10 @@ func scoreFile(rel, q string) int {
 }
 
 // withinRoot confirms rel resolves to a real path inside root, defending against a
-// symlink candidate that points outside the working directory (TS-03.R24).
+// symlink candidate that points outside the working directory (TS-03.R24). This
+// is a listing filter over path names and never returns bytes, so it is
+// deliberately not the authoritative containment: content reads go through
+// `os.Root` in fileread.go, which TS-05.R21 names as the authority (INV §2).
 func withinRoot(root, rel string) bool {
 	full := filepath.Join(root, filepath.FromSlash(rel))
 	resolved, err := filepath.EvalSymlinks(full)

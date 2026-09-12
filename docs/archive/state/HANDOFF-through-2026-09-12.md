@@ -26,3 +26,21 @@ surface.
 **Changelog — 2026-09-12 (fix):** Hardened the New Agent modal tests to wait for the Launch
 button to become enabled before clicking it, closing a CI timing race around asynchronously loaded
 role and project state. All 450 UI tests pass; product behavior is unchanged.
+
+**Changelog — 2026-09-12 (review):** Reviewed `file-read-nonregular-kind` (`22d77dc`), which
+classifies a target through `os.Root` before opening it. Containment holds: `Root.Stat` refuses an
+escaping symlink and the post-open descriptor check still guards replacement. Four findings — no
+test fails without the fix and its one non-regular case silently skips on macOS; TS-05.R21 still
+names `os.OpenInRoot`; an unreadable in-root file reports as outside the workspace; `filesearch.go`
+keeps the superseded containment spelling. **Fix model:** medium — Codex Terra or Claude Opus.
+Classes 2, 7, 8, 10, 14, 16, 17 apply; 1, 3–6, 9, 11–13, 15 have no surface. Archived three settled
+entries for header budget; the slice is still over it.
+
+**Changelog — 2026-09-12 (design-feature):** Recorded confirmed mail decisions: unread deferred
+mail survives until delivery/read then uses 24-hour cleanup; uncertain delivery remains recoverable
+with stable ids on a later authorized turn; inline batches contain bounded whole messages with
+durable overflow. Intervention FYIs are best effort, with no atomic change/mail requirement.
+Replacement context is supplied by the standing owner through assignment or ordinary mail; no
+automatic inbox/history transfer. Updated FS/TS and acceptance criteria consistently. No product
+question remains; the unit stays paused only for technical delivery mechanics. Spec checks, twin
+skills and diff checks pass; no product code changed.

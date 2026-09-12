@@ -159,13 +159,23 @@ sensitive-context sharing is a practical problem.
   directory recorded on that agent's own session snapshot, read from server-side state; the request
   supplies a path and can never supply or influence a root. That path is cleaned and refused before
   any filesystem access when it escapes the root, cannot be expressed inside it, or names `.git`.
-  The candidate is then opened with `os.OpenInRoot`, so pathname resolution and opening are one
-  root-confined operation: a symlink inside the directory cannot lead out of it, and a concurrent
-  replacement after the form check cannot redirect the open outside the root. File type, size,
-  modification time, and content are all read from that returned descriptor rather than resolving
-  the pathname again. Only a regular file is accepted, the read is bounded by an explicit byte
+  The candidate is then classified through an `os.Root` handle on that directory and opened through
+  the same handle: `Root.Stat` decides the target's kind before anything is opened, and `Root.Open`
+  returns the descriptor. Every resolution is root-confined, so a symlink inside the directory
+  cannot lead out of it on either call. Classifying first is required rather than incidental —
+  opening a non-regular target is what varies by platform and can block, so a socket must not depend
+  on the open's verdict and a FIFO must never be opened at all. The window this opens between the
+  two calls is closed by the post-open guard: size, modification time, kind, and content are all
+  read from the returned descriptor, so a replacement after the kind check cannot redirect the read
+  or serve a non-regular target. `os.Root` is the authoritative containment for content reads;
+  TS-03.R24's `withinRoot` resolve-and-recheck remains a listing filter over path names that never
+  returns bytes, and is not a second spelling of this boundary (`INV §2`). Only a regular file is
+  accepted, the read is bounded by an explicit byte
   limit rather than by the file's size, and non-UTF-8 content is refused rather than transcoded or
-  escaped. The
+  escaped. A file the root resolves but refuses to open — an unreadable mode or owner inside the
+  working directory — is refused as unreadable, not as outside the directory; the outside-the-
+  directory refusal is reserved for the path's form and the root's own escape verdict, so a
+  person is never misdirected to a containment problem that does not exist (`INV §8`). The
   route is registered inside `routes()` so it sits behind `localOnly` like every other route
   (R2, `INV §14`); loopback is not authentication (R3), which is precisely why the root comes from
   session state instead of the request. AgentDeck's own home tree stays out of reach unless a
@@ -174,8 +184,11 @@ sensitive-context sharing is a practical problem.
   readable inside the root: a deliberate product decision (FS-03.R55) that accepts a linked `.env`
   inside the working directory would display, on the grounds that the supervised agent already had
   that reach and a person is the one activating the link. R11 applies — traversal, absolute-path
-  escape, symlink escape, concurrent target replacement, `.git`, non-regular file, oversized, and
-  non-UTF-8 each need an adversarial test.
+  escape, symlink escape, target replacement between the kind check and the open, `.git`, socket,
+  FIFO, unreadable-but-contained file, oversized, and non-UTF-8 each need an adversarial test. The
+  socket and FIFO tests must run on the development platform rather than skipping: the socket
+  fixture needs a path short enough for `sun_path`, and the FIFO open needs a bounded wait so a
+  restored open-then-classify order fails instead of hanging the suite (`INV §17`).
 
 - **R22 (planned) — Run work authority is bounded by durable membership.** On the existing
   per-launch token/identity boundary, only the standing run orchestrator assigned the current

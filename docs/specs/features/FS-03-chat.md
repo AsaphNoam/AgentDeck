@@ -728,12 +728,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `ui/src/components/chat/ChatPanel.test.tsx`, with the rendered docked/reflowed forms exercised in
   journey J3.
 - **A37** (R55) — A path outside the session working directory, a symlink
-  escaping it, a target replaced with an escaping symlink after validation, a `.git` path, a
-  missing file, a directory, non-text content, and an absent working directory each return their
-  typed refusal without opening anything outside the directory; an
+  escaping it, a target replaced with an escaping symlink after its kind is checked, a `.git` path, a
+  missing file, a directory, a socket, a FIFO, non-text content, and an absent working directory
+  each return their typed refusal without opening anything outside the directory and without
+  blocking on the FIFO; a file inside the directory that cannot be opened is refused as unreadable
+  rather than as outside the directory; an
   oversized file returns its labelled partial read; a Git-ignored file inside the directory reads
   successfully; and each outcome renders as its stated reason in the viewer while the transcript
-  stays usable. *Verify by* `internal/server/fileread_test.go` and
+  stays usable. *Verify by* `internal/server/fileread_test.go`,
+  `internal/server/fileread_unix_test.go`, and
   `ui/src/components/chat/FileViewer.test.tsx`.
 - **A38** (R56) — A fake adapter whose active turn settles before it
   handles a Steer request returns `promptRequired` without emitting a detached turn; AgentDeck

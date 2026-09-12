@@ -17,8 +17,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None; the next role picks from the queues below.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `file-read-nonregular-kind` is reviewed and stays open on four findings;
-  `/review` has no available unit. Every other unit through this release is closed.
+- **Review units:** `/review` has no available unit; every unit through this release is closed.
   `stop-telling-agents-to-poll` shipped without entering this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
 - **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start, including the completed
@@ -67,15 +66,6 @@ Added TS-01.R31–R33, TS-02.R34 and TS-04.R53; completed readiness references a
 unit to Waiting to start. Removed its completed source idea. Spec checks, twin-skill and diff checks
 pass. No product code changed; implementation and provider acceptance remain future work.
 
-**Changelog — 2026-09-12 (design-feature):** Recorded confirmed mail decisions: unread deferred
-mail survives until delivery/read then uses 24-hour cleanup; uncertain delivery remains recoverable
-with stable ids on a later authorized turn; inline batches contain bounded whole messages with
-durable overflow. Intervention FYIs are best effort, with no atomic change/mail requirement.
-Replacement context is supplied by the standing owner through assignment or ordinary mail; no
-automatic inbox/history transfer. Updated FS/TS and acceptance criteria consistently. No product
-question remains; the unit stays paused only for technical delivery mechanics. Spec checks, twin
-skills and diff checks pass; no product code changed.
-
 **Changelog — 2026-09-12 (design-feature):** Drafted waking/deferred durable mail and bounded
 inline delivery in FS-06.R30–R36/A20–A25, FS-00.R17 and FS-14.R78/A45. Withdrew the separate
 coordinator-update queue and delivery watermark in TS-09.R50 / TS-10.R36; intervention awareness
@@ -83,14 +73,13 @@ uses ordinary deferred mail. The expanded pipeline unit is paused for unread def
 retention, feature confirmation and the matching technical contract. Spec checks, twin skills and
 diff checks pass; no product code changed.
 
-**Changelog — 2026-09-12 (review):** Reviewed `file-read-nonregular-kind` (`22d77dc`), which
-classifies a target through `os.Root` before opening it. Containment holds: `Root.Stat` refuses an
-escaping symlink and the post-open descriptor check still guards replacement. Four findings — no
-test fails without the fix and its one non-regular case silently skips on macOS; TS-05.R21 still
-names `os.OpenInRoot`; an unreadable in-root file reports as outside the workspace; `filesearch.go`
-keeps the superseded containment spelling. **Fix model:** medium — Codex Terra or Claude Opus.
-Classes 2, 7, 8, 10, 14, 16, 17 apply; 1, 3–6, 9, 11–13, 15 have no surface. Archived three settled
-entries for header budget; the slice is still over it.
+**Changelog — 2026-09-12 (fix):** Closed all four `file-read-nonregular-kind` findings. Added
+socket and FIFO regressions that fail without the pre-open kind check instead of skipping on macOS,
+moved the replacement hook into the real stat/open window, and split a contained-but-unopenable file
+out of `path_refused` into a new `file_unreadable` refusal. Restated TS-05.R21 as
+classify-through-the-root-then-open with `os.Root` authoritative over `withinRoot`; extended
+FS-03.A37 and TS-03.R40. Classes 2, 8, 10, 17. File-read tests pass under `-race`; the paused
+pipeline work's messaging/pipeline failures are pre-existing and unrelated.
 
 **Changelog — 2026-09-12 (design-feature):** Revised persistent orchestration so the standing
 agent always owns and reports the stage; configured dedicated coordinators are managed children and
@@ -109,9 +98,8 @@ are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` has none; `/work` may take
-`persistent-pipeline-orchestration` or `rename-product-to-deckhand`; `/fix` may take
-`file-read-nonregular-kind` or BR-1; `/design-feature` may choose an available or
-resumable idea. Queues are independent.
+`persistent-pipeline-orchestration` or `rename-product-to-deckhand`; `/fix` may take BR-1;
+`/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
 
@@ -143,66 +131,6 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
-
-### `file-read-nonregular-kind` — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — the change ships with no test that fails without it, and its only non-regular case
-  silently skips on macOS (**confirmed**, `INV §17`). **Where:** `22d77dc` adds no test;
-  `internal/server/fileread_test.go`'s `TestFileReadRefusesNonFileAndMissing` builds its non-regular
-  fixture with `net.Listen("unix", filepath.Join(root, "sock"))` under `t.TempDir()`.
-  **Normal-use trigger:** running the suite on macOS. The `t.TempDir()` path exceeds the 104-byte
-  `sun_path` limit, so the listen fails with `bind: invalid argument`, the case `t.Logf`s and
-  returns, and the test reports PASS. Verified by running that test at `100d1cd` (pre-fix) and at
-  `a632f3b` in clean worktrees: both pass, both log the skip. **Why it matters:** TS-05.R21's R11
-  list requires an adversarial test per refusal class, and the non-regular class has no effective
-  coverage on the development platform — the fix and the defect are indistinguishable locally. The
-  FIFO hang the commit message names as the severe symptom has no test on any platform; a
-  regression that restores open-then-classify would hang the suite rather than fail it.
-  **Requirement:** TS-05.R21, FS-03.A37, `INV §17`. **Suggested fix/test:** build the socket under a
-  short root (`os.MkdirTemp("/tmp", …)`) and fail rather than return when the platform does support
-  it; add a `syscall.Mkfifo` case behind a bounded timeout. Both were confirmed to work here —
-  `Root.Stat` reports a FIFO as `p---------` and non-regular, while `Root.Open` on it blocked
-  indefinitely.
-- **Must fix** — TS-05.R21 describes a mechanism the code no longer uses (**confirmed**,
-  `INV §10`). **Where:** `docs/specs/tech/TS-05-security.md` R21 states the candidate "is then
-  opened with `os.OpenInRoot`, so pathname resolution and opening are one root-confined operation"
-  and that "File type, size, modification time, and content are all read from that returned
-  descriptor rather than resolving the pathname again". `internal/server/fileread.go:204–227` now
-  uses `os.OpenRoot` plus `Root.Stat(name)` plus `Root.Open(name)`: two resolutions, and file type
-  is decided primarily by the pre-open `Root.Stat`, which is exactly "resolving the pathname
-  again". **Why it matters:** the commit cites TS-05.R21 and FS-03.A37 and changed neither, so the
-  security spec's containment argument now contradicts the shipped code; a later reader restoring
-  "one root-confined operation" literally would reintroduce the platform-dependent verdict and the
-  FIFO hang. FS-03.A37 also enumerates the refusal cases without naming the non-regular kind this
-  change exists to make deterministic, while the test cites A37 for precisely that.
-  **Requirement:** TS-05.R21, FS-03.A37, workflow §2.1, `INV §10`. **Suggested fix/test:** restate
-  R21 as classify-through-the-root-then-open, with the post-open descriptor check as the
-  replacement guard, and add the non-regular kind to A37.
-- **Worth fixing** — an unreadable file inside the workspace is reported as outside it
-  (**confirmed**, `INV §8`). **Where:** `internal/server/fileread.go:222–227` maps every `Root.Open`
-  error that is not `os.IsNotExist` to `CodePathRefused` / "that path is outside this agent's
-  working directory". **Normal-use trigger:** a root-owned or mode-`0000` file another process left
-  in the working directory. Verified directly: such a file passes `Root.Stat` as regular, then
-  `Root.Open` returns `openat …: permission denied` with `os.IsNotExist` false, so the viewer tells
-  the person the file is outside the agent's working directory when it is plainly inside it.
-  **Why it matters:** `INV §8` requires in-vocabulary data on user-facing surfaces, and this
-  refusal misdirects the person to a containment problem that does not exist. The mapping entered
-  in `100d1cd`, but this change keeps it as the fall-through for every stat failure.
-  **Requirement:** FS-03.A37, `INV §8`. **Suggested fix/test:** branch on
-  `errors.Is(err, fs.ErrPermission)` to an unreadable-file refusal and reserve path_refused for the
-  root escape, which `os.Root` reports distinguishably as "path escapes from parent".
-- **Worth fixing** — two containment spellings now coexist with no stated authority
-  (**confirmed**, `INV §2`). **Where:** `internal/server/filesearch.go:171` `withinRoot` still uses
-  `filepath.EvalSymlinks` resolve-and-recheck, the spelling the read abandoned in `100d1cd`; TS-05.R21
-  previously stated the two shared one spelling under `INV §2` and that sentence was removed without
-  saying which is now authoritative. **Normal-use trigger:** the composer offers a path its
-  containment accepts that the read's containment then refuses. **Why it matters:** the consequence
-  is bounded — `rankFiles` filters path names and never returns bytes, so the TOCTOU that motivated
-  the read's change does not leak content through search — but `INV §2` exists to stop exactly this
-  divergence in what "inside the root" means. **Requirement:** TS-05.R21, TS-03.R24, `INV §2`.
-  **Suggested fix/test:** state in TS-05.R21 that `os.Root` is the authoritative containment for
-  content reads while `withinRoot` remains a listing filter, or move the search onto `Root.Stat`
-  too.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 

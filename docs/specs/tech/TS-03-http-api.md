@@ -542,9 +542,12 @@ reloads the collections through this route rather than reconstructing them from 
   route serves file bytes under a caller-influenced content type, so a browser cannot be induced to
   render a read file as a document. Refusals use R3's envelope with codes that say which boundary
   was hit rather than one flat validation error: `path_refused` (422) for a path outside the working
-  directory or inside `.git`, decided on the path's form before any filesystem access so the route
+  directory or inside `.git`, decided on the path's form before any filesystem access or on the
+  root's own escape verdict, so the route
   cannot report whether a file exists elsewhere; `not_a_file` (422) for a directory or other
-  non-regular file; `not_text` (422) for content that is not valid UTF-8;
+  non-regular file; `not_text` (422) for content that is not valid UTF-8; `file_unreadable` (422)
+  for a file the root resolves but cannot open or read, which stays out of the containment
+  vocabulary because that file is inside the directory (TS-05.R21, `INV §8`);
   `workspace_unavailable` (422) when the recorded working directory is missing or unreadable;
   `not_found` (404) for an unknown agent and for a file absent inside the directory; and
   `validation` (422) for a missing or malformed `path`. Unlike `file-search`, the read is **not**

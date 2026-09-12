@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -217,8 +216,10 @@ func TestFileReadRefusesSymlinkEscape(t *testing.T) {
 }
 
 // TestFileReadRefusesTargetReplacedBeforeOpen proves containment is enforced by
-// the open itself: replacing an accepted in-root file with an outside symlink
-// after the preliminary check cannot return outside bytes (TS-05.R21, INV §17).
+// the open itself: replacing a target the kind check already accepted with an
+// outside symlink cannot return outside bytes. The hook fires in the real
+// check-then-act window, between the classifying stat and the open
+// (TS-05.R21, INV §17).
 func TestFileReadRefusesTargetReplacedBeforeOpen(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "report.txt")
@@ -226,7 +227,7 @@ func TestFileReadRefusesTargetReplacedBeforeOpen(t *testing.T) {
 	writeFile(t, target, "safe\n")
 	writeFile(t, outside, "secret\n")
 
-	got, apiErr := readWorkspaceFileAfterValidation(root, "report.txt", func() {
+	got, apiErr := readWorkspaceFileAfterClassification(root, "report.txt", func() {
 		if err := os.Remove(target); err != nil {
 			t.Fatalf("remove checked target: %v", err)
 		}
@@ -242,26 +243,37 @@ func TestFileReadRefusesTargetReplacedBeforeOpen(t *testing.T) {
 	}
 }
 
-// TestFileReadRefusesNonFileAndMissing covers the directory, missing-file, and
-// non-regular outcomes (FS-03.A37).
+// TestFileReadRefusesNonFileAndMissing covers the directory and missing-file
+// outcomes. The non-regular kinds need a short socket path and a bounded FIFO
+// open, so they live in the unix-only companion test (FS-03.A37).
 func TestFileReadRefusesNonFileAndMissing(t *testing.T) {
 	srv := testServer(t, false)
-	root := seedReadableWorkspace(t, srv, "a_kind")
+	seedReadableWorkspace(t, srv, "a_kind")
 	h := srv.routes()
 
 	readFileRefused(t, h, "a_kind", "internal", runtime.CodeNotAFile, http.StatusUnprocessableEntity)
 	readFileRefused(t, h, "a_kind", "gone.go", runtime.CodeNotFound, http.StatusNotFound)
 	readFileRefused(t, h, "a_kind", "", runtime.CodeValidation, http.StatusUnprocessableEntity)
+}
 
-	// A Unix socket is a non-regular file that every supported platform can
-	// create without a build-tagged syscall.
-	ln, err := net.Listen("unix", filepath.Join(root, "sock"))
-	if err != nil {
-		t.Logf("unix socket unsupported, skipping non-regular case: %v", err)
-		return
+// TestFileReadRefusesUnreadableFileInsideRoot proves a file the root resolves
+// but cannot open is reported as unreadable rather than as outside the working
+// directory, which it plainly is not (FS-03.A37, INV §8).
+func TestFileReadRefusesUnreadableFileInsideRoot(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores mode bits, so the file stays readable")
 	}
-	defer ln.Close()
-	readFileRefused(t, h, "a_kind", "sock", runtime.CodeNotAFile, http.StatusUnprocessableEntity)
+	srv := testServer(t, false)
+	root := seedReadableWorkspace(t, srv, "a_unreadable")
+	locked := filepath.Join(root, "locked.txt")
+	writeFile(t, locked, "private\n")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o644) })
+	h := srv.routes()
+
+	readFileRefused(t, h, "a_unreadable", "locked.txt", runtime.CodeFileUnreadable, http.StatusUnprocessableEntity)
 }
 
 // TestFileReadRefusesNonText proves invalid UTF-8 is refused rather than

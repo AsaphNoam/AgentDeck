@@ -137,6 +137,7 @@ describe("FileViewer", () => {
       ["workspace_unavailable", "this agent's working directory is no longer available"],
       ["not_a_file", "that path names a directory, not a file"],
       ["not_text", "that file is not text"],
+      ["file_unreadable", "that file could not be read"],
     ] as const) {
       refuse(code, message);
       render(<FileViewer agentId="a_1" link={{ path: "anything" }} onClose={vi.fn()} />);

@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -185,22 +186,21 @@ func resolveWorkspaceRoot(cwd string) (string, *runtime.APIError) {
 	return root, nil
 }
 
-// readWorkspaceFile opens rel inside the already-resolved root and returns its
-// bounded text. The root handle keeps path resolution and opening inside the
-// root; metadata and content then come from the opened descriptor so a
-// concurrent path replacement cannot redirect the read outside the workspace
+// readWorkspaceFile classifies rel through the already-resolved root, opens it
+// inside that root, and returns its bounded text. Every resolution goes through
+// the root handle, so neither the kind check nor the open can leave the working
+// directory; size, modification time, and content come from the opened
+// descriptor, so a replacement between the two cannot redirect the read
 // (TS-05.R21).
 func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
-	return readWorkspaceFileAfterValidation(root, rel, nil)
+	return readWorkspaceFileAfterClassification(root, rel, nil)
 }
 
-// readWorkspaceFileAfterValidation exposes the instant after the path's form
-// has been checked for the deterministic replacement regression.
-// Production callers never supply a hook.
-func readWorkspaceFileAfterValidation(root, rel string, afterValidation func()) (fileContent, *runtime.APIError) {
-	if afterValidation != nil {
-		afterValidation()
-	}
+// readWorkspaceFileAfterClassification exposes the instant between classifying
+// the target's kind and opening it — the check-then-act window this read has to
+// survive — for the deterministic replacement regression. Production callers
+// never supply a hook.
+func readWorkspaceFileAfterClassification(root, rel string, afterClassification func()) (fileContent, *runtime.APIError) {
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return fileContent{}, apiError(runtime.CodeWorkspaceUnavailable, "this agent's working directory is no longer available")
@@ -218,17 +218,27 @@ func readWorkspaceFileAfterValidation(root, rel string, afterValidation func()) 
 		}
 		return fileContent{}, apiError(runtime.CodeNotAFile, "that path does not name a regular file")
 	}
+	if afterClassification != nil {
+		afterClassification()
+	}
 	f, err := dir.Open(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
+		}
+		// A file the root resolves but refuses to open is inside the workspace, so
+		// saying it is outside would misdirect the person to a containment problem
+		// that does not exist; only the root's own escape refusal is path_refused
+		// (INV §8).
+		if errors.Is(err, fs.ErrPermission) {
+			return fileContent{}, apiError(runtime.CodeFileUnreadable, "that file could not be read")
 		}
 		return fileContent{}, apiError(runtime.CodePathRefused, "that path is outside this agent's working directory")
 	}
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
-		return fileContent{}, apiError(runtime.CodeNotAFile, "that file could not be read")
+		return fileContent{}, apiError(runtime.CodeFileUnreadable, "that file could not be read")
 	}
 	if info.IsDir() {
 		return fileContent{}, apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
@@ -241,7 +251,7 @@ func readWorkspaceFileAfterValidation(root, rel string, afterValidation func()) 
 	buf := make([]byte, fileReadLimit+1)
 	n, err := io.ReadFull(f, buf)
 	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-		return fileContent{}, apiError(runtime.CodeNotAFile, "that file could not be read")
+		return fileContent{}, apiError(runtime.CodeFileUnreadable, "that file could not be read")
 	}
 	truncated := n > fileReadLimit
 	if truncated {
