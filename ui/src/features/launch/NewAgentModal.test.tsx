@@ -115,7 +115,9 @@ describe("NewAgentModal", () => {
     await screen.findByText(/Implementer/);
 
     expect(screen.queryByText("Project")).toBeNull();
-    fireEvent.click(screen.getByText("Launch"));
+    const launchButton = screen.getByRole("button", { name: "Launch" });
+    await waitFor(() => expect(launchButton).toBeEnabled());
+    fireEvent.click(launchButton);
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect((capturedBody as Record<string, unknown>).project).toBe("billing");
@@ -144,7 +146,9 @@ describe("NewAgentModal", () => {
         <NewAgentModal open={true} onClose={onClose} fixedProject="billing" />
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByText("Launch"));
+    const launchButton = screen.getByRole("button", { name: "Launch" });
+    await waitFor(() => expect(launchButton).toBeEnabled());
+    fireEvent.click(launchButton);
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     expect((capturedBody as Record<string, unknown>).project).toBe("billing");
@@ -294,7 +298,9 @@ describe("NewAgentModal", () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByText(/Implementer/);
 
-    fireEvent.click(screen.getByText("Launch"));
+    const launchButton = screen.getByRole("button", { name: "Launch" });
+    await waitFor(() => expect(launchButton).toBeEnabled());
+    fireEvent.click(launchButton);
 
     expect(await screen.findByText(/project cwd does not exist/)).toBeInTheDocument();
   });
@@ -315,7 +321,9 @@ describe("NewAgentModal", () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => { onClose.called = true; }} />);
     await screen.findByText(/Implementer/);
 
-    fireEvent.click(screen.getByText("Launch"));
+    const launchButton = screen.getByRole("button", { name: "Launch" });
+    await waitFor(() => expect(launchButton).toBeEnabled());
+    fireEvent.click(launchButton);
 
     await waitFor(() => expect(capturedBody).toBeDefined());
     const body = capturedBody as Record<string, unknown>;

@@ -55,6 +55,10 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 
 **Change:** None.
 
+**Changelog — 2026-09-12 (fix):** Hardened the New Agent modal tests to wait for the Launch
+button to become enabled before clicking it, closing a CI timing race around asynchronously loaded
+role and project state. All 450 UI tests pass; product behavior is unchanged.
+
 **Changelog — 2026-09-11 (design-feature):** Designed pipeline progression over the shared task
 dispatcher and result transaction, dynamic lineage, scoped inspection/repair, durable child waiting,
 run-wide cancellation fences, same-agent recovery, and the authorized legacy reset. Reconciled
