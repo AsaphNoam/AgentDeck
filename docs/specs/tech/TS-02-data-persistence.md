@@ -447,6 +447,43 @@ state as it already is, and the awaiting-approval attention value is derived rat
 (TS-09.R29). The `pipeline_attempts` and run tables are untouched, so no migration is written and
 no existing durable field changes meaning.
 
+**R34 — Deferred mail extends the inbox and existing turn budget.** (planned)
+Add `messages.wake` (boolean, non-null default true); an additive SQLite migration preserves
+existing mail and treats it as waking. Add nullable `inline_delivery_turn_key` and the `inline`
+delivered_via value for confirmed inline receipt; preserve existing poll provenance and read_at
+when explicit reading already won. Do not use `delivered_via` as wake intent. The shared insert
+transaction retains outbound charging and creates/coalesces a mail activation only for waking sends.
+No coordinator-specific table, intervention transaction or mailbox-transfer mechanism is added.
+
+Extend the existing per-agent turn-budget record with a fresh globally unique `delivery_turn_key`
+and `inline_message_ids` (at most 15 ids, encoded as a JSON array). Reset both with the ordinary
+budget reset; do not use the process-local turn sequence alone as a restart-safe identity. One
+state transaction selects unread recipient mail in TS-04.R53 order, stores the selected ids and
+increments inbound usage once per selected message. It leaves messages unread until confirmation.
+No provider call occurs if this transaction fails. Reuse this record instead of adding receipt rows
+or a mail execution queue. The preparation is idempotent for its delivery key, not a second reset.
+
+Default unread `check_messages` excludes ids reserved for the current turn. An explicit history
+read may return them and retains normal mark-read/delete semantics, but does not charge those
+already reserved ids again in that turn. Other messages keep the existing budget rules. Selection,
+manual reads and budget changes serialize through the state layer. Successful inline settlement
+requires the matching agent/delivery key, marks only surviving selected rows read, records inline
+provenance and its receiving key on newly read rows, preserves an existing read_at, and clears the
+reserved ids in one transaction. A repeated or stale settlement
+cannot affect a new turn. Failed/uncertain settlement clears reservations without marking unread
+rows read; after process restart or the next budget reset, stale reservations are discarded and
+unread content is eligible again. This recovery creates no activation. Rows are bounded to one
+budget record per agent with at most 15 reserved ids and follow existing budget cleanup. If a
+confirmation commit itself fails or is uncertain, do not attempt a separate reservation-clear write;
+leave recovery to restart/next reset and never undo a read that may already have committed.
+
+The janitor excludes unread deferred messages from the seven-day hard expiry. Read deferred mail
+expires 24 hours after read_at, independent of its creation age. Waking mail retains both existing
+expiry rules. Existing explicit delete operations retain their semantics. Use indexed bounded batch
+selection, not an in-memory inbox scan; durable unread mail may accumulate but prompt memory cannot.
+FS-06.A20–A25 verification includes restart before/after preparation and confirmation, stale callback
+after a new turn, concurrent manual reads, no double charge, and a clock advanced past seven days.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:

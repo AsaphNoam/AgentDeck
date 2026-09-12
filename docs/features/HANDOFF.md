@@ -23,8 +23,8 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   its `steering-host-owned-fallback` continuation, and `usability-20260907`.
   `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `persistent-pipeline-orchestration.md` is Paused for its deferred/inline mail
-  extension: only the precise technical delivery/confirmation contract remains. Its exact
+- **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start, including the completed
+  deferred/inline mail technical contract. Its exact
   requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
   `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
@@ -34,9 +34,9 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration has resumed design for efficient durable mail: deferred FYIs
-  never wake a coordinator, and authorized turns receive bounded message bodies directly. The
-  mail scope is confirmed in FS-06 §6; the extension's technical contract remains to be designed.
+  Persistent pipeline orchestration and its mail extension are fully specified and ready to implement.
+  TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete shared prompt preparation, bounded batches,
+  transactional budget/read settlement, uncertain-delivery recovery and deferred retention.
   The clean legacy reset, descendant cancellation, project boundaries, subordinate stage
   coordination and ordinary stop/resume remain confirmed.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
@@ -61,6 +61,13 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (design-feature):** Completed the mail technical contract against existing
+runtime and state seams: optional wake intent, shared bounded inline preparation, provider-result
+confirmation, stable-id recovery without extra wakes, turn-budget reservation and deferred retention.
+Added TS-01.R31–R33, TS-02.R34 and TS-04.R53; completed readiness references and moved the pipeline
+unit to Waiting to start. Removed its completed source idea. Spec checks, twin-skill and diff checks
+pass. No product code changed; implementation and provider acceptance remain future work.
 
 **Changelog — 2026-09-12 (design-feature):** Recorded confirmed mail decisions: unread deferred
 mail survives until delivery/read then uses 24-hour cleanup; uncertain delivery remains recoverable
@@ -115,7 +122,8 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take `rename-product-to-deckhand`;
+**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take
+`persistent-pipeline-orchestration` or `rename-product-to-deckhand`;
 `/fix` may take BR-1 (difficult, Sol);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.

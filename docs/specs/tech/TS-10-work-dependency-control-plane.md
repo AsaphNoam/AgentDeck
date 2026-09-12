@@ -361,7 +361,7 @@ parallel copy of them.
   discard claims, advance a stage or declare Stop complete while a required effect remains unresolved.
 - **R36 — superseded 2026-09-12 by FS-14.R78 and FS-06.R30–R36:** Separate coordinator-update
   records, continuation requests and delivery watermarks are withdrawn. Intervention awareness uses
-  ordinary deferred mail; its direct delivery/confirmation design is being defined in the mail plane.
+  ordinary deferred mail under TS-01.R31–R33, TS-02.R34 and TS-04.R53.
 - **R37** (planned) — **Coordinator replacement is explicit managed work.** Extend `create_task`
   with optional `replaces_coordinator_task_id`, accepted only from the current standing owner for
   its bound coordinator and only after the predecessor is terminal and its release is settled.
@@ -489,7 +489,8 @@ object carries the derived boolean `retry_eligible` (R22) beside its stored fiel
   manual-first cleanup policy; R37 provides explicit succession. R36's separate coordinator
   awareness protocol is withdrawn for FS-06.R30–R36's mail extension. Deferred mail must not request
   a task continuation or satisfy a task wait by its mere arrival; R29's mail wake applies to waking
-  sends only. Mail scope is confirmed in FS-06 §6; technical delivery design remains outstanding.
+  sends only. Mail scope is confirmed in FS-06 §6; TS-01.R31–R33, TS-02.R34 and TS-04.R53
+  complete its technical delivery design.
 
 - **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
   but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a

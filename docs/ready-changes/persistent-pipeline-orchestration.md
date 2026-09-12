@@ -1,10 +1,11 @@
 # Persistent pipeline orchestration through durable tasks
 
-**State:** Paused
+**State:** Waiting to start
 **Why:** Operator request of 2026-09-11, refined and confirmed 2026-09-12; promoted from
 “Rethink the pipeline experience on top of durable tasks” in `docs/ideas.md`.
 **Relevant requirements:** FS-00.R17, FS-06.R30–R36, FS-14.R61–R78 (R60 superseded), FS-16.R30–R38,
-TS-09.R35–R50, TS-10.R25–R37, TS-05.R22; INV §1, INV §2, INV §3, INV §4, INV §5,
+TS-01.R31–R33, TS-02.R34, TS-04.R53, TS-09.R35–R50, TS-10.R25–R37, TS-05.R22;
+INV §1, INV §2, INV §3, INV §4, INV §5,
 INV §7, INV §8, INV §9, INV §10, INV §11, INV §14, INV §15, INV §16, INV §17.
 
 ## Outcome
@@ -20,10 +21,13 @@ coordinator FYIs reuse deferred mail without an extra synchronization turn.
 
 - Replace the old pipeline execution engine with the shared task dispatcher/result path; add durable
   wait/yield, scoped task inspection/repair, managed-child provenance and coordinator handoffs.
-- Keep run-wide authority with the standing owner; preserve subordinate coordination and durable
-  best-effort updates about material direct interventions through deferred mail, not a separate notice queue,
+- Keep run-wide authority with the standing owner; preserve subordinate coordination and
+  best-effort updates about material direct interventions through durable deferred mail, not a separate notice queue,
   wake or coordinator delivery watermark. Use ordinary same-identity stop/resume and re-deliver
   assignments/results, visibly reporting native context restoration failure.
+- Deliver bounded whole mail messages through shared turn preparation and provider-completion
+  settlement. Extend the existing inbox and turn budget; preserve uncertain messages for a later
+  authorized turn. No acknowledgement tool, automatic intervention capture or inbox transfer.
 - Fence stage/run closure before descendant cancellation; retry cleanup durably with bounded
   backoff and surface human attention only for persistent/non-recoverable conditions.
 - Update template, builder, UI/API/CLI, context report selectors, permissions, runtime knowledge and
@@ -57,12 +61,15 @@ with each send; `runPromptTurn`/`StartActivation` in `internal/runtime/chat.go` 
 delivery seams. The confirmed extension exempts unread deferred mail from the existing seven-day
 expiry and applies 24-hour cleanup after read. These verified local seams motivate convergence; no unverified provider
 limitation or provider upgrade motivates another execution mechanism.
+The efficient-mail extension originated in the 2026-09-12 request to eliminate FYI-only turns and
+payload-free mailbox-fetch activations. Both runtime paths already call `session/prompt` and settle
+its response; TS-01.R32 adds conservative receipt validation without relying on the current
+`mapPromptResult` fallback for malformed results. `TakeMessagesWithBudget` currently marks mail
+read immediately, so inline preparation must reuse its transaction/budget logic without that early
+read mutation. `internal/messaging/constants.go` provides the existing 15/50 count and 8000/200-byte
+message bounds; the new builder adds the explicit 64 KiB mail-section cap.
 
 ## Waiting on
 
-Only the precise technical delivery/confirmation contract for the mail extension. The operator
-confirmed retention until delivery/read, stable-id recovery of uncertain delivery on a later
-authorized turn, bounded whole messages and durable overflow. FYIs are best effort; replacement
-context comes from the standing owner through assignment/mail, with no automatic inbox transfer.
-No product question remains. The earlier hierarchy, cleanup and runtime-lifetime decisions remain
-confirmed. TS-09.R50 and TS-10.R36's old separate notice design is withdrawn.
+None. Product decisions and the technical contract are complete. TS-09.R50 and TS-10.R36's old
+separate notice design is withdrawn. Implementation and its acceptance checks have not started.

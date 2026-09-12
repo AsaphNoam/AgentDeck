@@ -526,7 +526,7 @@ unchanged by them.
 - **R50 — superseded 2026-09-12 by FS-14.R78:** The coordinator-specific update/continuation
   mechanism is withdrawn in favor of durable deferred mail. Normal coordinator responsibility,
   standing intervention authority and explicit ownership changes remain TS-09.R49/TS-05.R22.
-  Expanded mail technical design is pending; no coordinator-only delivery protocol is retained.
+  TS-01.R31–R33, TS-02.R34 and TS-04.R53 define mail delivery; no coordinator-only protocol is retained.
 
 ## 3. Interfaces & data shapes
 
@@ -640,7 +640,7 @@ new durable run revision or a structured validation/conflict result.
   draft's dedicated-assignee interpretation; TS-10.R35 replaces manual-first cleanup. The later
   mail extension withdraws R50 and TS-10.R36: FS-14.R78 uses deferred mail for intervention FYIs,
   with no separate notice queue or wake. FS-06 §6 records confirmed retention and best-effort FYIs;
-  the expanded change is paused only for technical delivery design. Old-engine exclusions below
+  TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete delivery design. Old-engine exclusions below
   describe shipped behavior only.
 
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated

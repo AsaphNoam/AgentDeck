@@ -84,8 +84,8 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 |---|---|---|
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
-| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped; efficient mail delivery in design |
-| Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped; persistent replacement paused for mail extension design |
+| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped; efficient mail delivery specified in pipeline ready change |
+| Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped; persistent replacement ready to implement |
 | Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped; orchestration extensions planned |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
 | Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |

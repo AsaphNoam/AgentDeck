@@ -668,6 +668,47 @@ migration, which runs only with the dashboard stopped (FS-10.R18). The tmux sess
 `deckhand-`, while session discovery accepts both prefixes so a detached pre-rename session is still
 found, adopted, and torn down rather than orphaned (INV §4).
 
+**R53 — Waking/deferred mail shares the existing protocol and bounded prompt builder.** (planned)
+Extend `send_message` with optional boolean `wake`, default true; reject non-booleans. Successful
+results retain message identity and include the effective `wake` plus `delivery: queued_waking` or
+`queued_deferred`; these describe scheduling intent, never guaranteed immediate execution. Expose
+the same optional choice on existing user/API mail entrypoints, with their existing default waking
+behavior, and include wake intent in mailbox results. Deferred recipient resolution uses existing
+non-archived chat identities in active projects, preserving project/authentication/terminal refusals
+while separating addressability from current wake eligibility. No new tool or provider method is
+required. All send paths use the same state helper; ordinary best-effort FYIs use `wake: false`.
+
+One builder formats at most 15 whole messages and at most 64 KiB of serialized UTF-8 mail-section
+content, including attribution and the overflow notice. Use existing 8,000-byte body/200-byte subject
+limits and the effective combined per-turn budget (default 50), frozen for the active turn.
+Also respect any smaller remaining prompt
+allowance after the primary assignment/user input; never clip that objective to fit mail. Stop at
+the first message that does not fit the selected class's ordered batch, retaining overflow. Queries
+fetch at most 15 candidate rows; aggregate remaining counts in SQL rather than loading the inbox.
+Mail-triggered turns select waking mail first, then deferred mail; each class uses created_at and
+message_id ascending. Other turns select unread mail chronologically. Ensure a maximum-size valid
+message fits an otherwise empty mail allowance; test encoding overhead. Mail activation base text
+is short and supplies this allowance. Overflow alone never schedules a follow-up.
+
+Each entry supplies message id, bounded sender identity/display attribution, timestamp, subject,
+complete body, optional reply id and wake intent. Escape the structured envelope so peer text cannot
+masquerade as AgentDeck metadata; label it peer input, not system authority. Bound display metadata
+without clipping the message body/subject. Include remaining pending counts and say that
+`check_messages` is available for deliberate overflow/history retrieval, without instructing a
+mandatory fetch. Do not add message content to activation rows, status details or SSE notifications.
+Keep the original user transcript text unchanged. The shared runtime applies TS-01.R31–R33 and
+TS-02.R34 to all prompt paths; no provider-specific mailbox injection or acknowledgement is needed.
+
+Contract tests exercise omitted/true/false/invalid wake through real serialization, all turn sources,
+whole-message and encoded-size limits, waking priority, mailbox/manual-read races, turn budget
+reset, cancellation/transport error/invalid-result recovery, and successful read projection. Fake
+provider tests also fail batch preparation after the mail activation's attempted boundary and prove
+that the activation stays retired while its messages stay recoverable. Fake
+provider tests must inspect actual `session/prompt` content and prove no mandatory mailbox call or
+deferred-only prompt. The existing packaged Claude/Codex continuation probes in TS-09.R47 also
+verify one inline mail body without an acknowledgement tool; they remain implementation acceptance,
+not a design blocker. Update operating-agent knowledge and tool descriptions with these semantics.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
@@ -736,10 +777,11 @@ found, adopted, and torn down rather than orphaned (INV §4).
 
 ## 5. Deviations & open decisions
 
-- **Mail delivery extension in design:** FS-06.R30–R36 replace R27's mandatory payload-free
+- **Mail delivery extension specified:** R53, TS-01.R31–R33 and TS-02.R34 implement FS-06.R30–R36
+  and replace R27's mandatory payload-free
   mail instruction with bounded direct message content. The existing `send_message` and
   `check_messages` tools remain; deferred send requests no model turn. Exact delivery/read/budget
-  transactions and tool payload additions remain to be specified against the confirmed FS-06 scope.
+  transactions and tool payload additions are defined above. No mail design decision remains open.
   The separate planned
   direct-action migration must not reintroduce a mandatory mailbox-fetch prompt when it ships.
 

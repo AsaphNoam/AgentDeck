@@ -987,8 +987,8 @@ The shipped first version deliberately keeps these product boundaries:
 **Mail extension requested later on 2026-09-12:** R78/A45 and FS-06.R30–R36/A20–A25 replace
 the separate coordinator-notice design with deferred mailbox delivery. The previously confirmed
 pipeline direction remains. Mail scope and retention are confirmed in FS-06 §6, including best-effort
-FYIs and owner-supplied replacement context. The expanded change remains paused only for the
-technical delivery contract; no further product decision is required.
+FYIs and owner-supplied replacement context. TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete
+the technical delivery contract; the expanded change is ready to implement.
 
 ## 7. Traceability
 

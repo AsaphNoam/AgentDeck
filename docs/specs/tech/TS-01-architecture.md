@@ -399,6 +399,43 @@ domain's authorization transition.
   exempts, with no way to correct it short of a new agent. No path composes its own variant of the
   set (R9, INV §2).
 
+**R31 — Inline mail uses one shared turn preparation and settlement seam.** (planned)
+For FS-06.R30–R36, `runPromptTurn` and `StartActivation` use the same state-owned mail batch
+preparation after claiming the existing turn gate and before `session/prompt`. Initial user prompts,
+held follow-ups, task assignments/continuations and waking-mail turns all join this seam. Preserve
+the original objective and its author; append an explicitly attributed peer-mail section, never
+save it into launch configuration or emit it as user-authored text. Deferred arrivals during a turn
+are not steering inputs. Starting/resuming a process without a reasoning turn does not consume mail.
+Reset the existing turn budget exactly once, reserve the bounded inline batch and persist its ids
+and inbound charge before provider I/O. Failure to prepare or persist aborts the prompt with the
+ordinary surfaced error, releases its turn gate and leaves messages unread. This does not invent
+an extra activation retry or change task-owned assignment redelivery.
+
+**R32 — Provider completion confirms inline delivery; uncertainty preserves mail.** (planned)
+Use a structurally valid successful `session/prompt` response with a recognized non-cancelled
+stop reason as the confirmation boundary. Successful dispatch, streaming output, an idle status,
+process existence, or selecting messages is insufficient. Before releasing/transferring the turn
+gate or starting a held successor, commit read/read_at for that turn's selected ids under TS-02.R34.
+Validate the raw result for this receipt decision; the existing `mapPromptResult` fallback to
+end_turn for malformed data is not evidence of delivery and need not change ordinary turn mapping.
+Delivery means supplied input, not comprehension or task success. An RPC error, cancellation,
+malformed result, transport loss, crash or failed confirmation commit leaves unconfirmed mail unread;
+an explicit mailbox read already committed during the turn stays read. A later independently
+authorized turn may include the same stable message ids again. No acknowledgement tool call, new
+delivery worker or deferred-mail replay wake is added. A failed settlement is surfaced and must not
+prevent ordinary turn cleanup; generation-checked state prevents late callbacks changing a new turn.
+
+**R33 — Waking opportunities and durable inbox contents have separate lifetimes.** (planned)
+Only waking sends coalesce the existing mail activation in the message-insert transaction; deferred
+sends insert mail without activating, scheduling a continuation or satisfying a task wait. Preserve
+the existing pre-effect attempted boundary and at-most-once activation policy. Uncertain content
+redelivery does not re-arm an attempted activation. Recheck for unread waking source mail under the
+turn gate before attempting a running recipient's mail turn; retire a stale opportunity without a
+prompt when no waking mail remains. Recheck after a stopped recipient resumes as well. Another
+authorized turn may already have consumed its mail. Deferred backlog can never keep an opportunity
+alive. A new waking send may coalesce a fresh opportunity under existing rules. Retain lifecycle,
+project, ownership and budget gates; waiting assignees route waking requests through TS-10.R29.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -455,12 +492,13 @@ lost.
 
 ## 5. Deviations & open decisions
 
-- **Mail delivery extension in design:** FS-00.R17 and FS-06.R30–R36 intentionally replace the
+- **Mail delivery extension specified:** R31–R33, TS-02.R34 and TS-04.R53 implement the planned
+  FS-00.R17 and FS-06.R30–R36 scope and intentionally replace the
   payload-free mail prompt/pull-only requirement associated with R19–R21. Mail remains durable
   source-domain data; a deferred message creates no activation or task continuation. The shared
-  prompt boundary will supply bounded mail to an already authorized turn. Feature scope and retention
-  are confirmed in FS-06 §6; technical confirmation/recovery mechanics remain pending. No second prompt engine is
-  approved as a substitute.
+  prompt boundary supplies bounded mail to an already authorized turn. Scope and retention are
+  confirmed in FS-06 §6. These requirements supersede only conflicting mail-send/direct-delivery
+  clauses in R19–R21; activation records remain payload-free and at-most-once. No decision remains open.
 
 - **Pipeline replacement:** TS-09.R35–R50 and TS-10.R25–R37 replace R11's direct pipeline
   lifecycle executor with stage tasks and the shared dispatcher when shipped. R19–R24's existing

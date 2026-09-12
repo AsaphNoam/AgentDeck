@@ -237,7 +237,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   delivery remains recoverable on a later authorized turn or explicit read, with stable ids for
   any repeat. It never creates a wake solely to replay deferred mail. Successfully supplied content
   updates the ordinary read/unread surface; delivery does not assert comprehension or execution.
-  Exact confirmation mechanics belong to technical design. Unread deferred mail is retained until
+  TS-01.R32 and TS-02.R34 define the confirmation boundary. Unread deferred mail is retained until
   delivery or explicit mailbox read, exempt from R8's seven-day expiry. Once read, it uses the
   existing 24-hour read-mail cleanup policy. Waking-mail retention is unchanged.
 - **R35** (planned) — Deferred mail can address an existing non-archived chat recipient in an
@@ -397,14 +397,14 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   (eligibility), R9/R24 (every send wakes), R10/R25 (payload-free/pull-only delivery), and R6/R11/R14
   (direct receipt/read projection). Waking opportunity ownership and mailbox tools remain; unread
   counts never become wake triggers. Unmarked requirements still describe shipped behavior.
-  Technical delivery/confirmation mechanics remain to be specified; the separate planned
+  TS-01.R31–R33, TS-02.R34 and TS-04.R53 specify delivery/confirmation mechanics; the separate planned
   coordinator-notice protocol in TS-10.R36 is withdrawn.
 - **Confirmed 2026-09-12:** Retain unread deferred mail until delivery/read, then use existing
   read-mail cleanup; preserve uncertain messages for a later authorized turn with stable ids;
   deliver bounded whole messages with durable overflow. Intervention FYIs are best effort through
   ordinary send, with no atomic capture requirement. Replacement context is supplied by the
   standing owner through assignment or mail, with no automatic inbox/history transfer. No product
-  decision remains open; finish the technical delivery contract before implementation.
+  decision remains open; the matching technical delivery contract is complete and planned.
 
 - **Pipeline replacement:** FS-14.R74 replaces R22's permanent exclusion of stopped agents with
   pipeline history when shipped. A waiting assigned agent resumes its task through TS-10.R29 before
