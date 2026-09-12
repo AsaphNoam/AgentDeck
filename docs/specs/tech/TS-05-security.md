@@ -178,7 +178,8 @@ sensitive-context sharing is a practical problem.
   non-UTF-8 each need an adversarial test.
 
 - **R22 (planned) — Run work authority is bounded by durable membership.** On the existing
-  per-launch token/identity boundary, the assignee of the current pipeline stage may list/read and
+  per-launch token/identity boundary, only the standing run orchestrator assigned the current
+  authoritative stage task may list/read and
   perform valid repair/cancel operations on tasks in that run. A normal task assignee may inspect
   and manage descendants of its own task; stable creator authority continues for its own work.
   These scopes are server-derived from immutable lineage and the current stage assignment, not a
@@ -193,6 +194,13 @@ sensitive-context sharing is a practical problem.
   can read. Stage/replacement task attachments retain only the prior stage assignment's explicit
   references through normal work-derived membership; unrelated grants are never copied. Context
   reads still re-authorize through the context service, and deleted sources remain tombstones.
+  A dedicated stage coordinator is an ordinary child assignee with its delegated subtree scope,
+  including explicitly bound successor work under TS-10.R37; stage membership alone grants no
+  run-wide authority. Coordinator bindings are server-derived and revision-checked. A successor
+  inherits only the preceding coordinator's delegated scope and supplied context, not all work
+  created by the same agent in other stages. Standing interventions do not change this boundary.
+  TS-10.R36's material coordination updates are deliberately supplied same-scope data; source
+  references remain subject to ordinary context checks, not blanket access to private conversations.
 
 ## 3. Interfaces & data shapes
 

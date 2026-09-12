@@ -17,8 +17,8 @@ workflow service, background job system, arbitrary expression engine, or paralle
 
 ## 2. Design & constraints
 
-R35–R48 are the planned replacement for the old stage-agent engine. They are contingent on the
-runtime-continuity choice in FS-14 §6. Unmarked requirements describe the shipped engine until then.
+R35–R50 are the planned replacement for the old stage-agent engine, including the confirmed
+2026-09-12 hierarchy and stop/resume decisions. Unmarked requirements describe the shipped engine.
 
 **R1 — One in-process authority.** `internal/pipeline` owns template validation and one
 server-resident manager/reconciler. The server process is the only pipeline-state writer and invokes
@@ -374,12 +374,15 @@ unchanged by them.
   and final run outcome. `internal/state` owns transactional run/task writes; the existing task
   dispatcher owns every stage/child start, resume, wait, result release, and stop. The pipeline
   controller never prompts or launches an agent itself and never evaluates a child dependency graph.
-  It may create the current stage task and observe that task's committed result and completed release.
+  It creates the current standing-owner stage task and, under R49, its optional managed coordinator
+  child, then observes the standing task's committed result and completed release.
 - **R36** (planned) — **Version 2 is ordered and model-neutral.** A template contains a standing
   orchestrator role, declared run inputs, and at most 32 ordered stages. Each stage has id/title,
   objective/instruction, input bindings, declared text outputs, optional approval after success, and
-  `executor: run` by default or `executor: dedicated` with a role. There are no outcome routes,
-  `max_visits`, child definitions, or runtime model fields. One validator serves file reads, CRUD,
+  `coordination: standing` by default or `coordination: dedicated` with a child coordinator role.
+  This replaces the unshipped `executor: dedicated` spelling: the stage executor is always the
+  standing owner. There are no outcome routes, `max_visits`, child DAG definitions, or runtime model
+  fields. One validator serves file reads, CRUD,
   builder proposals, and start. Input bindings name run inputs or earlier stage outputs; duplicate
   stage ids, future bindings, missing roles, or runtime overrides for ordinary stages are refused.
   Output value keys have one producer, removing mutable last-writer semantics and repair-loop values.
@@ -387,14 +390,15 @@ unchanged by them.
   project, inputs, standing runtime selection and dedicated overrides, run revision, stage cursor,
   and first task together before any external effect. `(run_id, stage_index, attempt_number)` uniquely
   names a stage task. Only the current stage is admitted; future stage tasks are not pre-created.
-  The first ordinary stage launches from the frozen standing spec; admission reserves and records
-  its agent id in the run before launch. Once the standing identity is confirmed, later ordinary
+  The first stage always launches from the frozen standing spec; admission reserves and records
+  its agent id in the run before launch. Once the standing identity is confirmed, later
   stages and its retries target that id; a dedicated agent is never promoted to standing identity.
   An unconfirmed failed launch can release its reservation; a confirmed identity is never silently
-  replaced. If a dedicated stage comes first, the standing orchestrator is shown as not started until
-  its first assignment. Dedicated stages use their own task launch specs, not another pipeline run.
+  replaced. Dedicated coordination is a managed child task under R49, never another stage assignee
+  or another pipeline run. Explicit standing replacement preserves an existing coordinator binding
+  and its work instead of creating a duplicate child; original task lineage remains immutable.
 - **R38** (planned) — **Persistence is task identity plus normal conversation resume.** Successive
-  ordinary stage tasks use the same confirmed agent id and normal session-load/resume seam. They
+  stage tasks use the same confirmed standing agent id and normal session-load/resume seam. They
   retain no process across a task-owned release, require no run-owned runtime lease, and consume the
   same capacity as ordinary tasks when creating/waking a runtime. Waiting follows TS-10.R27–R29.
   Pipeline participation is a durable run/stage/task association, not an immutable agent-to-stage
@@ -413,9 +417,14 @@ unchanged by them.
   response names the run/stage, task and execution handle, expected outputs, and authoritative prior
   output sources. Large inputs remain bounded pull data: the activation carries only the code-owned
   instruction to read the assignment. Full provider transcripts and the entire template are not
-  stage inputs. Dedicated/replacement orchestrators receive the same durable handoff contract.
+  stage inputs. Standing replacements receive the same durable handoff contract. A dedicated child
+  receives the bounded delegated objective, relevant inputs and references, upward report contract,
+  standing-owner identity and coordination scope; it is never told to report the pipeline stage.
 - **R40** (planned) — **One report write, one result.** Extend task result acceptance with an
-  optional pipeline association inside the same state transaction. Validate current agent,
+  authoritative stage-task association inside the same state transaction. Run/stage lineage alone
+  never enables the stage branch: only the current `pipeline_stage_tasks.task_id`, assigned to the
+  standing identity, qualifies. A coordinator or descendant reports only its own ordinary task.
+  Validate current agent,
   generation, execution handle, run revision/current task, outcome and output declarations; on
   success require this stage's declared required outputs. Commit the immutable task result, named
   outputs, `pending_release`, stage closure intent and run projection revision together. The task is
@@ -441,8 +450,9 @@ unchanged by them.
   outcomes and release intents through the shared task cancellation helper, and executes existing
   stop/turn-cancel seams. In-flight starts either lose their claim or are immediately released; no
   list-then-stop race can admit escaping children. Cleanup failure retains stopping/finishing with a
-  repairable reason and Retry cleanup action (the existing retry control dispatches by run phase,
-  without rerunning stage work); only completed cleanup permits next-stage creation or terminal `stopped` and
+  recorded retry schedule governed by TS-10.R35; transient failure resumes automatically. Only
+  persistent/non-recoverable conditions expose human attention and a cleanup-only repair control.
+  Only completed cleanup permits next-stage creation or terminal `stopped` and
   its shared cancelled result. Immutable completed child results remain untouched. This is lifecycle
   cleanup, not a requirement that every child succeed. Replacement in R41 closes only the old
   assignment, not the stage; generic descendant cancellation does not erase remaining useful work.
@@ -457,7 +467,9 @@ unchanged by them.
   existing API/CLI start/show/continue/retry/stop seams, adapting their payloads to version 2. Add the
   explicit replacement control. A run read joins current task state and persisted lineage for stage
   and descendant pages; it does not follow `created_by_agent` across a reused agent's whole history.
-  Show standing/dedicated assignees, effective runtime settings, waiting versus interruption,
+  Show the standing stage owner and subordinate coordination contact separately, effective runtime
+  settings, their respective assignments, upward child reports versus standing stage outcomes,
+  waiting versus interruption,
   accepted outputs, finishing/stopping cleanup and valid recovery actions. UI and API receive the
   same derived eligibility/reason fields. Existing post-commit `pipeline_update`/`task_update` events
   are invalidation hints; REST hydration reconstructs all state after reconnect.
@@ -480,8 +492,8 @@ unchanged by them.
   operator knowledge and seed instructions, mocked API shapes, spec supersessions, and generated UI
   through their existing seams. No legacy mode, parallel task scheduler, cyclic task graph, or
   independent provider-session implementation remains.
-- **R47** (planned) — **Verify boundaries, not only happy-path orchestration.** FS-14.A35–A42 and
-  FS-16.A20–A22 require real serialized tool/HTTP tests, task/run state race and fault-injection
+- **R47** (planned) — **Verify boundaries, not only happy-path orchestration.** FS-14.A35–A44 and
+  FS-16.A20–A24 require real serialized tool/HTTP tests, task/run state race and fault-injection
   tests, fake-provider conversation continuity, and rendered start/supervision/recovery journeys.
   Include budget-one nested waiting, Stop versus creation/wake/report, stale report on the same
   agent, replacement context/authority, and reset/deletion isolation. Run TS-06's applicable Go,
@@ -496,21 +508,48 @@ unchanged by them.
   legacy references resolve to honest deleted-source tombstones after reset; no reference is rebound
   to a new report. Keep direct grants, task attachments, bounded reads, and canonical identity rules
   unchanged. This adapts the store seam used by FS-15.R2/R4/R5, not a second artifact service.
+- **R49** (planned) — **A configured stage coordinator is a managed child, not the owner.**
+  In the stage creation transaction, record one optional coordinator child task and its binding to
+  the standing stage task, with a unique initial-child key. Only admit that child after its standing
+  assignment has been confirmed; no parent-success arm is added. The standing assignment includes
+  the child's id and objective and instructs normal delegation/progress/correction through it.
+  The child uses ordinary task dispatch, descendant management, results and waits. At capacity one
+  the standing owner yields to let it run; the child may similarly yield to its own workers. Its
+  result is delivered upward through durable task observation, not accepted as a stage report.
+  Restart/Retry reuses the same child; an explicit replacement or follow-up made by the standing
+  owner records its successor binding before dispatch without rewriting old task provenance/results.
+  Current coordinator scope follows that explicit binding, never agent names or `executor` metadata.
+  Such successor work remains managed beneath the same standing stage ownership and receives prior
+  reports and intervention context. This single optional child is a delegation choice, not a
+  template-authored execution graph; all of its internal work remains dynamically agent-authored.
+- **R50** (planned) — **Normal coordination stays through the sub-orchestrator; intervention is
+  visible.** Assignment instructions and supervision identify the bound coordinator as the normal
+  stage contact and coherent source of stage-work findings. The standing owner keeps run-wide
+  inspection, direct communication and control; no read-only inspection notice or mandatory
+  coordinator permission/acknowledgment is introduced. Standing mutations or direct corrective
+  communications affecting that scope persist a bounded coordination update with the effect under
+  TS-10.R36. The coordinator reads it on its next turn/continuation, with a durable wake when idle
+  or waiting; an executing turn is not forcibly interrupted. Completed coordinator tasks are not
+  reopened: updates remain available to the standing owner and a successor/follow-up assignment.
+  For work outside AgentDeck's observable controls, the standing assignment instructs the agent to
+  send a material-change summary through the same durable coordination path. Ownership changes only
+  through an explicit coordinator/standing replacement; a direct intervention does not reparent
+  work, select a new coordinator, or grant descendant access to the whole run.
 
 ## 3. Interfaces & data shapes
 
-**Planned version-2 shapes (R35–R48):**
+**Planned version-2 shapes (R35–R50):**
 
 ```text
 template: version=2, title, orchestrator_role, inputs[], stages[]
 stage: id, title, instruction, inputs[], outputs[{name,value,description,required}],
-       executor=run|dedicated, dedicated_role?, approval_after_success=false
+       coordination=standing|dedicated, dedicated_role?, approval_after_success=false
 run start: request_id, template_id, name, project, goal, inputs{},
            orchestrator{backend,model,effort?,fast?}, dedicated_assignments{stage_id: runtime}
 pipeline_runs: id, immutable snapshot, revision, state, stage_index,
                current_task_id, orchestrator_agent_id?, closure_revision?, pending_control?
 pipeline_stage_tasks: (run_id,stage_index,attempt_number) UNIQUE, task_id UNIQUE,
-                      executor, assignment digest/version, closure state
+                      assignment digest/version, closure state, coordinator_task_id?, coordinator_revision
 pipeline_values: run/stage/name -> source task's immutable output (projection, not another result)
 ```
 
@@ -601,11 +640,13 @@ new durable run revision or a structured validation/conflict result.
 
 ## 5. Deviations & open decisions
 
-- **Replacement contract.** R35–R48 supersede old R1–R14/R20/R24/R27–R28/R33–R34 wherever they
+- **Replacement contract.** R35–R50 supersede old R1–R14/R20/R24/R27–R28/R33–R34 wherever they
   require stage-specific processes, duplicate reports, routes/revisits, old state tables, per-stage
   runtime setup, creator-derived projections, or stage grouping. R15–R19/R21–R23/R25–R26/R29–R32
-  retain their shared boundary/interaction behavior with version-2 payloads. FS-14 §6 holds the one
-  pending runtime-continuity choice; old-engine exclusions below describe shipped behavior only.
+  retain their shared boundary/interaction behavior with version-2 payloads. FS-14 §6 records the
+  confirmed stop/resume and subordinate-coordination decisions. R49–R50 override the initial
+  draft's dedicated-assignee interpretation; TS-10.R35 replaces manual-first cleanup. Old-engine
+  exclusions below describe shipped behavior only; no design decision remains open for this change.
 
 - The builder confirmation is deliberately a soft interaction guard under the existing unauthenticated
   same-user loopback API. Hard per-agent API capabilities remain outside this feature.

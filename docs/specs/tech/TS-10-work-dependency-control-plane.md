@@ -300,11 +300,13 @@ parallel copy of them.
   ready automatically. A pre-crash running/ambiguous borrowed assignment becomes interrupted under
   the existing recovery rules. Unexpected exit while running remains interruption; an exit matching
   committed yield is not interruption. Failed yield cleanup retains intent/claim and blocks wake
-  until repaired. Cancellation wins over pending yield/wake and prevents any later continuation.
+  until repaired by automatic reconciliation under R35. Cancellation wins over pending yield/wake
+  and prevents any later continuation.
 - **R31** (planned) — **Stages use the task result authority.** Add bounded named text outputs
   and shared checks to the task result store/read shape; preserve them in immutable result storage
   after task detail deletion. `report_task_result` uses one shared accepting transaction; a
-  pipeline-associated task additionally applies TS-09.R40's output/closure writes there. No second
+  current standing-owner stage task additionally applies TS-09.R40's output/closure writes there.
+  Descendant or coordinator lineage is not that association and never closes/advances a stage. No second
   stage report is registered. A non-secret execution handle combines task id and start/continuation
   attempt id and is rechecked with token identity/generation. It is required for stage reports and
   waits, and validated when supplied for ordinary task reports; existing standalone report clients
@@ -320,8 +322,8 @@ parallel copy of them.
   Extend the existing agent-scoped cancellation seam with an expected generation/turn guard checked
   under its turn lock before both the initial cancel and escalation; an unguarded check followed by
   `Cancel(agentID)` is insufficient. Reuse the existing cancel→SIGINT grace policy, then bound the
-  release attempt to ten seconds. Failure retains ownership/intent and exposes `cleanup_failed`
-  with Retry cleanup, rather than silently waiting forever or hard-killing a later unrelated turn.
+  release attempt to ten seconds. Failure retains ownership/intent and enters automatic durable
+  reconciliation under R35; it never hard-kills a later unrelated turn or immediately demands a click.
 - **R33** (planned) — **Waiting and observation are bounded durable data.** Work list pages have
   a maximum of 100 items (default 25), waits 64 sources, result summaries/details/checks use existing
   shared limits, and named outputs reuse TS-09's text limits with a 256 KiB aggregate result limit.
@@ -339,10 +341,58 @@ parallel copy of them.
   share FS-17 structured results/classification and TS-04 registration/redaction. The paused direct
   transport migration is not a prerequisite. Mutation effects precede neither committed intent nor
   the tool's safe reply boundary. No new provider capability or ACP extension is required.
+- **R35** (planned) — **Cleanup retries are durable reconciliation, not task retries.** The shared
+  task release/yield/cancel path stores cleanup phase, effect key, consecutive failure count,
+  first-failure time, next retry time, and bounded classified last error with its existing intent.
+  One generation/intent-version CAS owns an effect at a time. Retry transient timeout, stop/reap
+  or release-write failures automatically after 2 seconds, doubling to at most 60 seconds; restart
+  preserves due times/counts and continues due work through the existing bounded dispatcher sweep.
+  Actual completed cleanup progress resets that phase's failure streak; a process restart, a lost
+  claim or a busy lifecycle does not. Contention consumes no failure attempt. Each effect retains
+  R32's time bound and R33's shared in-flight cap. No provider polling turn or extra timer service.
+  Escalate immediately when the classified condition cannot be repaired safely (for example,
+  uncorroborated process ownership or denied stop permission), or after ten consecutive failures
+  without progress, exposing the cause and required repair. Transient retries do not emit
+  needs-attention notifications. After persistent-failure attention, safe reconciliation may keep
+  checking at the capped interval and clear attention when repaired; no manual click is needed to
+  recognize recovery. An unsafe effect waits for a relevant state change or explicit repair before
+  another guarded attempt. Retry cleanup revalidates safety and retries only the retained effect;
+  task execution attempts, outcomes, stage position and immutable reports are untouched. Never
+  discard claims, advance a stage or declare Stop complete while a required effect remains unresolved.
+- **R36** (planned) — **Material intervention reaches the responsible coordinator durably.**
+  The standing owner's task control writes and direct messages/instructions to managed descendants
+  join the current coordinator binding/revision and persist a coordination update in the same state
+  transaction as the changed fact or delivery intent. Key it by the idempotent operation id plus
+  coordinator scope; duplicate requests cannot duplicate effects or notices. Each update identifies
+  actor, affected task/revision, action and bounded material instruction/summary, with existing
+  message/result references where appropriate. Same-project scoped recipients only; this creates
+  no general transcript grant. An explicit `send_message` to the coordinator is the existing path
+  for an agent's summary of material changes made outside observable AgentDeck task controls.
+  A pending update requests one coalesced same-task continuation at a safe turn boundary, preserving
+  the current assignment and using R29's generation/wait/closure checks and ordinary activation
+  seam; it never interrupts an executing turn or creates a second active assignment. For waiting
+  tasks, updates are an additional wake reason. Include unread coordination updates in bounded
+  assignment reads and successor handoffs; retention follows their task lineage/history, and a
+  completed task's notice does not reopen it. No coordinator acknowledgment gates intervention or
+  stage completion. Read-only inspection produces no update. Use the existing message field bounds
+  for instruction text, at most 100 updates per read, bounded keyset sweeps, and no in-memory log.
+  Assignment reads record a per-execution observed sequence; only matching turn-end settles that
+  delivery watermark. A crash before settlement replays the updates, while updates beyond the
+  watermark retain their continuation request. This prevents both lost delivery and repeated wake
+  for an already delivered update. Pagination exposes a cursor without dropping unseen updates.
+- **R37** (planned) — **Coordinator replacement is explicit managed work.** Extend `create_task`
+  with optional `replaces_coordinator_task_id`, accepted only from the current standing owner for
+  its bound coordinator and only after the predecessor is terminal and its release is settled.
+  Create a child beneath the standing assignment and CAS its coordinator binding in one transaction;
+  a unique successor key makes request replay return the same child. Normal Retry retains the
+  same coordinator task and identity. A successor may target the original agent for follow-up or a
+  new launch spec; it receives the preceding bounded reports/coordination updates and inherits only
+  that coordinator's delegated scope under TS-05.R22. Neither operation changes the standing stage
+  assignee, accepted reports, or immutable parent lineage. A cancelled/closed stage refuses it.
 
 ## 3. Interfaces & data shapes
 
-**Planned additions (R25–R34, contingent on FS-14 §6's runtime choice):**
+**Planned additions (R25–R37; stop/resume confirmed 2026-09-12):**
 
 ```text
 task_lineage: task_id PK, parent_task_id?, run_id?, stage_index?, stage_attempt?, project
@@ -350,6 +400,10 @@ task result: task_id, immutable outcome/summary/details/checks/outputs{}, lineag
 task execution: existing assignment + execution_handle, continuation_pending, pending_yield,
                 wait_version, resume_needed, runtime-release ownership separate from assignment
 task_waits: (waiting_task_id,wait_version,source_task_id) UNIQUE, after_revision
+task cleanup intent: effect_key, phase, failure_count, first_failure_at?, next_retry_at?, last_error?
+task_coordination_updates: scope_task_id, operation_id, sequence, actor, affected_task_id,
+                           affected_revision, action, bounded instruction/summary, source_refs[]
+create_task: existing fields + replaces_coordinator_task_id?
 list_tasks: optional parent_task_id, cursor, limit; server-derived permitted scope
 get_task: task_id; bounded result and provenance, including deleted-result tombstone
 retry_task: task_id, expected_revision
@@ -357,7 +411,7 @@ rearm_task: task_id, expected_revision, arms[]
 wait_for_tasks: execution_handle, observations[{task_id,after_revision}]
 report_task_result: outcome, summary, details?, checks?, outputs?, execution_handle?
 get_assigned_task: existing fields + execution_handle, stage?, inputs{}, output_declarations[],
-                   prior_results[], observed_changes[], continuation_reason?
+                   prior_results[], observed_changes[], coordination_updates[], continuation_reason?
 ```
 
 Reads page oversized collections; task ids/handles select records but never grant access. The
@@ -444,13 +498,14 @@ object carries the derived boolean `retry_eligible` (R22) beside its stored fiel
 
 ## 5. Deviations & open decisions
 
-- **Task-backed pipeline replacement.** R25–R34 extend this plane under FS-14.R60–R74 and
-  FS-16.R30–R36. They replace R7's separate pipeline acceptance transaction, R8's prohibition on
+- **Task-backed pipeline replacement.** R25–R37 extend this plane under FS-14.R61–R77 and
+  FS-16.R30–R38. They replace R7's separate pipeline acceptance transaction, R8's prohibition on
   pipeline/task coordination, R13's no-query surface, and R18's starting/running-only assignment
   index. They specialize R4/R6/R15/R17/R19 for unfinished waits while preserving normal task result
   and release semantics, and extend R16 for retained result/lineage tombstones. Acyclic task arms
   remain unchanged; the old result-only-convergence and no-query exclusions below end when the
-  replacement ships. Runtime continuity remains contingent on FS-14 §6.
+  replacement ships. Runtime continuity is confirmed in FS-14 §6. R35 replaces the initial
+  manual-first cleanup policy; R36–R37 provide scoped coordinator awareness and explicit succession.
 
 - **The dispatcher's notification path is the ticker.** Arm evaluation runs on the committing event,
   but the admission pass itself is woken only by its two-second sweep rather than by a channel, so a

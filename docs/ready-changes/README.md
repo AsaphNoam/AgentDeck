@@ -43,7 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- None.
+- [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — one standing
+  stage owner, managed stage sub-orchestrators, shared durable-task execution and automatic cleanup.
 
 ## Paused changes
 

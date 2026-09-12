@@ -20,7 +20,7 @@ free-form agent messaging.
 
 ## 2. Behavior
 
-Requirements without a planned marker reflect shipped behavior. R60–R74 describe the task-backed
+Requirements without a planned marker reflect shipped behavior. R61–R77 describe the task-backed
 replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 2.1 Templates and starting a run
@@ -504,11 +504,8 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 4.6 Persistent orchestration and bounded stage assignments
 
-- **R60** (planned) — A new-model run normally has one persistent orchestrator identity and
-  conversation across its stages. A stage boundary ends an assignment, not that orchestrator's
-  participation in the run. Each active stage is durable task work assigned to that orchestrator.
-  A template may explicitly select a dedicated orchestrator for a stage; that exception does not
-  replace the standing run orchestrator for subsequent stages.
+- **R60 — superseded 2026-09-12 by R75:** The initial planned dedicated-stage exception could
+  replace the standing orchestrator as stage assignee; dedicated orchestration is now child work.
 - **R61** (planned) — The pipeline guarantees the required major phases and their intended order,
   permits at most one active stage, and durably records activation, accepted completion, and workflow
   position. Agents cannot activate a later stage by creating ordinary tasks or changing task arms.
@@ -518,26 +515,30 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   stages. Assignment delivery does not require copying the entire pipeline definition or earlier
   transcripts into the conversation. Conversation continuity is useful context, never the authority
   for workflow position or a substitute for persisted stage outputs.
-- **R63** (planned) — Within the active stage, its orchestrator decides decomposition, delegation,
+- **R63** (planned) — Within the active stage, the standing owner and any delegated coordinator
+  decide decomposition, delegation,
   repository-specific work, reviewer selection, repair routing, and whether re-review is necessary.
   It can create additional durable tasks as facts emerge and manage, retry, or replace its work.
   A failed, blocked, cancelled, or replaced child task does not itself block or advance the pipeline.
   Repair loops normally stay within the stage. Ordinary task dependency arms remain available when
   the orchestrator chooses them, without becoming mandatory pipeline completion gates.
-- **R64** (planned) — Only an explicit outcome accepted from the active stage's assigned
-  orchestrator can complete that stage. Idle, process exit, and the aggregate states of child work
+- **R64** (planned) — Only an explicit outcome accepted from the standing orchestrator assigned
+  the active stage task can complete that stage. Idle, process exit, and the aggregate states of child work
   cannot substitute for its judgment. The report includes a durable summary and the declared outputs
   needed by subsequent stages. A rejected report leaves the assignment actionable; duplicate or
   stale reports cannot complete a later assignment on the same orchestrator. Application checks
   enforce assignment authority and the declared output contract, not an inferred child-work plan.
 - **R65** (planned) — The run view shows the standing orchestrator, the current stage and its
-  assignee, completed stage outcomes and outputs, and work associated with each stage. Reusing one
+  standing owner and optional stage sub-orchestrator, completed stage outcomes and outputs, and work
+  associated with each stage. Sub-orchestrator reports are labelled as reports to the standing owner,
+  not accepted pipeline stage outcomes. The default stage coordination contact is visible alongside
+  the standing owner's intervention controls. Reusing one
   agent across stages does not attribute all of its tasks to every stage. The person can open the
   orchestrator's conversation and inspect durable work without reconstructing progress from chat.
 - **R66** (planned) — Restart or interruption retains the stage position, accepted reports,
   outputs, and associated work. Recovery never assumes success or activates the next stage twice.
   The person sees whether work is executing, waiting for work or input, or interrupted, with a valid
-  recovery action and its consequence. The same orchestrator is the normal continuation target;
+  recovery action and its consequence. The same standing orchestrator is the normal stage continuation target;
   any necessary replacement is explicit and receives the durable handoff. Persistence of identity
   does not promise that a provider process survives restart.
   If normal provider resume starts a fresh native session, the agent receives its durable assignment
@@ -572,35 +573,63 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   reports the stage outcome. At accepted completion the stage closes to new work and its unfinished
   descendants are cancelled, rather than becoming independent work or a success-condition gate.
   Cleanup must finish before the next stage starts; cleanup errors are distinct from failed work.
-  A failed cleanup exposes Retry cleanup, which retries only cancellation/release, not stage work.
+  R77 governs automatic cleanup recovery; ordinary recoverable failures require no user click.
 - **R72** (planned) — A template chooses the standing orchestrator's role. Run setup supplies one
   backend/model/optional effort/fast-mode selection for it; dedicated stages explicitly select their
-  own role and runtime. Ordinary stages supply task instructions without changing the standing
+  child coordinator's role and runtime. All stages supply task instructions without changing the standing
   orchestrator's role/runtime. Configuration and effective runtime settings are frozen and validated
   through the existing launch rules, and supervision reports what actually ran. Templates remain
   model-neutral. Run and stage membership is durable task provenance, never a dashboard group label.
 - **R73** (planned) — Continue supplies new input after failure/blocked and creates another stage
-  assignment on the same orchestrator; Retry of an interrupted assignment retries that task on its
+  assignment on the same standing orchestrator; Retry of an interrupted assignment retries that task on its
   existing assignee. Neither operation rewrites an accepted result. An explicit Replace orchestrator
   action cancels any unfinished old stage assignment, retains existing child work and its history,
-  and creates a replacement assignment with durable stage context; subsequent ordinary stages use
-  the replacement. The current orchestrator can inspect and manage work belonging to its run,
+  and creates a replacement assignment with durable stage context; subsequent stages use
+  the replacement. The standing orchestrator can inspect and manage work belonging to its run,
   including work created by a predecessor, but not unrelated project work. Child agents retain
   their own assignment/descendant scope. People may stop, provide input, retry, or replace; they
   cannot mark a stage passed without its orchestrator's report.
 - **R74** (planned) — Active run ownership does not permanently make an agent unaddressable.
-  During a run, waking its orchestrator for stage work goes through its current durable assignment;
+  During a run, waking its standing orchestrator for stage work goes through its current durable assignment;
   unrelated task assignments cannot take over that agent. When run ownership ends, normal messaging,
   resume, archive, and task-target rules apply again. Run-created agents use one ordinary run-name
   group initially; a user's group edits have no control-plane effect.
+- **R75** (planned) — Every stage is a bounded durable assignment to the standing run
+  orchestrator, which retains run-wide responsibility and alone reports the stage outcome. For a
+  stage configured with dedicated coordination, AgentDeck creates one managed child task beneath
+  that assignment and launches its stage sub-orchestrator through ordinary task admission. The
+  standing owner receives that child's identity and objective, delegates the stage work through it,
+  and remains responsible for evaluating its report. The sub-orchestrator coordinates its own
+  workers/reviewers and reports upward; its result cannot advance or close the stage. Neither a
+  first-stage dedicated configuration nor child crash/retry changes standing ownership. The run uses
+  persistent agent identity and ordinary stop/resume with durable assignment re-delivery; continuous
+  process liveness is not required, including while either orchestrator waits for children.
+- **R76** (planned) — The stage sub-orchestrator is the normal coordination contact and
+  authoritative source for understanding and reporting its delegated stage work. Progress, findings,
+  corrections and completion normally flow through it; the standing owner retains the final stage
+  decision. The standing owner may inspect descendants, communicate directly or intervene when
+  useful. Direct interaction grants no implicit ownership transfer. Material intervention — changes
+  to assignments, task control, instructions, findings or completion decisions — is durably supplied
+  to the responsible sub-orchestrator so it can update its understanding, including after wait,
+  resume or restart. Read-only inspection needs no notification. A fresh follow-up assignment may
+  return corrections to a completed sub-orchestrator without rewriting its earlier result. This is
+  a coordination default, not a communication barrier or an automatic child-result acceptance gate.
+- **R77** (planned) — Cleanup normally reconciles itself. Transient stop, release and bookkeeping
+  failures retain their durable intent and ownership and are retried automatically with bounded
+  backoff across restarts. Stage advancement remains fenced until cleanup is complete. The run
+  shows that cleanup is retrying, without asking a person to operate normal control-plane recovery.
+  Only a non-recoverable failure or repeated failure after the bounded recovery policy needs human
+  attention, with the cause, affected work and a useful repair action. Retry cleanup is available
+  then, retries only cleanup, and never reruns accepted stage work. Task launch-attempt limits do
+  not turn transient cleanup failures into failed work or consume a stage retry.
 
 ## 5. Acceptance criteria
 
-- **A35** (planned; R60–R64) — Run spec → implementation → correctness review → additional
+- **A35** (planned; R61–R64, R75) — Run spec → implementation → correctness review → additional
   review → final validation against a fake provider. Assert one normal orchestrator identity,
   distinct durable stage assignments, ordered activation, stage-local inputs, and persisted outputs.
   Idle alone and a replayed earlier report do not advance. A dedicated review-stage configuration
-  assigns that stage to its explicit exception and returns the next to the standing orchestrator.
+  creates a child coordinator while the standing agent remains the stage assignee and sole reporter.
 - **A36** (planned; R63–R64, R68) — In a multi-repository fixture, implementation creates several
   tasks and adds one for a discovered dependency. Review uses the implementation outputs to choose
   reviewers, sends fixes to original implementors, replaces failed work, and re-reviews. Assert that
@@ -629,6 +658,19 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **A42** (planned; R67, R73) — Refuse a person-authored stage success and deletion of a stage
   task referenced by a retained run. Delete a terminal fully-cleaned run and verify task results,
   lineage, agents, and transcripts survive; deletion of a child preserves readable result evidence.
+- **A43** (planned; R64–R66, R75–R76) — Configure the first stage with a dedicated coordinator,
+  then run a fake-provider standing → stage coordinator → worker/reviewer hierarchy at capacity one.
+  Assert standing stage ownership from the start, exactly one managed coordinator despite replay,
+  upward result delivery and no advancement on child success/failure alone. The coordinator normally
+  directs its descendants and lacks run-wide or ancestor-report authority. Exercise direct standing
+  intervention: material corrections remain visible to the coordinator after wait/resume/restart,
+  ownership is unchanged, and a later standing stage result alone closes the stage. Render both
+  roles and distinguish the child report from the accepted stage result in run supervision.
+- **A44** (planned; R70–R71, R77) — Inject transient stop and release failures, restart during
+  backoff, and run two reconcilers concurrently. Cleanup eventually succeeds and progresses exactly
+  once without a user action; no child escapes and no slot releases early. Persistent failure and
+  a classified non-recoverable failure alone produce actionable attention. Repair and Retry cleanup
+  complete only cleanup, without repeating the accepted work or resetting backoff on every restart.
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
   once with Codex Work and Claude Review and again with those runtime assignments reversed, and
@@ -842,7 +884,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 **Persistent-orchestrator replacement, 2026-09-11.** The operator approved the feature direction,
 discarding old pipelines without migration, cancelling all delegated work on Stop, and existing
-project boundaries. R60–R74 and A35–A42 define the replacement; TS-09 and TS-10 define its technical
+project boundaries. R61–R77 and A35–A44 define the replacement; TS-09 and TS-10 define its technical
 design. Unmarked requirements still describe shipped behavior until implementation.
 
 On shipping, new requirements supersede conflicting portions of R1–R3/R31/R59 (setup), R5–R10
@@ -852,9 +894,11 @@ acceptance items. Existing role permissions, normal context authority, opaque bo
 proposal confirmations, browser/CLI access, notifications, and project isolation rules remain.
 TS-09.R46 records the required removal of obsolete code and knowledge rather than a parallel mode.
 
-**Technical choice pending:** whether persistence means the same identity/conversation with ordinary
-task stop/resume at stage and wait boundaries (recommended), or a continuously live process. The
-technical draft uses the former, contingent on that choice; no legacy-data decision remains open.
+**Confirmed 2026-09-12:** persistent identity/conversation with ordinary stop/resume and durable
+assignment re-delivery; dedicated stage coordination is subordinate to the standing stage owner;
+transient cleanup failures reconcile automatically. R75–R77 supersede the initial draft's dedicated
+stage-assignee interpretation and manual-first cleanup. No product or runtime-lifetime decision
+remains open for this change. Requirements remain planned until implementation and verification.
 
 The shipped first version deliberately keeps these product boundaries:
 

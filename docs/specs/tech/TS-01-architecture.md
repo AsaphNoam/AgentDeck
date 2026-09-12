@@ -455,7 +455,7 @@ lost.
 
 ## 5. Deviations & open decisions
 
-- **Pipeline replacement:** TS-09.R35–R48 and TS-10.R25–R34 replace R11's direct pipeline
+- **Pipeline replacement:** TS-09.R35–R50 and TS-10.R25–R37 replace R11's direct pipeline
   lifecycle executor with stage tasks and the shared dispatcher when shipped. R19–R24's existing
   activation and lifecycle seams serve both first assignment and same-task continuation; no
   additional provider protocol, daemon, or scheduler is introduced.

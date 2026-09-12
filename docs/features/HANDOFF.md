@@ -23,17 +23,18 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
   its `steering-host-owned-fallback` continuation, and `usability-20260907`.
   `stop-telling-agents-to-poll` shipped without entering
   this queue on the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** None waiting to start. `migrate-internal-actions-from-mcp.md` stays paused on its transport
+- **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start: standing stage ownership,
+  managed subordinate coordinators, shared task execution/waiting and automatic cleanup. Its exact
+  requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
+  `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
   Queue hygiene: `bump-pinned-acp-adapters.md` reads `State: Finished` but is still in
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration has feature and technical drafts in FS-14.R60–R74/A35–A42,
-  FS-16.R30–R36/A20–A22, TS-09.R35–R48, TS-10.R25–R34 and TS-05.R22. The operator approved a
-  clean legacy reset, cancellation of all run descendants, and existing project boundaries.
-  One technical choice remains in FS-14 §6: same identity/conversation with task stop/resume
-  (recommended), versus a continuously live process. Draft assumes the former; no ready work unit.
+  Persistent pipeline orchestration is fully specified and promoted to the work queue; no design
+  decision remains open for it. The clean legacy reset, descendant cancellation, project boundaries,
+  subordinate stage coordination and ordinary stop/resume are confirmed.
   Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code.
@@ -55,6 +56,15 @@ and [`../archive/state/HANDOFF-pre-sdd.md`](../archive/state/HANDOFF-pre-sdd.md)
 ## Active change
 
 **Change:** None.
+
+**Changelog — 2026-09-12 (design-feature):** Revised persistent orchestration so the standing
+agent always owns and reports the stage; configured dedicated coordinators are managed children and
+the normal coordination contact, with durable awareness of material direct intervention. Cleanup
+now automatically reconciles transient failures with persisted backoff and attention only for
+persistent/unsafe conditions. Confirmed same-identity stop/resume and assignment re-delivery. Updated
+FS-14.R61–R77/A35–A44, FS-16.R30–R38/A20–A24, TS-09.R35–R50, TS-10.R25–R37 and TS-05.R22;
+R60 is superseded by R75. Promoted the source idea to the waiting ready change. Spec checks, twin
+skills and diff checks pass; no product code changed and no implementation is active.
 
 **Changelog — 2026-09-12 (review):** Reviewed `fix-model-recommendations` across its workflow,
 mirrored role launchers, validation scripts, mutation tests, and build wiring. The change consistently
@@ -132,7 +142,7 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` has no waiting unit;
+**Available by role:** `/review` may take `file-read-nonregular-kind`; `/work` may take `persistent-pipeline-orchestration`;
 `/fix` may take BR-1 (difficult, Sol);
 `/design-feature` may choose an available or
 resumable idea. Queues are independent.

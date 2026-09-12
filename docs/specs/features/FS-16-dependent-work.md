@@ -369,7 +369,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   retaining assignment identity and attached-context membership. Wake resumes the same task and
   agent through normal admission; it never creates a second task or fabricates completion. A
   borrowed runtime stays up. Waiting and ready-to-resume are visible states distinct from an
-  unexpected interruption. This stop/resume design is contingent on FS-14 §6's runtime choice.
+  unexpected interruption. The operator confirmed this stop/resume design on 2026-09-12.
 - **R35** (planned) — Work created from an assigned task inherits durable parent and run/stage
   provenance. Creating or repairing work checks its owner's closure atomically, so stopping a run
   cannot race with a delegate that adds escaping work. Reports keep source task identity, summary,
@@ -382,6 +382,18 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   matching executing turn before release, while preserving the borrowed runtime and unrelated turns.
   Ordinary unowned task behavior remains unchanged except for the explicit new inspection, repair,
   and wait capabilities.
+- **R37** (planned) — A dedicated stage coordinator is managed child work under FS-14.R75–R76,
+  never the authoritative stage task. It reports its own result upward and manages its delegated
+  descendants; only the standing owner holds run-wide authority and reports the stage outcome.
+  Durable coordination updates make material standing-owner interventions visible to the coordinator
+  without requiring its permission. An explicit standing-owner-created successor can continue the
+  coordinator's delegated scope and inherit reports/updates, preserving original task lineage and
+  immutable results. Automatic child creation and replay create no duplicate coordinator.
+- **R38** (planned) — Pending yield, stop and release cleanup retries transient failures
+  automatically under FS-14.R77. Waiting/finishing/stopping remain honest about outstanding cleanup;
+  ordinary contention or transient failure neither consumes a task execution attempt nor requires
+  human Retry. Persistent or unsafe failures retain their claims and expose the reason and a
+  cleanup-only repair action. Successful automatic repair clears derived attention.
 
 ## 5. Acceptance criteria
 
@@ -398,6 +410,16 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   wake admission; inject stale results and cleanup failures. Assert no false success, no capacity
   leak, no orphan adoption, and no stopped-run wake. Deleting a watched task wakes with retained
   result/deletion evidence; a same-assignee wait is refused instead of deadlocking.
+- **A23** (planned; R37) — Task/MCP tests prove a managed stage coordinator can manage its
+  delegated subtree but cannot inspect unrelated run work or report for the standing stage task.
+  Inject a standing intervention concurrently with coordinator wait, replacement and stage closure;
+  its durable update is delivered to the correct current/successor coordinator or the operation is
+  refused atomically. No implicit ownership transfer, duplicate effect or second assignment occurs.
+  An explicit successor inherits only the prior coordinator's scope and immutable history.
+- **A24** (planned; R38) — Inject transient and persistent yield/release/stop failures with a
+  fake clock and restart. Assert persisted backoff, one effect owner, eventual automatic success,
+  no premature claim release and no provider polling turns. Only persistent/non-recoverable cases
+  produce human attention; manual cleanup repair never reruns task execution or rewrites a result.
 
 Each names the verification that demonstrates it.
 
@@ -512,9 +534,9 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-- **Persistent pipeline orchestration.** R30–R36 and A20–A22 support FS-14.R60–R74. TS-10.R25–R34
-  define the technical design and TS-05.R22 defines scoped work authority. Runtime continuity remains
-  contingent on FS-14 §6. On shipping they replace the no-inspection and result-only-convergence
+- **Persistent pipeline orchestration.** R30–R38 and A20–A24 support FS-14.R61–R77. TS-10.R25–R37
+  define the technical design and TS-05.R22 defines scoped work authority. Runtime continuity is
+  confirmed in FS-14 §6. On shipping they replace the no-inspection and result-only-convergence
   exclusions below, specialize R2/R4/R6/R7/R17/R19 for retained waiting assignments, extend
   R11/R12/R20/R24 for inspection/repair/results, and specialize R18/R22 for retained stage history and
   agent-reported stage outcomes. They require no cyclic task graph or cross-project authority.
