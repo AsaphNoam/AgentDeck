@@ -473,6 +473,9 @@ func (m *Manager) ClearPermissionAttention(agentID, generation string) {
 }
 
 func (m *Manager) Startup(ctx context.Context) error {
+	if err := m.resetLegacyPipelines(ctx); err != nil {
+		return err
+	}
 	runs, err := m.store.ListActivePipelineRuns()
 	if err != nil {
 		return err
@@ -521,6 +524,31 @@ func (m *Manager) Startup(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// resetLegacyPipelines is the authorized v1 cutover. It stops recorded legacy
+// agents before deleting only runs with no task-stage provenance, then removes
+// explicitly versioned v1 template files. A durable checkpoint makes retries
+// safe after a crash or filesystem failure.
+func (m *Manager) resetLegacyPipelines(ctx context.Context) error {
+	run, agents, err := m.store.BeginLegacyPipelineReset()
+	if err != nil || !run {
+		return err
+	}
+	if m.lifecycle != nil {
+		for _, agentID := range agents {
+			if err := m.lifecycle.StopStage(ctx, agentID); err != nil {
+				return err
+			}
+		}
+	}
+	if err := m.store.RemoveLegacyPipelineRecords(); err != nil {
+		return err
+	}
+	if err := m.templates.ResetVersion1Files(); err != nil {
+		return err
+	}
+	return m.store.CompleteLegacyPipelineReset()
 }
 
 func (m *Manager) pauseStartupRun(ctx context.Context, runID, reason string) error {

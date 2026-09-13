@@ -1,12 +1,38 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
+
+// DeleteVersion1PipelineFiles removes only templates whose on-disk document
+// explicitly declares version 1. Invalid or newer documents remain available
+// for their normal diagnostic/read paths.
+func (s *Store) DeleteVersion1PipelineFiles() error {
+	ids, err := s.ListPipelineIDs()
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		data, err := s.ReadPipelineFile(id, 1<<20)
+		if err != nil {
+			return err
+		}
+		var header struct {
+			Version int `json:"version"`
+		}
+		if json.Unmarshal(data, &header) == nil && header.Version == 1 {
+			if err := s.DeletePipelineFile(id); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 // ReadPipelineFile returns one raw pipeline-template JSON document through a
 // bounded reader. Decoding and semantic validation belong to internal/pipeline;

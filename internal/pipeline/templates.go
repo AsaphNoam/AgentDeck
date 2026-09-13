@@ -116,6 +116,12 @@ func (s *TemplateStore) Delete(id string) error {
 	return s.config.DeletePipelineFile(id)
 }
 
+func (s *TemplateStore) ResetVersion1Files() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.config.DeleteVersion1PipelineFiles()
+}
+
 func (s *TemplateStore) writeLocked(id string, template Template) (TemplateRecord, error) {
 	template = NormalizeTemplate(template)
 	roles, err := s.roleSet()

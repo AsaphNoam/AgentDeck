@@ -547,4 +547,19 @@ CREATE INDEX idx_tasks_cleanup_due
   WHERE pending_release = 1 OR pending_yield = 1;
 `,
 	},
+	{
+		// Checkpoint the authorized v1 pipeline reset. A restart can safely resume
+		// the targeted cleanup without touching task-backed v2 runs.
+		version: 31,
+		sql:     `CREATE TABLE pipeline_legacy_reset (id INTEGER PRIMARY KEY CHECK (id = 1), state TEXT NOT NULL, updated_at TEXT NOT NULL);`,
+	},
+	{
+		// The guarded turn identifies the borrowed conversation operation a task
+		// may cancel; unsafe cleanup waits for an explicit repair (TS-10.R32/R35).
+		version: 32,
+		sql: `
+ALTER TABLE tasks ADD COLUMN execution_turn TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN cleanup_unsafe INTEGER NOT NULL DEFAULT 0;
+`,
+	},
 }

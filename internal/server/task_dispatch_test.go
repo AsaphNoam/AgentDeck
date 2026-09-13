@@ -523,6 +523,22 @@ func TestDispatcherReconcilesDueTaskCleanupWithoutRetryingWork(t *testing.T) {
 	}
 }
 
+func TestBorrowedCancellationWithoutTurnIsUnsafeNotAnUnguardedCancel(t *testing.T) {
+	srv := testServer(t, true)
+	task := newLaunchTask(t, srv, "guarded borrowed cancel")
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, outcome = ?, pending_release = 1, runtime_claim = ?, assigned_agent_id = ?, assigned_generation = ?, execution_turn = '' WHERE task_id = ?`, state.TaskFinished, state.OutcomeCancelled, state.ClaimBorrowed, "a_borrowed", "g1", task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	srv.finishTaskCleanup(context.Background(), task)
+	retained, err := srv.stateStore.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !retained.PendingRelease || !retained.CleanupUnsafe || retained.CleanupNextRetryAt != nil {
+		t.Fatalf("unguarded borrowed cleanup was not retained as unsafe: %+v", retained)
+	}
+}
+
 // FS-16.R25 / TS-10.R4 — once a wake delivered the assignment turn, losing
 // its generation before confirmation spends the attempt and never strands the
 // task in starting.

@@ -119,6 +119,7 @@ type Task struct {
 	// ExecutionHandle identifies one confirmed execution attempt. It is not an
 	// authority token: task ownership still comes from the bound MCP session.
 	ExecutionHandle       string     `json:"execution_handle,omitempty"`
+	ExecutionTurn         string     `json:"execution_turn,omitempty"`
 	ContinuationPending   bool       `json:"continuation_pending"`
 	PendingYield          bool       `json:"pending_yield"`
 	WaitVersion           int        `json:"wait_version"`
@@ -129,6 +130,7 @@ type Task struct {
 	CleanupFirstFailureAt *time.Time `json:"cleanup_first_failure_at,omitempty"`
 	CleanupNextRetryAt    *time.Time `json:"cleanup_next_retry_at,omitempty"`
 	CleanupLastError      string     `json:"cleanup_last_error,omitempty"`
+	CleanupUnsafe         bool       `json:"cleanup_unsafe"`
 	StartAttemptID        string     `json:"start_attempt_id,omitempty"`
 	StartAttemptCount     int        `json:"start_attempt_count"`
 
@@ -766,8 +768,9 @@ SELECT task_id, project, display_name, instruction, target_kind, target_agent_id
   model, effort, fast, state, outcome, outcome_source, outcome_summary, outcome_details, attention_reason,
   created_by_kind, created_by_agent_id, created_by_generation, assigned_agent_id,
   assigned_generation, runtime_claim, pending_release, execution_handle, continuation_pending,
-  pending_yield, wait_version, resume_needed, cleanup_phase, cleanup_effect_key,
+  pending_yield, wait_version, resume_needed, execution_turn, cleanup_phase, cleanup_effect_key,
   cleanup_failure_count, cleanup_first_failure_at, cleanup_next_retry_at, cleanup_last_error,
+  cleanup_unsafe,
   start_attempt_id, start_attempt_count,
   revision, ready_at, start_claimed_at, created_at, updated_at, started_at, finished_at
 FROM tasks`
@@ -775,7 +778,7 @@ FROM tasks`
 func scanTask(row rowScanner) (Task, error) {
 	var t Task
 	var assignedAgentID sql.NullString
-	var pendingRelease, continuationPending, pendingYield, resumeNeeded int
+	var pendingRelease, continuationPending, pendingYield, resumeNeeded, cleanupUnsafe int
 	var readyAt, startClaimedAt, startedAt, finishedAt, cleanupFirstFailureAt, cleanupNextRetryAt sql.NullString
 	var createdAt, updatedAt string
 	if err := row.Scan(&t.TaskID, &t.Project, &t.DisplayName, &t.Instruction, &t.TargetKind,
@@ -783,8 +786,9 @@ func scanTask(row rowScanner) (Task, error) {
 		&t.OutcomeSummary, &t.OutcomeDetails, &t.AttentionReason, &t.CreatedByKind,
 		&t.CreatedByAgentID, &t.CreatedByGeneration, &assignedAgentID, &t.AssignedGeneration,
 		&t.RuntimeClaim, &pendingRelease, &t.ExecutionHandle, &continuationPending, &pendingYield,
-		&t.WaitVersion, &resumeNeeded, &t.CleanupPhase, &t.CleanupEffectKey,
+		&t.WaitVersion, &resumeNeeded, &t.ExecutionTurn, &t.CleanupPhase, &t.CleanupEffectKey,
 		&t.CleanupFailureCount, &cleanupFirstFailureAt, &cleanupNextRetryAt, &t.CleanupLastError,
+		&cleanupUnsafe,
 		&t.StartAttemptID, &t.StartAttemptCount, &t.Revision,
 		&readyAt, &startClaimedAt, &createdAt, &updatedAt, &startedAt, &finishedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -797,6 +801,7 @@ func scanTask(row rowScanner) (Task, error) {
 	t.ContinuationPending = continuationPending != 0
 	t.PendingYield = pendingYield != 0
 	t.ResumeNeeded = resumeNeeded != 0
+	t.CleanupUnsafe = cleanupUnsafe != 0
 
 	var err error
 	if t.CreatedAt, err = parseTime(createdAt); err != nil {
@@ -1292,6 +1297,30 @@ WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
 		[]any{generation}, "set task start generation")
 }
 
+// SetTaskExecutionTurn records the exact provider turn that a borrowed task
+// may later cancel. The start attempt and generation fence make a late writer a
+// harmless no-op rather than authority over a continuation (TS-10.R32).
+func (s *Store) SetTaskExecutionTurn(taskID, attemptID, generation, turnID string) (Task, bool, error) {
+	if generation == "" || turnID == "" {
+		return Task{}, false, nil
+	}
+	res, err := s.db.Exec(`UPDATE tasks SET execution_turn = ?, revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND state = ? AND start_attempt_id = ? AND assigned_generation = ?`,
+		turnID, formatTime(timeNow()), taskID, TaskStarting, attemptID, generation)
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: set task execution turn: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: set task execution turn rows: %w", err)
+	}
+	if n == 0 {
+		return Task{}, false, nil
+	}
+	task, err := s.ReadTask(taskID)
+	return task, err == nil, err
+}
+
 // AbandonTaskStart returns a task whose start produced no confirmed runtime to
 // ready, releasing its assignment claim and its slot and spending no attempt.
 // This is the deferral path — a lost lifecycle claim, a start the caller gave up
@@ -1541,9 +1570,9 @@ WHERE assigned_agent_id = ? AND assigned_generation = ? AND pending_release = 1`
 // ownership of a live runtime (TS-10.R19, INV §15).
 func (s *Store) CompleteTaskRelease(taskID string) error {
 	if _, err := s.db.Exec(`
-UPDATE tasks SET pending_release = 0, runtime_claim = '', cleanup_phase = '', cleanup_effect_key = '',
+UPDATE tasks SET pending_release = 0, runtime_claim = '', execution_turn = '', cleanup_phase = '', cleanup_effect_key = '',
   cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL,
-  cleanup_last_error = '', attention_reason = CASE WHEN cleanup_phase <> '' THEN '' ELSE attention_reason END,
+  cleanup_last_error = '', cleanup_unsafe = 0, attention_reason = CASE WHEN cleanup_phase <> '' THEN '' ELSE attention_reason END,
   revision = revision + 1,
   updated_at = ?
 WHERE task_id = ? AND pending_release = 1`, formatTime(timeNow()), taskID); err != nil {
@@ -1562,6 +1591,13 @@ const (
 // bounded exponential backoff. It changes neither the task outcome nor its
 // execution attempt count (TS-10.R35).
 func (s *Store) RecordTaskCleanupFailure(taskID, phase, effectKey string, cause error) (Task, error) {
+	return s.RecordTaskCleanupFailureClassified(taskID, phase, effectKey, cause, false)
+}
+
+// RecordTaskCleanupFailureClassified records an unsafe effect without an
+// automatic retry. A caller must explicitly repair it after revalidating the
+// process/permission boundary; transient effects retain exponential backoff.
+func (s *Store) RecordTaskCleanupFailureClassified(taskID, phase, effectKey string, cause error, unsafe bool) (Task, error) {
 	if phase != cleanupPhaseRelease && phase != cleanupPhaseYield || effectKey == "" {
 		return Task{}, fmt.Errorf("state: invalid task cleanup effect")
 	}
@@ -1596,20 +1632,45 @@ func (s *Store) RecordTaskCleanupFailure(taskID, phase, effectKey string, cause 
 		message = message[:500]
 	}
 	attention := ""
-	if failures >= 10 {
+	if unsafe || failures >= 10 {
 		attention = cleanupAttention + message
+	}
+	nextRetry := any(formatTime(now.Add(delay)))
+	if unsafe {
+		nextRetry = nil
 	}
 	if _, err := tx.Exec(`
 UPDATE tasks SET cleanup_phase = ?, cleanup_effect_key = ?, cleanup_failure_count = ?,
   cleanup_first_failure_at = COALESCE(cleanup_first_failure_at, ?), cleanup_next_retry_at = ?,
-  cleanup_last_error = ?, attention_reason = CASE WHEN ? <> '' THEN ? ELSE attention_reason END,
+  cleanup_last_error = ?, cleanup_unsafe = ?, attention_reason = CASE WHEN ? <> '' THEN ? ELSE attention_reason END,
   revision = revision + 1, updated_at = ?
-WHERE task_id = ?`, phase, effectKey, failures, formatTime(now), formatTime(now.Add(delay)), message,
+WHERE task_id = ?`, phase, effectKey, failures, formatTime(now), nextRetry, message, unsafe,
 		attention, attention, formatTime(now), taskID); err != nil {
 		return Task{}, fmt.Errorf("state: record task cleanup failure: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return Task{}, fmt.Errorf("state: commit task cleanup failure: %w", err)
+	}
+	return s.ReadTask(taskID)
+}
+
+// RepairTaskCleanup re-arms only an unsafe retained effect. It never alters a
+// task result, execution attempt, or assignment (TS-10.R35).
+func (s *Store) RepairTaskCleanup(taskID string) (Task, error) {
+	res, err := s.db.Exec(`UPDATE tasks SET cleanup_unsafe = 0, cleanup_next_retry_at = ?,
+  attention_reason = CASE WHEN cleanup_unsafe = 1 THEN '' ELSE attention_reason END,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ? AND cleanup_unsafe = 1 AND (pending_release = 1 OR pending_yield = 1)`,
+		formatTime(timeNow()), formatTime(timeNow()), taskID)
+	if err != nil {
+		return Task{}, fmt.Errorf("state: repair task cleanup: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return Task{}, fmt.Errorf("state: repair task cleanup rows: %w", err)
+	}
+	if n == 0 {
+		return Task{}, ErrTaskConflict
 	}
 	return s.ReadTask(taskID)
 }
@@ -1622,6 +1683,7 @@ func (s *Store) DueTaskCleanup(limit int) ([]Task, error) {
 	}
 	rows, err := s.db.Query(taskSelect+`
 WHERE (pending_release = 1 OR pending_yield = 1)
+  AND cleanup_unsafe = 0
   AND (cleanup_next_retry_at IS NULL OR cleanup_next_retry_at <= ?)
 ORDER BY COALESCE(cleanup_next_retry_at, finished_at, updated_at), task_id LIMIT ?`, formatTime(timeNow()), limit)
 	if err != nil {
@@ -1676,7 +1738,7 @@ func (s *Store) interrupt(reason, where string, args []any) (Task, bool, error) 
 	res, err := s.db.Exec(`
 UPDATE tasks SET state = ?, attention_reason = ?, assigned_generation = '', pending_yield = 0,
   continuation_pending = 0, resume_needed = 0,
-  runtime_claim = '', start_attempt_id = '', start_claimed_at = NULL,
+  runtime_claim = '', execution_turn = '', start_attempt_id = '', start_claimed_at = NULL,
   revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND pending_yield = 0 AND state IN (?, ?)`,
 		TaskInterrupted, reason, formatTime(timeNow()), taskID, TaskStarting, TaskRunning)
@@ -1842,7 +1904,7 @@ UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?
   outcome_details = ?, attention_reason = '', pending_release = ?, pending_yield = 0,
   continuation_pending = 0, resume_needed = 0, cleanup_phase = '', cleanup_effect_key = '',
   cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL,
-  cleanup_last_error = '', finished_at = ?,
+  cleanup_last_error = '', cleanup_unsafe = 0, finished_at = ?,
   revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ?`,
 		TaskFinished, result.Outcome, source, result.Summary, result.Details,

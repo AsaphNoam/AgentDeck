@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -216,6 +218,7 @@ func (s *Server) startLaunchedTask(ctx context.Context, task state.Task) {
 		s.failTaskStart(task, "assignment was not delivered: "+err.Error())
 		return
 	}
+	s.recordTaskExecutionTurn(task)
 	s.confirmTaskStart(task)
 }
 
@@ -290,6 +293,9 @@ func (s *Server) startExistingAgentTask(ctx context.Context, task state.Task) {
 			task = updated
 		}
 		attempted, started := s.runActivationTurn(ctx, state.ActivationKindDependency, activation, token)
+		if started {
+			s.recordTaskExecutionTurn(task)
+		}
 		s.settleActivationStart(task, activation, token, attempted, started)
 		return
 	}
@@ -319,8 +325,25 @@ func (s *Server) startExistingAgentTask(ctx context.Context, task state.Task) {
 			return
 		}
 		task, _ = s.stateStore.ReadTask(task.TaskID)
+		s.recordTaskExecutionTurn(task)
 	}
 	s.settleActivationStart(task, activation, token, attempted, wakeErr == nil)
+}
+
+// recordTaskExecutionTurn captures the provider turn while it is still the
+// task's active assignment turn. A later cleanup may cancel only this exact
+// borrowed turn, never a human follow-up that starts after it settles.
+func (s *Server) recordTaskExecutionTurn(task state.Task) {
+	budget, err := s.stateStore.CurrentTurnBudget(task.AssignedAgentID, 1)
+	if err != nil || budget.TurnID == "" {
+		s.log.Debug("read task execution turn", "task", task.TaskID, "err", err)
+		return
+	}
+	if _, ok, err := s.stateStore.SetTaskExecutionTurn(task.TaskID, task.StartAttemptID, task.AssignedGeneration, budget.TurnID); err != nil {
+		s.log.Debug("record task execution turn", "task", task.TaskID, "err", err)
+	} else if !ok {
+		s.log.Debug("task execution turn became stale", "task", task.TaskID)
+	}
 }
 
 // settleActivationStart resolves the task and its activation together. A turn
@@ -500,16 +523,29 @@ func (s *Server) finishTaskCleanup(ctx context.Context, task state.Task) {
 	if task.PendingYield {
 		phase = "yield"
 	}
+	if task.RuntimeClaim == state.ClaimBorrowed && task.Outcome == state.OutcomeCancelled {
+		if task.ExecutionTurn == "" {
+			s.recordTaskCleanupFailureClassified(task, phase, errors.New("missing guarded task turn for borrowed-runtime cancellation"), true)
+			return
+		}
+		cancelCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, err := s.registry.CancelGuarded(cancelCtx, task.AssignedAgentID, task.AssignedGeneration, task.ExecutionTurn)
+		cancel()
+		if err != nil {
+			s.recordTaskCleanupFailureClassified(task, phase, err, isUnsafeTaskCleanupError(err))
+			return
+		}
+	}
 	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
 		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
-			s.recordTaskCleanupFailure(task, phase, err)
+			s.recordTaskCleanupFailureClassified(task, phase, err, isUnsafeTaskCleanupError(err))
 			return
 		}
 	}
 	if task.PendingYield {
 		settled, err := s.stateStore.CompleteTaskYield(task.TaskID)
 		if err != nil {
-			s.recordTaskCleanupFailure(task, phase, err)
+			s.recordTaskCleanupFailureClassified(task, phase, err, isUnsafeTaskCleanupError(err))
 			return
 		}
 		s.publishTaskUpdate(settled)
@@ -519,19 +555,31 @@ func (s *Server) finishTaskCleanup(ctx context.Context, task state.Task) {
 		return
 	}
 	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
-		s.recordTaskCleanupFailure(task, phase, err)
+		s.recordTaskCleanupFailureClassified(task, phase, err, isUnsafeTaskCleanupError(err))
 	}
 }
 
 func (s *Server) recordTaskCleanupFailure(task state.Task, phase string, cause error) {
+	s.recordTaskCleanupFailureClassified(task, phase, cause, false)
+}
+
+func (s *Server) recordTaskCleanupFailureClassified(task state.Task, phase string, cause error, unsafe bool) {
 	effectKey := phase + ":" + task.TaskID + ":" + task.AssignedGeneration
-	updated, err := s.stateStore.RecordTaskCleanupFailure(task.TaskID, phase, effectKey, cause)
+	updated, err := s.stateStore.RecordTaskCleanupFailureClassified(task.TaskID, phase, effectKey, cause, unsafe)
 	if err != nil {
 		s.log.Warn("record task cleanup failure", "task", task.TaskID, "err", err)
 		return
 	}
 	s.publishTaskUpdate(updated)
 	s.log.Debug("task cleanup deferred", "task", task.TaskID, "phase", phase, "err", cause)
+}
+
+func isUnsafeTaskCleanupError(err error) bool {
+	if errors.Is(err, runtime.ErrNoHandle) {
+		return true
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "permission denied") || strings.Contains(text, "uncorroborated")
 }
 
 // evaluateTaskResult releases the arms waiting on a task that just recorded its

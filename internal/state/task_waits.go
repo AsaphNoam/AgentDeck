@@ -140,7 +140,7 @@ func (s *Store) NotifyTaskWaiters(sourceTaskID string) ([]Task, error) {
 // ends while preserving the assignment identity and durable watch.
 func (s *Store) CompleteTaskYield(taskID string) (Task, error) {
 	now := formatTime(timeNow())
-	res, err := s.db.Exec(`UPDATE tasks SET state = CASE WHEN resume_needed = 1 THEN ? ELSE ? END, continuation_pending = resume_needed, pending_yield = 0, runtime_claim = '', assigned_generation = '', execution_handle = '', start_attempt_id = '', start_claimed_at = NULL, cleanup_phase = '', cleanup_effect_key = '', cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL, cleanup_last_error = '', attention_reason = CASE WHEN cleanup_phase <> '' THEN '' ELSE attention_reason END, ready_at = CASE WHEN resume_needed = 1 THEN ? ELSE ready_at END, revision = revision + 1, updated_at = ? WHERE task_id = ? AND pending_yield = 1`, TaskReady, TaskWaiting, now, now, taskID)
+	res, err := s.db.Exec(`UPDATE tasks SET state = CASE WHEN resume_needed = 1 THEN ? ELSE ? END, continuation_pending = resume_needed, pending_yield = 0, runtime_claim = '', assigned_generation = '', execution_handle = '', execution_turn = '', start_attempt_id = '', start_claimed_at = NULL, cleanup_phase = '', cleanup_effect_key = '', cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL, cleanup_last_error = '', cleanup_unsafe = 0, attention_reason = CASE WHEN cleanup_phase <> '' THEN '' ELSE attention_reason END, ready_at = CASE WHEN resume_needed = 1 THEN ? ELSE ready_at END, revision = revision + 1, updated_at = ? WHERE task_id = ? AND pending_yield = 1`, TaskReady, TaskWaiting, now, now, taskID)
 	if err != nil {
 		return Task{}, err
 	}

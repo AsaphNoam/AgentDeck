@@ -57,6 +57,57 @@ func TestPipelineRunPersistenceIdempotencyAndRestart(t *testing.T) {
 	}
 }
 
+func TestLegacyPipelineResetCancelsWaitingTasksAndPreservesV2Runs(t *testing.T) {
+	store, _ := newTestStore(t)
+	now := formatTime(timeNow())
+	if _, err := store.DB().Exec(`
+INSERT INTO pipeline_runs(run_id, template_id, display_name, project, goal, state, revision,
+  current_stage_id, created_at, updated_at)
+VALUES('legacy-run', 'legacy', 'Legacy', 'app', 'old work', 'running', 1, 'work', ?, ?),
+      ('v2-run', 'v2', 'V2', 'app', 'new work', 'running', 1, 'work', ?, ?)`, now, now, now, now); err != nil {
+		t.Fatal(err)
+	}
+	v2Task := newTask(t, store, "app", "v2 stage")
+	if _, err := store.DB().Exec(`
+INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, state, created_at)
+VALUES('v2-run', 0, 1, 'work', ?, 'open', ?)`, v2Task.TaskID, now); err != nil {
+		t.Fatal(err)
+	}
+	dependent := newTask(t, store, "app", "wait for legacy", TaskArm{
+		Kind: ArmWorkResult, SourceKind: SourcePipelineRun, SourceID: "legacy-run",
+		SatisfyingOutcomes: []string{OutcomeSuccess},
+	})
+	if dependent.State != TaskArmed {
+		t.Fatalf("dependent state = %s, want armed", dependent.State)
+	}
+
+	if err := store.RemoveLegacyPipelineRecords(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ReadPipelineRun("legacy-run"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("legacy run read error = %v, want ErrNotFound", err)
+	}
+	if _, err := store.ReadPipelineRun("v2-run"); err != nil {
+		t.Fatalf("v2 run was removed: %v", err)
+	}
+	result, err := store.ReadWorkResult(SourcePipelineRun, "legacy-run")
+	if err != nil || result.Outcome != OutcomeCancelled {
+		t.Fatalf("legacy result = %+v, err = %v", result, err)
+	}
+	dependent, err = store.ReadTask(dependent.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dependent.State != TaskDependencyFailed || dependent.Arms[0].State != ArmUnsatisfiable {
+		t.Fatalf("dependent after reset = %+v", dependent)
+	}
+	// Re-entry after a post-commit interruption remains safe and re-evaluates
+	// the durable reset result.
+	if err := store.RemoveLegacyPipelineRecords(); err != nil {
+		t.Fatalf("repeated reset cleanup: %v", err)
+	}
+}
+
 // FS-14.A5/A8: revisions and lineage are monotonic, while deletion leaves the
 // ordinary agent identity intact.
 func TestPipelineAttemptLineageCASAndDeletionKeepsAgent(t *testing.T) {

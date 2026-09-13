@@ -22,6 +22,123 @@ func (s *Store) NewPipelineAttemptID() (string, error) {
 	return s.newPipelineID("pa_", "pipeline_attempts", "attempt_id")
 }
 
+// BeginLegacyPipelineReset records an authorized one-time reset before its
+// external template-file cleanup begins. Runs with stage-task provenance are
+// v2 and are deliberately excluded from every query here.
+func (s *Store) BeginLegacyPipelineReset() (bool, []string, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, nil, fmt.Errorf("state: begin legacy pipeline reset: %w", err)
+	}
+	defer tx.Rollback()
+	var current string
+	err = tx.QueryRow(`SELECT state FROM pipeline_legacy_reset WHERE id = 1`).Scan(&current)
+	if err == nil && current == "complete" {
+		return false, []string{}, nil
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, nil, err
+	}
+	rows, err := tx.Query(`SELECT DISTINCT a.agent_id FROM pipeline_attempts a JOIN pipeline_runs r ON r.run_id = a.run_id WHERE a.agent_id != '' AND NOT EXISTS (SELECT 1 FROM pipeline_stage_tasks p WHERE p.run_id = r.run_id)`)
+	if err != nil {
+		return false, nil, err
+	}
+	defer rows.Close()
+	agents := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return false, nil, err
+		}
+		agents = append(agents, id)
+	}
+	if err := rows.Err(); err != nil {
+		return false, nil, err
+	}
+	if _, err := tx.Exec(`INSERT INTO pipeline_legacy_reset(id, state, updated_at) VALUES(1, 'running', ?) ON CONFLICT(id) DO UPDATE SET state = 'running', updated_at = excluded.updated_at`, formatTime(timeNow())); err != nil {
+		return false, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, nil, err
+	}
+	return true, agents, nil
+}
+
+// RemoveLegacyPipelineRecords deletes only attempt-backed runs. Cascades clear
+// their values and idempotency keys; ordinary tasks and every v2 run with a
+// pipeline_stage_tasks row remain intact.
+func (s *Store) RemoveLegacyPipelineRecords() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin legacy pipeline cleanup: %w", err)
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query(`
+SELECT run_id FROM pipeline_runs
+WHERE NOT EXISTS (SELECT 1 FROM pipeline_stage_tasks p WHERE p.run_id = pipeline_runs.run_id)
+UNION
+SELECT source_id FROM work_results
+WHERE source_kind = ? AND raw_label = 'legacy_reset_cancelled'`, SourcePipelineRun)
+	if err != nil {
+		return err
+	}
+	legacyRunIDs := []string{}
+	for rows.Next() {
+		var runID string
+		if err := rows.Scan(&runID); err != nil {
+			rows.Close()
+			return err
+		}
+		legacyRunIDs = append(legacyRunIDs, runID)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, runID := range legacyRunIDs {
+		err := RegisterWorkResultTx(tx, WorkResult{
+			SourceKind: SourcePipelineRun,
+			SourceID:   runID,
+			Outcome:    OutcomeCancelled,
+			RawLabel:   "legacy_reset_cancelled",
+			Summary:    "cancelled by the one-time pipeline v1 reset",
+		}, timeNow())
+		if err != nil && !errors.Is(err, ErrWorkResultRecorded) {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`DELETE FROM pipeline_runs WHERE NOT EXISTS (SELECT 1 FROM pipeline_stage_tasks p WHERE p.run_id = pipeline_runs.run_id)`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM pipeline_attempts`); err != nil {
+		return err
+	}
+	// A save-template proposal embeds its exact template, so only an explicit
+	// v1 payload is safe to remove here. Start proposals name a template id but
+	// do not carry its version; preserve those ambiguous historical offers rather
+	// than deleting a v2 offer during the one-time reset.
+	if _, err := tx.Exec(`DELETE FROM pipeline_proposals WHERE kind = 'save_template' AND instr(payload_json, '"version":1') > 0`); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	// The result outlives the deleted run. Re-evaluate after commit so tasks
+	// waiting on a legacy run receive a durable cancelled prerequisite. The
+	// work-result branch in the query above makes this retryable even if an
+	// evaluation fails after the records have already been removed.
+	for _, runID := range legacyRunIDs {
+		if _, err := s.EvaluateSource(SourcePipelineRun, runID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) CompleteLegacyPipelineReset() error {
+	_, err := s.db.Exec(`UPDATE pipeline_legacy_reset SET state = 'complete', updated_at = ? WHERE id = 1`, formatTime(timeNow()))
+	return err
+}
+
 func (s *Store) newPipelineID(prefix, table, column string) (string, error) {
 	for i := 0; i < 10; i++ {
 		var bytes [8]byte

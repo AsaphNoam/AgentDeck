@@ -76,6 +76,46 @@ func TestTaskCleanupFailureBacksOffWithoutChangingTaskOutcome(t *testing.T) {
 	}
 }
 
+func TestUnsafeTaskCleanupRequiresExplicitRepair(t *testing.T) {
+	st, _ := newTestStore(t)
+	task := newTask(t, st, "proj", "unsafe cleanup")
+	if _, err := st.DB().Exec(`UPDATE tasks SET state = ?, pending_release = 1, runtime_claim = ? WHERE task_id = ?`, TaskFinished, ClaimBorrowed, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	unsafe, err := st.RecordTaskCleanupFailureClassified(task.TaskID, cleanupPhaseRelease, "release:"+task.TaskID, errors.New("permission denied"), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !unsafe.CleanupUnsafe || unsafe.CleanupNextRetryAt != nil || unsafe.AttentionReason == "" {
+		t.Fatalf("unsafe cleanup = %+v", unsafe)
+	}
+	if due, err := st.DueTaskCleanup(8); err != nil || len(due) != 0 {
+		t.Fatalf("unsafe cleanup was retried automatically: %+v, %v", due, err)
+	}
+	repaired, err := st.RepairTaskCleanup(task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repaired.CleanupUnsafe || repaired.CleanupNextRetryAt == nil || repaired.AttentionReason != "" {
+		t.Fatalf("repaired cleanup = %+v", repaired)
+	}
+}
+
+func TestTaskExecutionTurnIsFencedByStartAttemptAndGeneration(t *testing.T) {
+	st, _ := newTestStore(t)
+	task := newTask(t, st, "proj", "borrowed")
+	if _, err := st.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ?, assigned_generation = ?, start_attempt_id = ? WHERE task_id = ?`, TaskStarting, "a_owner", "g1", "attempt1", task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	updated, ok, err := st.SetTaskExecutionTurn(task.TaskID, "attempt1", "g1", "t_000000000001")
+	if err != nil || !ok || updated.ExecutionTurn != "t_000000000001" {
+		t.Fatalf("set execution turn = %+v, %v, %v", updated, ok, err)
+	}
+	if _, ok, err := st.SetTaskExecutionTurn(task.TaskID, "attempt1", "g2", "t_000000000002"); err != nil || ok {
+		t.Fatalf("stale execution turn accepted: ok=%v err=%v", ok, err)
+	}
+}
+
 func TestTaskWaitReturnsAlreadyChangedTaskWithoutYield(t *testing.T) {
 	st, _ := newTestStore(t)
 	owner := newTask(t, st, "proj", "owner")
