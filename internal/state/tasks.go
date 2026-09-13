@@ -79,6 +79,29 @@ var ErrTaskAttachmentReference = errors.New("state: unknown context reference")
 // Registrations are immutable (TS-10.R8).
 var ErrWorkResultRecorded = errors.New("state: work result already registered")
 
+// taskRunOpenClause is the single inherited-closure fence shared by every
+// mutation that makes an existing task executable again: admission, retry,
+// re-arm, and waking a settled waiter. Creation checks the same rule, but a
+// child that was already ready, or a watch that fires later, reaches execution
+// through these paths instead — so a stage completion or a Stop that only fenced
+// creation still let escaped work start (TS-09.R42, TS-10.R29/R32, INV §2/§5).
+//
+// It is a WHERE-clause fragment correlated to the `tasks` row the statement is
+// already selecting or updating, so it binds no extra argument and the check
+// runs inside each writer's own statement rather than as a separate read a
+// concurrent Stop can pass between. A task with no pipeline lineage matches
+// nothing here and is unaffected.
+const taskRunOpenClause = `
+  AND NOT EXISTS (
+    SELECT 1 FROM task_lineage l
+    JOIN pipeline_runs r ON r.run_id = l.pipeline_run_id
+    LEFT JOIN pipeline_stage_tasks p
+      ON p.run_id = l.pipeline_run_id AND p.stage_id = l.pipeline_stage_id
+      AND p.attempt_number = CAST(l.creation_attempt_id AS INTEGER)
+    WHERE l.task_id = tasks.task_id
+      AND (r.state IN ('stopping', 'stopped', 'completed')
+        OR p.state IS NULL OR p.state <> 'open'))`
+
 // ErrTaskRunClosed refuses new descendant work after its inherited pipeline
 // stage/run closure fence has committed.
 var ErrTaskRunClosed = errors.New("state: governing pipeline run or stage is closed")
@@ -321,6 +344,33 @@ func (s *Store) CreateTask(task Task) (Task, error) {
 	return s.CreateTaskWithAttachments(task, nil, "")
 }
 
+// insertTaskRowTx writes one task row inside a transaction the caller already
+// owns. It is the single persistence shape for a task: the pipeline's atomic
+// run/stage writes cannot call a public create — that would open a nested
+// transaction and apply creation-time closure and lineage rules that do not
+// belong to a server-composed stage task — but they must not re-spell these
+// columns either, or the next schema change silently misses some of them
+// (INV §2, TS-09.R37).
+//
+// Lifecycle fields stay the caller's: state, revision, timestamps, ready time
+// and creator provenance are exactly what differs between a standing stage task,
+// its armed coordinator, an armed replacement successor, and an ordinary create.
+func insertTaskRowTx(tx *sql.Tx, task Task) error {
+	if _, err := tx.Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id,
+  role, backend, model, effort, fast, state, attention_reason, created_by_kind, created_by_agent_id,
+  created_by_generation, revision, ready_at, created_at, updated_at)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		task.TaskID, task.Project, task.DisplayName, task.Instruction, task.TargetKind,
+		task.TargetAgentID, task.Role, task.Backend, task.Model, task.Effort, task.Fast, task.State,
+		task.AttentionReason, task.CreatedByKind, task.CreatedByAgentID, task.CreatedByGeneration,
+		task.Revision, formatOptionalTime(task.ReadyAt), formatTime(task.CreatedAt),
+		formatTime(task.UpdatedAt)); err != nil {
+		return fmt.Errorf("state: insert task: %w", err)
+	}
+	return nil
+}
+
 // CreateTaskWithAttachments creates the task, its graph, and its context
 // attachments in one transaction. An agent creator's direct grants are checked
 // by that same transaction, so a revocation cannot slip between authorization
@@ -380,18 +430,8 @@ ORDER BY parent.updated_at DESC LIMIT 1`, task.CreatedByAgentID, task.CreatedByG
 		task.AttentionReason = parkedAttentionReason
 	}
 
-	if _, err := tx.Exec(`
-INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id,
-  role, backend, model, effort, fast, state, attention_reason, created_by_kind, created_by_agent_id,
-  created_by_generation, revision, ready_at, created_at, updated_at)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		task.TaskID, task.Project, task.DisplayName, task.Instruction, task.TargetKind,
-		task.TargetAgentID, task.Role, task.Backend, task.Model, task.Effort, task.Fast, task.State,
-		task.AttentionReason,
-		task.CreatedByKind, task.CreatedByAgentID, task.CreatedByGeneration,
-		task.Revision, formatOptionalTime(task.ReadyAt), formatTime(task.CreatedAt),
-		formatTime(task.UpdatedAt)); err != nil {
-		return Task{}, fmt.Errorf("state: insert task: %w", err)
+	if err := insertTaskRowTx(tx, task); err != nil {
+		return Task{}, err
 	}
 	if err := insertTaskArms(tx, task.TaskID, task.Arms); err != nil {
 		return Task{}, err
@@ -674,10 +714,56 @@ func (s *Store) ListTasks(project string) ([]Task, error) {
 
 // ListTasksForPipelineRun follows durable lineage rather than creator identity,
 // so a reused orchestrator cannot pull unrelated work into run cleanup.
-func (s *Store) ListTasksForPipelineRun(runID string) ([]Task, error) {
+// ListPipelineCleanupMembers returns one bounded page of the tasks a cleanup
+// pass owns, ordered by task id so the caller can keyset-page the whole set with
+// the last id it saw. A long run's lineage is unbounded, so cleanup never loads
+// it whole (TS-09.R42, INV §16).
+//
+// An empty stageID scopes the page to the entire run, which is what a Stop
+// cleans up. A stage id and attempt scope it to that one stage attempt: a
+// descendant inherits its creator's stage id and attempt, so this is exactly the
+// work that stage brought into being and nothing from an earlier or later one.
+func (s *Store) ListPipelineCleanupMembers(runID, stageID, attempt, afterTaskID string, limit int) ([]Task, error) {
+	if limit <= 0 {
+		limit = 32
+	}
+	rows, err := s.db.Query(taskSelect+` WHERE EXISTS (
+SELECT 1 FROM task_lineage l
+WHERE l.task_id = tasks.task_id AND l.pipeline_run_id = ?
+  AND (? = '' OR (l.pipeline_stage_id = ? AND l.creation_attempt_id = ?))
+) AND tasks.task_id > ? ORDER BY tasks.task_id LIMIT ?`,
+		runID, stageID, stageID, attempt, afterTaskID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list pipeline cleanup members: %w", err)
+	}
+	defer rows.Close()
+	out := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate pipeline cleanup members: %w", err)
+	}
+	// Deliberately not hydrated: cleanup reads lifecycle columns only, and
+	// per-task output/lineage reads would re-introduce the per-member query
+	// amplification paging exists to avoid.
+	return out, nil
+}
+
+// ListTasksForPipelineRun returns a run's task history, oldest first, bounded by
+// limit. A long run's descendant history is unbounded, so the caller states how
+// much of it it is prepared to carry (TS-09.R28, INV §16).
+func (s *Store) ListTasksForPipelineRun(runID string, limit int) ([]Task, error) {
+	if limit <= 0 {
+		limit = 200
+	}
 	rows, err := s.db.Query(taskSelect+` WHERE EXISTS (
 SELECT 1 FROM task_lineage l WHERE l.task_id = tasks.task_id AND l.pipeline_run_id = ?
-) ORDER BY created_at, task_id`, runID)
+) ORDER BY created_at, task_id LIMIT ?`, runID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("state: list pipeline run tasks: %w", err)
 	}
@@ -1221,7 +1307,7 @@ SET state = ?, assigned_agent_id = ?, assigned_generation = ?, runtime_claim = ?
 WHERE task_id = ? AND state = ?
   AND (? = ? OR (
     SELECT COUNT(*) FROM tasks AS live
-    WHERE live.runtime_claim IN (?, ?) AND live.state IN (?, ?)) < ?)`,
+    WHERE live.runtime_claim IN (?, ?) AND live.state IN (?, ?)) < ?)`+taskRunOpenClause,
 		TaskStarting, reservation.AgentID, reservation.Generation, reservation.Claim,
 		reservation.AttemptID, stamp, stamp,
 		taskID, TaskReady,
@@ -1492,7 +1578,12 @@ type PipelineStageTask struct {
 // response. The claim and the budget slot stay held until the reporting turn
 // ends, and because the intent is durable a crash in between cannot strand a
 // live task-owned runtime (INV §15).
-func (s *Store) RecordAgentTaskResult(taskID, agentID, generation string, result TaskResult) (Task, error) {
+// RecordAgentTaskResult accepts an ordinary (non-stage) result. An execution
+// handle is optional here so a client that reports without one still works, but
+// a handle that is supplied must match this execution: a stale handle names an
+// assignment that has already ended and must not land on the current one
+// (TS-10.R28/R31).
+func (s *Store) RecordAgentTaskResult(taskID, agentID, generation, executionHandle string, result TaskResult) (Task, error) {
 	if err := ValidateAgentReport(result.Outcome, result.Summary, result.Details, ""); err != nil {
 		return Task{}, err
 	}
@@ -1502,11 +1593,11 @@ func (s *Store) RecordAgentTaskResult(taskID, agentID, generation string, result
 	}
 	defer tx.Rollback()
 
-	var taskState, assignedAgent, assignedGeneration string
+	var taskState, assignedAgent, assignedGeneration, storedHandle string
 	var pendingYield int
 	err = tx.QueryRow(`
-SELECT state, COALESCE(assigned_agent_id, ''), assigned_generation, pending_yield
-FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assignedGeneration, &pendingYield)
+SELECT state, COALESCE(assigned_agent_id, ''), assigned_generation, execution_handle, pending_yield
+FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assignedGeneration, &storedHandle, &pendingYield)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, ErrNotFound
 	}
@@ -1514,6 +1605,9 @@ FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assigne
 		return Task{}, fmt.Errorf("state: read task for result: %w", err)
 	}
 	if !OwnsReportedWork(agentID, generation, assignedAgent, assignedGeneration) {
+		return Task{}, ErrTaskNotAssigned
+	}
+	if executionHandle != "" && executionHandle != storedHandle {
 		return Task{}, ErrTaskNotAssigned
 	}
 	// A result is accepted from the assignment's own states only. A finished task
@@ -2007,14 +2101,39 @@ func (s *Store) RetryTask(taskID string) (Task, error) {
 	res, err := s.db.Exec(`
 UPDATE tasks SET state = ?, start_attempt_count = 0, attention_reason = '',
   ready_at = ?, revision = revision + 1, updated_at = ?
-WHERE task_id = ? AND state = ?`, TaskReady, stamp, stamp, taskID, task.State)
+WHERE task_id = ? AND state = ?`+taskRunOpenClause, TaskReady, stamp, stamp, taskID, task.State)
 	if err != nil {
 		return Task{}, fmt.Errorf("state: retry task: %w", err)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
+		// Either the state moved under this retry or the governing run/stage
+		// closed. Both mean the same thing to the caller: it is not retryable now.
+		if closed, closedErr := taskRunClosed(s.db, taskID); closedErr != nil {
+			return Task{}, closedErr
+		} else if closed {
+			return Task{}, ErrTaskRunClosed
+		}
 		return Task{}, ErrTaskConflict
 	}
 	return s.ReadTask(taskID)
+}
+
+// taskRunClosed reports the same inherited-closure condition taskRunOpenClause
+// fences with, for a caller that needs to explain a refusal, or that mutates
+// inside a transaction this clause cannot be folded into. A task that no longer
+// exists reads as closed. It is never a substitute for the clause on a bare
+// statement: a check followed by a separate write is exactly the race the clause
+// exists to close (INV §5).
+func taskRunClosed(q rowQuerier, taskID string) (bool, error) {
+	var one int
+	err := q.QueryRow(`SELECT 1 FROM tasks WHERE task_id = ?`+taskRunOpenClause, taskID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("state: read task closure state: %w", err)
+	}
+	return false, nil
 }
 
 // RearmTask replaces a task's whole arm set atomically, revalidating the graph
@@ -2037,6 +2156,13 @@ func (s *Store) RearmTask(taskID string, arms []TaskArm) (Task, error) {
 	}
 	if taskState != TaskArmed && taskState != TaskReady && taskState != TaskDependencyFailed {
 		return Task{}, ErrTaskNotRearmable
+	}
+	// Re-arming can put the task straight back into `ready`, so it is one of the
+	// paths a closed run or stage must fence (TS-09.R42).
+	if closed, err := taskRunClosed(tx, taskID); err != nil {
+		return Task{}, err
+	} else if closed {
+		return Task{}, ErrTaskRunClosed
 	}
 	if _, err := tx.Exec(`DELETE FROM task_arms WHERE task_id = ?`, taskID); err != nil {
 		return Task{}, fmt.Errorf("state: clear task arms: %w", err)

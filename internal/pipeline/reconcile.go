@@ -11,9 +11,8 @@ import (
 // Reconcile advances only durable task-backed pipeline effects. Process launch,
 // resume, report, and release belong to the shared task dispatcher.
 func (m *Manager) Reconcile(_ context.Context, runID string) error {
-	lock := m.runLock(runID)
-	lock.Lock()
-	defer lock.Unlock()
+	unlock := m.lockRun(runID)
+	defer unlock()
 	for step := 0; step < maxReconcileSteps; step++ {
 		run, err := m.store.ReadPipelineRun(runID)
 		if err != nil {
@@ -25,11 +24,11 @@ func (m *Manager) Reconcile(_ context.Context, runID string) error {
 		case "cleanup_run":
 			return m.reconcileRunCleanup(run)
 		case "activate_replacement":
-			stages, err := m.store.ListPipelineStageTasks(run.RunID)
-			if err != nil || len(stages) == 0 {
+			current, found, err := m.currentStageTask(run.RunID)
+			if err != nil || !found {
 				return err
 			}
-			updated, err := m.store.ActivatePipelineStageReplacement(run.RunID, stages[len(stages)-1].TaskID, run.Revision)
+			updated, err := m.store.ActivatePipelineStageReplacement(run.RunID, current.TaskID, run.Revision)
 			if err == nil {
 				m.publish(updated)
 			}
@@ -41,25 +40,49 @@ func (m *Manager) Reconcile(_ context.Context, runID string) error {
 	return fmt.Errorf("pipeline: reconcile step limit reached for %s", runID)
 }
 
+// settleCleanup is the one stage/run cleanup completion contract. It keyset-pages
+// the members in scope, cancels the unfinished ones through the shared task
+// cancellation helper, and reports whether every release and yield intent has
+// settled. It never drops a claim early: an effect that has not settled keeps
+// the run in `finishing`/`stopping` until the dispatcher's cleanup pass finishes
+// it and re-drives this cursor (TS-09.R40/R42/R43, INV §5/§15).
+//
+// An empty stageID scopes it to the whole run, which is what Stop cleans up. A
+// stage id and attempt scope it to that stage attempt's own members, so stage
+// completion converges on exactly the work that stage started.
+func (m *Manager) settleCleanup(runID, stageID, attempt string) (bool, error) {
+	settled := true
+	after := ""
+	for {
+		tasks, err := m.store.ListPipelineCleanupMembers(runID, stageID, attempt, after, cleanupPageSize)
+		if err != nil {
+			return false, err
+		}
+		for _, task := range tasks {
+			after = task.TaskID
+			if task.State != state.TaskFinished {
+				cancelled, cancelErr := m.store.CancelTask(task.TaskID)
+				if cancelErr != nil && !errors.Is(cancelErr, state.ErrTaskNotReportable) {
+					return false, cancelErr
+				}
+				if cancelErr == nil {
+					task = cancelled
+				}
+			}
+			if task.State != state.TaskFinished || task.PendingRelease || task.PendingYield {
+				settled = false
+			}
+		}
+		if len(tasks) < cleanupPageSize {
+			return settled, nil
+		}
+	}
+}
+
 func (m *Manager) reconcileRunCleanup(run state.PipelineRunRecord) error {
-	tasks, err := m.store.ListTasksForPipelineRun(run.RunID)
+	settled, err := m.settleCleanup(run.RunID, "", "")
 	if err != nil {
 		return err
-	}
-	settled := true
-	for _, task := range tasks {
-		if task.State != state.TaskFinished {
-			cancelled, cancelErr := m.store.CancelTask(task.TaskID)
-			if cancelErr != nil && !errors.Is(cancelErr, state.ErrTaskNotReportable) {
-				return cancelErr
-			}
-			if cancelErr == nil {
-				task = cancelled
-			}
-		}
-		if task.PendingRelease || task.PendingYield {
-			settled = false
-		}
 	}
 	if !settled {
 		return nil
@@ -76,19 +99,22 @@ func (m *Manager) reconcileRunCleanup(run state.PipelineRunRecord) error {
 }
 
 func (m *Manager) reconcileTaskStageRelease(run state.PipelineRunRecord) error {
-	stages, err := m.store.ListPipelineStageTasks(run.RunID)
-	if err != nil {
+	current, found, err := m.currentStageTask(run.RunID)
+	if err != nil || !found {
 		return err
 	}
-	if len(stages) == 0 {
-		return nil
-	}
-	current := stages[len(stages)-1]
 	task, err := m.store.ReadTask(current.TaskID)
 	if err != nil {
 		return err
 	}
-	if task.PendingRelease {
+	// Waiting for the owner's own release alone advanced the run with the stage's
+	// unfinished descendants still alive. The whole stage attempt must converge
+	// before any next-stage or final write (TS-09.R42).
+	settled, err := m.settleCleanup(run.RunID, current.StageID, fmt.Sprintf("%d", current.AttemptNumber))
+	if err != nil {
+		return err
+	}
+	if !settled {
 		return nil
 	}
 	detail, err := m.Detail(run.RunID)

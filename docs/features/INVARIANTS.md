@@ -105,13 +105,28 @@ Paid for by:
   required and another optional) with nothing failing yet — structural typing and a CSS-blind test
   suite see none of it. Fix: `ui/src/lib/annotations.ts` for the clip, `api/types.ts` for the type.
 
+- Five statements re-spelled the task row's persistence shape across
+  `internal/state/pipeline_tasks.go` and `pipelines.go`, with differing creator and ready-time
+  columns, so any schema or default change had to find all of them. Fix: `insertTaskRowTx`, with
+  each caller still owning its own lifecycle and ownership fields.
+- Creation was the only writer that checked inherited pipeline closure; admission, retry, re-arm and
+  wait wake each re-derived (or skipped) the rule, so work that was already ready and watches that
+  fired later escaped a stage completion or a Stop. Fix: one `taskRunOpenClause` fragment every
+  writer appends to its own statement.
+- Every pipeline control path listed all stage attempts and took the last one, re-stating the run
+  cursor's definition at each site and growing with the run. Fix: `LatestPipelineStageTask`, with
+  `PipelineStageTaskForAssignee` ordered the same way.
+
 **Canonical helpers:** `composeLaunch`, `composeResumeSpec`, `composeSwitchSpec`, `resolveSkip`,
 `expandAddDirs`, `composeEnv`
 (`internal/server/launch.go`); keep `sessionNewParams`/`sessionLoadParams` in lockstep;
 `config.ValidSlug` on **every** verb of every path-keyed resource; `foldTranscript` and live append
 share `appendRenderedEvent` for every render-affecting event transform; Go transcript
 consumers derive typed text parts from `transcript.ProjectEvent` rather than adding another
-`runtime.Event` switch.
+`runtime.Event` switch; `insertTaskRowTx` for every task row a transaction writes;
+`taskRunOpenClause` for every mutation that makes an existing task executable again;
+`LatestPipelineStageTask` for the run cursor and `Manager.settleCleanup` for stage/run cleanup
+convergence.
 
 Corollary: permission-relevant re-resolution **fails closed** — on a role-read error, refuse, never
 fall back to the permissive global default (`resolveSkip`).

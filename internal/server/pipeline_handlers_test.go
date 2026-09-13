@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -399,6 +400,227 @@ VALUES (?, 'my-app', ?, '', 'agent', 'finished', 'agent', ?, 'g1', ?, 'success',
 	second := agents["pa_2"]
 	if len(second.DelegatedAgents) != 1 || second.DelegatedAgents[0].TaskID != "second" {
 		t.Fatalf("second delegated agents = %+v", second)
+	}
+}
+
+// TS-09.R44 / FS-14.R39 — a stage task's parent is its predecessor stage task,
+// which is stage succession, not delegated work. Rendering that lineage edge
+// recursively nested stage two under stage one and repeated the whole remaining
+// stage tail under every earlier card. Each stage keeps its own card and only
+// real subordinate work appears under it, across continuation and replacement
+// histories, in the serialized response.
+func TestPipelineRunDetailSeparatesStageSuccessionFromDelegatedWork(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	stamp := now.Format(time.RFC3339Nano)
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "Two", OrchestratorRole: "implementer", Stages: []pipeline.Stage{
+		{ID: "work", Title: "Work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+		{ID: "review", Title: "Review", Objective: "Review", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: "pr_succession", TemplateID: "two", TemplateSnapshot: snapshot, DisplayName: "Two", Project: "my-app",
+		Goal: "goal", State: "running", CurrentStageID: "review", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "succession"}); err != nil {
+		t.Fatal(err)
+	}
+	addTask := func(id, parent string, at time.Time) {
+		t.Helper()
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state, created_by_kind, created_at, updated_at)
+VALUES (?, 'my-app', ?, '', 'launch', 'finished', 'pipeline', ?, ?)`, id, id, at.Format(time.RFC3339Nano), at.Format(time.RFC3339Nano)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at)
+VALUES (?, ?, 'pr_succession', 'work', '1', ?)`, id, parent, at.Format(time.RFC3339Nano)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	addStage := func(taskID string, index, attempt int, stageID, stageState string) {
+		t.Helper()
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, state, created_at)
+VALUES ('pr_succession', ?, ?, ?, ?, ?, ?)`, index, attempt, stageID, taskID, stageState, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Stage one, its replacement attempt, the delegated work it really created,
+	// and the stage-two task that succeeds it.
+	addTask("tk_work1", "", now)
+	addStage("tk_work1", 0, 1, "work", "replaced")
+	addTask("tk_child", "tk_work1", now.Add(time.Second))
+	addTask("tk_work2", "tk_work1", now.Add(2*time.Second))
+	addStage("tk_work2", 0, 2, "work", "closing")
+	addTask("tk_review1", "tk_work2", now.Add(3*time.Second))
+	addStage("tk_review1", 1, 1, "review", "open")
+
+	rec := doGET(t, srv.routes(), "/api/pipeline-runs/pr_succession")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("run detail = %d %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		StageTasks []struct {
+			TaskID string `json:"task_id"`
+			Work   []struct {
+				TaskID   string `json:"task_id"`
+				Children []struct {
+					TaskID string `json:"task_id"`
+				} `json:"children"`
+			} `json:"work"`
+		} `json:"stage_tasks"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode run detail: %v (%s)", err, rec.Body.String())
+	}
+	if len(body.StageTasks) != 3 {
+		t.Fatalf("stage cards = %+v, want one per stage attempt", body.StageTasks)
+	}
+	for _, card := range body.StageTasks {
+		switch card.TaskID {
+		case "tk_work1":
+			if len(card.Work) != 1 || card.Work[0].TaskID != "tk_child" || len(card.Work[0].Children) != 0 {
+				t.Fatalf("stage one work = %+v, want only its delegated child", card.Work)
+			}
+		default:
+			if len(card.Work) != 0 {
+				t.Fatalf("%s work = %+v, want no inherited stage tail", card.TaskID, card.Work)
+			}
+		}
+	}
+}
+
+// TS-09.R42 / FS-14.R44, INV §8/§10/§11 — supervision already renders retained
+// cleanup, but the projection never emitted it, so a stage holding
+// unrecoverable cleanup looked idle. Persistent cleanup also earns the same
+// repair control a stopping run's does, on a `finishing` run.
+func TestPipelineRunDetailProjectsRetainedStageCleanup(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "One", OrchestratorRole: "implementer", Stages: []pipeline.Stage{
+		{ID: "work", Title: "Work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: "pr_cleanup", TemplateID: "one", TemplateSnapshot: snapshot, DisplayName: "One", Project: "my-app",
+		Goal: "goal", State: "queued", Revision: 1, PendingAction: "dispatch_stage_task",
+		CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "cleanup-projection", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: "pr_cleanup", ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "work",
+		Task: state.Task{TaskID: taskID, Project: "my-app", DisplayName: "Work", Instruction: "work",
+			TargetKind: state.TargetLaunch, Role: "implementer", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, pending_release = 1, cleanup_phase = 'release', cleanup_unsafe = 1, cleanup_last_error = 'permission denied stopping the runtime' WHERE task_id = ?`,
+		state.TaskFinished, taskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE pipeline_runs SET state = 'finishing', pending_action = 'release_stage_task' WHERE run_id = 'pr_cleanup'`); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doGET(t, srv.routes(), "/api/pipeline-runs/pr_cleanup")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("run detail = %d %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		StageTasks []struct {
+			Cleanup *struct {
+				State  string `json:"state"`
+				Reason string `json:"reason"`
+			} `json:"cleanup"`
+		} `json:"stage_tasks"`
+		Controls struct {
+			RepairCleanup struct {
+				Eligible bool `json:"eligible"`
+			} `json:"repair_cleanup"`
+		} `json:"controls"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode run detail: %v (%s)", err, rec.Body.String())
+	}
+	if len(body.StageTasks) != 1 || body.StageTasks[0].Cleanup == nil {
+		t.Fatalf("stage cleanup = %+v, want the retained cleanup projected", body.StageTasks)
+	}
+	if got := body.StageTasks[0].Cleanup; got.State != "release_needs_attention" || !strings.Contains(got.Reason, "permission denied") {
+		t.Fatalf("stage cleanup = %+v", got)
+	}
+	if !body.Controls.RepairCleanup.Eligible {
+		t.Fatal("a finishing run holding unsafe cleanup offered no repair control")
+	}
+}
+
+// TS-09.R28/R42, INV §7/§16 — a run read loaded its whole task history and then
+// read lineage, identity and liveness once per task, so supervision grew with
+// the run's descendant count. History is bounded and those reads are batched.
+func TestPipelineRunDetailBoundsAndBatchesALargeRunRead(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	stamp := now.Format(time.RFC3339Nano)
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "One", OrchestratorRole: "implementer", Stages: []pipeline.Stage{
+		{ID: "work", Title: "Work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stageTaskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: "pr_large", TemplateID: "one", TemplateSnapshot: snapshot, DisplayName: "One", Project: "my-app",
+		Goal: "goal", State: "queued", Revision: 1, PendingAction: "dispatch_stage_task",
+		CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "large-run", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: "pr_large", ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "work",
+		Task: state.Task{TaskID: stageTaskID, Project: "my-app", DisplayName: "Work", Instruction: "work",
+			TargetKind: state.TargetLaunch, Role: "implementer", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	const descendants = 300
+	for i := 0; i < descendants; i++ {
+		id := fmt.Sprintf("tk_desc_%04d", i)
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state, created_by_kind, created_at, updated_at)
+VALUES (?, 'my-app', ?, 'work', 'launch', 'finished', 'agent', ?, ?)`, id, id, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := srv.stateStore.DB().Exec(`
+INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at)
+VALUES (?, ?, 'pr_large', 'work', '1', ?)`, id, stageTaskID, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if tasks, err := srv.stateStore.ListTasksForPipelineRun("pr_large", maxProjectedRunTasks); err != nil || len(tasks) != maxProjectedRunTasks {
+		t.Fatalf("run task history = %d, %v; want the bounded page", len(tasks), err)
+	}
+	rec := doGET(t, srv.routes(), "/api/pipeline-runs/pr_large")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("run detail = %d %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		StageTasks []struct {
+			Work []struct {
+				TaskID string `json:"task_id"`
+			} `json:"work"`
+		} `json:"stage_tasks"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode run detail: %v", err)
+	}
+	if len(body.StageTasks) != 1 || len(body.StageTasks[0].Work) >= descendants {
+		t.Fatalf("projected work = %d items, want the bounded page", len(body.StageTasks[0].Work))
 	}
 }
 

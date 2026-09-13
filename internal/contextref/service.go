@@ -240,15 +240,32 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 	return span, nil
 }
 
-// resolvePipelineReport joins the caller plus its token generation to the one
-// current attempt and requires an accepted report that has not yet reached
-// quiescence — the exact window between report_pipeline_stage_result succeeding
-// and the reporting turn ending (TS-04.R28, FS-15.R4).
+// resolvePipelineReport joins the caller plus its token generation to its own
+// accepted stage result and requires that the result's release has not settled —
+// the exact window between report_task_result succeeding and the reporting turn
+// ending (TS-04.R28, TS-09.R48, FS-15.R4).
+//
+// A task-backed run writes no pipeline attempt row, so this resolves the stage
+// task directly: requiring an attempt first refused every share on every new
+// run. The legacy attempt locator stays available for a run that still has one,
+// and already-created references keep their own locators and tombstones in the
+// read path.
 func (s *Service) resolvePipelineReport(caller Caller) (state.ContextSource, *Error) {
-	run, attempt, err := s.store.CurrentPipelineAttemptForAgent(caller.AgentID)
+	_, task, err := s.store.AcceptedPipelineStageTaskReport(caller.AgentID)
+	switch {
+	case err == nil:
+		if caller.Generation != "" && task.AssignedGeneration != "" && task.AssignedGeneration != caller.Generation {
+			return state.ContextSource{}, failf(CodeSourceUnavailable,
+				"Your session does not own the current pipeline stage task.")
+		}
+		return state.ContextSource{Kind: state.ContextSourcePipelineReport, PipelineAttemptID: task.TaskID}, nil
+	case !errors.Is(err, state.ErrNotFound):
+		return state.ContextSource{}, unavailable(err)
+	}
+	_, attempt, err := s.store.CurrentPipelineAttemptForAgent(caller.AgentID)
 	if errors.Is(err, state.ErrNotFound) {
 		return state.ContextSource{}, failf(CodeSourceUnavailable,
-			"You have no current pipeline attempt with an accepted report.")
+			"You have no accepted pipeline stage result to share.")
 	}
 	if err != nil {
 		return state.ContextSource{}, unavailable(err)
@@ -260,18 +277,6 @@ func (s *Service) resolvePipelineReport(caller Caller) (state.ContextSource, *Er
 	if attempt.ReportedAt == nil || attempt.QuiescentAt != nil {
 		return state.ContextSource{}, failf(CodeSourceUnavailable,
 			"A pipeline report is shareable only after it is accepted and before the reporting turn ends.")
-	}
-	// New task-backed runs identify the immutable task result. The legacy
-	// attempt locator remains the fallback for references created before the
-	// replacement reset (TS-09.R48).
-	if stages, stageErr := s.store.ListPipelineStageTasks(run.RunID); stageErr == nil {
-		for i := len(stages) - 1; i >= 0; i-- {
-			if stages[i].StageID == attempt.StageID && stages[i].TaskID != "" {
-				return state.ContextSource{Kind: state.ContextSourcePipelineReport, PipelineAttemptID: stages[i].TaskID}, nil
-			}
-		}
-	} else {
-		return state.ContextSource{}, unavailable(stageErr)
 	}
 	return state.ContextSource{Kind: state.ContextSourcePipelineReport, PipelineAttemptID: attempt.AttemptID}, nil
 }

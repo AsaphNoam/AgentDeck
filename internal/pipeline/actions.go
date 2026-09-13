@@ -3,42 +3,37 @@ package pipeline
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/toolresult"
 )
 
 func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision int64, input string) (RunDetail, error) {
-	lock := m.runLock(runID)
-	lock.Lock()
+	unlock := m.lockRun(runID)
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, err
 	}
 	if run.Revision != expectedRevision {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before continuing")
 	}
-	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
-		current := stages[len(stages)-1]
+	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
 		detail, detailErr := m.Detail(runID)
 		if detailErr != nil {
-			lock.Unlock()
+			unlock()
 			return RunDetail{}, detailErr
 		}
 		task, taskErr := m.store.ReadTask(current.TaskID)
 		if taskErr != nil {
-			lock.Unlock()
+			unlock()
 			return RunDetail{}, taskErr
 		}
 		stage, found := stageByID(detail.Template, current.StageID)
 		if !found {
-			lock.Unlock()
+			unlock()
 			return RunDetail{}, controlError("invalid_state", "current stage is missing")
 		}
 		var continueErr error
@@ -54,16 +49,16 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 		default:
 			continueErr = controlError("invalid_state", "continue is not valid for the current run state")
 		}
-		lock.Unlock()
+		unlock()
 		if continueErr != nil {
 			return RunDetail{}, continueErr
 		}
 		return m.Detail(runID)
 	} else if stageErr != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, stageErr
 	}
-	lock.Unlock()
+	unlock()
 	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
@@ -72,12 +67,18 @@ func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetai
 	if err != nil {
 		return err
 	}
-	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, nil, input)
 	assignment := standingAssignment(detail.Assignments, stage.ID)
-	coordinator, err := m.coordinatorTask(run.Project, run.Goal, stage, detail.Assignments[stage.ID])
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, taskID, stage, detail.Assignments[stage.ID])
 	if err != nil {
 		return err
 	}
+	prior, err := m.priorStageResults(run.RunID, "")
+	if err != nil {
+		return err
+	}
+	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, assignmentContext{
+		Coordinator: coordinatorContext(coordinator, stage), PriorResults: prior, Continuation: input,
+	})
 	targetKind := state.TargetLaunch
 	if current.StandingAgentID != "" {
 		targetKind = state.TargetAgent
@@ -118,12 +119,18 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 	if err != nil {
 		return err
 	}
-	instruction, digest := renderAssignment(run, detail.Template, next, detail.Values, nil, "")
 	assignment := standingAssignment(detail.Assignments, next.ID)
-	coordinator, err := m.coordinatorTask(run.Project, run.Goal, next, detail.Assignments[next.ID])
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, taskID, next, detail.Assignments[next.ID])
 	if err != nil {
 		return err
 	}
+	prior, err := m.priorStageResults(run.RunID, "")
+	if err != nil {
+		return err
+	}
+	instruction, digest := renderAssignment(run, detail.Template, next, detail.Values, assignmentContext{
+		Coordinator: coordinatorContext(coordinator, next), PriorResults: prior,
+	})
 	targetKind := state.TargetLaunch
 	if current.StandingAgentID != "" {
 		targetKind = state.TargetAgent
@@ -148,42 +155,39 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 }
 
 func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
-	lock := m.runLock(runID)
-	lock.Lock()
+	unlock := m.lockRun(runID)
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, err
 	}
 	if run.Revision != expectedRevision {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before retrying")
 	}
-	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
-		current := stages[len(stages)-1]
+	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
 		updated, retryErr := m.store.RetryInterruptedPipelineStageTask(runID, current.TaskID, expectedRevision)
 		if retryErr != nil {
-			lock.Unlock()
+			unlock()
 			if errors.Is(retryErr, state.ErrPipelineStageConflict) {
 				return RunDetail{}, controlError("invalid_state", "retry is not valid for the current stage task")
 			}
 			return RunDetail{}, retryErr
 		}
 		m.publish(updated)
-		lock.Unlock()
+		unlock()
 		return m.Detail(runID)
 	} else if stageErr != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, stageErr
 	}
-	lock.Unlock()
+	unlock()
 	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
 func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision int64, runtime RuntimeAssignment) (RunDetail, error) {
-	lock := m.runLock(runID)
-	lock.Lock()
-	defer lock.Unlock()
+	unlock := m.lockRun(runID)
+	defer unlock()
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
 		return RunDetail{}, err
@@ -195,11 +199,10 @@ func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision in
 	if err != nil {
 		return RunDetail{}, err
 	}
-	stages, err := m.store.ListPipelineStageTasks(runID)
-	if err != nil || len(stages) == 0 {
+	current, found, err := m.currentStageTask(runID)
+	if err != nil || !found {
 		return RunDetail{}, controlError("invalid_state", "there is no current stage task to replace")
 	}
-	current := stages[len(stages)-1]
 	task, err := m.store.ReadTask(current.TaskID)
 	if err != nil {
 		return RunDetail{}, err
@@ -217,7 +220,20 @@ func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision in
 	if err != nil {
 		return RunDetail{}, err
 	}
-	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, nil, "Replacement standing owner: inspect the retained stage work and continue from durable results.")
+	// A replacement keeps the predecessor's coordinator binding, so its assignment
+	// names that same child rather than minting a second one (TS-09.R37/R41).
+	var replacementCoordinator *coordinatorHandoff
+	if current.CoordinatorTaskID != "" {
+		replacementCoordinator = &coordinatorHandoff{TaskID: current.CoordinatorTaskID, Role: stage.DedicatedRole, Objective: stage.Objective}
+	}
+	prior, err := m.priorStageResults(runID, "")
+	if err != nil {
+		return RunDetail{}, err
+	}
+	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, assignmentContext{
+		Coordinator: replacementCoordinator, PriorResults: prior,
+		Continuation: "Replacement standing owner: inspect the retained stage work and continue from durable results.",
+	})
 	prepared, err := m.store.PreparePipelineStageReplacement(state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: run.Revision, StageIndex: current.StageIndex, AttemptNumber: current.AttemptNumber + 1, StageID: stage.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Task: state.Task{TaskID: id, Project: run.Project, DisplayName: stage.Title, Instruction: instruction, TargetKind: state.TargetLaunch, Role: detail.Template.OrchestratorRole, Backend: runtime.Backend, Model: runtime.Model, Effort: runtime.Effort, Fast: runtime.Fast, CreatedByKind: "pipeline"}}, current.TaskID)
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineStageConflict) {
@@ -234,48 +250,46 @@ func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision in
 }
 
 func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
-	lock := m.runLock(runID)
-	lock.Lock()
+	unlock := m.lockRun(runID)
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, err
 	}
 	if run.Revision != expectedRevision {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before stopping")
 	}
 	if run.State == "completed" || run.State == "stopped" {
-		lock.Unlock()
+		unlock()
 		return m.Detail(runID)
 	}
-	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
+	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
 		updated, stopErr := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
 			State: "stopping", PendingAction: "cleanup_run", CurrentStageID: run.CurrentStageID,
-			CurrentAgentID: stages[len(stages)-1].StandingAgentID, FinalOutcome: "",
+			CurrentAgentID: current.StandingAgentID, FinalOutcome: "",
 		})
 		if stopErr == nil {
 			m.publish(updated)
 		}
-		lock.Unlock()
+		unlock()
 		if stopErr != nil {
 			return RunDetail{}, stopErr
 		}
 		return m.Detail(runID)
 	} else if stageErr != nil {
-		lock.Unlock()
+		unlock()
 		return RunDetail{}, stageErr
 	}
-	lock.Unlock()
+	unlock()
 	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
 // FinishStopCleanup commits the terminal run outcome only after every lineage
 // member is terminal and its runtime release has settled.
 func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDetail, error) {
-	lock := m.runLock(runID)
-	lock.Lock()
-	defer lock.Unlock()
+	unlock := m.lockRun(runID)
+	defer unlock()
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
 		return RunDetail{}, err
@@ -286,14 +300,12 @@ func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDe
 	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
 		return RunDetail{}, controlError("invalid_state", "run cleanup is not pending")
 	}
-	tasks, err := m.store.ListTasksForPipelineRun(runID)
+	settled, err := m.settleCleanup(runID, "", "")
 	if err != nil {
 		return RunDetail{}, err
 	}
-	for _, task := range tasks {
-		if task.State != state.TaskFinished || task.PendingRelease || task.PendingYield {
-			return RunDetail{}, controlError("cleanup_pending", "run cleanup still has unfinished task effects")
-		}
+	if !settled {
+		return RunDetail{}, controlError("cleanup_pending", "run cleanup still has unfinished task effects")
 	}
 	stopped, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
 		State: "stopped", PendingAction: "", CurrentStageID: run.CurrentStageID,
@@ -315,13 +327,29 @@ func (m *Manager) RepairCleanup(ctx context.Context, runID string, expectedRevis
 	if run.Revision != expectedRevision {
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before repairing cleanup")
 	}
-	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
+	// Stage completion retains cleanup exactly as Stop does, so `finishing` needs
+	// the same repair route: without it a stage whose cleanup failed persistently
+	// had no operator action at all (TS-09.R42).
+	if !cleanupRepairable(run) {
 		return RunDetail{}, controlError("invalid_state", "cleanup repair is not valid for the current run state")
 	}
 	if err := m.Reconcile(ctx, runID); err != nil {
 		return RunDetail{}, err
 	}
 	return m.Detail(runID)
+}
+
+// CleanupRepairable reports whether a run is holding retained cleanup that the
+// operator-facing repair control can retry. Both the stopping run's cleanup and
+// a completing stage's release are retained the same way, so both expose the
+// same recovery action (TS-09.R42, FS-14.R44).
+func CleanupRepairable(state, pendingAction string) bool {
+	return (state == "stopping" && pendingAction == "cleanup_run") ||
+		(state == "finishing" && pendingAction == "release_stage_task")
+}
+
+func cleanupRepairable(run state.PipelineRunRecord) bool {
+	return CleanupRepairable(run.State, run.PendingAction)
 }
 
 // StopProject uses the ordinary durable stop path for every non-terminal run
@@ -344,328 +372,4 @@ func (m *Manager) StopProject(ctx context.Context, project string) error {
 
 func (m *Manager) Delete(runID string) error {
 	return m.store.DeletePipelineRun(runID)
-}
-
-func currentAttempt(detail RunDetail) (state.PipelineAttemptRecord, bool) {
-	for _, attempt := range detail.Attempts {
-		if attempt.AttemptID == detail.Run.CurrentAttemptID {
-			return attempt, true
-		}
-	}
-	return state.PipelineAttemptRecord{}, false
-}
-
-func (m *Manager) Report(agentID, generation string, report StageReport) (RunDetail, error) {
-	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
-	if err != nil {
-		if errors.Is(err, state.ErrNotFound) {
-			return m.reportStageTask(agentID, generation, report)
-		}
-		return RunDetail{}, err
-	}
-	lock := m.runLock(run.RunID)
-	lock.Lock()
-	defer lock.Unlock()
-	run, err = m.store.ReadPipelineRun(run.RunID)
-	if err != nil {
-		return RunDetail{}, err
-	}
-	attempt, err = m.store.ReadPipelineAttempt(run.CurrentAttemptID)
-	if err != nil {
-		return RunDetail{}, err
-	}
-	if !state.OwnsReportedWork(agentID, generation, attempt.AgentID, attempt.AgentGeneration) {
-		return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "caller is not the current stage attempt"))
-	}
-	if run.PendingAction != "await_result" {
-		if attempt.ReportOutcome != "" {
-			return refuseReport(run, attempt, agentID, generation, controlError("already_reported", "this attempt already reported a result and its participation has ended; work done since then cannot be recorded against the run. Wait for the run's human Continue action, which arrives as a new assignment"))
-		}
-		return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "the current stage attempt is no longer awaiting a result"))
-	}
-	// The vocabulary and the field bounds are the shared work-result rules, so a
-	// stage report and a task report can never drift apart (TS-10.R7).
-	switch err := state.ValidateAgentReport(report.Outcome, report.Summary, report.Details, report.Checks); {
-	case errors.Is(err, state.ErrInvalidOutcome):
-		return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outcome", Code: "invalid", Message: "outcome must be success, failure, or blocked"}}))
-	case err != nil:
-		return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}}))
-	}
-	if report.Outputs == nil {
-		report.Outputs = map[string]string{}
-	}
-	detail, err := m.Detail(run.RunID)
-	if err != nil {
-		return RunDetail{}, err
-	}
-	stage, ok := stageByID(detail.Template, attempt.StageID)
-	if !ok {
-		return refuseReport(run, attempt, agentID, generation, controlError("invalid_state", "current stage is missing"))
-	}
-	declared := map[string]StageOutput{}
-	for _, output := range stage.Outputs {
-		declared[output.Name] = output
-	}
-	outputValues := []state.PipelineValueRecord{}
-	available := map[string]string{}
-	for _, value := range detail.Values {
-		available[value.Name] = value.Value
-	}
-	for localName, value := range report.Outputs {
-		output, exists := declared[localName]
-		if !exists {
-			return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "undeclared", Message: "output is not declared by the current stage"}}))
-		}
-		if utf8.RuneCountInString(value) > MaxValueRunes {
-			return refuseReport(run, attempt, agentID, generation, validationError("invalid stage result", []Diagnostic{{Field: "outputs." + localName, Code: "too_long", Message: "output exceeds the pipeline value limit"}}))
-		}
-		available[output.Value] = value
-		outputValues = append(outputValues, state.PipelineValueRecord{RunID: run.RunID, Name: output.Value, Value: value, SourceAttemptID: attempt.AttemptID})
-	}
-	if report.Outcome != "blocked" {
-		transition := stage.Transitions.Success
-		if report.Outcome == "failure" {
-			transition = stage.Transitions.Failure
-		}
-		if transition.Stage != "" {
-			destination, found := stageByID(detail.Template, transition.Stage)
-			if !found {
-				return refuseReport(run, attempt, agentID, generation, controlError("invalid_state", "transition destination is missing"))
-			}
-			missing := []Diagnostic{}
-			for _, input := range destination.Inputs {
-				if input.Required && strings.TrimSpace(available[input.Value]) == "" {
-					missing = append(missing, Diagnostic{Field: "outputs." + input.Value, Code: "missing_destination_value", Message: "destination requires a non-empty value named " + input.Value})
-				}
-			}
-			if len(missing) > 0 {
-				return refuseReport(run, attempt, agentID, generation, validationError("destination inputs are unresolved", missing))
-			}
-		}
-	}
-	updated, _, err := m.store.AcceptPipelineReport(state.PipelineReportInput{
-		RunID: run.RunID, AttemptID: attempt.AttemptID, AgentID: agentID, AgentGeneration: generation,
-		ExpectedRevision: run.Revision, Outcome: report.Outcome, Summary: report.Summary,
-		Details: report.Details, Checks: report.Checks, Outputs: outputValues, ReportedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		if errors.Is(err, state.ErrPipelineConflict) {
-			return refuseReport(run, attempt, agentID, generation, controlError("stale_assignment", "stage result was already accepted or the run changed"))
-		}
-		return RunDetail{}, err
-	}
-	m.publish(updated)
-	return m.Detail(run.RunID)
-}
-
-// reportStageTask keeps the historical manager entry point usable while the
-// shared task tool is wired by the server. Its acceptance path is task-owned;
-// it never writes a pipeline attempt/report row.
-func (m *Manager) reportStageTask(agentID, generation string, report StageReport) (RunDetail, error) {
-	stageTask, task, err := m.store.PipelineStageTaskForAssignee(agentID, generation)
-	if errors.Is(err, state.ErrNotFound) {
-		return RunDetail{}, controlError("assignment_unknown", "caller has no current pipeline stage task")
-	}
-	if err != nil {
-		return RunDetail{}, err
-	}
-	detail, err := m.Detail(stageTask.RunID)
-	if err != nil {
-		return RunDetail{}, err
-	}
-	stage, found := stageByID(detail.Template, stageTask.StageID)
-	if !found {
-		return RunDetail{}, controlError("invalid_state", "current stage is missing")
-	}
-	if err := state.ValidateAgentReport(report.Outcome, report.Summary, report.Details, report.Checks); err != nil {
-		return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}})
-	}
-	if report.Outputs == nil {
-		report.Outputs = map[string]string{}
-	}
-	declared := map[string]StageOutput{}
-	for _, output := range stage.Outputs {
-		declared[output.Name] = output
-	}
-	for name, value := range report.Outputs {
-		if _, ok := declared[name]; !ok {
-			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + name, Code: "undeclared", Message: "output is not declared by the current stage"}})
-		}
-		if utf8.RuneCountInString(value) > MaxValueRunes {
-			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + name, Code: "too_long", Message: "output exceeds the pipeline value limit"}})
-		}
-	}
-	for _, output := range stage.Outputs {
-		if output.Value == "" {
-			continue
-		}
-		// Declared outputs are required on success; partial values remain legal for
-		// failure/blocked and are still retained on the immutable task result.
-		if report.Outcome == state.OutcomeSuccess && strings.TrimSpace(report.Outputs[output.Name]) == "" {
-			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + output.Name, Code: "required", Message: "success requires every declared output"}})
-		}
-	}
-	updated, err := m.store.AcceptPipelineStageTaskResult(task.TaskID, agentID, generation, detail.Run.Revision, state.TaskResult{Outcome: report.Outcome, Summary: report.Summary, Details: report.Details, Outputs: report.Outputs})
-	if errors.Is(err, state.ErrPipelineStageConflict) {
-		return RunDetail{}, controlError("stale_assignment", "the stage task is no longer current")
-	}
-	if err != nil {
-		return RunDetail{}, err
-	}
-	m.publish(updated)
-	return m.Detail(stageTask.RunID)
-}
-
-// refuseReport logs every refused stage result at Warn before returning it. The
-// server log is otherwise silent about control-plane refusals, so a field report
-// of a refused report could only be corroborated from the agent's own
-// transcript. The fields carried here are exactly what separates the refusal
-// conditions from one another (stale_assignment vs already_reported vs the rest).
-func refuseReport(run state.PipelineRunRecord, attempt state.PipelineAttemptRecord, agentID, generation string, refusal *ControlError) (RunDetail, error) {
-	if guidance := toolresult.StageReportGuidance(refusal.Code); guidance != "" {
-		refusal.Message += " " + guidance
-	}
-	slog.Warn("pipeline: stage result refused",
-		"code", refusal.Code, "run", run.RunID, "attempt", attempt.AttemptID,
-		"caller_agent", agentID, "caller_generation", generation,
-		"attempt_agent", attempt.AgentID, "attempt_generation", attempt.AgentGeneration,
-		"pending_action", run.PendingAction)
-	return RunDetail{}, refusal
-}
-
-func (m *Manager) OnTurnEnd(agentID, generation string) error {
-	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
-	if errors.Is(err, state.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if attempt.AgentGeneration != generation || attempt.ReportOutcome == "" || run.PendingAction != "await_quiescence" {
-		return nil
-	}
-	lock := m.runLock(run.RunID)
-	lock.Lock()
-	// The pre-lock read only filters; the quiescence claim must use the state
-	// this critical section observed, exactly as Report re-reads it. A revision
-	// bump inside that window otherwise fails the CAS and parks the run at
-	// await_quiescence with no further turn boundary coming (INV §5).
-	run, attempt, err = m.currentUnderLock(run.RunID, agentID, generation)
-	if err != nil {
-		lock.Unlock()
-		return err
-	}
-	if attempt.AttemptID == "" || attempt.ReportOutcome == "" || run.PendingAction != "await_quiescence" {
-		lock.Unlock()
-		slog.Warn("pipeline: turn end skipped; run changed before the quiescence claim",
-			"run", run.RunID, "attempt", run.CurrentAttemptID, "caller_agent", agentID,
-			"caller_generation", generation, "pending_action", run.PendingAction)
-		return nil
-	}
-	updated, err := m.store.MarkPipelineQuiescent(run.RunID, attempt.AttemptID, agentID, generation, run.Revision, time.Now().UTC())
-	if err == nil {
-		m.publish(updated)
-		if updated.AttentionReason == "blocked" {
-			m.notify(updated, "needs_attention")
-		}
-	}
-	lock.Unlock()
-	if err != nil {
-		if errors.Is(err, state.ErrPipelineConflict) {
-			slog.Warn("pipeline: quiescence claim conflicted",
-				"run", run.RunID, "attempt", attempt.AttemptID, "caller_agent", agentID,
-				"caller_generation", generation, "revision", run.Revision)
-			return nil
-		}
-		return err
-	}
-	return m.Reconcile(context.Background(), run.RunID)
-}
-
-// currentUnderLock re-reads the run and its current attempt while the run lock
-// is held, and reports whether that attempt is still the caller's. Callers that
-// resolved an attempt before taking the lock must refresh through it so a CAS
-// never carries a revision from outside the critical section (INV §5).
-func (m *Manager) currentUnderLock(runID, agentID, generation string) (state.PipelineRunRecord, state.PipelineAttemptRecord, error) {
-	run, err := m.store.ReadPipelineRun(runID)
-	if err != nil {
-		return state.PipelineRunRecord{}, state.PipelineAttemptRecord{}, err
-	}
-	attempt, err := m.store.ReadPipelineAttempt(run.CurrentAttemptID)
-	if errors.Is(err, state.ErrNotFound) {
-		return run, state.PipelineAttemptRecord{}, nil
-	}
-	if err != nil {
-		return state.PipelineRunRecord{}, state.PipelineAttemptRecord{}, err
-	}
-	if attempt.AgentID != agentID || attempt.AgentGeneration != generation {
-		return run, state.PipelineAttemptRecord{}, nil
-	}
-	return run, attempt, nil
-}
-
-func (m *Manager) OnExit(agentID, generation, cause string) error {
-	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
-	if errors.Is(err, state.ErrNotFound) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if attempt.AgentGeneration != generation {
-		return nil
-	}
-	if stoppingAgent(run) {
-		return m.Reconcile(context.Background(), run.RunID)
-	}
-	lock := m.runLock(run.RunID)
-	lock.Lock()
-	// Same INV §5 refresh as OnTurnEnd: the crash pause CAS must not carry the
-	// revision read before the lock, or a run whose revision moved inside the
-	// window stays running with no attention reason and no notification.
-	run, attempt, err = m.currentUnderLock(run.RunID, agentID, generation)
-	if err != nil {
-		lock.Unlock()
-		return err
-	}
-	if attempt.AttemptID == "" {
-		lock.Unlock()
-		slog.Warn("pipeline: exit skipped; run changed before the crash pause",
-			"run", run.RunID, "attempt", run.CurrentAttemptID, "caller_agent", agentID,
-			"caller_generation", generation, "pending_action", run.PendingAction)
-		return nil
-	}
-	if stoppingAgent(run) {
-		lock.Unlock()
-		return m.Reconcile(context.Background(), run.RunID)
-	}
-	attemptState := "crashed"
-	attentionReason := "agent_crash"
-	if cause == "requested_stop" {
-		attemptState = "stopped"
-		attentionReason = "agent_stopped"
-	}
-	updated, err := m.store.UpdatePipelineAttemptAndRunCAS(run.RunID, run.Revision, attempt.AttemptID, attemptState, generation, state.PipelineRunUpdate{
-		State: "paused", PendingAction: "", CurrentStageID: run.CurrentStageID,
-		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, AttentionReason: attentionReason,
-	})
-	if err == nil {
-		m.publish(updated)
-		m.notify(updated, "needs_attention")
-	}
-	lock.Unlock()
-	if errors.Is(err, state.ErrPipelineConflict) {
-		slog.Warn("pipeline: crash pause conflicted",
-			"run", run.RunID, "attempt", attempt.AttemptID, "caller_agent", agentID,
-			"caller_generation", generation, "revision", run.Revision)
-		return nil
-	}
-	return err
-}
-
-// stoppingAgent reports the pending actions that already own stopping the run's
-// agent, so an exit callback reconciles instead of raising a crash pause.
-func stoppingAgent(run state.PipelineRunRecord) bool {
-	return run.State == "stopped" || run.PendingAction == "stopping_agent" ||
-		run.PendingAction == "stop_run_agent" || run.PendingAction == "retry_stopping_agent"
 }

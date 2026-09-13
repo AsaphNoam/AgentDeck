@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -349,7 +350,7 @@ func TestRetryAndRearmRepairDifferentThings(t *testing.T) {
 	}{{failing, state.OutcomeFailure}, {succeeding, state.OutcomeSuccess}} {
 		running := dispatchUntilTaskState(t, srv, prereq.task.TaskID, state.TaskRunning)
 		if _, err := srv.stateStore.RecordAgentTaskResult(prereq.task.TaskID,
-			running.AssignedAgentID, running.AssignedGeneration,
+			running.AssignedAgentID, running.AssignedGeneration, running.ExecutionHandle,
 			state.TaskResult{Outcome: prereq.outcome, Summary: "done"}); err != nil {
 			t.Fatalf("RecordAgentTaskResult: %v", err)
 		}
@@ -466,7 +467,7 @@ func TestDeletionIsRefusedWhileATaskOwnsARuntime(t *testing.T) {
 	// A dependent whose arm the prerequisite already satisfied is untouched by
 	// that prerequisite's deletion; one still waiting is parked.
 	if _, err := srv.stateStore.RecordAgentTaskResult(satisfied.TaskID,
-		satisfiedRunning.AssignedAgentID, satisfiedRunning.AssignedGeneration,
+		satisfiedRunning.AssignedAgentID, satisfiedRunning.AssignedGeneration, satisfiedRunning.ExecutionHandle,
 		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}
@@ -618,6 +619,141 @@ func TestAgentTaskControlUsesCreatorAuthorityAndBoundedList(t *testing.T) {
 	retried, err := srv.RetryAgentTask(mine.TaskID, creator)
 	if err != nil || retried.State != state.TaskReady {
 		t.Fatalf("RetryAgentTask = %+v, %v", retried, err)
+	}
+}
+
+// TS-09.R39/R41/R49, FS-14.R73 — a standing stage owner controls the work its
+// stage owns even when it did not create it: the host creates the dedicated
+// coordinator, and a replacement owner inherits retained predecessor work.
+// Creator-only authority refused the owner exactly the delegation workflow its
+// stage requires, while unrelated callers must still be refused.
+func TestStandingStageOwnerControlsManagedWorkItDidNotCreate(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	owner := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	stranger := launchAndWaitIdle(t, ts, "reviewer", "tmpproj")
+	now := time.Now().UTC()
+	runID, err := srv.stateStore.NewPipelineRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stageTaskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: runID, TemplateID: "quality", TemplateSnapshot: json.RawMessage(`{"version":2}`),
+		DisplayName: "Quality", Project: "tmpproj", Goal: "ship", Inputs: json.RawMessage(`{}`),
+		Assignments: json.RawMessage(`{}`), State: "queued", Revision: 1,
+		PendingAction: "dispatch_stage_task", CurrentStageID: "implement", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "managed-control", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "implement",
+		Task: state.Task{TaskID: stageTaskID, Project: "tmpproj", DisplayName: "Implement",
+			Instruction: "implement", TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline"},
+		Coordinator: &state.Task{TaskID: "tk_managed", Project: "tmpproj", DisplayName: "Implement coordinator",
+			Instruction: "coordinate", TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline_coordinator"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ? WHERE task_id = ?`,
+		state.TaskRunning, owner, stageTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.stateStore.BindPipelineStageTaskStandingAgent(stageTaskID, owner); err != nil {
+		t.Fatal(err)
+	}
+
+	read, err := srv.ReadAgentTask("tk_managed", owner)
+	if err != nil || read.TaskID != "tk_managed" {
+		t.Fatalf("standing owner reading its managed child = %+v, %v", read, err)
+	}
+	_, unauthorizedErr := srv.ReadAgentTask("tk_managed", stranger)
+	_, unknownErr := srv.ReadAgentTask("tk_missing", stranger)
+	var unauthorized, unknown *messaging.ToolError
+	if !errors.As(unauthorizedErr, &unauthorized) || !errors.As(unknownErr, &unknown) ||
+		unauthorized.Code != unknown.Code || unauthorized.Message != unknown.Message {
+		t.Fatalf("unauthorized = %v, unknown = %v", unauthorizedErr, unknownErr)
+	}
+	// The stage task itself is not generic-control surface (TS-09.R41).
+	if _, err := srv.ReadAgentTask(stageTaskID, owner); err == nil {
+		t.Fatal("the standing stage task was reachable through generic task control")
+	}
+	cancelled, err := srv.CancelAgentTask("tk_managed", owner)
+	if err != nil || cancelled.Outcome != state.OutcomeCancelled {
+		t.Fatalf("standing owner cancelling its managed child = %+v, %v", cancelled, err)
+	}
+}
+
+// TS-09.R17/R40, INV §1/§2 — an accepted stage result moves its run, and that
+// run update was discarded at the tool surface, so every connected client kept
+// showing the pre-report run until something unrelated happened to publish.
+// Deciding a stage report belongs to the plane that owns runs, and that plane
+// republishes what the commit changed.
+func TestAcceptedStageResultPublishesItsRunUpdate(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	owner := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	now := time.Now().UTC()
+	runID, err := srv.stateStore.NewPipelineRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stageTaskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: runID, TemplateID: "quality", TemplateSnapshot: json.RawMessage(`{"version":2}`),
+		DisplayName: "Quality", Project: "tmpproj", Goal: "ship", Inputs: json.RawMessage(`{}`),
+		Assignments: json.RawMessage(`{}`), State: "queued", Revision: 1,
+		PendingAction: "dispatch_stage_task", CurrentStageID: "implement", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "report-publish", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "implement",
+		Task: state.Task{TaskID: stageTaskID, Project: "tmpproj", DisplayName: "Implement",
+			Instruction: "implement", TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	generation := srv.registry.Generation(owner)
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ?, assigned_generation = ?, execution_handle = 'ta_pub' WHERE task_id = ?`,
+		state.TaskRunning, owner, generation, stageTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.stateStore.BindPipelineStageTaskStandingAgent(stageTaskID, owner); err != nil {
+		t.Fatal(err)
+	}
+
+	events, unsubscribe := srv.eventBus.Subscribe()
+	defer unsubscribe()
+
+	finished, err := srv.ReportAgentTaskResult(messaging.AgentTaskResultRequest{
+		AgentID: owner, Generation: generation, ExecutionHandle: "ta_pub",
+		Result: state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "stage done"},
+	})
+	if err != nil || finished.Outcome != state.OutcomeSuccess {
+		t.Fatalf("ReportAgentTaskResult = %+v, %v", finished, err)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type != "pipeline_update" {
+				continue
+			}
+			encoded, err := json.Marshal(ev.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var update pipeline.PipelineUpdate
+			if err := json.Unmarshal(encoded, &update); err != nil {
+				t.Fatal(err)
+			}
+			if update.RunID != runID || update.State != "finishing" {
+				t.Fatalf("published run update = %+v, want the finishing run this report committed", update)
+			}
+			return
+		case <-deadline:
+			t.Fatal("an accepted stage result published no run update")
+		}
 	}
 }
 

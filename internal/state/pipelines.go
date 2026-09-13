@@ -245,7 +245,8 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 		}
 		now := run.CreatedAt
 		p.Task.CreatedAt, p.Task.UpdatedAt, p.Task.Revision, p.Task.State = now, now, 1, TaskReady
-		if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, created_by_agent_id, created_by_generation, revision, ready_at, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.Task.Project, p.Task.DisplayName, p.Task.Instruction, p.Task.TargetKind, p.Task.TargetAgentID, p.Task.Role, p.Task.Backend, p.Task.Model, p.Task.Effort, p.Task.Fast, p.Task.State, p.Task.CreatedByKind, p.Task.CreatedByAgentID, p.Task.CreatedByGeneration, p.Task.Revision, formatTime(now), formatTime(now), formatTime(now)); err != nil {
+		p.Task.AttentionReason, p.Task.ReadyAt = "", &now
+		if err := insertTaskRowTx(tx, p.Task); err != nil {
 			return PipelineRunRecord{}, false, fmt.Errorf("state: insert initial pipeline stage task: %w", err)
 		}
 		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
@@ -255,7 +256,10 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 		if p.Coordinator != nil {
 			c := *p.Coordinator
 			c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
-			if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`, c.TaskID, c.Project, c.DisplayName, c.Instruction, c.TargetKind, c.TargetAgentID, c.Role, c.Backend, c.Model, c.Effort, c.Fast, c.State, c.CreatedByKind, c.Revision, formatTime(now), formatTime(now)); err != nil {
+			// A managed coordinator is armed until its standing owner is confirmed,
+			// so it deliberately carries no ready time (TS-09.R49).
+			c.AttentionReason, c.ReadyAt = "", nil
+			if err := insertTaskRowTx(tx, c); err != nil {
 				return PipelineRunRecord{}, false, err
 			}
 			if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {

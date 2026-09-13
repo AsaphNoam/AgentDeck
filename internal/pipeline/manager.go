@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +15,12 @@ import (
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
-const maxReconcileSteps = 16
+const (
+	maxReconcileSteps = 16
+	// cleanupPageSize bounds one keyset page of cleanup members. A run's lineage
+	// is unbounded, so cleanup pages it rather than loading it whole (INV §16).
+	cleanupPageSize = 32
+)
 
 type Manager struct {
 	store     *state.Store
@@ -23,9 +29,16 @@ type Manager struct {
 	publisher Publisher
 
 	locksMu            sync.Mutex
-	locks              map[string]*sync.Mutex
+	locks              map[string]*runLock
 	attentionMu        sync.Mutex
 	pendingPermissions map[string]map[string]pendingPermission
+}
+
+// runLock is one run's control mutex plus the count of holders and waiters that
+// keeps it in the map.
+type runLock struct {
+	mu   sync.Mutex
+	refs int
 }
 
 type pendingPermission struct {
@@ -33,7 +46,7 @@ type pendingPermission struct {
 }
 
 func NewManager(store *state.Store, templates *TemplateStore, lifecycle Lifecycle, publisher Publisher) *Manager {
-	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*sync.Mutex{}, pendingPermissions: map[string]map[string]pendingPermission{}}
+	return &Manager{store: store, templates: templates, lifecycle: lifecycle, publisher: publisher, locks: map[string]*runLock{}, pendingPermissions: map[string]map[string]pendingPermission{}}
 }
 
 func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, bool, error) {
@@ -76,12 +89,12 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	for name, value := range request.Inputs {
 		values = append(values, state.PipelineValueRecord{RunID: runID, Name: name, Value: value, SourceKind: "run_input", UpdatedAt: now})
 	}
-	assignmentText, assignmentHash := renderAssignment(run, record.Template, first, values, nil, "")
 	assignment := standingAssignment(request.Assignments, first.ID)
-	coordinator, err := m.coordinatorTask(run.Project, run.Goal, first, request.Assignments[first.ID])
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, taskID, first, request.Assignments[first.ID])
 	if err != nil {
 		return RunDetail{}, false, err
 	}
+	assignmentText, assignmentHash := renderAssignment(run, record.Template, first, values, assignmentContext{Coordinator: coordinatorContext(coordinator, first)})
 	created, replay, err := m.store.CreatePipelineRun(state.CreatePipelineRunParams{
 		Run: run, RequestID: request.RequestID, RequestHash: requestHash, Values: values,
 		InitialStageTask: &state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Coordinator: coordinator, Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}},
@@ -101,7 +114,13 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	return detail, replay, err
 }
 
-func (m *Manager) coordinatorTask(project, goal string, stage Stage, assignment RuntimeAssignment) (*state.Task, error) {
+// coordinatorTask composes the optional managed child for a dedicated stage. The
+// child is told which standing stage task owns it and that its result is
+// delivered upward rather than accepted as the stage result (TS-09.R39/R49).
+// Its creator provenance stays `pipeline_coordinator`: the standing owner's
+// authority over it is derived from the live stage binding, not rewritten
+// creation history.
+func (m *Manager) coordinatorTask(project, goal, standingTaskID string, stage Stage, assignment RuntimeAssignment) (*state.Task, error) {
 	if stage.Coordination != "dedicated" {
 		return nil, nil
 	}
@@ -109,8 +128,65 @@ func (m *Manager) coordinatorTask(project, goal string, stage Stage, assignment 
 	if err != nil {
 		return nil, err
 	}
-	instruction := fmt.Sprintf("Coordinate pipeline stage %q. Run goal: %s\nStage objective: %s\nCreate and manage durable child work, report progress and your final result to the standing owner, and do not report the pipeline stage itself.", stage.Title, goal, stage.Objective)
+	instruction := fmt.Sprintf("Coordinate pipeline stage %q. Run goal: %s\nStage objective: %s\nYou report upward to the standing stage owner, whose assignment is task %s; it may read, correct, watch and cancel your work. Create and manage durable child work, report progress and your final result to that owner, and do not report the pipeline stage itself.", stage.Title, goal, stage.Objective, standingTaskID)
 	return &state.Task{TaskID: id, Project: project, DisplayName: stage.Title + " coordinator", Instruction: instruction, TargetKind: state.TargetLaunch, Role: stage.DedicatedRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline_coordinator"}, nil
+}
+
+// currentStageTask resolves the run's cursor through the one bounded accessor,
+// reporting false when the run has no durable stage task yet. Every control path
+// used to list every stage attempt and take the last, repeating the cursor
+// definition and growing with the run (TS-09.R40, INV §2/§16).
+func (m *Manager) currentStageTask(runID string) (state.PipelineStageTask, bool, error) {
+	current, err := m.store.LatestPipelineStageTask(runID)
+	if errors.Is(err, state.ErrNotFound) {
+		return state.PipelineStageTask{}, false, nil
+	}
+	if err != nil {
+		return state.PipelineStageTask{}, false, err
+	}
+	return current, true, nil
+}
+
+// priorStageResults reads the accepted results of this run's earlier stage
+// tasks, oldest first, bounded by MaxPriorStageResults. A continuation or
+// replacement may start a fresh conversation, so the assignment is the only
+// place those findings and their authoritative named sources survive
+// (TS-09.R39/R41).
+func (m *Manager) priorStageResults(runID, excludeTaskID string) ([]stageResultSummary, error) {
+	stages, err := m.store.ListPipelineStageTasks(runID)
+	if err != nil {
+		return nil, err
+	}
+	if len(stages) > MaxPriorStageResults {
+		stages = stages[len(stages)-MaxPriorStageResults:]
+	}
+	out := make([]stageResultSummary, 0, len(stages))
+	for _, stage := range stages {
+		if stage.TaskID == excludeTaskID {
+			continue
+		}
+		task, err := m.store.ReadTask(stage.TaskID)
+		if err != nil {
+			return nil, err
+		}
+		if task.Outcome == "" {
+			continue
+		}
+		out = append(out, stageResultSummary{
+			StageID: stage.StageID, Attempt: stage.AttemptNumber, Outcome: task.Outcome,
+			Summary: task.OutcomeSummary, TaskID: task.TaskID, Outputs: task.Outputs,
+		})
+	}
+	return out, nil
+}
+
+// coordinatorContext derives the bounded handoff the standing assignment carries
+// for a managed child, or nil when the stage has none.
+func coordinatorContext(coordinator *state.Task, stage Stage) *coordinatorHandoff {
+	if coordinator == nil {
+		return nil
+	}
+	return &coordinatorHandoff{TaskID: coordinator.TaskID, Role: stage.DedicatedRole, Objective: stage.Objective}
 }
 
 // OnStageTaskInterrupted projects an unexpected standing-owner exit onto the
@@ -329,10 +405,11 @@ func (m *Manager) Detail(runID string) (RunDetail, error) {
 		return RunDetail{}, err
 	}
 	detail.Values, err = m.store.ListPipelineValues(runID)
-	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr != nil {
+	current, stageErr := m.store.LatestPipelineStageTask(runID)
+	if stageErr != nil && !errors.Is(stageErr, state.ErrNotFound) {
 		return RunDetail{}, stageErr
-	} else if len(stages) > 0 {
-		current := stages[len(stages)-1]
+	}
+	if stageErr == nil {
 		detail.Run.CurrentTaskID = current.TaskID
 		detail.Run.OrchestratorAgentID = current.StandingAgentID
 		detail.Run.CurrentAgentID = current.StandingAgentID
@@ -530,6 +607,15 @@ func (m *Manager) pauseStartupRun(ctx context.Context, runID, reason string) err
 	if run.State == "completed" || run.State == "stopped" {
 		return nil
 	}
+	// A stop already committed its closure fence. Pausing here would drop that
+	// fence and re-enable Retry on a run a person asked to stop, so a failed
+	// recovery leaves the stop standing and its cleanup pending instead
+	// (TS-09.R42/R43, INV §15).
+	if run.State == "stopping" {
+		slog.Warn("pipeline: startup reconcile failed for a stopping run; retaining the stop fence",
+			"run", run.RunID, "reason", reason, "pending_action", run.PendingAction)
+		return nil
+	}
 	updated, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
 		State: "paused", PendingAction: "", CurrentStageID: run.CurrentStageID,
 		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID,
@@ -549,15 +635,31 @@ func (m *Manager) pauseStartupRun(ctx context.Context, runID, reason string) err
 	return nil
 }
 
-func (m *Manager) runLock(runID string) *sync.Mutex {
+// lockRun serializes one run's control transitions and returns its unlock. The
+// entry is dropped once the last holder and waiter have released it, so a
+// long-lived server does not retain one mutex for every run it has ever started,
+// read a control for, or since deleted (INV §16). This is the same refcounted
+// pattern the task dispatcher's per-task start lock uses (INV §2).
+func (m *Manager) lockRun(runID string) func() {
 	m.locksMu.Lock()
-	defer m.locksMu.Unlock()
 	lock := m.locks[runID]
 	if lock == nil {
-		lock = &sync.Mutex{}
+		lock = &runLock{}
 		m.locks[runID] = lock
 	}
-	return lock
+	lock.refs++
+	m.locksMu.Unlock()
+
+	lock.mu.Lock()
+	return func() {
+		lock.mu.Unlock()
+		m.locksMu.Lock()
+		lock.refs--
+		if lock.refs == 0 {
+			delete(m.locks, runID)
+		}
+		m.locksMu.Unlock()
+	}
 }
 
 func (m *Manager) publish(run state.PipelineRunRecord) {

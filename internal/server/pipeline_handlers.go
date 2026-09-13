@@ -279,6 +279,33 @@ func (s *Server) handleReplacePipelineRun(w http.ResponseWriter, r *http.Request
 	s.writePipelineRunResponse(w, detail)
 }
 
+// pipelineCleanupPage bounds one keyset page of a run's cleanup members. A run's
+// lineage is unbounded, so these sweeps page it rather than loading it whole
+// (TS-09.R42, INV §16).
+const pipelineCleanupPage = 32
+
+// eachPipelineCleanupMember visits every task a run's cleanup owns, one bounded
+// page at a time. The cursor is the last task id seen, so a member the callback
+// mutates cannot shift the page under it.
+func (s *Server) eachPipelineCleanupMember(runID string, visit func(state.Task) error) error {
+	after := ""
+	for {
+		tasks, err := s.stateStore.ListPipelineCleanupMembers(runID, "", "", after, pipelineCleanupPage)
+		if err != nil {
+			return err
+		}
+		for _, task := range tasks {
+			after = task.TaskID
+			if err := visit(task); err != nil {
+				return err
+			}
+		}
+		if len(tasks) < pipelineCleanupPage {
+			return nil
+		}
+	}
+}
+
 func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Request) {
 	var request pipelineControlRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -286,20 +313,19 @@ func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	runID := r.PathValue("id")
-	tasks, err := s.stateStore.ListTasksForPipelineRun(runID)
-	if err != nil {
+	if err := s.eachPipelineCleanupMember(runID, func(task state.Task) error {
+		if !task.CleanupUnsafe {
+			return nil
+		}
+		repaired, repairErr := s.stateStore.RepairTaskCleanup(task.TaskID)
+		if repairErr != nil {
+			return repairErr
+		}
+		s.finishTaskCleanup(r.Context(), repaired)
+		return nil
+	}); err != nil {
 		writePipelineError(w, err)
 		return
-	}
-	for _, task := range tasks {
-		if task.CleanupUnsafe {
-			repaired, repairErr := s.stateStore.RepairTaskCleanup(task.TaskID)
-			if repairErr != nil {
-				writePipelineError(w, repairErr)
-				return
-			}
-			s.finishTaskCleanup(r.Context(), repaired)
-		}
 	}
 	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), runID, request.Revision)
 	if err != nil {
@@ -321,22 +347,20 @@ func (s *Server) handleStopPipelineRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if detail.Run.State == "stopping" && detail.Run.PendingAction == "cleanup_run" {
-		tasks, listErr := s.stateStore.ListTasksForPipelineRun(detail.Run.RunID)
-		if listErr != nil {
-			writePipelineError(w, listErr)
-			return
-		}
-		for _, task := range tasks {
+		if err := s.eachPipelineCleanupMember(detail.Run.RunID, func(task state.Task) error {
 			if task.State == state.TaskFinished {
-				continue
+				return nil
 			}
 			cancelled, cancelErr := s.stateStore.CancelTask(task.TaskID)
 			if cancelErr != nil {
-				writePipelineError(w, cancelErr)
-				return
+				return cancelErr
 			}
 			s.finishInterruptedRelease(r.Context(), cancelled)
 			s.publishTaskUpdate(cancelled)
+			return nil
+		}); err != nil {
+			writePipelineError(w, err)
+			return
 		}
 		latest, readErr := s.pipelineMgr.Detail(detail.Run.RunID)
 		if readErr != nil {

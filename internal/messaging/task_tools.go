@@ -107,43 +107,40 @@ type reportTaskArgs struct {
 	Summary string            `json:"summary" jsonschema:"bounded human-readable result summary"`
 	Details string            `json:"details,omitempty" jsonschema:"optional bounded result details"`
 	Outputs map[string]string `json:"outputs,omitempty" jsonschema:"optional declared named outputs"`
+	// ExecutionHandle names the execution this result belongs to. A pipeline
+	// stage result requires it; an ordinary task result may omit it, and any
+	// handle supplied must match the current execution (TS-09.R40, TS-10.R28).
+	ExecutionHandle string `json:"execution_handle,omitempty" jsonschema:"handle returned by get_assigned_task for this execution; required for a pipeline stage result"`
 }
 
 // handleReportTaskResult records the caller's own result for its own assignment.
 // There is no task id argument and no reporter argument: both are the session
 // token's, so no caller can report for work it does not hold (TS-05.R14).
+//
+// Deciding whether this assignment is a pipeline stage — and publishing what an
+// accepted stage result did to its run — belongs to the control plane that owns
+// runs, not to this tool surface. This package keeps identity and tool shape
+// (TS-09.R40, INV §1/§2).
 func (s *Server) handleReportTaskResult(_ context.Context, req *mcp.CallToolRequest, input reportTaskArgs) (*mcp.CallToolResult, any, error) {
 	identity, ok := s.caller(req)
 	if !ok {
 		return sessionUnknown()
 	}
-	task, err := s.store.AssignedTask(identity.AgentID)
-	if errors.Is(err, state.ErrNotFound) {
-		return errResult(map[string]any{
-			"ok": false, "error": "not_assigned", "message": "You have no assigned task to report on.",
-		})
+	control := s.taskControl()
+	if control == nil {
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Task control plane is unavailable."})
 	}
-	if err != nil {
-		s.log.Debug("read assigned task failed", "agent", identity.AgentID, "err", err)
-		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Could not read your assignment."})
-	}
-	var finished state.Task
-	if stage, stageErr := s.store.ReadPipelineStageTaskByTask(task.TaskID); stageErr == nil {
-		run, runErr := s.store.ReadPipelineRun(stage.RunID)
-		if runErr != nil {
-			err = runErr
-		} else {
-			_, err = s.store.AcceptPipelineStageTaskResult(task.TaskID, identity.AgentID, identity.Generation, run.Revision,
-				state.TaskResult{Outcome: input.Outcome, Summary: input.Summary, Details: input.Details, Outputs: input.Outputs})
-			if err == nil {
-				finished, err = s.store.ReadTask(task.TaskID)
-			}
-		}
-	} else if errors.Is(stageErr, state.ErrNotFound) {
-		finished, err = s.store.RecordAgentTaskResult(task.TaskID, identity.AgentID, identity.Generation,
-			state.TaskResult{Outcome: input.Outcome, Summary: input.Summary, Details: input.Details, Outputs: input.Outputs})
-	} else {
-		err = stageErr
+	finished, err := control.ReportAgentTaskResult(AgentTaskResultRequest{
+		AgentID: identity.AgentID, Generation: identity.Generation,
+		ExecutionHandle: strings.TrimSpace(input.ExecutionHandle),
+		Result: state.TaskResult{
+			Outcome: input.Outcome, Summary: input.Summary,
+			Details: input.Details, Outputs: input.Outputs,
+		},
+	})
+	var toolErr *ToolError
+	if errors.As(err, &toolErr) {
+		return errResult(map[string]any{"ok": false, "error": toolErr.Code, "message": toolErr.Message})
 	}
 	switch {
 	case errors.Is(err, state.ErrInvalidOutcome):
@@ -171,7 +168,7 @@ func (s *Server) handleReportTaskResult(_ context.Context, req *mcp.CallToolRequ
 			"ok": false, "error": "task_not_found", "message": "No such task.",
 		})
 	case err != nil:
-		s.log.Debug("record task result failed", "task", task.TaskID, "err", err)
+		s.log.Debug("record task result failed", "agent", identity.AgentID, "err", err)
 		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Could not record your result."})
 	}
 	// The runtime claim is released and the agent stopped at this turn's end, not
@@ -216,11 +213,22 @@ type AgentTaskRequest struct {
 	Attachments   []state.TaskAttachment
 }
 
+// AgentTaskResultRequest is one agent-reported result after identity
+// resolution. The reporter and its generation are the session token's, never
+// arguments; the execution handle is the caller's and is matched durably.
+type AgentTaskResultRequest struct {
+	AgentID         string
+	Generation      string
+	ExecutionHandle string
+	Result          state.TaskResult
+}
+
 // TaskControl is the control plane behind the agent-facing task tools. This
 // package owns identity, resolution, and tool shape; validating a target and
 // committing the record stay with the plane that owns them.
 type TaskControl interface {
 	CreateAgentTask(req AgentTaskRequest) (state.Task, error)
+	ReportAgentTaskResult(req AgentTaskResultRequest) (state.Task, error)
 	CancelAgentTask(taskID, creatorAgentID string) (state.Task, error)
 	ListAgentTasks(creatorAgentID string, limit int) ([]state.Task, error)
 	ReadAgentTask(taskID, creatorAgentID string) (state.Task, error)

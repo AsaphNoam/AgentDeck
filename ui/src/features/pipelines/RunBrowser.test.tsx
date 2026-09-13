@@ -41,6 +41,18 @@ it("requires recovery input when blocked continuation is eligible", async () => 
   expect(screen.getByRole("button", { name: "Continue stage" })).toBeEnabled();
 });
 
+it("surfaces retained stage cleanup and its repair action", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+    ...detail,
+    run: { ...run, state: "finishing", pending_action: "release_stage_task" },
+    stage_tasks: [{ ...stageTask, state: "finished", cleanup: { state: "release_needs_attention", reason: "permission denied stopping the runtime" } }],
+    controls: { ...controls, repair_cleanup: { eligible: true, reason: "Retries only the retained cleanup effects." } },
+  })));
+  renderRun();
+  expect(await screen.findByText((_, element) => element?.tagName === "P" && element.textContent === "Cleanup: release needs attention · permission denied stopping the runtime")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Repair cleanup" })).toBeInTheDocument();
+});
+
 it("loads retained run pages to an exact complete-history state", async () => {
   const retained = Array.from({ length: 51 }, (_, index) => ({ run_id: `run_${index}`, template_id: "delivery", display_name: `Run ${index + 1}`, project: "app", state: "completed", revision: 1, pending_action: "", current_stage_id: "work", current_stage_title: "Work", current_agent_id: "", attention_reason: "", final_outcome: "success", updated_at: new Date(Date.UTC(2026, 6, 26, 0, 0, 51 - index)).toISOString(), diagnostics: [] }));
   server.use(http.get("/api/pipeline-runs", ({ request }) => { const url = new URL(request.url); const offset = Number(url.searchParams.get("offset") ?? 0); const limit = Number(url.searchParams.get("limit") ?? 50); return HttpResponse.json(retained.slice(offset, offset + limit), { headers: { "X-Total-Count": "51" } }); }));

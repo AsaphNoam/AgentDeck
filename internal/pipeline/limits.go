@@ -20,6 +20,10 @@ const (
 	MaxDelegatedAgents  = 20
 	MaxVisits           = 32
 	MaxProposalBytes    = 256 * 1024
+	// MaxPriorStageResults bounds the accepted-result history a persisted
+	// assignment carries. A long run must not grow its handoff without limit
+	// (TS-09.R39, INV §16).
+	MaxPriorStageResults = 8
 )
 
 // The report bounds are the shared work-result limits, not a second set: one

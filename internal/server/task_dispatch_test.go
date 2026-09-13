@@ -459,7 +459,7 @@ func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
 	if !strings.Contains(string(raw), dependency.Instruction) {
 		t.Fatalf("woken prompt = %s, want the task instruction", raw)
 	}
-	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration,
+	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration, "",
 		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult with runtime token: %v", err)
 	}
@@ -601,7 +601,7 @@ func TestFinishingStopsTheRuntimeTheTaskCreated(t *testing.T) {
 		t.Fatalf("live generation %q is not the one the task reserved (%q)",
 			generation, running.AssignedGeneration)
 	}
-	finished, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, generation,
+	finished, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, generation, running.ExecutionHandle,
 		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "built it"})
 	if err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
@@ -648,7 +648,7 @@ func TestFinishingLeavesABorrowedRuntimeAlone(t *testing.T) {
 		t.Fatalf("borrowed assignment generation = %q, runtime generation = %q", running.AssignedGeneration, realGeneration)
 	}
 
-	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration,
+	if _, err := srv.stateStore.RecordAgentTaskResult(task.TaskID, agentID, realGeneration, "",
 		state.TaskResult{Outcome: state.OutcomeBlocked, Summary: "needs a decision"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestADependentStartsWhenItsPrerequisiteRecordsItsResult(t *testing.T) {
 	}
 
 	generation := running.AssignedGeneration
-	if _, err := srv.stateStore.RecordAgentTaskResult(first.TaskID, running.AssignedAgentID, generation,
+	if _, err := srv.stateStore.RecordAgentTaskResult(first.TaskID, running.AssignedAgentID, generation, running.ExecutionHandle,
 		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}
@@ -761,7 +761,7 @@ func TestAnUnsatisfyingResultParksTheDependent(t *testing.T) {
 	srv.dispatchReadyTasks(context.Background())
 	running := waitTaskState(t, srv, first.TaskID, state.TaskRunning)
 	if _, err := srv.stateStore.RecordAgentTaskResult(first.TaskID, running.AssignedAgentID,
-		running.AssignedGeneration,
+		running.AssignedGeneration, running.ExecutionHandle,
 		state.TaskResult{Outcome: state.OutcomeFailure, Summary: "could not"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}
@@ -845,7 +845,7 @@ func TestRestartResolvesUnfinishedTasksFromTheirOwnRows(t *testing.T) {
 	srv.dispatchReadyTasks(context.Background())
 	reportedRunning := waitTaskState(t, srv, reported.TaskID, state.TaskRunning)
 	if _, err := srv.stateStore.RecordAgentTaskResult(reported.TaskID,
-		reportedRunning.AssignedAgentID, reportedRunning.AssignedGeneration,
+		reportedRunning.AssignedAgentID, reportedRunning.AssignedGeneration, reportedRunning.ExecutionHandle,
 		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "done"}); err != nil {
 		t.Fatalf("RecordAgentTaskResult: %v", err)
 	}

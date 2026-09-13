@@ -23,8 +23,11 @@ say which one you took. Several available changes are not a reason to ask, and p
 review, or fix units do not block work. If none is available, say so.
 
 An explicitly named ready change is likewise authorized by `/work <name>`; verify that it exists,
-move it into the handoff, then proceed. Continue until the change is done, a real blocker occurs, or
-quota requires a safe exit. When substantive work finishes, add that completed change to the
+move it into the handoff, then proceed. Use the slice/checkpoint loop in workflow §2 and the durable
+resumption notes in §4. A verified slice closes with a handoff update and commit, then work continues;
+it does not close the request. Apply §5's pre-final check before ending a turn: continue while
+authorized work is actionable, unless the user stops or redirects it or an actual execution/usage
+limit forces an interruption. When substantive work finishes, add that completed change to the
 available review units without replacing or blocking units already there; administrative commits
 are not additional units. Close every session with the handoff update, commit rules, and human
 update.

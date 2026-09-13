@@ -90,13 +90,13 @@ type PipelineUpdate struct {
 }
 
 type RunDetail struct {
-	Run         state.PipelineRunRecord       `json:"run"`
-	Template    Template                      `json:"template"`
-	Inputs      map[string]string             `json:"inputs"`
-	Assignments map[string]RuntimeAssignment  `json:"assignments"`
+	Run         state.PipelineRunRecord      `json:"run"`
+	Template    Template                     `json:"template"`
+	Inputs      map[string]string            `json:"inputs"`
+	Assignments map[string]RuntimeAssignment `json:"assignments"`
 	// Attempts is retained only while decoding/resetting historical v1 state.
 	// Live API responses project stage tasks instead.
-	Attempts []state.PipelineAttemptRecord `json:"-"`
+	Attempts    []state.PipelineAttemptRecord `json:"-"`
 	Values      []state.PipelineValueRecord   `json:"values"`
 	Diagnostics []Diagnostic                  `json:"diagnostics"`
 }
@@ -119,14 +119,6 @@ type RunSummary struct {
 	FinalOutcome      string       `json:"final_outcome"`
 	UpdatedAt         string       `json:"updated_at"`
 	Diagnostics       []Diagnostic `json:"diagnostics"`
-}
-
-type StageReport struct {
-	Outcome string            `json:"outcome"`
-	Summary string            `json:"summary"`
-	Details string            `json:"details"`
-	Checks  string            `json:"checks"`
-	Outputs map[string]string `json:"outputs"`
 }
 
 type ControlError struct {

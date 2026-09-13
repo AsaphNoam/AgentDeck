@@ -635,6 +635,80 @@ func TestSharePipelineReportWindow(t *testing.T) {
 	}
 }
 
+// pipelineStageTask writes the durable shape a task-backed run leaves behind
+// once report_task_result is accepted: an immutable finished task result with a
+// standing release intent, bound to its stage. No pipeline attempt row exists.
+func (f *fixture) pipelineStageTask(t *testing.T, agentID, generation string, pendingRelease bool) {
+	t.Helper()
+	now := "2026-09-13T10:00:00Z"
+	release := 0
+	if pendingRelease {
+		release = 1
+	}
+	if _, err := f.store.DB().Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state, outcome, outcome_source,
+                  outcome_summary, outcome_details, created_by_kind, assigned_agent_id, assigned_generation,
+                  pending_release, created_at, updated_at, finished_at)
+VALUES ('tk_1','proj','Stage one','do the stage','launch','finished','success','agent',
+        'the stage passed','full details','pipeline',?,?,?,?,?,?)`,
+		agentID, generation, release, now, now, now); err != nil {
+		t.Fatalf("insert stage task: %v", err)
+	}
+	if _, err := f.store.DB().Exec(`
+INSERT INTO task_result_outputs(task_id, name, value) VALUES ('tk_1','artifact','bin/agentdeck')`); err != nil {
+		t.Fatalf("insert stage task output: %v", err)
+	}
+	if _, err := f.store.DB().Exec(`
+INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, standing_agent_id,
+                                 state, closure_revision, created_at, closed_at)
+VALUES ('pr_task',0,1,'s1','tk_1',?,'closing',2,?,?)`, agentID, now, now); err != nil {
+		t.Fatalf("insert stage association: %v", err)
+	}
+}
+
+// TS-09.R48, FS-15.R4 — a task-backed run writes no pipeline attempt row, so
+// requiring one refused every share of every new run's report. The window is the
+// accepted task result with its release still standing; once release settles at
+// the reporting turn's end the selector is unavailable again, and another
+// generation is refused throughout.
+func TestSharePipelineReportResolvesTaskBackedResult(t *testing.T) {
+	f := newFixture(t)
+	f.agent(t, "a_stage", "stage")
+	f.agent(t, "a_dst", "dst")
+	f.pipelineStageTask(t, "a_stage", "gen1", true)
+	caller := Caller{AgentID: "a_stage", Generation: "gen1"}
+
+	if _, err := f.svc.Share(Caller{AgentID: "a_stage", Generation: "gen2"},
+		SelectorCurrentPipelineReport, "a_dst", "", ""); code(err) != CodeSourceUnavailable {
+		t.Fatalf("foreign generation = %v, want %s", err, CodeSourceUnavailable)
+	}
+	res := mustShare(t, f, caller, SelectorCurrentPipelineReport, "a_dst")
+	if res.Source.Kind != state.ContextSourcePipelineReport || res.Source.PipelineAttemptID != "tk_1" {
+		t.Fatalf("report source = %+v, want the immutable stage task result", res.Source)
+	}
+	page, err := f.svc.Read(Caller{AgentID: "a_dst"}, res.ContextRefID, "")
+	if err != nil {
+		t.Fatalf("read report: %v", err)
+	}
+	for _, want := range []string{"success", "the stage passed", "full details", "bin/agentdeck"} {
+		if !strings.Contains(page.Text, want) {
+			t.Errorf("report page missing %q: %q", want, page.Text)
+		}
+	}
+
+	// The reporting turn ends, cleanup completes the release, and the friendly
+	// selector closes while the created reference stays readable.
+	if _, err := f.store.DB().Exec(`UPDATE tasks SET pending_release = 0 WHERE task_id = 'tk_1'`); err != nil {
+		t.Fatalf("settle release: %v", err)
+	}
+	if _, err := f.svc.Share(caller, SelectorCurrentPipelineReport, "a_dst", "", ""); code(err) != CodeSourceUnavailable {
+		t.Fatalf("post-release share = %v, want %s", err, CodeSourceUnavailable)
+	}
+	if _, err := f.svc.Read(Caller{AgentID: "a_dst"}, res.ContextRefID, ""); err != nil {
+		t.Fatalf("existing reference stopped reading after release: %v", err)
+	}
+}
+
 // An unreported attempt and another generation's attempt are both rejected
 // without creating a reference (TS-05.R16, FS-15.R15).
 func TestSharePipelineReportRejectsUnreportedAndForeignGeneration(t *testing.T) {

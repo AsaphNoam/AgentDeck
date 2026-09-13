@@ -153,6 +153,7 @@ func TestReportTaskResultRecordsTheCallersOwnOutcome(t *testing.T) {
 	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
 	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
 	task := assignTask(t, f.store, "a_impl", "migrate", "write migration 19", state.TaskRunning)
+	f.srv.SetTaskControl(&storeTaskControl{store: f.store})
 
 	recorded := ""
 	f.srv.SetTaskResultSink(func(taskID string) { recorded = taskID })
@@ -204,6 +205,7 @@ func TestReportTaskResultRefusesWorkTheCallerDoesNotHold(t *testing.T) {
 	f.srv.RegisterSession("tok-stale", "a_impl", "gen-old")
 	f.srv.RegisterSession("tok-other", "a_other", "gen-a_other")
 	task := assignTask(t, f.store, "a_impl", "migrate", "write migration 19", state.TaskRunning)
+	f.srv.SetTaskControl(&storeTaskControl{store: f.store})
 
 	cases := []struct {
 		name, token, outcome, summary, wantErr string
@@ -238,6 +240,26 @@ func TestReportTaskResultRefusesWorkTheCallerDoesNotHold(t *testing.T) {
 
 // stubTaskControl records what the tools hand the control plane, so the tool's
 // own contract — identity, resolution, shape — is tested without a server.
+// storeTaskControl stands in for the server's control plane where a tool-shape
+// test needs the real store effects of an ordinary task result. It implements
+// only the report path; the pipeline stage branch is a run decision this package
+// deliberately no longer makes, and is covered where that plane lives.
+type storeTaskControl struct {
+	stubTaskControl
+	store *state.Store
+}
+
+func (c *storeTaskControl) ReportAgentTaskResult(req AgentTaskResultRequest) (state.Task, error) {
+	task, err := c.store.AssignedTask(req.AgentID)
+	if errors.Is(err, state.ErrNotFound) {
+		return state.Task{}, &ToolError{Code: "not_assigned", Message: "You have no assigned task to report on."}
+	}
+	if err != nil {
+		return state.Task{}, err
+	}
+	return c.store.RecordAgentTaskResult(task.TaskID, req.AgentID, req.Generation, req.ExecutionHandle, req.Result)
+}
+
 type stubTaskControl struct {
 	created   AgentTaskRequest
 	cancelled struct{ taskID, creator string }
@@ -251,7 +273,16 @@ type stubTaskControl struct {
 		taskID, creator string
 		arms            []state.TaskArm
 	}
-	err error
+	reported AgentTaskResultRequest
+	err      error
+}
+
+func (s *stubTaskControl) ReportAgentTaskResult(req AgentTaskResultRequest) (state.Task, error) {
+	s.reported = req
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: "tk_reported", State: state.TaskFinished, Outcome: req.Result.Outcome}, nil
 }
 
 func (s *stubTaskControl) CreateAgentTask(req AgentTaskRequest) (state.Task, error) {

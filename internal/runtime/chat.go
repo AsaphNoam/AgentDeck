@@ -745,6 +745,10 @@ const (
 // held follow-ups, task assignments, dependency continuations, and host-owned
 // activations. The original text is emitted to the transcript separately and
 // is never rewritten or persisted with peer mail (TS-01.R31, INV §2/§3).
+//
+// The third result reports whether the prepared batch carries a waking message.
+// A batch of deferred-only mail is delivered to a turn that already exists, but
+// it is never a reason to start one (FS-06.R30/R33, TS-01.R33).
 func (c *ChatRuntime) prepareTurnPrompt(agentID, primary string, wakingFirst bool) (string, string, bool, error) {
 	c.mu.Lock()
 	budgetProvider := c.messageBudget
@@ -774,7 +778,11 @@ func (c *ChatRuntime) prepareTurnPrompt(agentID, primary string, wakingFirst boo
 		Wake        bool   `json:"wake"`
 	}
 	mail := make([]inlinePeerMail, 0, len(batch.Messages))
+	hasWakingMail := false
 	for _, message := range batch.Messages {
+		if message.Wake {
+			hasWakingMail = true
+		}
 		mail = append(mail, inlinePeerMail{
 			MessageID: message.MessageID, From: message.FromAgent,
 			FromAddress: message.FromAddress, FromName: message.FromName,
@@ -797,7 +805,7 @@ func (c *ChatRuntime) prepareTurnPrompt(agentID, primary string, wakingFirst boo
 		c.clearInlineMail(agentID, batch.DeliveryTurnKey)
 		return "", "", false, errors.New("runtime: inline mail section exceeds 64 KiB")
 	}
-	return primary + section, batch.DeliveryTurnKey, true, nil
+	return primary + section, batch.DeliveryTurnKey, hasWakingMail, nil
 }
 
 func validInlineReceipt(raw json.RawMessage) bool {
@@ -1278,23 +1286,25 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		as.mu.Unlock()
 		return false, err
 	}
-	promptText, deliveryKey, hasInlineMail, err := c.prepareTurnPrompt(as.agentID, contract.Instruction, kind == state.ActivationKindMail)
+	promptText, deliveryKey, hasWakingMail, err := c.prepareTurnPrompt(as.agentID, contract.Instruction, kind == state.ActivationKindMail)
 	if err != nil {
 		as.mu.Lock()
 		as.turnActive = false
 		as.mu.Unlock()
 		return false, err
 	}
-	// A waking opportunity is separate from inbox contents. If another turn or
-	// an explicit read already consumed its source mail, retire the stale
-	// opportunity without sending a payload-free mailbox-fetch turn.
-	if kind == state.ActivationKindMail {
-		if !hasInlineMail {
-			as.mu.Lock()
-			as.turnActive = false
-			as.mu.Unlock()
-			return false, nil
-		}
+	// A waking opportunity is separate from inbox contents, and only waking mail
+	// creates one. If another turn or an explicit read already consumed its waking
+	// source, retire the stale opportunity without sending a turn — even when
+	// deferred mail is still unread, because deferred mail asked not to wake this
+	// agent (FS-06.R30/R33, TS-01.R33). Releasing the reservation leaves those
+	// rows pending for the next turn that genuinely exists.
+	if kind == state.ActivationKindMail && !hasWakingMail {
+		c.clearInlineMail(as.agentID, deliveryKey)
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return false, nil
 	}
 
 	// TS-01.R21/INV §15: the ordinary busy turn state must commit before the

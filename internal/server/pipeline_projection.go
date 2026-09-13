@@ -40,8 +40,32 @@ type pipelineStageTaskDetail struct {
 	Coordinator    *pipelineStageCoordinator `json:"coordinator,omitempty"`
 	Result         *pipelineStageResult      `json:"result,omitempty"`
 	Work           []pipelineTaskWork        `json:"work"`
+	Cleanup        *pipelineStageCleanup     `json:"cleanup,omitempty"`
 	CreatedAt      time.Time                 `json:"created_at"`
 	UpdatedAt      time.Time                 `json:"updated_at"`
+}
+
+// pipelineStageCleanup is the bounded, in-vocabulary view of a stage task's
+// retained cleanup. Supervision already renders this shape; the projection never
+// emitted it, so the stored phase, unsafe flag and error were invisible and a
+// stage holding unrecoverable cleanup looked idle (TS-09.R42, FS-14.R44,
+// INV §8/§10/§11).
+type pipelineStageCleanup struct {
+	State  string `json:"state"`
+	Reason string `json:"reason,omitempty"`
+}
+
+func stageCleanupDetail(task state.Task) *pipelineStageCleanup {
+	if task.CleanupPhase == "" {
+		return nil
+	}
+	// `retrying` is the transient schedule the dispatcher owns; `needs_attention`
+	// is the persistent condition that earns the repair control.
+	phase := task.CleanupPhase + "_retrying"
+	if task.CleanupUnsafe {
+		phase = task.CleanupPhase + "_needs_attention"
+	}
+	return &pipelineStageCleanup{State: phase, Reason: clipPreview(task.CleanupLastError, detailPreviewLimit)}
 }
 
 type pipelineStageCoordinator struct {
@@ -81,35 +105,77 @@ type pipelineTaskWork struct {
 	Children    []pipelineTaskWork `json:"children"`
 }
 
+// maxProjectedRunTasks bounds the task history one run read carries. A long run
+// accumulates descendants without limit, and a supervision read must not grow
+// with them (TS-09.R28, INV §16).
+const maxProjectedRunTasks = 200
+
+// agentRoute derives one task's route from the batched snapshot set rather than
+// a per-task identity and liveness read.
+func agentRoute(snapshots map[string]state.PipelineAgentSnapshot, agentID string) string {
+	if agentID == "" {
+		return "unavailable"
+	}
+	snapshot, ok := snapshots[agentID]
+	if !ok || !snapshot.IdentityFound {
+		return "unavailable"
+	}
+	if snapshot.Running {
+		return "live"
+	}
+	return "archive"
+}
+
 func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelineStageTaskDetail, pipelineRunControls, error) {
 	stages, err := s.stateStore.ListPipelineStageTasks(detail.Run.RunID)
 	if err != nil {
 		return nil, pipelineRunControls{}, err
 	}
-	agentIDs := make([]string, 0, len(stages))
+	runTasks, err := s.stateStore.ListTasksForPipelineRun(detail.Run.RunID, maxProjectedRunTasks)
+	if err != nil {
+		return nil, pipelineRunControls{}, err
+	}
+	// One identity/liveness read for every agent this projection can mention, and
+	// one provenance read for the whole run. Reading them per task made a long
+	// run's supervision read grow with its descendant count (TS-09.R28/R42,
+	// INV §7/§16).
+	agentIDs := make([]string, 0, len(stages)+len(runTasks))
 	for _, stage := range stages {
 		if stage.StandingAgentID != "" {
 			agentIDs = append(agentIDs, stage.StandingAgentID)
+		}
+	}
+	for _, task := range runTasks {
+		if task.AssignedAgentID != "" {
+			agentIDs = append(agentIDs, task.AssignedAgentID)
 		}
 	}
 	snapshots, err := s.stateStore.PipelineAgentSnapshots(agentIDs)
 	if err != nil {
 		return nil, pipelineRunControls{}, err
 	}
-	runTasks, err := s.stateStore.ListTasksForPipelineRun(detail.Run.RunID)
+	lineageByTask, err := s.stateStore.ListPipelineRunTaskLineage(detail.Run.RunID, maxProjectedRunTasks)
 	if err != nil {
 		return nil, pipelineRunControls{}, err
+	}
+	// A stage task's parent is its predecessor stage task: that edge is stage
+	// succession, not delegated work. Immutable lineage keeps it, but rendering it
+	// as subordinate work nested stage two under stage one and repeated the whole
+	// remaining stage tail under every earlier card (TS-09.R44, FS-14.R39).
+	// Each stage has its own card, so succession edges never enter the work tree.
+	stageTaskIDs := make(map[string]struct{}, len(stages))
+	for _, stage := range stages {
+		stageTaskIDs[stage.TaskID] = struct{}{}
 	}
 	tasksByID := make(map[string]state.Task, len(runTasks))
 	childrenByParent := map[string][]string{}
 	for _, task := range runTasks {
 		tasksByID[task.TaskID] = task
-		lineage, lineageErr := s.stateStore.ReadTaskLineage(task.TaskID)
-		if lineageErr != nil {
-			return nil, pipelineRunControls{}, lineageErr
+		if _, isStage := stageTaskIDs[task.TaskID]; isStage {
+			continue
 		}
-		if lineage.ParentTaskID != "" {
-			childrenByParent[lineage.ParentTaskID] = append(childrenByParent[lineage.ParentTaskID], task.TaskID)
+		if parent := lineageByTask[task.TaskID].ParentTaskID; parent != "" {
+			childrenByParent[parent] = append(childrenByParent[parent], task.TaskID)
 		}
 	}
 	var projectWork func(string) []pipelineTaskWork
@@ -117,16 +183,7 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 		items := []pipelineTaskWork{}
 		for _, taskID := range childrenByParent[parentID] {
 			task := tasksByID[taskID]
-			route := "unavailable"
-			if task.AssignedAgentID != "" {
-				if _, readErr := s.stateStore.ReadAgent(task.AssignedAgentID); readErr == nil {
-					route = "archive"
-					if _, runningErr := s.stateStore.ReadRunning(task.AssignedAgentID); runningErr == nil {
-						route = "live"
-					}
-				}
-			}
-			items = append(items, pipelineTaskWork{TaskID: task.TaskID, DisplayName: task.DisplayName, State: task.State, Outcome: task.Outcome, Summary: task.OutcomeSummary, AgentID: task.AssignedAgentID, Route: route, Children: projectWork(task.TaskID)})
+			items = append(items, pipelineTaskWork{TaskID: task.TaskID, DisplayName: task.DisplayName, State: task.State, Outcome: task.Outcome, Summary: task.OutcomeSummary, AgentID: task.AssignedAgentID, Route: agentRoute(snapshots, task.AssignedAgentID), Children: projectWork(task.TaskID)})
 		}
 		return items
 	}
@@ -151,22 +208,17 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 			}
 			work = filtered
 		}
-		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: work, CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: work, Cleanup: stageCleanupDetail(task), CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
 		if stage.CoordinatorTaskID != "" {
 			coordinator, readErr := s.stateStore.ReadTask(stage.CoordinatorTaskID)
 			if readErr != nil {
 				return nil, pipelineRunControls{}, readErr
 			}
-			route, name := "unavailable", coordinator.AssignedAgentID
-			if coordinator.AssignedAgentID != "" {
-				if agent, agentErr := s.stateStore.ReadAgent(coordinator.AssignedAgentID); agentErr == nil {
-					name, route = agent.Name, "archive"
-					if _, runningErr := s.stateStore.ReadRunning(coordinator.AssignedAgentID); runningErr == nil {
-						route = "live"
-					}
-				}
+			name := coordinator.AssignedAgentID
+			if snapshot, ok := snapshots[coordinator.AssignedAgentID]; ok && snapshot.Name != "" {
+				name = snapshot.Name
 			}
-			item.Coordinator = &pipelineStageCoordinator{TaskID: coordinator.TaskID, AgentID: coordinator.AssignedAgentID, Name: name, State: coordinator.State, Route: route, ReportSummary: coordinator.OutcomeSummary, Runtime: pipeline.RuntimeAssignment{Backend: coordinator.Backend, Model: coordinator.Model, Effort: coordinator.Effort, Fast: coordinator.Fast}}
+			item.Coordinator = &pipelineStageCoordinator{TaskID: coordinator.TaskID, AgentID: coordinator.AssignedAgentID, Name: name, State: coordinator.State, Route: agentRoute(snapshots, coordinator.AssignedAgentID), ReportSummary: coordinator.OutcomeSummary, Runtime: pipeline.RuntimeAssignment{Backend: coordinator.Backend, Model: coordinator.Model, Effort: coordinator.Effort, Fast: coordinator.Fast}}
 		}
 		if task.Outcome != "" {
 			outputs, err := s.stateStore.ReadTaskResultOutputs(task.TaskID)
@@ -185,7 +237,7 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 		controls.Continue = pipelineRunControl{Eligible: detail.Run.State == "paused" && (detail.Run.PendingAction == "await_approval" || current.Result != nil && (current.Result.Outcome == state.OutcomeFailure || current.Result.Outcome == state.OutcomeBlocked)), Reason: "Approves success or sends recovery input to a new stage attempt."}
 		controls.Retry = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Retries the interrupted assignment on the same standing owner."}
 		controls.Replace = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Replaces only the interrupted standing owner and retains stage work."}
-		controls.RepairCleanup = pipelineRunControl{Eligible: detail.Run.State == "stopping" && detail.Run.PendingAction == "cleanup_run", Reason: "Retries only the retained cleanup effects."}
+		controls.RepairCleanup = pipelineRunControl{Eligible: pipeline.CleanupRepairable(detail.Run.State, detail.Run.PendingAction), Reason: "Retries only the retained cleanup effects."}
 	}
 	return out, controls, nil
 }

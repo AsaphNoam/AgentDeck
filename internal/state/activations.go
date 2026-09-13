@@ -138,14 +138,18 @@ func scanActivation(rows *sql.Rows) (Activation, error) {
 }
 
 // ClaimMailActivation atomically decides one pending activation's fate: it
-// reserves the opportunity only if the recipient still has unread mail, and
-// otherwise retires it (FS-06.R25). Testing availability and claiming in two
-// statements let a concurrent check_messages or dashboard mailbox read drain the
-// last unread row in between, after which the claim crossed the non-replayable
-// attempt boundary and sent an empty provider turn (INV §5/§15). Each statement
-// re-tests both facts, so a claim implies mail existed at claim time and a retire
-// implies the mailbox was empty at retire time. A false result with no error
-// means another executor won the claim or the opportunity was retired.
+// reserves the opportunity only if the recipient still has unread *waking* mail,
+// and otherwise retires it (FS-06.R25, FS-06.R30/R33). Only waking mail enqueues
+// an opportunity, so a deferred FYI must not keep one alive after its waking
+// source is consumed: testing any unread row started a provider turn for mail
+// that deliberately asked not to wake anyone. Testing availability and claiming
+// in two statements let a concurrent check_messages or dashboard mailbox read
+// drain the last unread waking row in between, after which the claim crossed the
+// non-replayable attempt boundary and sent an empty provider turn (INV §5/§15).
+// Each statement re-tests both facts, so a claim implies waking mail existed at
+// claim time and a retire implies there was none at retire time. Deferred rows
+// are untouched either way. A false result with no error means another executor
+// won the claim or the opportunity was retired.
 func (s *Store) ClaimMailActivation(activationID string) (string, bool, error) {
 	var b [16]byte
 	if _, err := randRead(b[:]); err != nil {
@@ -156,7 +160,7 @@ func (s *Store) ClaimMailActivation(activationID string) (string, bool, error) {
 UPDATE activations
 SET state = ?, claim_token = ?, claimed_at = ?
 WHERE activation_id = ? AND kind = ? AND state = ?
-  AND EXISTS (SELECT 1 FROM messages WHERE to_agent = activations.agent_id AND read = 0)`,
+  AND EXISTS (SELECT 1 FROM messages WHERE to_agent = activations.agent_id AND read = 0 AND wake = 1)`,
 		ActivationClaimed, token, formatTime(time.Now().UTC()),
 		activationID, ActivationKindMail, ActivationPending)
 	if err != nil {
@@ -166,12 +170,13 @@ WHERE activation_id = ? AND kind = ? AND state = ?
 		return token, true, nil
 	}
 	// Either another executor won the claim (state is no longer pending, so the
-	// delete matches nothing) or the mailbox drained first. Mail inserted between
-	// the two statements fails NOT EXISTS and correctly leaves the row pending.
+	// delete matches nothing) or the waking source drained first. Waking mail
+	// inserted between the two statements fails NOT EXISTS and correctly leaves
+	// the row pending.
 	if _, err := s.db.Exec(`
 DELETE FROM activations
 WHERE activation_id = ? AND kind = ? AND state = ?
-  AND NOT EXISTS (SELECT 1 FROM messages WHERE to_agent = activations.agent_id AND read = 0)`,
+  AND NOT EXISTS (SELECT 1 FROM messages WHERE to_agent = activations.agent_id AND read = 0 AND wake = 1)`,
 		activationID, ActivationKindMail, ActivationPending); err != nil {
 		return "", false, fmt.Errorf("state: retire empty mail activation: %w", err)
 	}

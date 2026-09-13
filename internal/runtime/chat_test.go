@@ -1244,6 +1244,71 @@ func TestStartActivationInjectsInlineMailTurn(t *testing.T) {
 	}
 }
 
+// FS-06.R30/R33, TS-01.R33 — a waking opportunity is only ever created by waking
+// mail, so once its waking source is consumed the opportunity is stale even when
+// deferred mail is still unread. Gating on "any inline mail" started a provider
+// turn purely to deliver an FYI that deliberately asked not to wake anyone. The
+// deferred row must survive for the next turn that genuinely exists, and the
+// in-memory turn gate must be released.
+func TestStartActivationRetiresDeferredOnlyMailOpportunity(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	dump := filepath.Join(t.TempDir(), "prompt.json")
+	spec.Env = append(spec.Env, "FAKEACP_PROMPT_DUMP="+dump)
+	ctx := context.Background()
+
+	h, err := c.Start(ctx, spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+	ch, unsub, err := c.Subscribe(h.AgentID)
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	defer unsub()
+	if _, err := c.store.InsertMessageWithWake(state.Message{
+		FromAgent: "a_sender", FromAddress: "reviewer@test", FromName: "Nova",
+		ToAgent: h.AgentID, Subject: "FYI", Body: "Deferred background note.",
+	}, false); err != nil {
+		t.Fatal(err)
+	}
+	started, err := c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
+	})
+	if err != nil || started {
+		t.Fatalf("StartActivation with deferred-only mail = %v, %v; want no turn", started, err)
+	}
+	if _, err := os.ReadFile(dump); err == nil {
+		t.Fatal("a provider prompt was sent for deferred-only mail")
+	}
+	if unread, err := c.store.UnreadCount(h.AgentID); err != nil || unread != 1 {
+		t.Fatalf("unread after retired opportunity = %d, %v; want the deferred row retained", unread, err)
+	}
+
+	// The turn gate is released, so genuine waking mail still starts a turn and
+	// carries the retained deferred row with it.
+	if _, err := c.store.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "reviewer@test", FromName: "Nova",
+		ToAgent: h.AgentID, Subject: "Review", Body: "Please review the durable result.",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	started, err = c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
+	})
+	if err != nil || !started {
+		t.Fatalf("StartActivation after waking mail = %v, %v; want started (turn gate leaked)", started, err)
+	}
+	_ = drainTurn(t, ch)
+	raw, err := os.ReadFile(dump)
+	if err != nil {
+		t.Fatalf("read prompt dump: %v", err)
+	}
+	if !strings.Contains(string(raw), "Please review the durable result.") || !strings.Contains(string(raw), "Deferred background note.") {
+		t.Fatalf("waking prompt = %s, want both the waking message and the retained deferred row", raw)
+	}
+}
+
 // TS-01.R21 / INV §15 — the ordinary busy turn state commits before the provider
 // frame. StartActivation used to discard the status write's error and prompt the
 // model anyway, so a store failure left durable and UI state `idle` while the

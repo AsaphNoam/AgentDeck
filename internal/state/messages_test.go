@@ -558,3 +558,54 @@ func TestClaimMailActivationRetiresDrainedMailbox(t *testing.T) {
 		t.Fatalf("ClaimMailActivation(rearmed) = %q, %v, %v; want a claim", token, claimed, err)
 	}
 }
+
+// FS-06.R30/R33, TS-01.R33 — only waking mail creates an opportunity, so a
+// deferred FYI must not keep a stale one alive after its waking source is
+// consumed. Claiming on any unread row started a provider turn for mail that
+// deliberately asked not to wake the recipient. The deferred row itself is
+// retained for the next turn that genuinely exists.
+func TestClaimMailActivationIgnoresDeferredBacklog(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_defer", "Nova", "reviewer", "my-app")
+	if _, err := st.InsertMessage(Message{
+		FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas",
+		ToAgent: "a_defer", Body: "wake me",
+	}); err != nil {
+		t.Fatalf("InsertMessage waking: %v", err)
+	}
+	if _, err := st.InsertMessageWithWake(Message{
+		FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas",
+		ToAgent: "a_defer", Body: "fyi only",
+	}, false); err != nil {
+		t.Fatalf("InsertMessageWithWake deferred: %v", err)
+	}
+	pending, err := st.PendingActivations(ActivationKindMail, "a_defer", 10)
+	if err != nil || len(pending) != 1 {
+		t.Fatalf("PendingMailActivations = %+v, %v; want one", pending, err)
+	}
+
+	// The waking source is consumed before the executor claims; the deferred FYI
+	// stays unread.
+	if _, err := st.DB().Exec(`UPDATE messages SET read = 1 WHERE to_agent = 'a_defer' AND wake = 1`); err != nil {
+		t.Fatalf("consume waking source: %v", err)
+	}
+
+	token, claimed, err := st.ClaimMailActivation(pending[0].ActivationID)
+	if err != nil {
+		t.Fatalf("ClaimMailActivation: %v", err)
+	}
+	if claimed || token != "" {
+		t.Fatalf("ClaimMailActivation = %q, %v; want no claim for a deferred-only backlog", token, claimed)
+	}
+	after, err := st.PendingActivations(ActivationKindMail, "a_defer", 10)
+	if err != nil || len(after) != 0 {
+		t.Fatalf("PendingMailActivations after consume = %+v, %v; want the opportunity retired", after, err)
+	}
+	var unreadDeferred int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent = 'a_defer' AND read = 0 AND wake = 0`).Scan(&unreadDeferred); err != nil {
+		t.Fatalf("count deferred: %v", err)
+	}
+	if unreadDeferred != 1 {
+		t.Fatalf("unread deferred rows = %d; want the deferred message retained", unreadDeferred)
+	}
+}

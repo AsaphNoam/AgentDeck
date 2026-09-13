@@ -16,7 +16,37 @@ const (
 	maxAssignmentRunes = 48000
 )
 
-func renderAssignment(run state.PipelineRunRecord, template Template, stage Stage, values []state.PipelineValueRecord, attempts []state.PipelineAttemptRecord, continuation string) (string, string) {
+// coordinatorHandoff names the managed child a dedicated stage delegates
+// through. The standing owner cannot delegate to, correct, or observe a child
+// whose id it was never told (TS-09.R39/R49).
+type coordinatorHandoff struct {
+	TaskID    string
+	Role      string
+	Objective string
+}
+
+// stageResultSummary is one earlier accepted stage result, rendered so a
+// continuation or replacement in a fresh conversation still receives the prior
+// findings and the authoritative named sources (TS-09.R39/R41).
+type stageResultSummary struct {
+	StageID string
+	Attempt int
+	Outcome string
+	Summary string
+	TaskID  string
+	Outputs map[string]string
+}
+
+// assignmentContext carries the durable facts a stage assignment needs beyond
+// the frozen template and run values. Every field is bounded before rendering.
+type assignmentContext struct {
+	Coordinator  *coordinatorHandoff
+	PriorResults []stageResultSummary
+	Continuation string
+}
+
+func renderAssignment(run state.PipelineRunRecord, template Template, stage Stage, values []state.PipelineValueRecord, ctx assignmentContext) (string, string) {
+	continuation := ctx.Continuation
 	valueMap := map[string]string{}
 	for _, value := range values {
 		valueMap[value.Name] = value.Value
@@ -44,6 +74,12 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 			fmt.Fprintf(&fixed, "- %s\n", output.Name)
 		}
 	}
+	if ctx.Coordinator != nil {
+		// Without the child's id the owner cannot read, correct, watch or cancel
+		// the work this stage is configured to delegate (TS-09.R49).
+		fmt.Fprintf(&fixed, "\nManaged coordinator: task %s (role %s).\nObjective delegated to it: %s\nDelegate this stage's work through that task: read its progress with get_task, watch it with wait_for_tasks, correct it with ordinary mail, and cancel it if it is no longer useful. It reports upward to you; it never reports this pipeline stage.\n",
+			ctx.Coordinator.TaskID, ctx.Coordinator.Role, clipText(ctx.Coordinator.Objective, MaxInstructionRunes))
+	}
 
 	responsibility := stage.Objective
 	if strings.TrimSpace(responsibility) == "" {
@@ -60,16 +96,17 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 			fmt.Fprintf(&variable, "- %s: %s\n", input.Name, clipText(valueMap[input.Value], MaxValueRunes))
 		}
 	}
-	prior := make([]state.PipelineAttemptRecord, 0, len(attempts))
-	for _, attempt := range attempts {
-		if attempt.ReportOutcome != "" {
-			prior = append(prior, attempt)
-		}
-	}
-	if len(prior) > 0 {
-		variable.WriteString("\nPrior structured results:\n")
-		for _, attempt := range prior {
-			fmt.Fprintf(&variable, "- %s attempt %d: %s — %s\n", attempt.StageID, attempt.AttemptNo, attempt.ReportOutcome, clipText(attempt.ReportSummary, MaxSummaryRunes))
+	if len(ctx.PriorResults) > 0 {
+		// A continuation or replacement often starts a fresh conversation, so the
+		// only durable record of what earlier attempts found is what this handoff
+		// carries (TS-09.R39/R41).
+		variable.WriteString("\nPrior accepted results:\n")
+		for _, prior := range ctx.PriorResults {
+			fmt.Fprintf(&variable, "- %s attempt %d (task %s): %s — %s\n",
+				prior.StageID, prior.Attempt, prior.TaskID, prior.Outcome, clipText(prior.Summary, MaxSummaryRunes))
+			for _, name := range sortedNames(prior.Outputs) {
+				fmt.Fprintf(&variable, "  - %s: %s\n", name, clipText(prior.Outputs[name], MaxValueRunes))
+			}
 		}
 	}
 	if strings.TrimSpace(continuation) != "" {
@@ -89,6 +126,15 @@ func renderAssignment(run state.PipelineRunRecord, template Template, stage Stag
 	text := fixedText + clipText(variable.String(), remaining)
 	sum := sha256.Sum256([]byte(text))
 	return text, hex.EncodeToString(sum[:])
+}
+
+func sortedNames(values map[string]string) []string {
+	names := make([]string, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func clipText(value string, max int) string {

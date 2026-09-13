@@ -547,10 +547,35 @@ func (s *Server) finishTaskCleanup(ctx context.Context, task state.Task) {
 		if settled.State == state.TaskReady {
 			go s.dispatchReadyTasks(context.Background())
 		}
+		s.reconcilePipelineForTask(task)
 		return
 	}
 	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
 		s.recordTaskCleanupFailureClassified(task, phase, err, isUnsafeTaskCleanupError(err))
+		return
+	}
+	s.reconcilePipelineForTask(task)
+}
+
+// reconcilePipelineForTask re-drives the run a settled cleanup effect belongs to.
+// A release completed here has no turn boundary behind it — it can be the retry
+// timer finishing a transient stop failure, or startup recovery — so without
+// this the run sits in `finishing`/`stopping` with nothing left to wake it
+// (TS-09.R42/R43, INV §15).
+func (s *Server) reconcilePipelineForTask(task state.Task) {
+	if s.pipelineMgr == nil {
+		return
+	}
+	lineage, err := s.stateStore.ReadTaskLineage(task.TaskID)
+	if errors.Is(err, state.ErrNotFound) || (err == nil && lineage.PipelineRunID == "") {
+		return
+	}
+	if err != nil {
+		s.log.Debug("read cleanup task lineage", "task", task.TaskID, "err", err)
+		return
+	}
+	if err := s.pipelineMgr.Reconcile(context.Background(), lineage.PipelineRunID); err != nil {
+		s.log.Warn("pipeline cleanup reconcile", "task", task.TaskID, "run", lineage.PipelineRunID, "err", err)
 	}
 }
 

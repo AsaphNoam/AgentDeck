@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -114,23 +114,39 @@ func pipelineManagerFixture(t *testing.T) (*Manager, *fakeLifecycle, *fakePublis
 	return NewManager(store, templates, lifecycle, publisher), lifecycle, publisher
 }
 
-func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
+// startStagePipeline starts a v2 run and puts its standing stage task into the
+// running state the shared dispatcher would leave behind, so control-plane tests
+// exercise the task-backed cursor rather than the removed v1 executor.
+func startStagePipeline(t *testing.T, manager *Manager, requestID, agentID, generation string) (RunDetail, state.PipelineStageTask) {
 	t.Helper()
-	// The remaining callers exercise the removed v1 direct-launch executor.
-	// v2 dispatch is owned by the shared task dispatcher and is covered by the
-	// task-backed start test below.
-	t.Skip("superseded v1 direct-launch pipeline test")
 	detail, replay, err := manager.Start(context.Background(), StartRequest{
 		RequestID: requestID, TemplateID: "quality", DisplayName: "Ship", Project: "app", Goal: "Implement the spec",
-		Inputs: map[string]string{"spec": "Requirements"},
-		Assignments: map[string]RuntimeAssignment{
-			"work": {Backend: "codex", Model: "gpt", Effort: "high"}, "review": {Backend: "claude", Model: "sonnet"},
-		},
+		Inputs:       map[string]string{"spec": "Requirements"},
+		Orchestrator: RuntimeAssignment{Backend: "codex", Model: "gpt", Effort: "high"},
 	})
 	if err != nil || replay {
 		t.Fatalf("Start = %+v replay=%v err=%v", detail, replay, err)
 	}
-	return detail
+	stages, err := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 1 {
+		t.Fatalf("stage tasks = %#v, err=%v", stages, err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ?, assigned_generation = ? WHERE task_id = ?`,
+		state.TaskRunning, agentID, generation, stages[0].TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.store.BindPipelineStageTaskStandingAgent(stages[0].TaskID, agentID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'running', pending_action = '' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	detail, err = manager.Detail(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _ = manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	return detail, stages[0]
 }
 
 func TestStartCreatesOneStandingStageTaskWithoutDirectLaunch(t *testing.T) {
@@ -266,7 +282,7 @@ func TestReplaceInterruptedStandingOwnerFencesOldTask(t *testing.T) {
 	if replaced.Run.State != "queued" || stages[0].State != "replaced" || stages[1].AttemptNumber != 2 || oldTask.Outcome != state.OutcomeCancelled || newTask.State != state.TaskReady || newTask.TargetKind != state.TargetLaunch || newTask.Model != "gpt" {
 		t.Fatalf("run=%#v stages=%#v old=%#v new=%#v", replaced.Run, stages, oldTask, newTask)
 	}
-	if _, err := manager.store.AcceptPipelineStageTaskResult(oldTask.TaskID, "old-owner", "", replaced.Run.Revision, state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "stale"}); !errors.Is(err, state.ErrPipelineStageConflict) {
+	if _, err := manager.store.AcceptPipelineStageTaskResult(oldTask.TaskID, "old-owner", "", oldTask.ExecutionHandle, replaced.Run.Revision, state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "stale"}); !errors.Is(err, state.ErrPipelineStageConflict) {
 		t.Fatalf("stale result error = %v", err)
 	}
 }
@@ -275,12 +291,12 @@ func TestReplaceInterruptedStandingOwnerFencesOldTask(t *testing.T) {
 // without mutating the durable run revision or transition state.
 func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {
 	manager, _, publisher := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "permission-attention")
-	attempt := detail.Attempts[0]
-	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", true); err != nil {
+	detail, _ := startStagePipeline(t, manager, "permission-attention", "a_owner", "gen-1")
+	agentID, generation := "a_owner", "gen-1"
+	if err := manager.OnPermissionEvent(agentID, generation, "tc_1", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", true); err != nil {
+	if err := manager.OnPermissionEvent(agentID, generation, "tc_1", true); err != nil {
 		t.Fatal(err)
 	}
 	derived, err := manager.Detail(detail.Run.RunID)
@@ -293,10 +309,10 @@ func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {
 	if len(publisher.notifications) != 1 || publisher.notifications[0] != "needs_attention" {
 		t.Fatalf("notifications = %v", publisher.notifications)
 	}
-	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_2", true); err != nil {
+	if err := manager.OnPermissionEvent(agentID, generation, "tc_2", true); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_1", false); err != nil {
+	if err := manager.OnPermissionEvent(agentID, generation, "tc_1", false); err != nil {
 		t.Fatal(err)
 	}
 	stillWaiting, err := manager.Detail(detail.Run.RunID)
@@ -306,15 +322,154 @@ func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {
 	if stillWaiting.Run.AttentionReason != "awaiting permission approval" {
 		t.Fatalf("first resolution cleared concurrent permission: %+v", stillWaiting.Run)
 	}
-	if err := manager.OnPermissionEvent(attempt.AgentID, attempt.AgentGeneration, "tc_2", false); err != nil {
+	if err := manager.OnPermissionEvent(agentID, generation, "tc_2", false); err != nil {
 		t.Fatal(err)
 	}
 	cleared, err := manager.Detail(detail.Run.RunID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cleared.Run.AttentionReason != "" || cleared.Run.PendingAction != "await_result" {
+	if cleared.Run.AttentionReason != "" || cleared.Run.PendingAction != "" {
 		t.Fatalf("cleared run = %+v", cleared.Run)
+	}
+}
+
+// TS-09.R40/R42/R43, INV §5/§15 — waiting only for the standing owner's own
+// release advanced the run with the finished stage's descendants still alive,
+// and a release that settled in the cleanup timer re-drove nothing, parking
+// `finishing` forever. One convergence contract cancels the stage's unfinished
+// members, retains the cursor until every effect settles, and only then writes
+// the next stage.
+func TestStageCleanupCancelsDescendantsBeforeAdvancing(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, stage := startStagePipeline(t, manager, "stage-cleanup", "a_owner", "gen-1")
+	if _, err := manager.store.DB().Exec(`UPDATE tasks SET execution_handle = 'ta_1' WHERE task_id = ?`, stage.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	// Two descendants the owner created for this stage attempt: one running, one
+	// still only ready.
+	addChild := func(id, taskState string) {
+		t.Helper()
+		if _, err := manager.store.DB().Exec(`
+INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state, created_by_kind, created_by_agent_id, created_by_generation, created_at, updated_at)
+VALUES (?, 'app', ?, 'work', 'launch', ?, 'agent', 'a_owner', 'gen-1', ?, ?)`,
+			id, id, taskState, detail.Run.CreatedAt.Format(time.RFC3339Nano), detail.Run.CreatedAt.Format(time.RFC3339Nano)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := manager.store.DB().Exec(`
+INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at)
+VALUES (?, ?, ?, ?, '1', ?)`, id, stage.TaskID, detail.Run.RunID, stage.StageID,
+			detail.Run.CreatedAt.Format(time.RFC3339Nano)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	addChild("tk_running_child", state.TaskRunning)
+	addChild("tk_ready_child", state.TaskReady)
+
+	if _, err := manager.store.AcceptPipelineStageTaskResult(stage.TaskID, "a_owner", "gen-1", "ta_1", detail.Run.Revision,
+		state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "stage done", Outputs: map[string]string{"implementation": "done"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The owner's release has not settled yet: nothing advances, but both
+	// descendants are cancelled now rather than left running beside a new stage.
+	if err := manager.Reconcile(context.Background(), detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	stages, err := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 1 {
+		t.Fatalf("stage tasks = %#v, %v; want the run held at the finishing stage", stages, err)
+	}
+	for _, id := range []string{"tk_running_child", "tk_ready_child"} {
+		child, err := manager.store.ReadTask(id)
+		if err != nil || child.State != state.TaskFinished || child.Outcome != state.OutcomeCancelled {
+			t.Fatalf("%s = %#v, %v; want a host-cancelled result", id, child, err)
+		}
+	}
+	held, err := manager.store.ReadPipelineRun(detail.Run.RunID)
+	if err != nil || held.State != "finishing" || held.PendingAction != "release_stage_task" {
+		t.Fatalf("held run = %#v, %v", held, err)
+	}
+	// Retained cleanup on a finishing run still has an operator repair route.
+	if !CleanupRepairable(held.State, held.PendingAction) {
+		t.Fatal("a finishing run with retained cleanup has no repair control")
+	}
+
+	// The dispatcher's cleanup pass finally completes the release; the same
+	// reconcile now converges and writes the next stage.
+	if err := manager.store.CompleteTaskRelease(stage.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Reconcile(context.Background(), detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	stages, err = manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 2 || stages[1].StageID != "review" {
+		t.Fatalf("stage tasks after convergence = %#v, %v", stages, err)
+	}
+}
+
+// INV §16 — the per-run control mutex was appended and never removed, so a
+// long-lived server retained one for every run it had ever started or read a
+// control for, including deleted ones. The lock still excludes concurrent
+// control transitions on the same run, and the map is reclaimed once the last
+// holder and waiter release.
+func TestRunLockExcludesAndReclaims(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+
+	held := manager.lockRun("pr_lock")
+	entered := make(chan struct{})
+	released := make(chan struct{})
+	go func() {
+		unlock := manager.lockRun("pr_lock")
+		close(entered)
+		unlock()
+		close(released)
+	}()
+	select {
+	case <-entered:
+		t.Fatal("a second holder entered the same run's critical section")
+	case <-time.After(50 * time.Millisecond):
+	}
+	manager.locksMu.Lock()
+	waiting := len(manager.locks)
+	manager.locksMu.Unlock()
+	if waiting != 1 {
+		t.Fatalf("retained locks while held = %d, want the one in use", waiting)
+	}
+	held()
+	<-released
+
+	manager.locksMu.Lock()
+	remaining := len(manager.locks)
+	manager.locksMu.Unlock()
+	if remaining != 0 {
+		t.Fatalf("retained locks after release = %d, want the map reclaimed", remaining)
+	}
+}
+
+// TS-09.R42/R43, INV §15 — a Stop has already committed its closure fence, so a
+// failed startup reconciliation must not pause the run: pausing dropped the
+// fence and re-enabled Retry on a run a person asked to stop. The stop and its
+// pending cleanup stand until cleanup can finish.
+func TestFailedStartupRecoveryRetainsTheStopFence(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, _ := startStagePipeline(t, manager, "startup-stop-fence", "a_owner", "gen-1")
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'stopping', pending_action = 'cleanup_run' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.pauseStartupRun(context.Background(), detail.Run.RunID, "restart_reconcile_failed"); err != nil {
+		t.Fatal(err)
+	}
+	run, err := manager.store.ReadPipelineRun(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
+		t.Fatalf("recovered run = %#v, want the stop and its cleanup retained", run)
+	}
+	if _, err := manager.Retry(context.Background(), run.RunID, run.Revision); err == nil {
+		t.Fatal("Retry became available on a stopping run")
 	}
 }
 
@@ -422,9 +577,9 @@ func TestStartRejectsMissingRequiredFirstStageValueBeforeSideEffects(t *testing.
 }
 
 func TestRunListAndStartupIsolateMalformedRunDetail(t *testing.T) {
-	manager, lifecycle, _ := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "request-corrupt-detail")
-	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET template_snapshot_json = '{' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, _ := startStagePipeline(t, manager, "request-corrupt-detail", "a_owner", "gen-1")
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET template_snapshot_json = '{', pending_action = 'release_stage_task' WHERE run_id = ?`, detail.Run.RunID); err != nil {
 		t.Fatal(err)
 	}
 	runs, err := manager.List(10, 0)
@@ -433,192 +588,13 @@ func TestRunListAndStartupIsolateMalformedRunDetail(t *testing.T) {
 	if err != nil || len(runs) != 1 || len(runs[0].Diagnostics) != 1 || !hasDiagnostic(runs[0].Diagnostics, "frozen_stage_title_unavailable") {
 		t.Fatalf("List = %+v err=%v", runs, err)
 	}
+	// Startup reconciliation cannot decode the snapshot either, so it must pause
+	// the run for a person rather than advance a cursor it cannot read.
 	if err := manager.Startup(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	run, err := manager.store.ReadPipelineRun(detail.Run.RunID)
-	if err != nil || run.State != "paused" || run.AttentionReason != "restart_state_invalid" || lifecycle.IsRunning(run.CurrentAgentID) {
-		t.Fatalf("recovered run = %+v running=%v err=%v", run, lifecycle.IsRunning(run.CurrentAgentID), err)
-	}
-}
-
-// FS-14.A2/A3/A4: explicit results and quiescence drive one sequential route;
-// blocked continuation reuses the agent while a repair-loop visit does not.
-func TestManagerSequentialRoutingBlockedContinuationAndIdentity(t *testing.T) {
-	manager, lifecycle, _ := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "request-routing")
-	if detail.Run.PendingAction != "await_result" || len(lifecycle.launches) != 1 {
-		t.Fatalf("started detail = %+v launches=%d", detail.Run, len(lifecycle.launches))
-	}
-	work := detail.Attempts[0]
-	if err := manager.OnTurnEnd(work.AgentID, work.AgentGeneration); err != nil {
-		t.Fatal(err)
-	}
-	unchanged, _ := manager.Detail(detail.Run.RunID)
-	if unchanged.Run.CurrentAttemptID != work.AttemptID {
-		t.Fatal("turn_end without result advanced the run")
-	}
-	if _, err := manager.Report(work.AgentID, "wrong-generation", StageReport{Outcome: "success", Summary: "done", Outputs: map[string]string{"implementation": "change"}}); err == nil {
-		t.Fatal("spoofed generation report succeeded")
-	}
-	if _, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{Outcome: "success", Summary: "done", Outputs: map[string]string{"implementation": "change"}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{Outcome: "success", Summary: "duplicate"}); err == nil {
-		t.Fatal("duplicate report succeeded")
-	}
-	if err := manager.OnTurnEnd(work.AgentID, work.AgentGeneration); err != nil {
-		t.Fatal(err)
-	}
-	detail, _ = manager.Detail(detail.Run.RunID)
-	review := detail.Attempts[len(detail.Attempts)-1]
-	if review.StageID != "review" || review.AgentID == work.AgentID || len(lifecycle.launches) != 2 {
-		t.Fatalf("review attempt = %+v launches=%d", review, len(lifecycle.launches))
-	}
-	if _, err := manager.Report(review.AgentID, review.AgentGeneration, StageReport{Outcome: "failure", Summary: "needs repair"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.OnTurnEnd(review.AgentID, review.AgentGeneration); err != nil {
-		t.Fatal(err)
-	}
-	detail, _ = manager.Detail(detail.Run.RunID)
-	repair := detail.Attempts[len(detail.Attempts)-1]
-	if repair.StageID != "work" || repair.AgentID == work.AgentID || repair.VisitNo != 2 {
-		t.Fatalf("repair attempt = %+v", repair)
-	}
-	if _, err := manager.Report(repair.AgentID, repair.AgentGeneration, StageReport{Outcome: "blocked", Summary: "need input"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.OnTurnEnd(repair.AgentID, repair.AgentGeneration); err != nil {
-		t.Fatal(err)
-	}
-	detail, _ = manager.Detail(detail.Run.RunID)
-	if detail.Run.State != "paused" || detail.Run.AttentionReason != "blocked" {
-		t.Fatalf("blocked run = %+v", detail.Run)
-	}
-	detail, err := manager.Continue(context.Background(), detail.Run.RunID, detail.Run.Revision, "Use the fallback")
-	if err != nil {
-		t.Fatal(err)
-	}
-	continued := detail.Attempts[len(detail.Attempts)-1]
-	if continued.AgentID != repair.AgentID || continued.AttemptID == repair.AttemptID || continued.Effort != "high" || len(lifecycle.continuations) != 1 || lifecycle.continuations[0].Effort != "high" {
-		t.Fatalf("continued attempt = %+v continuations=%d", continued, len(lifecycle.continuations))
-	}
-}
-
-// FS-14.A4: launch failure pauses honestly and Retry creates a fresh identity.
-func TestManagerLaunchFailureRetryAndStop(t *testing.T) {
-	manager, lifecycle, _ := pipelineManagerFixture(t)
-	lifecycle.failNextLaunch = true
-	detail := startPipeline(t, manager, "request-retry")
-	failed := detail.Attempts[0]
-	if detail.Run.State != "paused" || detail.Run.AttentionReason != "launch_failed" {
-		t.Fatalf("failed launch run = %+v", detail.Run)
-	}
-	detail, err := manager.Retry(context.Background(), detail.Run.RunID, detail.Run.Revision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	retried := detail.Attempts[len(detail.Attempts)-1]
-	if retried.AgentID == failed.AgentID || detail.Run.PendingAction != "await_result" {
-		t.Fatalf("retried attempt = %+v run=%+v", retried, detail.Run)
-	}
-	detail, err = manager.Stop(context.Background(), detail.Run.RunID, detail.Run.Revision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if detail.Run.State != "stopped" || detail.Run.PendingAction != "" || lifecycle.IsRunning(retried.AgentID) {
-		t.Fatalf("stopped run = %+v running=%v", detail.Run, lifecycle.IsRunning(retried.AgentID))
-	}
-}
-
-// FS-14.A9: destination inputs are verified before accepting any report/output.
-func TestManagerRejectsMissingDestinationValueAtomically(t *testing.T) {
-	manager, _, _ := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "request-values")
-	attempt := detail.Attempts[0]
-	if _, err := manager.Report(attempt.AgentID, attempt.AgentGeneration, StageReport{Outcome: "success", Summary: "done"}); err == nil {
-		t.Fatal("report without required implementation output succeeded")
-	}
-	after, _ := manager.Detail(detail.Run.RunID)
-	if after.Attempts[0].ReportOutcome != "" || len(after.Values) != 1 || after.Run.Revision != detail.Run.Revision {
-		t.Fatalf("rejected report mutated state: %+v values=%+v", after.Run, after.Values)
-	}
-}
-
-// TS-09.R12/R13: crash recovery is generation-scoped, so a stage agent that
-// exits without carrying its concrete launch generation (the resume path once
-// dropped it) is silently ignored and the run never receives its agent_crash
-// pause. The recorded generation must pause the run with Retry available.
-func TestManagerCrashRecoveryRequiresTheConcreteGeneration(t *testing.T) {
-	manager, _, _ := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "request-crash")
-	attempt := detail.Attempts[0]
-
-	if err := manager.OnExit(attempt.AgentID, "", "process_exit"); err != nil {
-		t.Fatal(err)
-	}
-	unchanged, _ := manager.Detail(detail.Run.RunID)
-	if unchanged.Run.State != "running" || unchanged.Run.AttentionReason != "" {
-		t.Fatalf("empty-generation exit changed the run: %+v", unchanged.Run)
-	}
-
-	if err := manager.OnExit(attempt.AgentID, attempt.AgentGeneration, "process_exit"); err != nil {
-		t.Fatal(err)
-	}
-	crashed, _ := manager.Detail(detail.Run.RunID)
-	if crashed.Run.State != "paused" || crashed.Run.AttentionReason != "agent_crash" {
-		t.Fatalf("crashed run = %+v, want paused/agent_crash", crashed.Run)
-	}
-	if crashed.Attempts[0].State != "crashed" {
-		t.Fatalf("crashed attempt = %+v", crashed.Attempts[0])
-	}
-	if _, err := manager.Retry(context.Background(), crashed.Run.RunID, crashed.Run.Revision); err != nil {
-		t.Fatalf("Retry after crash: %v", err)
-	}
-}
-
-// FS-14.A33 / TS-09.R33: every stage agent carries its stage's label — the same
-// string it is named for — so a retried stage's two agents share one dashboard
-// section and each other stage's agent gets its own.
-func TestStageAgentsCarryTheirStageLabelAcrossARetry(t *testing.T) {
-	manager, lifecycle, _ := pipelineManagerFixture(t)
-	detail := startPipeline(t, manager, "request-grouping")
-	work := detail.Attempts[0]
-
-	if _, err := manager.Report(work.AgentID, work.AgentGeneration, StageReport{
-		Outcome: "success", Summary: "done", Outputs: map[string]string{"implementation": "change"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := manager.OnTurnEnd(work.AgentID, work.AgentGeneration); err != nil {
-		t.Fatal(err)
-	}
-	detail, _ = manager.Detail(detail.Run.RunID)
-	review := detail.Attempts[len(detail.Attempts)-1]
-
-	// Crash the review stage so Retry mints a second agent for the same stage.
-	if err := manager.OnExit(review.AgentID, review.AgentGeneration, "process_exit"); err != nil {
-		t.Fatal(err)
-	}
-	crashed, _ := manager.Detail(detail.Run.RunID)
-	if crashed.Run.AttentionReason != "agent_crash" {
-		t.Fatalf("crashed run = %+v, want agent_crash", crashed.Run)
-	}
-	retried, err := manager.Retry(context.Background(), crashed.Run.RunID, crashed.Run.Revision)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if second := retried.Attempts[len(retried.Attempts)-1]; second.AgentID == review.AgentID {
-		t.Fatalf("retry reused the crashed agent id %q", second.AgentID)
-	}
-
-	var labels []string
-	for _, launch := range lifecycle.launches {
-		labels = append(labels, launch.AgentName)
-	}
-	want := []string{"Work — Ship", "Review — Ship", "Review — Ship"}
-	if !reflect.DeepEqual(labels, want) {
-		t.Fatalf("stage labels = %q, want %q", labels, want)
+	if err != nil || run.State != "paused" || run.AttentionReason != "restart_reconcile_failed" {
+		t.Fatalf("recovered run = %+v err=%v", run, err)
 	}
 }

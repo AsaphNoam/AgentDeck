@@ -11,6 +11,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/contextref"
 	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -700,6 +701,56 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 	return created, nil
 }
 
+// ReportAgentTaskResult records the caller's result for its own assignment. This
+// plane decides whether that assignment is a pipeline stage, because it is the
+// plane that owns runs; `internal/messaging` keeps identity and tool shape
+// (TS-09.R40, INV §2).
+//
+// State acceptance stays one atomic transaction. What happens after the commit
+// belongs here: an accepted stage result moved its run, and a boundary that
+// leaves derived state behind must republish it, or every client keeps showing
+// the pre-report run until something else happens to publish (TS-09.R17,
+// INV §1).
+func (s *Server) ReportAgentTaskResult(req messaging.AgentTaskResultRequest) (state.Task, error) {
+	task, err := s.stateStore.AssignedTask(req.AgentID)
+	if errors.Is(err, state.ErrNotFound) {
+		return state.Task{}, &messaging.ToolError{Code: "not_assigned", Message: "You have no assigned task to report on."}
+	}
+	if err != nil {
+		return state.Task{}, err
+	}
+	stage, stageErr := s.stateStore.ReadPipelineStageTaskByTask(task.TaskID)
+	if errors.Is(stageErr, state.ErrNotFound) {
+		return s.stateStore.RecordAgentTaskResult(task.TaskID, req.AgentID, req.Generation, req.ExecutionHandle, req.Result)
+	}
+	if stageErr != nil {
+		return state.Task{}, stageErr
+	}
+	// A stage result carries run-wide consequences, so it names the execution it
+	// belongs to rather than relying on agent plus generation, which a re-borrowed
+	// runtime can repeat (TS-09.R40, TS-10.R28).
+	if req.ExecutionHandle == "" {
+		return state.Task{}, &messaging.ToolError{
+			Code:    "validation",
+			Message: "A pipeline stage result requires the execution_handle from get_assigned_task.",
+		}
+	}
+	run, err := s.stateStore.ReadPipelineRun(stage.RunID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	updated, err := s.stateStore.AcceptPipelineStageTaskResult(task.TaskID, req.AgentID, req.Generation, req.ExecutionHandle, run.Revision, req.Result)
+	if err != nil {
+		return state.Task{}, err
+	}
+	s.PublishPipelineUpdate(pipeline.PipelineUpdate{
+		RunID: updated.RunID, DisplayName: updated.DisplayName, Revision: updated.Revision,
+		State: updated.State, CurrentStageID: updated.CurrentStageID, CurrentAgentID: updated.CurrentAgentID,
+		AttentionReason: updated.AttentionReason, FinalOutcome: updated.FinalOutcome,
+	})
+	return s.stateStore.ReadTask(task.TaskID)
+}
+
 // CancelAgentTask cancels a task the calling agent created. Authority is the
 // durably recorded creator id, so a stopped-and-resumed agent keeps it, and a
 // task it did not create is refused with the same answer an unknown task gets:
@@ -734,8 +785,15 @@ func (s *Server) ListAgentTasks(creatorAgentID string, limit int) ([]state.Task,
 }
 
 // agentOwnedTask keeps unknown and unauthorized task ids indistinguishable on
-// every creator-scoped control operation.
-func (s *Server) agentOwnedTask(taskID, creatorAgentID string) (state.Task, error) {
+// every agent-scoped control operation.
+//
+// Authority is either immutable creation provenance or the live standing-owner
+// binding of the pipeline run that owns this task. The second is not a
+// convenience: a dedicated coordinator is created by the host and a replacement
+// standing owner inherits retained work it never created, so a creator-only test
+// refuses the owner the exact delegation workflow its stage requires of it
+// (TS-09.R37/R39/R41/R49, FS-14.R73).
+func (s *Server) agentOwnedTask(taskID, callerAgentID string) (state.Task, error) {
 	task, err := s.stateStore.ReadTask(taskID)
 	if err != nil {
 		if errors.Is(err, state.ErrNotFound) {
@@ -743,7 +801,14 @@ func (s *Server) agentOwnedTask(taskID, creatorAgentID string) (state.Task, erro
 		}
 		return state.Task{}, err
 	}
-	if task.CreatedByKind != "agent" || task.CreatedByAgentID != creatorAgentID {
+	if task.CreatedByKind == "agent" && task.CreatedByAgentID == callerAgentID {
+		return task, nil
+	}
+	managed, err := s.stateStore.AgentManagesPipelineWork(callerAgentID, taskID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	if !managed {
 		return state.Task{}, &messaging.ToolError{Code: "task_not_found", Message: "No such task."}
 	}
 	return task, nil
