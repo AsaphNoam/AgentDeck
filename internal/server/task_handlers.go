@@ -401,12 +401,13 @@ func (s *Server) writeTaskError(w http.ResponseWriter, err error) {
 // handleCancelTask implements POST /api/tasks/{id}/cancel (FS-16.R3, R20).
 func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
 	unlock := s.lockTaskStart(r.PathValue("id"))
-	defer unlock()
 	task, err := s.stateStore.CancelTask(r.PathValue("id"))
 	if err != nil {
+		unlock()
 		s.writeTaskError(w, err)
 		return
 	}
+	unlock()
 	// A cancel has no reporting turn to wait for, so the stop follows its commit
 	// immediately (TS-10.R19).
 	s.finishInterruptedRelease(r.Context(), task)
@@ -706,14 +707,16 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 // TS-05.R14, R17).
 func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
 	unlock := s.lockTaskStart(taskID)
-	defer unlock()
 	if _, err := s.agentOwnedTask(taskID, creatorAgentID); err != nil {
+		unlock()
 		return state.Task{}, err
 	}
 	task, err := s.stateStore.CancelTask(taskID)
 	if err != nil {
+		unlock()
 		return state.Task{}, err
 	}
+	unlock()
 	s.finishInterruptedRelease(context.Background(), task)
 	s.evaluateTaskResult(task.TaskID)
 	s.publishTaskUpdate(task)

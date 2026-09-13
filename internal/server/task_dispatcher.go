@@ -33,6 +33,7 @@ func (s *Server) runTaskDispatcher(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.reconcileTaskCleanup(ctx)
 			s.dispatchReadyTasks(ctx)
 		}
 	}
@@ -448,21 +449,7 @@ func (s *Server) releaseYieldedTask(ctx context.Context, agentID, generation str
 		s.log.Debug("read pending task yield failed", "agent", agentID, "err", err)
 		return
 	}
-	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
-		if err := s.StopStage(ctx, agentID); err != nil {
-			s.log.Debug("stop yielded task runtime failed", "task", task.TaskID, "agent", agentID, "err", err)
-			return
-		}
-	}
-	settled, err := s.stateStore.CompleteTaskYield(task.TaskID)
-	if err != nil {
-		s.log.Debug("complete task yield failed", "task", task.TaskID, "err", err)
-		return
-	}
-	s.publishTaskUpdate(settled)
-	if settled.State == state.TaskReady {
-		go s.dispatchReadyTasks(context.Background())
-	}
+	s.finishTaskCleanup(ctx, task)
 }
 
 // releaseReportedTask completes the release a recorded result already promised:
@@ -479,15 +466,72 @@ func (s *Server) releaseReportedTask(ctx context.Context, agentID, generation st
 		s.log.Debug("read pending task release failed", "agent", agentID, "err", err)
 		return
 	}
+	s.finishTaskCleanup(ctx, task)
+}
+
+// reconcileTaskCleanup is the bounded durable retry pass. A timer only wakes
+// this existing dispatcher; rows and their deadlines remain authoritative.
+func (s *Server) reconcileTaskCleanup(ctx context.Context) {
+	due, err := s.stateStore.DueTaskCleanup(taskDispatchBatch)
+	if err != nil {
+		s.log.Debug("list due task cleanup", "err", err)
+		return
+	}
+	for _, task := range due {
+		s.finishTaskCleanup(ctx, task)
+	}
+}
+
+// finishTaskCleanup is the sole release/yield effect seam. It serializes an
+// effect with cancellation/start for this task and records a retryable failure
+// before returning, so no live runtime loses its durable owner (TS-10.R35).
+func (s *Server) finishTaskCleanup(ctx context.Context, task state.Task) {
+	unlock := s.lockTaskStart(task.TaskID)
+	defer unlock()
+	fresh, err := s.stateStore.ReadTask(task.TaskID)
+	if err != nil || (!fresh.PendingRelease && !fresh.PendingYield) {
+		return
+	}
+	task = fresh
+	if task.CleanupNextRetryAt != nil && task.CleanupNextRetryAt.After(time.Now().UTC()) {
+		return
+	}
+	phase := "release"
+	if task.PendingYield {
+		phase = "yield"
+	}
 	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
-		if err := s.StopStage(ctx, agentID); err != nil {
-			s.log.Debug("stop task runtime failed", "task", task.TaskID, "agent", agentID, "err", err)
+		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
+			s.recordTaskCleanupFailure(task, phase, err)
 			return
 		}
 	}
-	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
-		s.log.Debug("complete task release failed", "task", task.TaskID, "err", err)
+	if task.PendingYield {
+		settled, err := s.stateStore.CompleteTaskYield(task.TaskID)
+		if err != nil {
+			s.recordTaskCleanupFailure(task, phase, err)
+			return
+		}
+		s.publishTaskUpdate(settled)
+		if settled.State == state.TaskReady {
+			go s.dispatchReadyTasks(context.Background())
+		}
+		return
 	}
+	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
+		s.recordTaskCleanupFailure(task, phase, err)
+	}
+}
+
+func (s *Server) recordTaskCleanupFailure(task state.Task, phase string, cause error) {
+	effectKey := phase + ":" + task.TaskID + ":" + task.AssignedGeneration
+	updated, err := s.stateStore.RecordTaskCleanupFailure(task.TaskID, phase, effectKey, cause)
+	if err != nil {
+		s.log.Warn("record task cleanup failure", "task", task.TaskID, "err", err)
+		return
+	}
+	s.publishTaskUpdate(updated)
+	s.log.Debug("task cleanup deferred", "task", task.TaskID, "phase", phase, "err", cause)
 }
 
 // evaluateTaskResult releases the arms waiting on a task that just recorded its
@@ -549,23 +593,19 @@ func (s *Server) recoverTasks(ctx context.Context) error {
 	if err := s.stateStore.DiscardDependencyActivations(); err != nil {
 		return err
 	}
-	awaiting, err := s.stateStore.TasksAwaitingRelease()
+	awaiting, err := s.stateStore.DueTaskCleanup(taskDispatchBatch)
 	if err != nil {
 		return err
 	}
 	for _, task := range awaiting {
-		s.finishInterruptedRelease(ctx, task)
+		s.finishTaskCleanup(ctx, task)
 	}
 	unfinished, err := s.stateStore.TasksInStates(state.TaskStarting, state.TaskRunning, state.TaskWaiting)
 	if err != nil {
 		return err
 	}
 	for _, task := range unfinished {
-		if task.State == state.TaskWaiting {
-			continue
-		}
-		if task.PendingYield {
-			s.releaseYieldedTask(ctx, task.AssignedAgentID, task.AssignedGeneration)
+		if task.State == state.TaskWaiting || task.PendingRelease || task.PendingYield {
 			continue
 		}
 		if task.State == state.TaskRunning {
@@ -634,15 +674,7 @@ func (s *Server) recoverStartAttempt(ctx context.Context, task state.Task) {
 // finished, so a recorded result can never leave a task-owned runtime up with
 // nothing owning it (TS-10.R19, INV §15).
 func (s *Server) finishInterruptedRelease(ctx context.Context, task state.Task) {
-	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
-		if err := s.StopStage(ctx, task.AssignedAgentID); err != nil {
-			s.log.Warn("finish interrupted task release failed", "task", task.TaskID, "err", err)
-			return
-		}
-	}
-	if err := s.stateStore.CompleteTaskRelease(task.TaskID); err != nil {
-		s.log.Warn("complete interrupted task release failed", "task", task.TaskID, "err", err)
-	}
+	s.finishTaskCleanup(ctx, task)
 }
 
 func (s *Server) interruptTask(task state.Task, reason string) {

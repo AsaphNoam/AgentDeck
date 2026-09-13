@@ -118,13 +118,19 @@ type Task struct {
 	PendingRelease     bool   `json:"pending_release"`
 	// ExecutionHandle identifies one confirmed execution attempt. It is not an
 	// authority token: task ownership still comes from the bound MCP session.
-	ExecutionHandle     string `json:"execution_handle,omitempty"`
-	ContinuationPending bool   `json:"continuation_pending"`
-	PendingYield        bool   `json:"pending_yield"`
-	WaitVersion         int    `json:"wait_version"`
-	ResumeNeeded        bool   `json:"resume_needed"`
-	StartAttemptID      string `json:"start_attempt_id,omitempty"`
-	StartAttemptCount   int    `json:"start_attempt_count"`
+	ExecutionHandle       string     `json:"execution_handle,omitempty"`
+	ContinuationPending   bool       `json:"continuation_pending"`
+	PendingYield          bool       `json:"pending_yield"`
+	WaitVersion           int        `json:"wait_version"`
+	ResumeNeeded          bool       `json:"resume_needed"`
+	CleanupPhase          string     `json:"cleanup_phase,omitempty"`
+	CleanupEffectKey      string     `json:"cleanup_effect_key,omitempty"`
+	CleanupFailureCount   int        `json:"cleanup_failure_count,omitempty"`
+	CleanupFirstFailureAt *time.Time `json:"cleanup_first_failure_at,omitempty"`
+	CleanupNextRetryAt    *time.Time `json:"cleanup_next_retry_at,omitempty"`
+	CleanupLastError      string     `json:"cleanup_last_error,omitempty"`
+	StartAttemptID        string     `json:"start_attempt_id,omitempty"`
+	StartAttemptCount     int        `json:"start_attempt_count"`
 
 	Revision int `json:"revision"`
 
@@ -760,7 +766,9 @@ SELECT task_id, project, display_name, instruction, target_kind, target_agent_id
   model, effort, fast, state, outcome, outcome_source, outcome_summary, outcome_details, attention_reason,
   created_by_kind, created_by_agent_id, created_by_generation, assigned_agent_id,
   assigned_generation, runtime_claim, pending_release, execution_handle, continuation_pending,
-  pending_yield, wait_version, resume_needed, start_attempt_id, start_attempt_count,
+  pending_yield, wait_version, resume_needed, cleanup_phase, cleanup_effect_key,
+  cleanup_failure_count, cleanup_first_failure_at, cleanup_next_retry_at, cleanup_last_error,
+  start_attempt_id, start_attempt_count,
   revision, ready_at, start_claimed_at, created_at, updated_at, started_at, finished_at
 FROM tasks`
 
@@ -768,14 +776,16 @@ func scanTask(row rowScanner) (Task, error) {
 	var t Task
 	var assignedAgentID sql.NullString
 	var pendingRelease, continuationPending, pendingYield, resumeNeeded int
-	var readyAt, startClaimedAt, startedAt, finishedAt sql.NullString
+	var readyAt, startClaimedAt, startedAt, finishedAt, cleanupFirstFailureAt, cleanupNextRetryAt sql.NullString
 	var createdAt, updatedAt string
 	if err := row.Scan(&t.TaskID, &t.Project, &t.DisplayName, &t.Instruction, &t.TargetKind,
 		&t.TargetAgentID, &t.Role, &t.Backend, &t.Model, &t.Effort, &t.Fast, &t.State, &t.Outcome, &t.OutcomeSource,
 		&t.OutcomeSummary, &t.OutcomeDetails, &t.AttentionReason, &t.CreatedByKind,
 		&t.CreatedByAgentID, &t.CreatedByGeneration, &assignedAgentID, &t.AssignedGeneration,
 		&t.RuntimeClaim, &pendingRelease, &t.ExecutionHandle, &continuationPending, &pendingYield,
-		&t.WaitVersion, &resumeNeeded, &t.StartAttemptID, &t.StartAttemptCount, &t.Revision,
+		&t.WaitVersion, &resumeNeeded, &t.CleanupPhase, &t.CleanupEffectKey,
+		&t.CleanupFailureCount, &cleanupFirstFailureAt, &cleanupNextRetryAt, &t.CleanupLastError,
+		&t.StartAttemptID, &t.StartAttemptCount, &t.Revision,
 		&readyAt, &startClaimedAt, &createdAt, &updatedAt, &startedAt, &finishedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Task{}, err
@@ -804,6 +814,8 @@ func scanTask(row rowScanner) (Task, error) {
 		{"task start_claimed_at", startClaimedAt, &t.StartClaimedAt},
 		{"task started_at", startedAt, &t.StartedAt},
 		{"task finished_at", finishedAt, &t.FinishedAt},
+		{"task cleanup_first_failure_at", cleanupFirstFailureAt, &t.CleanupFirstFailureAt},
+		{"task cleanup_next_retry_at", cleanupNextRetryAt, &t.CleanupNextRetryAt},
 	} {
 		v, err := parseOptionalTime(opt.raw)
 		if err != nil {
@@ -1529,12 +1541,105 @@ WHERE assigned_agent_id = ? AND assigned_generation = ? AND pending_release = 1`
 // ownership of a live runtime (TS-10.R19, INV §15).
 func (s *Store) CompleteTaskRelease(taskID string) error {
 	if _, err := s.db.Exec(`
-UPDATE tasks SET pending_release = 0, runtime_claim = '', revision = revision + 1,
+UPDATE tasks SET pending_release = 0, runtime_claim = '', cleanup_phase = '', cleanup_effect_key = '',
+  cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL,
+  cleanup_last_error = '', attention_reason = CASE WHEN cleanup_phase <> '' THEN '' ELSE attention_reason END,
+  revision = revision + 1,
   updated_at = ?
 WHERE task_id = ? AND pending_release = 1`, formatTime(timeNow()), taskID); err != nil {
 		return fmt.Errorf("state: complete task release: %w", err)
 	}
 	return nil
+}
+
+const (
+	cleanupPhaseRelease = "release"
+	cleanupPhaseYield   = "yield"
+	cleanupAttention    = "cleanup needs attention: "
+)
+
+// RecordTaskCleanupFailure retains an unresolved external cleanup effect with
+// bounded exponential backoff. It changes neither the task outcome nor its
+// execution attempt count (TS-10.R35).
+func (s *Store) RecordTaskCleanupFailure(taskID, phase, effectKey string, cause error) (Task, error) {
+	if phase != cleanupPhaseRelease && phase != cleanupPhaseYield || effectKey == "" {
+		return Task{}, fmt.Errorf("state: invalid task cleanup effect")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Task{}, fmt.Errorf("state: begin task cleanup failure: %w", err)
+	}
+	defer tx.Rollback()
+	var failures int
+	var active bool
+	err = tx.QueryRow(`SELECT cleanup_failure_count, CASE WHEN pending_release = 1 OR pending_yield = 1 THEN 1 ELSE 0 END FROM tasks WHERE task_id = ?`, taskID).Scan(&failures, &active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, fmt.Errorf("state: read task cleanup effect: %w", err)
+	}
+	if !active {
+		return Task{}, ErrTaskConflict
+	}
+	failures++
+	delay := 2 * time.Second
+	for i := 1; i < failures && delay < time.Minute; i++ {
+		delay *= 2
+	}
+	if delay > time.Minute {
+		delay = time.Minute
+	}
+	now := timeNow()
+	message := strings.TrimSpace(cause.Error())
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	attention := ""
+	if failures >= 10 {
+		attention = cleanupAttention + message
+	}
+	if _, err := tx.Exec(`
+UPDATE tasks SET cleanup_phase = ?, cleanup_effect_key = ?, cleanup_failure_count = ?,
+  cleanup_first_failure_at = COALESCE(cleanup_first_failure_at, ?), cleanup_next_retry_at = ?,
+  cleanup_last_error = ?, attention_reason = CASE WHEN ? <> '' THEN ? ELSE attention_reason END,
+  revision = revision + 1, updated_at = ?
+WHERE task_id = ?`, phase, effectKey, failures, formatTime(now), formatTime(now.Add(delay)), message,
+		attention, attention, formatTime(now), taskID); err != nil {
+		return Task{}, fmt.Errorf("state: record task cleanup failure: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Task{}, fmt.Errorf("state: commit task cleanup failure: %w", err)
+	}
+	return s.ReadTask(taskID)
+}
+
+// DueTaskCleanup returns a bounded batch of unresolved effects whose durable
+// retry deadline has passed. Empty deadlines are newly committed intents.
+func (s *Store) DueTaskCleanup(limit int) ([]Task, error) {
+	if limit <= 0 || limit > 8 {
+		limit = 8
+	}
+	rows, err := s.db.Query(taskSelect+`
+WHERE (pending_release = 1 OR pending_yield = 1)
+  AND (cleanup_next_retry_at IS NULL OR cleanup_next_retry_at <= ?)
+ORDER BY COALESCE(cleanup_next_retry_at, finished_at, updated_at), task_id LIMIT ?`, formatTime(timeNow()), limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list due task cleanup: %w", err)
+	}
+	defer rows.Close()
+	out := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate due task cleanup: %w", err)
+	}
+	return out, nil
 }
 
 // InterruptTaskForAgent moves the task this agent generation was executing to
@@ -1735,7 +1840,9 @@ func (s *Store) finishTask(taskID string, result TaskResult, source string, from
 	if _, err := tx.Exec(`
 UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?,
   outcome_details = ?, attention_reason = '', pending_release = ?, pending_yield = 0,
-  continuation_pending = 0, resume_needed = 0, finished_at = ?,
+  continuation_pending = 0, resume_needed = 0, cleanup_phase = '', cleanup_effect_key = '',
+  cleanup_failure_count = 0, cleanup_first_failure_at = NULL, cleanup_next_retry_at = NULL,
+  cleanup_last_error = '', finished_at = ?,
   revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ?`,
 		TaskFinished, result.Outcome, source, result.Summary, result.Details,

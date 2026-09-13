@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestTaskWaitYieldsAndWakesAfterWatchedResult(t *testing.T) {
@@ -32,6 +33,46 @@ func TestTaskWaitYieldsAndWakesAfterWatchedResult(t *testing.T) {
 	}
 	if settled.State != TaskReady || !settled.ContinuationPending || settled.AssignedAgentID != "a_owner" || settled.RuntimeClaim != "" {
 		t.Fatalf("settled wait = %+v", settled)
+	}
+}
+
+func TestTaskCleanupFailureBacksOffWithoutChangingTaskOutcome(t *testing.T) {
+	st, _ := newTestStore(t)
+	task := newTask(t, st, "proj", "cleanup")
+	if _, err := st.DB().Exec(`UPDATE tasks SET state = ?, outcome = ?, pending_release = 1, runtime_claim = ? WHERE task_id = ?`, TaskFinished, OutcomeSuccess, ClaimCreated, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 13, 9, 0, 0, 0, time.UTC)
+	original := timeNow
+	timeNow = func() time.Time { return now }
+	t.Cleanup(func() { timeNow = original })
+	first, err := st.RecordTaskCleanupFailure(task.TaskID, cleanupPhaseRelease, "release:"+task.TaskID, errors.New("stop timed out"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.State != TaskFinished || first.Outcome != OutcomeSuccess || first.CleanupFailureCount != 1 || first.CleanupNextRetryAt == nil || !first.CleanupNextRetryAt.Equal(now.Add(2*time.Second)) {
+		t.Fatalf("first cleanup failure = %+v", first)
+	}
+	if due, err := st.DueTaskCleanup(8); err != nil || len(due) != 0 {
+		t.Fatalf("due before retry = %+v, %v", due, err)
+	}
+	now = now.Add(2 * time.Second)
+	second, err := st.RecordTaskCleanupFailure(task.TaskID, cleanupPhaseRelease, "release:"+task.TaskID, errors.New("stop timed out"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.CleanupFailureCount != 2 || second.CleanupNextRetryAt == nil || !second.CleanupNextRetryAt.Equal(now.Add(4*time.Second)) {
+		t.Fatalf("second cleanup failure = %+v", second)
+	}
+	if err := st.CompleteTaskRelease(task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	settled, err := st.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settled.CleanupFailureCount != 0 || settled.CleanupNextRetryAt != nil || settled.CleanupLastError != "" || settled.RuntimeClaim != "" {
+		t.Fatalf("settled cleanup = %+v", settled)
 	}
 }
 

@@ -531,4 +531,20 @@ CREATE INDEX idx_task_waits_source ON task_waits(source_task_id, waiting_task_id
 ALTER TABLE pipeline_stage_tasks ADD COLUMN output_values_json TEXT NOT NULL DEFAULT '{}';
 `,
 	},
+	{
+		// Cleanup is a durable intent. Retries are reconciliation effects, not
+		// execution attempts, so their backoff survives a restart (TS-10.R35).
+		version: 30,
+		sql: `
+ALTER TABLE tasks ADD COLUMN cleanup_phase TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN cleanup_effect_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN cleanup_failure_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN cleanup_first_failure_at TEXT;
+ALTER TABLE tasks ADD COLUMN cleanup_next_retry_at TEXT;
+ALTER TABLE tasks ADD COLUMN cleanup_last_error TEXT NOT NULL DEFAULT '';
+CREATE INDEX idx_tasks_cleanup_due
+  ON tasks(cleanup_next_retry_at, task_id)
+  WHERE pending_release = 1 OR pending_yield = 1;
+`,
+	},
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -497,6 +498,28 @@ func TestYieldedTaskReleasesThenResumesOnWatchedResult(t *testing.T) {
 	ready := waitTaskState(t, srv, owner.TaskID, state.TaskReady)
 	if !ready.ContinuationPending || !ready.ResumeNeeded {
 		t.Fatalf("watched change did not request continuation: %+v", ready)
+	}
+}
+
+func TestDispatcherReconcilesDueTaskCleanupWithoutRetryingWork(t *testing.T) {
+	srv := testServer(t, true)
+	task := newLaunchTask(t, srv, "cleanup retry")
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, outcome = ?, pending_release = 1, runtime_claim = ? WHERE task_id = ?`, state.TaskFinished, state.OutcomeSuccess, state.ClaimBorrowed, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.RecordTaskCleanupFailure(task.TaskID, "release", "release:"+task.TaskID, errors.New("temporary stop failure")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET cleanup_next_retry_at = ? WHERE task_id = ?`, time.Now().UTC().Add(-time.Second).Format(time.RFC3339), task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	srv.reconcileTaskCleanup(context.Background())
+	settled, err := srv.stateStore.ReadTask(task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settled.PendingRelease || settled.RuntimeClaim != "" || settled.Outcome != state.OutcomeSuccess || settled.StartAttemptCount != 0 {
+		t.Fatalf("cleanup reconciliation changed work instead of only releasing it: %+v", settled)
 	}
 }
 
