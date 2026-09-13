@@ -134,11 +134,23 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
 			return PipelineRunRecord{}, false, err
 		}
+		coordinatorID := ""
+		if p.Coordinator != nil {
+			c := *p.Coordinator
+			c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
+			if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`, c.TaskID, c.Project, c.DisplayName, c.Instruction, c.TargetKind, c.TargetAgentID, c.Role, c.Backend, c.Model, c.Effort, c.Fast, c.State, c.CreatedByKind, c.Revision, formatTime(now), formatTime(now)); err != nil {
+				return PipelineRunRecord{}, false, err
+			}
+			if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
+				return PipelineRunRecord{}, false, err
+			}
+			coordinatorID = c.TaskID
+		}
 		outputJSON, err := json.Marshal(p.OutputValues)
 		if err != nil {
 			return PipelineRunRecord{}, false, err
 		}
-		if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, assignment_digest, output_values_json, created_at) VALUES (?, 0, 1, ?, ?, ?, ?, ?)`, p.RunID, p.StageID, p.Task.TaskID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
+		if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at) VALUES (?, 0, 1, ?, ?, ?, ?, ?, ?)`, p.RunID, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
 			return PipelineRunRecord{}, false, err
 		}
 	}

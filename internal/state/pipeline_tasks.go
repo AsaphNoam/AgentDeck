@@ -25,6 +25,7 @@ type CreatePipelineStageTaskParams struct {
 	ParentTaskID     string
 	// OutputValues maps task-result local names to frozen pipeline value keys.
 	OutputValues map[string]string
+	Coordinator  *Task
 }
 
 // PipelineStageTaskForAssignee resolves only a live standing-owner assignment;
@@ -169,12 +170,24 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
 		p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, fmt.Sprintf("%d", p.AttemptNumber), formatTime(now)); err != nil {
 		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline task lineage: %w", err)
 	}
+	coordinatorID := ""
+	if p.Coordinator != nil {
+		c := *p.Coordinator
+		c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
+		if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`, c.TaskID, c.Project, c.DisplayName, c.Instruction, c.TargetKind, c.TargetAgentID, c.Role, c.Backend, c.Model, c.Effort, c.Fast, c.State, c.CreatedByKind, c.Revision, formatTime(now), formatTime(now)); err != nil {
+			return PipelineStageTask{}, Task{}, false, err
+		}
+		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, fmt.Sprintf("%d", p.AttemptNumber), formatTime(now)); err != nil {
+			return PipelineStageTask{}, Task{}, false, err
+		}
+		coordinatorID = c.TaskID
+	}
 	outputJSON, err := json.Marshal(p.OutputValues)
 	if err != nil {
 		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: encode stage output contract: %w", err)
 	}
-	if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, assignment_digest, output_values_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
+	if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
 		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline stage association: %w", err)
 	}
 	if _, err := tx.Exec(`UPDATE pipeline_runs SET pending_action = 'dispatch_stage_task', revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, formatTime(now), p.RunID, revision); err != nil {
@@ -245,7 +258,13 @@ func scanPipelineStageTask(row interface{ Scan(...any) error }) (PipelineStageTa
 // BindPipelineStageTaskStandingAgent records the dispatcher-confirmed identity.
 // A non-empty different identity is never silently substituted.
 func (s *Store) BindPipelineStageTaskStandingAgent(taskID, agentID string) error {
-	res, err := s.db.Exec(`UPDATE pipeline_stage_tasks SET standing_agent_id = ? WHERE task_id = ? AND state = 'open' AND (standing_agent_id = '' OR standing_agent_id = ?)`, agentID, taskID, agentID)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var coordinator string
+	res, err := tx.Exec(`UPDATE pipeline_stage_tasks SET standing_agent_id = ? WHERE task_id = ? AND state = 'open' AND (standing_agent_id = '' OR standing_agent_id = ?)`, agentID, taskID, agentID)
 	if err != nil {
 		return fmt.Errorf("state: bind pipeline standing agent: %w", err)
 	}
@@ -256,7 +275,15 @@ func (s *Store) BindPipelineStageTaskStandingAgent(taskID, agentID string) error
 	if n != 1 {
 		return ErrPipelineStageConflict
 	}
-	return nil
+	if err := tx.QueryRow(`SELECT coordinator_task_id FROM pipeline_stage_tasks WHERE task_id = ?`, taskID).Scan(&coordinator); err != nil {
+		return err
+	}
+	if coordinator != "" {
+		if _, err := tx.Exec(`UPDATE tasks SET state = ?, ready_at = ?, revision = revision + 1, updated_at = ? WHERE task_id = ? AND state = ?`, TaskReady, formatTime(timeNow()), formatTime(timeNow()), coordinator, TaskArmed); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ClosePipelineStageTask fences descendant creation before release/cleanup.

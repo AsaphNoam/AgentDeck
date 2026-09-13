@@ -136,6 +136,10 @@ func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetai
 	}
 	instruction, digest := renderAssignment(queued, detail.Template, stage, detail.Values, nil, input)
 	assignment := standingAssignment(detail.Assignments, stage.ID)
+	coordinator, err := m.coordinatorTask(queued.Project, queued.Goal, stage, detail.Assignments[stage.ID])
+	if err != nil {
+		return err
+	}
 	targetKind := state.TargetLaunch
 	if current.StandingAgentID != "" {
 		targetKind = state.TargetAgent
@@ -143,7 +147,7 @@ func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetai
 	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
 		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex,
 		AttemptNumber: current.AttemptNumber + 1, StageID: stage.ID, AssignmentDigest: digest,
-		ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Task: state.Task{
+		ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Coordinator: coordinator, Task: state.Task{
 			TaskID: taskID, Project: queued.Project, DisplayName: stage.Title, Instruction: instruction,
 			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
 			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
@@ -185,6 +189,10 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 	}
 	instruction, digest := renderAssignment(queued, detail.Template, next, detail.Values, nil, "")
 	assignment := standingAssignment(detail.Assignments, next.ID)
+	coordinator, err := m.coordinatorTask(queued.Project, queued.Goal, next, detail.Assignments[next.ID])
+	if err != nil {
+		return err
+	}
 	targetKind := state.TargetLaunch
 	if current.StandingAgentID != "" {
 		targetKind = state.TargetAgent
@@ -192,7 +200,7 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
 		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex + 1,
 		AttemptNumber: 1, StageID: next.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID,
-		OutputValues: stageOutputValues(next), Task: state.Task{
+		OutputValues: stageOutputValues(next), Coordinator: coordinator, Task: state.Task{
 			TaskID: taskID, Project: queued.Project, DisplayName: next.Title, Instruction: instruction,
 			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
 			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,

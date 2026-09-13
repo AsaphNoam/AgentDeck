@@ -78,9 +78,13 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	}
 	assignmentText, assignmentHash := renderAssignment(run, record.Template, first, values, nil, "")
 	assignment := standingAssignment(request.Assignments, first.ID)
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, first, request.Assignments[first.ID])
+	if err != nil {
+		return RunDetail{}, false, err
+	}
 	created, replay, err := m.store.CreatePipelineRun(state.CreatePipelineRunParams{
 		Run: run, RequestID: request.RequestID, RequestHash: requestHash, Values: values,
-		InitialStageTask: &state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}},
+		InitialStageTask: &state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Coordinator: coordinator, Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}},
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineRequestConflict) {
@@ -95,6 +99,18 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	m.publish(created)
 	detail, err := m.Detail(created.RunID)
 	return detail, replay, err
+}
+
+func (m *Manager) coordinatorTask(project, goal string, stage Stage, assignment RuntimeAssignment) (*state.Task, error) {
+	if stage.Coordination != "dedicated" {
+		return nil, nil
+	}
+	id, err := m.store.NewTaskID()
+	if err != nil {
+		return nil, err
+	}
+	instruction := fmt.Sprintf("Coordinate pipeline stage %q. Run goal: %s\nStage objective: %s\nCreate and manage durable child work, report progress and your final result to the standing owner, and do not report the pipeline stage itself.", stage.Title, goal, stage.Objective)
+	return &state.Task{TaskID: id, Project: project, DisplayName: stage.Title + " coordinator", Instruction: instruction, TargetKind: state.TargetLaunch, Role: stage.DedicatedRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline_coordinator"}, nil
 }
 
 // OnStageTaskInterrupted projects an unexpected standing-owner exit onto the
@@ -251,6 +267,22 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 		for _, input := range record.Template.Stages[0].Inputs {
 			if input.Required && strings.TrimSpace(request.Inputs[input.Value]) == "" {
 				add("inputs."+input.Value, "required_for_first_stage", "the first stage requires a non-empty value named "+input.Value)
+			}
+		}
+	}
+	for _, stage := range record.Template.Stages {
+		if stage.Coordination != "dedicated" {
+			continue
+		}
+		assignment := request.Assignments[stage.ID]
+		field := "dedicated_assignments." + stage.ID
+		if assignment.Backend == "" || assignment.Model == "" {
+			add(field, "required", "a dedicated coordinator requires a configured backend and model")
+			continue
+		}
+		if m.lifecycle != nil {
+			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.DedicatedRole, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
+				add(field, "unavailable", err.Error())
 			}
 		}
 	}

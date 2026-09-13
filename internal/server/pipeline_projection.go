@@ -30,18 +30,29 @@ type pipelineRunControls struct {
 }
 
 type pipelineStageTaskDetail struct {
-	TaskID         string               `json:"task_id"`
-	RunID          string               `json:"run_id"`
-	StageID        string               `json:"stage_id"`
-	StageIndex     int                  `json:"stage_index"`
-	AttemptNumber  int                  `json:"attempt_number"`
-	State          string               `json:"state"`
-	AssignmentText string               `json:"assignment_text"`
-	StandingOwner  pipelineStageOwner   `json:"standing_owner"`
-	Result         *pipelineStageResult `json:"result,omitempty"`
-	Work           []pipelineTaskWork   `json:"work"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	TaskID         string                    `json:"task_id"`
+	RunID          string                    `json:"run_id"`
+	StageID        string                    `json:"stage_id"`
+	StageIndex     int                       `json:"stage_index"`
+	AttemptNumber  int                       `json:"attempt_number"`
+	State          string                    `json:"state"`
+	AssignmentText string                    `json:"assignment_text"`
+	StandingOwner  pipelineStageOwner        `json:"standing_owner"`
+	Coordinator    *pipelineStageCoordinator `json:"coordinator,omitempty"`
+	Result         *pipelineStageResult      `json:"result,omitempty"`
+	Work           []pipelineTaskWork        `json:"work"`
+	CreatedAt      time.Time                 `json:"created_at"`
+	UpdatedAt      time.Time                 `json:"updated_at"`
+}
+
+type pipelineStageCoordinator struct {
+	TaskID        string                     `json:"task_id"`
+	AgentID       string                     `json:"agent_id,omitempty"`
+	Name          string                     `json:"name,omitempty"`
+	State         string                     `json:"state,omitempty"`
+	Route         string                     `json:"route"`
+	ReportSummary string                     `json:"report_summary,omitempty"`
+	Runtime       pipeline.RuntimeAssignment `json:"runtime"`
 }
 
 type pipelineStageOwner struct {
@@ -131,7 +142,33 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 			card := pipelineAgentCard(snapshots[stage.StandingAgentID], stage.StandingAgentID, stage.StandingAgentID, task.OutcomeSummary)
 			owner.Name, owner.State, owner.Route = card.Name, card.State, card.Route
 		}
-		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: projectWork(task.TaskID), CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		work := projectWork(task.TaskID)
+		if stage.CoordinatorTaskID != "" {
+			filtered := work[:0]
+			for _, child := range work {
+				if child.TaskID != stage.CoordinatorTaskID {
+					filtered = append(filtered, child)
+				}
+			}
+			work = filtered
+		}
+		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: work, CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		if stage.CoordinatorTaskID != "" {
+			coordinator, readErr := s.stateStore.ReadTask(stage.CoordinatorTaskID)
+			if readErr != nil {
+				return nil, pipelineRunControls{}, readErr
+			}
+			route, name := "unavailable", coordinator.AssignedAgentID
+			if coordinator.AssignedAgentID != "" {
+				if agent, agentErr := s.stateStore.ReadAgent(coordinator.AssignedAgentID); agentErr == nil {
+					name, route = agent.Name, "archive"
+					if _, runningErr := s.stateStore.ReadRunning(coordinator.AssignedAgentID); runningErr == nil {
+						route = "live"
+					}
+				}
+			}
+			item.Coordinator = &pipelineStageCoordinator{TaskID: coordinator.TaskID, AgentID: coordinator.AssignedAgentID, Name: name, State: coordinator.State, Route: route, ReportSummary: coordinator.OutcomeSummary, Runtime: pipeline.RuntimeAssignment{Backend: coordinator.Backend, Model: coordinator.Model, Effort: coordinator.Effort, Fast: coordinator.Fast}}
+		}
 		if task.Outcome != "" {
 			outputs, err := s.stateStore.ReadTaskResultOutputs(task.TaskID)
 			if err != nil {

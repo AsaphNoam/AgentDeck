@@ -156,6 +156,43 @@ func TestStartCreatesOneStandingStageTaskWithoutDirectLaunch(t *testing.T) {
 	}
 }
 
+func TestDedicatedCoordinatorWaitsForStandingOwnerConfirmation(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	record, err := manager.templates.Read("quality")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record.Template.Stages[0].Coordination = "dedicated"
+	record.Template.Stages[0].DedicatedRole = "implementer"
+	if updated, err := manager.templates.Update("quality", record.Template); err != nil || !updated.Valid {
+		t.Fatalf("update template = %#v, err=%v", updated, err)
+	}
+	detail, _, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "v2-coordinator", TemplateID: "quality", Project: "proj", Goal: "ship",
+		Inputs:               map[string]string{"spec": "implement it"},
+		Orchestrator:         RuntimeAssignment{Backend: "claude", Model: "sonnet"},
+		DedicatedAssignments: map[string]RuntimeAssignment{"work": {Backend: "codex", Model: "gpt"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 1 || stages[0].CoordinatorTaskID == "" {
+		t.Fatalf("stage tasks = %#v, err=%v", stages, err)
+	}
+	coordinator, err := manager.store.ReadTask(stages[0].CoordinatorTaskID)
+	if err != nil || coordinator.State != state.TaskArmed || coordinator.Role != "implementer" {
+		t.Fatalf("coordinator before bind = %#v, err=%v", coordinator, err)
+	}
+	if err := manager.store.BindPipelineStageTaskStandingAgent(stages[0].TaskID, "standing-agent"); err != nil {
+		t.Fatal(err)
+	}
+	coordinator, err = manager.store.ReadTask(stages[0].CoordinatorTaskID)
+	if err != nil || coordinator.State != state.TaskReady {
+		t.Fatalf("coordinator after bind = %#v, err=%v", coordinator, err)
+	}
+}
+
 func TestContinueFailureCreatesAnotherDurableStageTaskForStandingOwner(t *testing.T) {
 	manager, _, _ := pipelineManagerFixture(t)
 	detail, _, err := manager.Start(context.Background(), StartRequest{
