@@ -359,11 +359,6 @@ func (s *Server) handleAgentExit(agentID, generation, cause string) {
 	s.clearPermissionTools(agentID, generation)
 	if s.pipelineMgr != nil {
 		s.pipelineMgr.ClearPermissionAttention(agentID, generation)
-		go func() {
-			if err := s.pipelineMgr.OnExit(agentID, generation, cause); err != nil {
-				s.log.Warn("pipeline agent exit", "agent_id", agentID, "err", err)
-			}
-		}()
 	}
 }
 

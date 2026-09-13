@@ -94,7 +94,9 @@ type RunDetail struct {
 	Template    Template                      `json:"template"`
 	Inputs      map[string]string             `json:"inputs"`
 	Assignments map[string]RuntimeAssignment  `json:"assignments"`
-	Attempts    []state.PipelineAttemptRecord `json:"attempts"`
+	// Attempts is retained only while decoding/resetting historical v1 state.
+	// Live API responses project stage tasks instead.
+	Attempts []state.PipelineAttemptRecord `json:"-"`
 	Values      []state.PipelineValueRecord   `json:"values"`
 	Diagnostics []Diagnostic                  `json:"diagnostics"`
 }

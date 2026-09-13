@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -400,10 +399,6 @@ VALUES (?, 'my-app', ?, '', 'agent', 'finished', 'agent', ?, 'g1', ?, 'success',
 	second := agents["pa_2"]
 	if len(second.DelegatedAgents) != 1 || second.DelegatedAgents[0].TaskID != "second" {
 		t.Fatalf("second delegated agents = %+v", second)
-	}
-	encoded, err := json.Marshal(pipelineRunDetailResponse{RunDetail: detail, AgentsByAttempt: agents})
-	if err != nil || !bytes.Contains(encoded, []byte(`"delegated_agents":[]`)) {
-		t.Fatalf("empty delegated collection JSON = %s err=%v", encoded, err)
 	}
 }
 

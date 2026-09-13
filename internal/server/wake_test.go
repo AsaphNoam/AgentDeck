@@ -163,15 +163,10 @@ func TestPromptDoesNotWakeExcludedAgents(t *testing.T) {
 		id := launchThenStop(t, srv, ts)
 		associatePipeline(t, srv, id)
 		resp, body := post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "hi"})
-		if resp.StatusCode != http.StatusNotFound {
+		if resp.StatusCode != http.StatusAccepted {
 			t.Fatalf("pipeline prompt status = %d: %s", resp.StatusCode, body)
 		}
-		waitRunning(t, srv, id, false)
-
-		// Explicit Resume remains the human-driven revival path for it.
-		if resp, body := post(t, ts.URL+"/api/sessions/"+id+"/resume", nil); resp.StatusCode != http.StatusOK {
-			t.Fatalf("explicit resume of pipeline agent status = %d: %s", resp.StatusCode, body)
-		}
+		waitRunning(t, srv, id, true)
 	})
 }
 
@@ -410,9 +405,8 @@ func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	}
 }
 
-// FS-06.A11 — a stopped agent the pipeline state machine owns is unlisted,
-// unresolvable, and never woken by mail.
-func TestStoppedPipelineAgentIsNeverAddressableOrWoken(t *testing.T) {
+// Task-backed pipelines no longer veto ordinary stopped-agent wakeability.
+func TestStoppedPipelineAgentIsAddressableAndWoken(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	stopped := launchThenStop(t, srv, ts)
 	associatePipeline(t, srv, stopped)
@@ -421,13 +415,8 @@ func TestStoppedPipelineAgentIsNeverAddressableOrWoken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("addressableAgents: %v", err)
 	}
-	for _, a := range addressable {
-		if a.AgentID == stopped {
-			t.Fatalf("pipeline-associated agent is addressable: %+v", a)
-		}
-	}
-	if id, _, err := state.ResolveRecipient(addressable, stopped); err == nil {
-		t.Fatalf("ResolveRecipient resolved a pipeline-associated agent: %q", id)
+	if id, _, err := state.ResolveRecipient(addressable, stopped); err != nil || id != stopped {
+		t.Fatalf("ResolveRecipient = %q, %v; want stopped pipeline agent", id, err)
 	}
 
 	if _, err := srv.stateStore.InsertMessage(state.Message{
@@ -438,7 +427,7 @@ func TestStoppedPipelineAgentIsNeverAddressableOrWoken(t *testing.T) {
 	}
 	srv.executePendingMailActivations(context.Background(), stopped)
 	time.Sleep(300 * time.Millisecond)
-	waitRunning(t, srv, stopped, false)
+	waitRunning(t, srv, stopped, true)
 }
 
 // slowACP wraps the fake adapter in a shell launcher that stalls for the given

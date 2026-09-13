@@ -139,15 +139,18 @@ func (s *Server) handlePipelineRun(w http.ResponseWriter, r *http.Request) {
 		writePipelineError(w, err)
 		return
 	}
-	agentsByAttempt, err := s.pipelineAttemptAgents(detail)
+	response, err := s.pipelineRunResponse(detail)
 	if err != nil {
 		writePipelineError(w, err)
 		return
 	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) pipelineRunResponse(detail pipeline.RunDetail) (pipelineRunDetailResponse, error) {
 	stageTasks, controls, err := s.pipelineTaskRunProjection(detail)
 	if err != nil {
-		writePipelineError(w, err)
-		return
+		return pipelineRunDetailResponse{}, err
 	}
 	orchestrator := detail.Assignments["standing"]
 	dedicated := map[string]pipeline.RuntimeAssignment{}
@@ -156,14 +159,13 @@ func (s *Server) handlePipelineRun(w http.ResponseWriter, r *http.Request) {
 			dedicated[stageID] = assignment
 		}
 	}
-	writeJSON(w, http.StatusOK, pipelineRunDetailResponse{
+	return pipelineRunDetailResponse{
 		RunDetail:            detail,
-		AgentsByAttempt:      agentsByAttempt,
 		Orchestrator:         orchestrator,
 		DedicatedAssignments: dedicated,
 		StageTasks:           stageTasks,
 		Controls:             controls,
-	})
+	}, nil
 }
 
 type startPipelineRequest struct {
@@ -181,7 +183,12 @@ func (s *Server) handleStartPipelineRun(w http.ResponseWriter, r *http.Request) 
 		writePipelineError(w, err)
 		return
 	} else if replay {
-		writeJSON(w, http.StatusOK, map[string]any{"run": detail, "replay": true, "workspace_conflicts": []workspaceConflict{}})
+		response, projectionErr := s.pipelineRunResponse(detail)
+		if projectionErr != nil {
+			writePipelineError(w, projectionErr)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"run": response, "replay": true, "workspace_conflicts": []workspaceConflict{}})
 		return
 	}
 	conflicts, err := s.pipelineWorkspaceConflicts(request.Project)
@@ -209,7 +216,12 @@ func (s *Server) handleStartPipelineRun(w http.ResponseWriter, r *http.Request) 
 		// start, while the periodic sweep remains the recovery path.
 		s.dispatchReadyTasks(r.Context())
 	}
-	writeJSON(w, status, map[string]any{"run": detail, "replay": replay, "workspace_conflicts": conflicts})
+	response, err := s.pipelineRunResponse(detail)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	writeJSON(w, status, map[string]any{"run": response, "replay": replay, "workspace_conflicts": conflicts})
 }
 
 type pipelineControlRequest struct {
@@ -229,7 +241,7 @@ func (s *Server) handleContinuePipelineRun(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	s.dispatchReadyTasks(r.Context())
-	writeJSON(w, http.StatusOK, detail)
+	s.writePipelineRunResponse(w, detail)
 }
 
 func (s *Server) handleRetryPipelineRun(w http.ResponseWriter, r *http.Request) {
@@ -244,7 +256,7 @@ func (s *Server) handleRetryPipelineRun(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.dispatchReadyTasks(r.Context())
-	writeJSON(w, http.StatusOK, detail)
+	s.writePipelineRunResponse(w, detail)
 }
 
 type pipelineReplaceRequest struct {
@@ -264,7 +276,7 @@ func (s *Server) handleReplacePipelineRun(w http.ResponseWriter, r *http.Request
 		return
 	}
 	s.dispatchReadyTasks(r.Context())
-	writeJSON(w, http.StatusOK, detail)
+	s.writePipelineRunResponse(w, detail)
 }
 
 func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +306,7 @@ func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Requ
 		writePipelineError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, detail)
+	s.writePipelineRunResponse(w, detail)
 }
 
 func (s *Server) handleStopPipelineRun(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +351,16 @@ func (s *Server) handleStopPipelineRun(w http.ResponseWriter, r *http.Request) {
 			detail = latest
 		}
 	}
-	writeJSON(w, http.StatusOK, detail)
+	s.writePipelineRunResponse(w, detail)
+}
+
+func (s *Server) writePipelineRunResponse(w http.ResponseWriter, detail pipeline.RunDetail) {
+	response, err := s.pipelineRunResponse(detail)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *Server) handleDeletePipelineRun(w http.ResponseWriter, r *http.Request) {

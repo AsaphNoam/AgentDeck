@@ -1,7 +1,6 @@
 package messaging
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -111,35 +110,3 @@ func TestPipelineProposalToolFailsCleanlyWithoutManager(t *testing.T) {
 // reads as "keep going": nothing told a blocked stage agent that the chat it is
 // still sitting in is out of band, so a person's answer there produced work the
 // run could never accept.
-func TestAcceptedStageResultStatesTheBoundary(t *testing.T) {
-	blocked := reportNextGuidance("blocked")
-	for _, phrase := range []string{"out of band", "cannot be recorded", "new assignment"} {
-		if !strings.Contains(blocked, phrase) {
-			t.Fatalf("blocked guidance is missing %q: %s", phrase, blocked)
-		}
-	}
-	for _, outcome := range []string{"success", "failure"} {
-		guidance := reportNextGuidance(outcome)
-		if guidance == blocked {
-			t.Fatalf("%s reuses the blocked pause guidance", outcome)
-		}
-		if !strings.Contains(guidance, "This attempt is finished") {
-			t.Fatalf("%s guidance does not end the attempt: %s", outcome, guidance)
-		}
-	}
-}
-
-// FS-14.A29: every refused report states that no result was accepted and what
-// the stage agent must do next, including control-plane unavailability.
-func TestStageReportUnavailableIncludesRetryGuidance(t *testing.T) {
-	server, _, _ := pipelineProposalFixture(t)
-	server.SetPipelineManager(nil)
-	builder := connect(t, server, "builder-token")
-	result, isErr := call(t, builder, "report_pipeline_stage_result", map[string]any{
-		"outcome": "success", "summary": "done",
-	})
-	message, _ := result["message"].(string)
-	if !isErr || result["error"] != "pipeline_unavailable" || !strings.Contains(message, "still owes a result") || !strings.Contains(message, "retry") {
-		t.Fatalf("report refusal = %v isErr=%v", result, isErr)
-	}
-}

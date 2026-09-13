@@ -438,8 +438,8 @@ VALUES (?,?,?,?,'claude','sonnet','chat','/tmp','prompt','2026-08-16T10:00:00Z',
 
 // FS-06.R22 / TS-04.R26 — the addressable set adds stopped chat agents a message
 // can wake, and only those: the wake gates exclude an archived agent, a terminal
-// agent, an agent with no snapshot to resume, and any agent a pipeline attempt
-// owns (its state machine stopped it deliberately).
+// agent, and an agent with no snapshot to resume. Historical pipeline attempt
+// association no longer changes ordinary wakeability.
 func TestStoppedWakeCandidates(t *testing.T) {
 	st, _ := newTestStore(t)
 	stoppedAgent(t, st, "a_wake", "Atlas", "implementer", "my-app")
@@ -470,8 +470,8 @@ VALUES ('pr_1','t_1','Build','my-app','ship','running','2026-08-16T10:00:00Z','2
 	if err != nil {
 		t.Fatalf("StoppedWakeCandidates: %v", err)
 	}
-	if len(got) != 1 || got[0].AgentID != "a_wake" {
-		t.Fatalf("candidates = %+v, want only a_wake", got)
+	if len(got) != 2 || got[0].AgentID != "a_wake" || got[1].AgentID != "a_pipe" {
+		t.Fatalf("candidates = %+v, want a_wake and a_pipe", got)
 	}
 	if got[0].Availability != AvailabilityStoppedWakeable {
 		t.Fatalf("availability = %q, want %q", got[0].Availability, AvailabilityStoppedWakeable)
@@ -481,7 +481,7 @@ VALUES ('pr_1','t_1','Build','my-app','ship','running','2026-08-16T10:00:00Z','2
 	for _, c := range []struct {
 		id   string
 		want int
-	}{{"a_wake", 1}, {"a_pipe", 0}, {"a_arch", 0}, {"a_bare", 0}, {"a_live", 0}} {
+	}{{"a_wake", 1}, {"a_pipe", 1}, {"a_arch", 0}, {"a_bare", 0}, {"a_live", 0}} {
 		one, err := st.StoppedWakeCandidates(c.id)
 		if err != nil {
 			t.Fatalf("StoppedWakeCandidates(%s): %v", c.id, err)
@@ -500,7 +500,7 @@ VALUES ('pr_1','t_1','Build','my-app','ship','running','2026-08-16T10:00:00Z','2
 	if len(live) != 1 || live[0].Availability != AvailabilityRunning {
 		t.Fatalf("live = %+v, want one running agent", live)
 	}
-	id, _, err := ResolveRecipient(directory(t, st), "implementer@my-app")
+	id, _, err := ResolveRecipient(directory(t, st), "a_wake")
 	if err != nil || id != "a_wake" {
 		t.Fatalf("ResolveRecipient = %q,%v want a_wake", id, err)
 	}

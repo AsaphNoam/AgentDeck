@@ -411,14 +411,18 @@ func (m *Manager) hasPendingPermission(runID, agentID string) bool {
 // OnPermissionEvent derives pipeline attention from the current stage agent's
 // process-lifetime permission state. It changes no durable run state.
 func (m *Manager) OnPermissionEvent(agentID, generation, toolCallID string, pending bool) error {
-	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
+	stage, task, err := m.store.PipelineStageTaskForAssignee(agentID, generation)
 	if errors.Is(err, state.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if attempt.AgentGeneration != generation || run.CurrentAgentID != agentID || run.CurrentAttemptID != attempt.AttemptID || run.PendingAction != "await_result" {
+	run, err := m.store.ReadPipelineRun(stage.RunID)
+	if err != nil {
+		return err
+	}
+	if stage.State != "open" || (task.State != state.TaskStarting && task.State != state.TaskRunning) {
 		return nil
 	}
 	m.attentionMu.Lock()
@@ -482,39 +486,6 @@ func (m *Manager) Startup(ctx context.Context) error {
 	}
 	for _, run := range runs {
 		if run.PendingAction == "" || run.PendingAction == "await_approval" {
-			continue
-		}
-		if run.PendingAction == "await_result" || run.PendingAction == "await_quiescence" {
-			detail, detailErr := m.Detail(run.RunID)
-			if detailErr != nil {
-				if pauseErr := m.pauseStartupRun(ctx, run.RunID, "restart_state_invalid"); pauseErr != nil {
-					return pauseErr
-				}
-				continue
-			}
-			attempt, ok := currentAttempt(detail)
-			if !ok {
-				if pauseErr := m.pauseStartupRun(ctx, run.RunID, "restart_state_invalid"); pauseErr != nil {
-					return pauseErr
-				}
-				continue
-			}
-			reason := "restart_recovery"
-			if run.PendingAction == "await_quiescence" {
-				reason = "restart_awaiting_quiescence"
-			}
-			updated, updateErr := m.store.UpdatePipelineAttemptAndRunCAS(run.RunID, run.Revision, attempt.AttemptID, reason, attempt.AgentGeneration, state.PipelineRunUpdate{
-				State: "paused", PendingAction: "", CurrentStageID: run.CurrentStageID,
-				CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, AttentionReason: reason,
-			})
-			if updateErr != nil {
-				return updateErr
-			}
-			m.publish(updated)
-			m.notify(updated, "needs_attention")
-			if m.lifecycle != nil && run.CurrentAgentID != "" {
-				_ = m.lifecycle.StopStage(ctx, run.CurrentAgentID)
-			}
 			continue
 		}
 		if err := m.Reconcile(ctx, run.RunID); err != nil {

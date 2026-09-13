@@ -37,15 +37,14 @@ const agentColumns = `a.agent_id, a.name, a.role, a.project, a.interface,
 
 // stoppedWakeGates is the one SQL spelling of FS-01.R33's database-checkable wake
 // gates: not archived, chat interface, a persisted session snapshot to resume
-// from, and no pipeline attempt association — a pipeline stage agent was
-// deliberately stopped by its state machine, so no message may revive it. Both
+// from. Pipeline work now uses ordinary task claims, so historical pipeline
+// attempt association is not a wake veto. Both
 // the single-agent candidacy query and the addressable-set query embed this exact
 // text so the two cannot drift (INV §2). The project-archive gate is not here: it
 // reads configuration rather than this database, so the caller applies it.
 const stoppedWakeGates = `a.archived = 0
   AND a.interface = 'chat'
-  AND EXISTS (SELECT 1 FROM sessions se WHERE se.agent_id = a.agent_id)
-  AND NOT EXISTS (SELECT 1 FROM pipeline_attempts pa WHERE pa.agent_id = a.agent_id)`
+  AND EXISTS (SELECT 1 FROM sessions se WHERE se.agent_id = a.agent_id)`
 
 // LiveAgents returns every currently-running agent (a row in the running
 // registry) joined with identity and latest status (techspec §3.2). Agents with

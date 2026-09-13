@@ -63,80 +63,18 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 		lock.Unlock()
 		return RunDetail{}, stageErr
 	}
-	release, err := m.acquireProjectStart(ctx, run.Project)
-	if err != nil {
-		lock.Unlock()
-		return RunDetail{}, err
-	}
-	defer release()
-	detail, err := m.Detail(runID)
-	if err != nil {
-		lock.Unlock()
-		return RunDetail{}, err
-	}
-	attempt, ok := currentAttempt(detail)
-	if !ok {
-		lock.Unlock()
-		return RunDetail{}, controlError("invalid_state", "current attempt is missing")
-	}
-	switch {
-	case run.State == "paused" && run.AttentionReason == "blocked" && attempt.ReportOutcome == "blocked":
-		if strings.TrimSpace(input) == "" || utf8.RuneCountInString(input) > MaxValueRunes {
-			lock.Unlock()
-			return RunDetail{}, validationError("continuation input is required", []Diagnostic{{Field: "input", Code: "invalid", Message: "input is required and must fit the pipeline value limit"}})
-		}
-		_, err = m.createStageAttempt(run, attempt.StageID, false, false, input)
-	case run.State == "paused" && run.PendingAction == "await_approval":
-		stage, found := stageByID(detail.Template, attempt.StageID)
-		if !found {
-			err = controlError("invalid_state", "current stage is missing")
-			break
-		}
-		transition := stage.Transitions.Success
-		if attempt.ReportOutcome == "failure" {
-			transition = stage.Transitions.Failure
-		}
-		if transition.Final != "" {
-			var completed state.PipelineRunRecord
-			completed, err = m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
-				State: "completed", PendingAction: "", CurrentStageID: run.CurrentStageID,
-				CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: "", FinalOutcome: transition.Final,
-			})
-			if err == nil {
-				m.publish(completed)
-				m.notify(completed, "completed")
-			}
-		} else {
-			_, err = m.createStageAttempt(run, transition.Stage, false, true, "")
-		}
-	default:
-		err = controlError("invalid_state", "continue is not valid for the current run state")
-	}
 	lock.Unlock()
-	if err != nil {
-		return RunDetail{}, err
-	}
-	if err := m.Reconcile(ctx, runID); err != nil {
-		return RunDetail{}, err
-	}
-	return m.Detail(runID)
+	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
 func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetail, current state.PipelineStageTask, stage Stage, input string) error {
-	queued, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
-		State: "queued", PendingAction: "create_stage_task", CurrentStageID: stage.ID,
-		CurrentAgentID: current.StandingAgentID,
-	})
-	if err != nil {
-		return err
-	}
 	taskID, err := m.store.NewTaskID()
 	if err != nil {
 		return err
 	}
-	instruction, digest := renderAssignment(queued, detail.Template, stage, detail.Values, nil, input)
+	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, nil, input)
 	assignment := standingAssignment(detail.Assignments, stage.ID)
-	coordinator, err := m.coordinatorTask(queued.Project, queued.Goal, stage, detail.Assignments[stage.ID])
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, stage, detail.Assignments[stage.ID])
 	if err != nil {
 		return err
 	}
@@ -145,10 +83,10 @@ func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetai
 		targetKind = state.TargetAgent
 	}
 	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
-		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex,
+		RunID: run.RunID, ExpectedRevision: run.Revision, StageIndex: current.StageIndex,
 		AttemptNumber: current.AttemptNumber + 1, StageID: stage.ID, AssignmentDigest: digest,
 		ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Coordinator: coordinator, Task: state.Task{
-			TaskID: taskID, Project: queued.Project, DisplayName: stage.Title, Instruction: instruction,
+			TaskID: taskID, Project: run.Project, DisplayName: stage.Title, Instruction: instruction,
 			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
 			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
 			CreatedByKind: "pipeline",
@@ -176,20 +114,13 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 		return err
 	}
 	next := detail.Template.Stages[current.StageIndex+1]
-	queued, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
-		State: "queued", PendingAction: "create_stage_task", CurrentStageID: next.ID,
-		CurrentAgentID: current.StandingAgentID,
-	})
-	if err != nil {
-		return err
-	}
 	taskID, err := m.store.NewTaskID()
 	if err != nil {
 		return err
 	}
-	instruction, digest := renderAssignment(queued, detail.Template, next, detail.Values, nil, "")
+	instruction, digest := renderAssignment(run, detail.Template, next, detail.Values, nil, "")
 	assignment := standingAssignment(detail.Assignments, next.ID)
-	coordinator, err := m.coordinatorTask(queued.Project, queued.Goal, next, detail.Assignments[next.ID])
+	coordinator, err := m.coordinatorTask(run.Project, run.Goal, next, detail.Assignments[next.ID])
 	if err != nil {
 		return err
 	}
@@ -198,10 +129,10 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 		targetKind = state.TargetAgent
 	}
 	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
-		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex + 1,
+		RunID: run.RunID, ExpectedRevision: run.Revision, StageIndex: current.StageIndex + 1,
 		AttemptNumber: 1, StageID: next.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID,
 		OutputValues: stageOutputValues(next), Coordinator: coordinator, Task: state.Task{
-			TaskID: taskID, Project: queued.Project, DisplayName: next.Title, Instruction: instruction,
+			TaskID: taskID, Project: run.Project, DisplayName: next.Title, Instruction: instruction,
 			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
 			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
 			CreatedByKind: "pipeline",
@@ -245,31 +176,8 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 		lock.Unlock()
 		return RunDetail{}, stageErr
 	}
-	release, err := m.acquireProjectStart(ctx, run.Project)
-	if err != nil {
-		lock.Unlock()
-		return RunDetail{}, err
-	}
-	defer release()
-	if run.State != "paused" || run.PendingAction == "await_approval" || run.AttentionReason == "loop_limit_reached" {
-		lock.Unlock()
-		return RunDetail{}, controlError("invalid_state", "retry is not valid for the current run state")
-	}
-	updated, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
-		State: "paused", PendingAction: "retry_stop_agent", CurrentStageID: run.CurrentStageID,
-		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID,
-	})
-	if err == nil {
-		m.publish(updated)
-	}
 	lock.Unlock()
-	if err != nil {
-		return RunDetail{}, err
-	}
-	if err := m.Reconcile(ctx, runID); err != nil {
-		return RunDetail{}, err
-	}
-	return m.Detail(runID)
+	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
 func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision int64, runtime RuntimeAssignment) (RunDetail, error) {
@@ -358,21 +266,8 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 		lock.Unlock()
 		return RunDetail{}, stageErr
 	}
-	updated, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
-		State: "stopped", PendingAction: "stop_run_agent", CurrentStageID: run.CurrentStageID,
-		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, FinalOutcome: "stopped",
-	})
-	if err == nil {
-		m.publish(updated)
-	}
 	lock.Unlock()
-	if err != nil {
-		return RunDetail{}, err
-	}
-	if err := m.Reconcile(ctx, runID); err != nil {
-		return RunDetail{}, err
-	}
-	return m.Detail(runID)
+	return RunDetail{}, controlError("invalid_state", "run has no durable stage task")
 }
 
 // FinishStopCleanup commits the terminal run outcome only after every lineage
@@ -449,6 +344,15 @@ func (m *Manager) StopProject(ctx context.Context, project string) error {
 
 func (m *Manager) Delete(runID string) error {
 	return m.store.DeletePipelineRun(runID)
+}
+
+func currentAttempt(detail RunDetail) (state.PipelineAttemptRecord, bool) {
+	for _, attempt := range detail.Attempts {
+		if attempt.AttemptID == detail.Run.CurrentAttemptID {
+			return attempt, true
+		}
+	}
+	return state.PipelineAttemptRecord{}, false
 }
 
 func (m *Manager) Report(agentID, generation string, report StageReport) (RunDetail, error) {

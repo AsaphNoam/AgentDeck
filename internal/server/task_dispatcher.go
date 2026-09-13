@@ -445,11 +445,6 @@ func (s *Server) dispatchTurnEnd(agentID, generation string) {
 	s.releaseYieldedTask(context.Background(), agentID, generation)
 	s.releaseReportedTask(context.Background(), agentID, generation)
 	if s.pipelineMgr != nil {
-		// Legacy attempts still receive their compatibility callback; v2 stage
-		// advancement observes the released task association below.
-		if err := s.pipelineMgr.OnTurnEnd(agentID, generation); err != nil {
-			s.log.Warn("pipeline turn boundary", "agent_id", agentID, "err", err)
-		}
 		task, _, err := s.stateStore.PipelineStageTaskForAssignee(agentID, generation)
 		if err == nil {
 			if err := s.pipelineMgr.Reconcile(context.Background(), task.RunID); err != nil {

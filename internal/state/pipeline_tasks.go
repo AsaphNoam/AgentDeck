@@ -129,15 +129,15 @@ func (s *Store) CreatePipelineStageTask(p CreatePipelineStageTaskParams) (Pipeli
 	}
 	defer tx.Rollback()
 	var revision int64
-	var stateName, currentStage string
-	err = tx.QueryRow(`SELECT revision, state, current_stage_id FROM pipeline_runs WHERE run_id = ?`, p.RunID).Scan(&revision, &stateName, &currentStage)
+	var stateName string
+	err = tx.QueryRow(`SELECT revision, state FROM pipeline_runs WHERE run_id = ?`, p.RunID).Scan(&revision, &stateName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PipelineStageTask{}, Task{}, false, ErrNotFound
 	}
 	if err != nil {
 		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: read pipeline run: %w", err)
 	}
-	if revision != p.ExpectedRevision || currentStage != p.StageID || stateName == "stopping" || stateName == "stopped" || stateName == "completed" {
+	if revision != p.ExpectedRevision || stateName == "stopping" || stateName == "stopped" || stateName == "completed" {
 		return PipelineStageTask{}, Task{}, false, ErrPipelineStageConflict
 	}
 	if existing, err := readPipelineStageTaskTx(tx, p.RunID, p.StageIndex, p.AttemptNumber); err == nil {
@@ -190,7 +190,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
 		p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
 		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline stage association: %w", err)
 	}
-	if _, err := tx.Exec(`UPDATE pipeline_runs SET pending_action = 'dispatch_stage_task', revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, formatTime(now), p.RunID, revision); err != nil {
+	if _, err := tx.Exec(`UPDATE pipeline_runs SET state = 'queued', pending_action = 'dispatch_stage_task', current_stage_id = ?, revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, p.StageID, formatTime(now), p.RunID, revision); err != nil {
 		return PipelineStageTask{}, Task{}, false, err
 	}
 	if err := tx.Commit(); err != nil {

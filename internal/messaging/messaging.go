@@ -221,10 +221,6 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Description: "Deliberately retrieve pending or historical mail, including overflow not supplied inline; flags returned messages read (or deletes) as requested.",
 	}, s.handleCheckMessages)
 	addTool(s, &mcp.Tool{
-		Name:        "report_pipeline_stage_result",
-		Description: "Report the authoritative success, failure, or blocked result for your current pipeline stage attempt. An accepted result is final for that attempt.",
-	}, s.handleReportPipelineStageResult)
-	addTool(s, &mcp.Tool{
 		Name:        "propose_pipeline_template",
 		Description: "Validate and propose a model-neutral pipeline template for exact human approval; this never saves it.",
 	}, s.handleProposePipelineTemplate)

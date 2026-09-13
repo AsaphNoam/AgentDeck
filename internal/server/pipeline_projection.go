@@ -9,7 +9,6 @@ import (
 
 type pipelineRunDetailResponse struct {
 	pipeline.RunDetail
-	AgentsByAttempt      map[string]pipelineAttemptAgents      `json:"agents_by_attempt"`
 	Orchestrator         pipeline.RuntimeAssignment            `json:"orchestrator"`
 	DedicatedAssignments map[string]pipeline.RuntimeAssignment `json:"dedicated_assignments"`
 	StageTasks           []pipelineStageTaskDetail             `json:"stage_tasks"`

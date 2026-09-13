@@ -143,13 +143,6 @@ export const pipelineStageTaskSchema = z.object({
   updated_at: z.string(),
 });
 
-// Kept as a read-only compatibility projection until the server detail route
-// switches to task provenance. New UI chooses `stage_tasks` whenever present.
-export const pipelineAttemptSchema = z.object({
-  attempt_id: z.string(), run_id: z.string(), stage_id: z.string(), attempt_no: z.number().int(), visit_no: z.number().int(),
-  parent_attempt_id: z.string().optional().default(""), agent_id: z.string().optional().default(""), agent_generation: z.string().optional().default(""), backend: z.string(), model: z.string(), state: z.string(), assignment_text: z.string(), assignment_hash: z.string(), assignment_version: z.number().int(), report_outcome: z.string().optional().default(""), report_summary: z.string().optional().default(""), report_details: z.string().optional().default(""), report_checks: z.string().optional().default(""), report_outputs: z.record(z.string()), reported_at: z.string().nullable().optional(), quiescent_at: z.string().nullable().optional(), created_at: z.string(), updated_at: z.string(),
-});
-
 export const pipelineValueSchema = z.object({
   run_id: z.string(),
   name: z.string(),
@@ -165,9 +158,8 @@ export const pipelineRunDetailSchema = z.object({
   inputs: z.record(z.string()),
   orchestrator: pipelineRuntimeAssignmentSchema.optional(),
   dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
-  stage_tasks: z.array(pipelineStageTaskSchema).optional().default([]),
+  stage_tasks: z.array(pipelineStageTaskSchema),
   assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
-  attempts: z.array(pipelineAttemptSchema).optional().default([]),
   values: z.array(pipelineValueSchema),
   diagnostics: z.array(pipelineDiagnosticSchema),
   controls: z.object({
@@ -176,11 +168,7 @@ export const pipelineRunDetailSchema = z.object({
     replace: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
     stop: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
     repair_cleanup: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
-  }).optional(),
-  agents_by_attempt: z.record(z.object({
-    stage_agent: z.object({ agent_id: z.string(), name: z.string(), running: z.boolean(), state: z.string(), preview: z.string(), route: z.enum(["live", "archive", "unavailable"]), available: z.boolean(), fast: z.boolean().optional().default(false) }).nullable(),
-    delegated_agents: z.array(z.object({ agent_id: z.string(), name: z.string(), running: z.boolean(), state: z.string(), preview: z.string(), route: z.enum(["live", "archive", "unavailable"]), available: z.boolean(), fast: z.boolean().optional().default(false), task_id: z.string(), display_name: z.string(), task_state: z.string().optional().default(""), outcome: z.string() })), delegated_total: z.number().int(), delegated_running_count: z.number().int(),
-  })).optional().default({}),
+  }),
 });
 
 export const pipelineRunSummarySchema = z.object({
@@ -273,11 +261,9 @@ export type PipelineTemplateRecord = z.infer<typeof pipelineTemplateRecordSchema
 export type PipelineRuntimeAssignment = z.infer<typeof pipelineRuntimeAssignmentSchema>;
 export type PipelineStartRequest = z.infer<typeof pipelineStartRequestSchema>;
 export type PipelineRun = z.infer<typeof pipelineRunSchema>;
-export type PipelineAttempt = z.infer<typeof pipelineAttemptSchema>;
 export type PipelineValue = z.infer<typeof pipelineValueSchema>;
 export type PipelineRunDetail = z.infer<typeof pipelineRunDetailSchema>;
 export type PipelineRunSummary = z.infer<typeof pipelineRunSummarySchema>;
-export type PipelineAttemptAgents = PipelineRunDetail["agents_by_attempt"][string];
 export type PipelineWorkspaceConflict = z.infer<typeof pipelineWorkspaceConflictSchema>;
 export type PipelineStartResponse = z.infer<typeof pipelineStartResponseSchema>;
 export type PipelineUpdate = z.infer<typeof pipelineUpdateSchema>;

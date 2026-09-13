@@ -112,8 +112,7 @@ func TestRegisteredToolsShareResultContract(t *testing.T) {
 	}
 	validArgs := map[string]map[string]any{
 		"list_agents": {}, "send_message": {"to": "nobody", "body": "hello"},
-		"check_messages":               {},
-		"report_pipeline_stage_result": {"outcome": "success", "summary": "done"},
+		"check_messages": {},
 		"propose_pipeline_template": {"id": "sample", "template": map[string]any{
 			"version": 2, "title": "sample", "orchestrator_role": "implementer", "inputs": []any{}, "stages": []any{},
 		}},

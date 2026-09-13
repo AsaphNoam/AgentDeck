@@ -506,20 +506,6 @@ func TestManagerSequentialRoutingBlockedContinuationAndIdentity(t *testing.T) {
 	}
 }
 
-// TS-09.R24: a resumed stage executes the effort recorded with that attempt,
-// never a value re-read from the run's assignment document.
-func TestStageExecutionUsesAttemptEffort(t *testing.T) {
-	detail := RunDetail{Run: state.PipelineRunRecord{RunID: "pr_1", DisplayName: "Run", Project: "app"}, Assignments: map[string]RuntimeAssignment{
-		"work": {Backend: "codex", Model: "gpt", Effort: "low"},
-	}}
-	execution := stageExecution(detail, state.PipelineAttemptRecord{
-		AttemptID: "pa_1", StageID: "work", Backend: "codex", Model: "gpt", Effort: "high",
-	}, Stage{ID: "work", Title: "Work", Role: "implementer"})
-	if execution.Effort != "high" {
-		t.Fatalf("stage execution effort = %q, want frozen attempt effort high", execution.Effort)
-	}
-}
-
 // FS-14.A4: launch failure pauses honestly and Retry creates a fresh identity.
 func TestManagerLaunchFailureRetryAndStop(t *testing.T) {
 	manager, lifecycle, _ := pipelineManagerFixture(t)
