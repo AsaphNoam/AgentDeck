@@ -220,7 +220,11 @@ reason, and fast mode stays fail-open under R45. `claude-acp` keeps `_meta` mode
 and gains nothing here. `opencode-acp` and `openhands-acp` keep today's parameter unchanged, because
 whether their pinned adapters read it is unverified and changing delivery on an unverified adapter
 would trade a known-good path for an assumption — INV §12's rule, and the same rule that makes this
-requirement cite a live check rather than a code reading alone.
+requirement cite a live check rather than a code reading alone. "Unchanged" is not "working": both
+still send an out-of-schema top-level `systemPrompt`, OpenCode's model depends on an out-of-schema
+top-level `model`, and OpenHands' model already arrives through `LLM_MODEL` so its copy is redundant
+regardless. R54 records those members as unverified delivery paths and FS-09.A6 gates the claim until
+each CLI is installed and checked at the effective provider.
 
 Because effort now applies to a live session as well as at startup, the same helper serves the
 running-agent change in FS-03.R47 with no second spelling of the call (INV §2).

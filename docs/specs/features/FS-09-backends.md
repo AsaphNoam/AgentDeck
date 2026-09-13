@@ -373,8 +373,13 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A6** `(GATED — real CLI credentials; Phase 7.4)` — With authenticated `opencode` and
   `openhands` CLIs, verify ACP handshake and one streamed turn, permission round-trip and
   skip-permissions behavior, stop, native resume or documented primer fallback, provider/model/env
-  mapping, and HTTP `mcpServers` registration. Until recorded, these backends pass fake-ACP tests but
-  real-CLI compatibility is not claimed.
+  mapping, and HTTP `mcpServers` registration. Model and system-prompt delivery is checked at the
+  effective provider, not at the request AgentDeck emits: both backends send a top-level
+  `systemPrompt` and OpenCode depends on a top-level `model`, and neither member is in the ACP
+  session-request schema (TS-04.R54). OpenHands' model arrives through `LLM_MODEL` instead, so its
+  top-level `model` is redundant either way. Until recorded, these backends pass fake-ACP tests but
+  real-CLI compatibility is not claimed, and no out-of-schema member is removed before its real
+  mechanism is known.
 - **A7** `(GATED — real CLI credentials)` — Re-run live Codex chat launch/turn/stop/resume and the
   official Claude adapter plus Claude/Codex/OpenCode/OpenHands HTTP messaging-MCP registration
   against pinned versions before a release claims those external compatibility paths.
@@ -539,6 +544,11 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **OpenCode/OpenHands live acceptance is gated (A6).** Their binary/ACP commands, native
   `session/load`, exact OpenCode permission keys, OpenHands CLI-side approval mode, and HTTP MCP
   acceptance are based on adapter contracts plus fake ACP tests, not a recorded authenticated run.
+  Their top-level `systemPrompt`, and OpenCode's top-level `model`, are outside the ACP
+  session-request schema; the two pinned adapters AgentDeck did check strip such members, and
+  whether these two CLIs' own decoders do is unverified because neither is installed. Treat that
+  delivery as unproven rather than working — it is the exact shape BR-1 took — and do not remove
+  the members before the live check establishes the real mechanism (TS-04.R47, TS-04.R54).
 - **OpenHands skip-permissions is host-side.** The shared runtime auto-approves ACP permission
   requests, but an always-approve session mode/CLI flag is intentionally not sent until a real CLI
   acceptance establishes its contract.

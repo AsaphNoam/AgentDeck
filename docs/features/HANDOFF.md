@@ -39,15 +39,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
-- **Open findings:** `persistent-pipeline-orchestration` is closed; all fourteen findings are fixed
-  with regression tests. Still open in BR-1: the unverified OpenCode/OpenHands paths. Live-gate
-  finding durability and provider-contract oracles are fixed. The injected-steer lifetime edge
-  case is named here but was never recorded as a finding; it needs `/investigate-bug` before `/fix`
-  can take it. See **Review findings**.
-- **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
-  fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed; BR-2 is fixed and closed.
-  BR-1's still-open findings are listed above. Pinned Claude model delivery
-  through `_meta` works; an ACP model `currentValue` can be stale and is no execution-model oracle.
+- **Open findings:** none. `persistent-pipeline-orchestration` and BR-1 are both closed as of
+  2026-09-13. The injected-steer lifetime edge case is still named in prose but was never recorded
+  as a finding; it needs `/investigate-bug` before `/fix` can take it.
+- **Bug reports:** BR-1, BR-2, and BR-3 are investigated, fixed and closed. Pinned Claude model
+  delivery through `_meta` works; an ACP model `currentValue` is adapter configuration evidence and
+  no execution-model oracle (TS-04.R54). OpenCode/OpenHands model and prompt delivery is unverified
+  and now sits under **Acceptance gates**.
 - **State:** The file viewer's credentialed rendered forms are owed: journey J3 now carries the
   file-link steps (docked and transcript-width forms, the refusal branch, the dashboard-pane
   navigation), and none of them has been exercised against a real browser.
@@ -58,9 +56,18 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `/fix` on BR-1. Findings 1 (live-gate durability) and 2 (provider-contract oracles) are
-closed; finding 3 (OpenCode/OpenHands) follows. Settled 2026-09-13 changelog entries moved to
+**Change:** None. BR-1 is closed: all three findings fixed on 2026-09-13. Settled 2026-09-13
+changelog entries moved to
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+
+**Changelog — 2026-09-13 (fix: BR-1 OpenCode/OpenHands delivery):** The undetermined finding
+becomes recorded gated evidence instead of an open finding. FS-09.A6 and its deviation note name the
+two out-of-schema members (top-level `systemPrompt` on both, top-level `model` on OpenCode), state
+that OpenHands' model arrives through `LLM_MODEL` so its copy is redundant, and require delivery to
+be checked at the effective provider rather than at the emitted request. TS-04.R47 now says
+"unchanged" is not "working". Neither member is removed: R47's reason holds while the CLIs are
+uninstalled. The **Acceptance gates** entry carries the check (INV §12). No code change; the
+machine-readable record is the R54 out-of-schema table added with finding 2.
 
 **Changelog — 2026-09-13 (fix: BR-1 provider-contract oracles):** TS-04.R54 states the three rules
 that separate a contract claim from a restatement of AgentDeck's own intent. The pinned ACP
@@ -91,7 +98,7 @@ are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
 **Available by role:** `/review` has no unreviewed unit. `/work` may take
-`rename-product-to-deckhand`; `/fix` may take BR-1;
+`rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -112,7 +119,9 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
       reported-result checks. The historical 2026-07-26 run failed model precedence and is evidence,
       not closure for the current implementation.
 - [ ] Pinned Claude terminal flags/hooks and live xterm journeys.
-- [ ] Pinned OpenCode/OpenHands launch and credential checks.
+- [ ] Pinned OpenCode/OpenHands launch and credential checks, including model and system-prompt
+      delivery at the effective provider: both send an out-of-schema top-level `systemPrompt` and
+      OpenCode's model depends on an out-of-schema top-level `model` (FS-09.A6, TS-04.R54).
 - [ ] Real macOS native folder-panel checks (FS-04.A22/J2/J9/J16).
 - [ ] Real-browser permission-pane and drag-refusal journeys (FS-02.A35/A43).
 - [ ] Phase 7 federation matrix against real Claude and Codex installations.
@@ -126,18 +135,11 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 ## Review findings
 
 `persistent-pipeline-orchestration` closed on 2026-09-13: all fourteen findings are fixed with
-regression tests, and the unit is no longer open for review or fixes.
+regression tests, and the unit is no longer open for review or fixes. BR-1 closed on 2026-09-13:
+all three findings are fixed, and the OpenCode/OpenHands delivery it left undetermined is now
+gated evidence under **Acceptance gates** rather than an open finding.
 
-### BR-1 — **Fix model:** difficult — Codex Sol.
-
-- **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
-  **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
-  so it does not depend on the suspect ACP `model` member, but both adapters still receive an
-  out-of-schema top-level `systemPrompt`; OpenCode also still depends on the top-level `model`.
-  **Why it matters:** the same silent-ignore class may be live on surfaces explicitly advertised by
-  AgentDeck. **Requirement:** FS-09.A6, `INV §12`. **Suggested fix/test:** keep the claims gated until
-  each pinned CLI is installed and its model/prompt delivery is checked at the effective provider;
-  remove any redundant unsupported top-level fields once their real mechanism is known.
+No review or bug-report unit has open findings.
 
 ## Design consistency notes
 
