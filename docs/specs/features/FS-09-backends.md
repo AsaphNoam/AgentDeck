@@ -424,9 +424,11 @@ Configuration-source federation for Claude/Codex is FS-08.
   launch carries the level in its argv; an `opencode-acp`/`openhands-acp` model declaring `efforts`
   is rejected at save; an undeclared level is rejected at launch, switch runtime, and pipeline run
   start with no process started; and precedence resolves explicit over source override over
-  `default_effort` over omitted. *Verify by* runtime parameter/process-environment tests, a fake-ACP
-  post-session failure regression, launch/switch/pipeline validation tests, and the federation
-  precedence tests named in FS-08.A8.
+  `default_effort` over omitted. Emission is checked against the pinned session-request schema, not
+  against the shape AgentDeck asserted (TS-04.R54); live honoring stays A16's gated claim.
+  *Verify by* runtime parameter/process-environment tests, the pinned-schema session-parameter
+  check, a fake-ACP post-session failure regression, launch/switch/pipeline validation tests, and
+  the federation precedence tests named in FS-08.A8.
 - **A16** `(planned)` `(GATED — real CLI credentials)` — Against pinned authenticated Codex and
   Claude CLIs, confirm that a chosen level is actually honored by the running agent for Codex chat,
   Claude chat, and Claude terminal, and that an undeclared level surfaces as AgentDeck's rejection

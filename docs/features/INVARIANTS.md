@@ -359,6 +359,12 @@ Paid for by:
   retry without the optional flag, and normalize the fallback locally.
 - The ACP handshake once logged an incompatible protocol version and proceeded. Version gates fail
   and run the normal shutdown path; they never warn and continue with an unsupported peer.
+- BR-1: a `model` member was asserted from a reading of the adapter's internal parser, emitted by
+  AgentDeck, accepted by the fake, and read by no provider — the pinned request schema has no such
+  field. A claim that a provider *honors* a value needs a complete trace from the wire call to the
+  provider-side read, or a credentialed run that observed the effect. An adapter-local readback is
+  neither: an ACP `configOptions.model.currentValue` is adapter configuration evidence, not provider
+  execution evidence, and a stale one produced a false "delivery is broken" finding (TS-04.R54).
 
 **Canonical pattern:** `runClaudeAuthStatus` (`internal/backend/credcheck/claude.go`) — try with
 optional flags, sniff the error output, retry bare. The `/usability-review` S3 sweep audits every
@@ -504,6 +510,11 @@ Paid for by:
   executable's build metadata (`.github/workflows/release.yml`).
 - The server once marshaled an empty collection as `null` while its MSW double returned `[]`, so
   every UI test passed against a payload the server did not produce (§11).
+- `fakeacp` accepted every `session/new` member AgentDeck sent, while the pinned ACP decoder strips
+  anything outside its closed schema. The fixture therefore confirmed emission and was read as
+  confirming delivery. The fake now decodes through the same member set, and the params check
+  enumerates that set from the protocol schema and its backends from the adapter registry rather
+  than from `sessionNewParams` (`internal/runtime/acp_session_schema_test.go`, TS-04.R54).
 
 **Canonical patterns:** enumerate producers independently from their policy table; drive the real
 wire/serialization boundary; make fixtures trigger the named OS or storage failure; inspect built
@@ -529,4 +540,5 @@ the old behavior before relying on it.
 | `clipAnnotationExcerpt` | `ui/src/lib/annotations.ts` (server copy authoritative: `internal/server/sessions.go`) | every UI surface that captures an annotation excerpt (§2) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
-| `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`) |
+| `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`); it drops out-of-schema session-request members like the pinned peer (§17) |
+| `backend.Types` | `internal/backend/adapter.go` | enumerating every backend type instead of restating the union (§2, §17) |

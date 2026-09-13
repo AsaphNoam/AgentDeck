@@ -40,8 +40,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
 - **Open findings:** `persistent-pipeline-orchestration` is closed; all fourteen findings are fixed
-  with regression tests. Still open in BR-1: provider-contract oracles and the unverified
-  OpenCode/OpenHands paths. Live-gate finding durability is fixed. The injected-steer lifetime edge
+  with regression tests. Still open in BR-1: the unverified OpenCode/OpenHands paths. Live-gate
+  finding durability and provider-contract oracles are fixed. The injected-steer lifetime edge
   case is named here but was never recorded as a finding; it needs `/investigate-bug` before `/fix`
   can take it. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
@@ -58,9 +58,21 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `/fix` on BR-1. Finding 1 (live-gate finding durability) is closed; findings 2
-(provider-contract oracles) and 3 (OpenCode/OpenHands) follow in that order. Settled 2026-09-13
-changelog entries moved to [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+**Change:** `/fix` on BR-1. Findings 1 (live-gate durability) and 2 (provider-contract oracles) are
+closed; finding 3 (OpenCode/OpenHands) follows. Settled 2026-09-13 changelog entries moved to
+[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+
+**Changelog — 2026-09-13 (fix: BR-1 provider-contract oracles):** TS-04.R54 states the three rules
+that separate a contract claim from a restatement of AgentDeck's own intent. The pinned ACP
+session-request member set is now transcribed from the protocol schema and compared against
+`sessionNewParams`/`sessionLoadParams`, with each backend's surviving out-of-schema members declared
+and backend types enumerated from the adapter registry (new `backend.Types`, one `registry` slice
+replacing `For`'s parallel union). `fakeacp` decodes both session requests through that member set,
+so it drops what the pinned peer drops. R46 now labels `configOptions.currentValue` adapter
+configuration evidence, not provider execution evidence, and FS-09.A15 cites the schema check while
+leaving live honoring to gated A16. INV §12/§17 gained the BR-1 entries (INV §12/§17/§2).
+`internal/runtime/acp_session_schema_test.go` holds both checks; the fake-peer one fails against the
+pre-fix fake with `[model systemPrompt]`.
 
 **Changelog — 2026-09-13 (fix: BR-1 live-gate durability):** Workflow §4 makes a failed acceptance
 gate or live-provider check live state: recorded under `## Review findings` in the §7 format before
@@ -118,21 +130,6 @@ regression tests, and the unit is no longer open for review or fixes.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 
-- **Must fix** — provider-contract claims can still be proved by a self-authored oracle
-  (**confirmed**). **Where:** TS-04.R18 asserted a `model[effort]` request shape after inspecting
-  `codex-acp`'s internal `ModelId` parser without tracing `session/new` to `threadStart`; FS-09.A15
-  and `fakeacp` then checked only that AgentDeck emitted the asserted field. The fake accepts unknown
-  request members that the pinned ACP decoder drops. The same oracle error recurred in the 2026-09-08
-  finding-fix: it called ACP `configOptions.model.currentValue` an independent effective-model oracle
-  and declared Claude `_meta` delivery broken without sending a prompt. A real prompt then showed
-  stale `currentValue = opus` alongside requested Haiku/Sonnet in SDK init, assistant, and usage
-  signals. **Why it matters:** design, implementation, review, and an adapter-local readback can all
-  agree and remain wrong about the external provider; following the false Claude finding would add a
-  redundant delivery path and change launch failure/order behavior. **Requirement:** `INV §11`,
-  `INV §12`, `INV §17`. **Suggested fix/test:** require provider-behavior statements to cite a
-  complete reachability trace or a credentialed prompt receipt; label ACP `currentValue` as adapter
-  configuration evidence, not provider execution evidence; and add an independently derived contract
-  oracle that rejects out-of-schema standard fields instead of mirroring `sessionNewParams`.
 - **Worth fixing** — equivalent OpenCode/OpenHands fields remain unverified (**undetermined**).
   **Where:** neither CLI is installed. OpenHands model delivery has a separate `LLM_MODEL` env path,
   so it does not depend on the suspect ACP `model` member, but both adapters still receive an

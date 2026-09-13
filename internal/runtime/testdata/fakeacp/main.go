@@ -28,6 +28,36 @@ import (
 
 const sessionID = "fake-sess-1"
 
+// The pinned ACP session-request schemas declare a closed member set, and the
+// adapters decode with a schema parser that strips every member outside it
+// (TS-04.R47). A double that echoed the raw parameters back would let a test
+// "prove" delivery of a field the real peer never sees — the oracle error BR-1
+// was made of — so this one decodes the way the pinned peer does: keep the
+// declared members, discard the rest. `_meta` is the protocol's own
+// extensibility channel and passes through whole.
+var (
+	newSessionMembers  = []string{"cwd", "additionalDirectories", "mcpServers", "_meta"}
+	loadSessionMembers = []string{"sessionId", "cwd", "additionalDirectories", "mcpServers", "_meta"}
+)
+
+func decodeSessionRequest(raw json.RawMessage, members []string) []byte {
+	var sent map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &sent); err != nil {
+		return raw
+	}
+	kept := make(map[string]json.RawMessage, len(members))
+	for _, member := range members {
+		if value, ok := sent[member]; ok {
+			kept[member] = value
+		}
+	}
+	decoded, err := json.Marshal(kept)
+	if err != nil {
+		return raw
+	}
+	return decoded
+}
+
 type rpcMessage struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      *int64          `json:"id,omitempty"`
@@ -110,7 +140,7 @@ func handle(msg *rpcMessage) {
 		// If asked, record that session/new was invoked so a resume test can
 		// prove a successful session/load did NOT fall back to a fresh session.
 		if dump := os.Getenv("FAKEACP_NEW_DUMP"); dump != "" {
-			_ = os.WriteFile(dump, msg.Params, 0o600)
+			_ = os.WriteFile(dump, decodeSessionRequest(msg.Params, newSessionMembers), 0o600)
 		}
 		// The real adapters publish an available_commands_update right after a
 		// session is created. Emit it BEFORE the response so the runtime's ordered
@@ -122,7 +152,7 @@ func handle(msg *rpcMessage) {
 		// If asked, dump the raw load params so tests can assert that the
 		// fresh MCP registration is carried on the load path (not just new).
 		if dump := os.Getenv("FAKEACP_LOAD_DUMP"); dump != "" {
-			_ = os.WriteFile(dump, msg.Params, 0o600)
+			_ = os.WriteFile(dump, decodeSessionRequest(msg.Params, loadSessionMembers), 0o600)
 		}
 		initConfigOptions()
 		// A real adapter may restore native context by replaying the prior

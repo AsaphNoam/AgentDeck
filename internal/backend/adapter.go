@@ -92,20 +92,29 @@ var agentDeckHookEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
 }
 
+// registry is the one list of shipped adapters. Lookup and enumeration both read
+// it so a caller that needs "every backend type" does not maintain a second copy
+// of the union (INV §2).
+var registry = []BackendAdapter{claudeACP{}, codexACP{}, opencodeACP{}, openhandsACP{}}
+
 // For returns the adapter for a backends.json type, or (nil, false) if unknown.
 func For(backendType string) (BackendAdapter, bool) {
-	switch backendType {
-	case "claude-acp":
-		return claudeACP{}, true
-	case "codex-acp":
-		return codexACP{}, true
-	case "opencode-acp":
-		return opencodeACP{}, true
-	case "openhands-acp":
-		return openhandsACP{}, true
-	default:
-		return nil, false
+	for _, adapter := range registry {
+		if adapter.Type() == backendType {
+			return adapter, true
+		}
 	}
+	return nil, false
+}
+
+// Types lists every registered backend type. A contract check enumerates the
+// registry through this instead of restating the union it is checking (INV §17).
+func Types() []string {
+	types := make([]string, 0, len(registry))
+	for _, adapter := range registry {
+		types = append(types, adapter.Type())
+	}
+	return types
 }
 
 // SupportsEffort derives catalog capability from the adapter delivery contract

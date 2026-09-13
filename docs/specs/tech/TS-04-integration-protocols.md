@@ -189,6 +189,9 @@ rebuilt list reports a different effective value, which is the silent ignore BR-
 `currentValue` — not the RPC envelope — decides whether a setting AgentDeck required was honored
 (INV §12, INV §17). A value the peer does not report is treated as unreported rather than as a
 mismatch, so an adapter that legitimately omits it does not fail an otherwise good launch (INV §7).
+The readback is adapter configuration evidence and nothing more: it says the adapter accepted and
+recorded the setting, not that the provider executed at it, and R54 forbids citing it as an
+effective-model or effective-effort oracle.
 
 **R47 — One ordered post-session configuration step replaces
 model-suffix effort delivery.** R18's model-suffix mechanism is retired for `codex-acp`, and with it
@@ -708,6 +711,33 @@ provider tests must inspect actual `session/prompt` content and prove no mandato
 deferred-only prompt. The existing packaged Claude/Codex continuation probes in TS-09.R47 also
 verify one inline mail body without an acknowledgement tool; they remain implementation acceptance,
 not a design blocker. Update operating-agent knowledge and tool descriptions with these semantics.
+
+**R54 — A provider-contract claim needs an oracle AgentDeck does not author.**
+(shipped 2026-09-13) BR-1 shipped a `model` member that the design asserted, the implementation
+emitted, the fake accepted, and no provider ever read: every layer agreed because every layer was
+derived from the same asserted shape. Three rules separate a contract statement from a restatement
+of AgentDeck's own intent.
+
+- **The pinned request schema is the oracle, enumerated separately from the builder.** The session
+  request member set — `cwd`, `additionalDirectories`, `mcpServers`, `_meta`, plus `sessionId` on
+  load (R47) — is transcribed from the protocol schema the pinned adapters decode with, and the
+  check compares `sessionNewParams`/`sessionLoadParams` against it. A member outside that set is
+  recorded per backend as an unverified delivery path, never as a working one, so adding one is a
+  test failure rather than a silent no-op. Backend types are enumerated from the adapter registry
+  (`backend.Types()`), so a new adapter must declare its position instead of inheriting silence
+  (INV §2, INV §17).
+- **The fake peer drops what the pinned peer drops.** `testdata/fakeacp` decodes `session/new` and
+  `session/load` through that same member set before any test can observe the parameters. A double
+  that echoes unknown members lets an integration test prove delivery the provider never performs,
+  which is how FS-09.A15's fixture agreed with a broken path.
+- **Provider *behavior* needs a reachability trace or a credentialed receipt.** A statement that a
+  provider honors a value is supported either by a complete trace from the wire call to the
+  provider-side read, or by a credentialed run that observed the effect. An adapter-local readback is
+  neither: R46's `configOptions.model.currentValue` is **adapter configuration evidence** — it says
+  the adapter accepted and recorded the setting — and is **not** provider execution evidence. A
+  pinned adapter reported a stale `currentValue` alongside correctly requested models in its SDK
+  init, assistant, and usage signals, so treating it as an execution oracle produced a false
+  finding that would have added a redundant delivery path (INV §12, INV §17).
 
 ## 3. Interfaces & data shapes
 
