@@ -19,8 +19,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
 - **Review units:** none available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
-  closed the same day when its fixes landed; that fix commit is part of its closure and is not a new
-  review unit. `stop-telling-agents-to-poll` shipped without entering this queue on
+  closed the same day when its fixes landed; BR-1's three findings were fixed the same day. Both
+  sets of fix commits are closure of their originating units and are not new review units.
+  `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
