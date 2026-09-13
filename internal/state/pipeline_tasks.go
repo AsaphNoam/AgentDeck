@@ -333,6 +333,82 @@ func (s *Store) RetryInterruptedPipelineStageTask(runID, taskID string, expected
 	return s.ReadPipelineRun(runID)
 }
 
+// PreparePipelineStageReplacement fences the interrupted owner and records its
+// armed successor in one transaction. The successor is admitted separately so
+// recovery can replay that single committed intent without minting another task.
+func (s *Store) PreparePipelineStageReplacement(p CreatePipelineStageTaskParams, oldTaskID string) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	defer tx.Rollback()
+	var revision int64
+	var runState, currentStage, oldState, coordinatorID string
+	err = tx.QueryRow(`SELECT r.revision, r.state, r.current_stage_id, t.state, ps.coordinator_task_id FROM pipeline_runs r JOIN pipeline_stage_tasks ps ON ps.run_id = r.run_id AND ps.task_id = ? JOIN tasks t ON t.task_id = ps.task_id WHERE r.run_id = ? AND ps.state = 'open'`, oldTaskID, p.RunID).Scan(&revision, &runState, &currentStage, &oldState, &coordinatorID)
+	if err != nil || revision != p.ExpectedRevision || runState != "paused" || currentStage != p.StageID || oldState != TaskInterrupted {
+		return PipelineRunRecord{}, ErrPipelineStageConflict
+	}
+	now := timeNow()
+	stamp := formatTime(now)
+	if _, err := tx.Exec(`UPDATE pipeline_stage_tasks SET state = 'replaced', closure_revision = ?, closed_at = ? WHERE task_id = ? AND state = 'open'`, revision+1, stamp, oldTaskID); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if _, err := tx.Exec(`UPDATE tasks SET state = ?, outcome = ?, outcome_source = 'host', outcome_summary = 'replaced', attention_reason = '', finished_at = ?, revision = revision + 1, updated_at = ? WHERE task_id = ? AND state = ?`, TaskFinished, OutcomeCancelled, stamp, stamp, oldTaskID, TaskInterrupted); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if err := RegisterWorkResultTx(tx, WorkResult{SourceKind: SourceTask, SourceID: oldTaskID, Outcome: OutcomeCancelled, Summary: "replaced"}, now); err != nil && !errors.Is(err, ErrWorkResultRecorded) {
+		return PipelineRunRecord{}, err
+	}
+	p.Task.State, p.Task.Revision, p.Task.CreatedAt, p.Task.UpdatedAt = TaskArmed, 1, now, now
+	if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, revision, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`, p.Task.TaskID, p.Task.Project, p.Task.DisplayName, p.Task.Instruction, p.Task.TargetKind, p.Task.TargetAgentID, p.Task.Role, p.Task.Backend, p.Task.Model, p.Task.Effort, p.Task.Fast, p.Task.State, p.Task.CreatedByKind, p.Task.Revision, stamp, stamp); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, p.Task.TaskID, oldTaskID, p.RunID, p.StageID, fmt.Sprintf("%d", p.AttemptNumber), stamp); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	outputs, err := json.Marshal(p.OutputValues)
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputs), stamp); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if _, err := tx.Exec(`UPDATE pipeline_runs SET state = 'paused', pending_action = 'activate_replacement', current_agent_id = '', attention_reason = '', revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, stamp, p.RunID, revision); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	return s.ReadPipelineRun(p.RunID)
+}
+
+func (s *Store) ActivatePipelineStageReplacement(runID, taskID string, expectedRevision int64) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	defer tx.Rollback()
+	now := formatTime(timeNow())
+	res, err := tx.Exec(`UPDATE tasks SET state = ?, ready_at = ?, revision = revision + 1, updated_at = ? WHERE task_id = ? AND state = ?`, TaskReady, now, now, taskID, TaskArmed)
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return PipelineRunRecord{}, ErrPipelineStageConflict
+	}
+	res, err = tx.Exec(`UPDATE pipeline_runs SET state = 'queued', pending_action = 'dispatch_stage_task', revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ? AND pending_action = 'activate_replacement'`, now, runID, expectedRevision)
+	if err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if n, _ := res.RowsAffected(); n != 1 {
+		return PipelineRunRecord{}, ErrPipelineStageConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	return s.ReadPipelineRun(runID)
+}
+
 // ReadTaskLineage reads durable provenance without exposing task detail.
 func (s *Store) ReadTaskLineage(taskID string) (TaskLineage, error) {
 	var v TaskLineage

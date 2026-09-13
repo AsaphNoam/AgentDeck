@@ -185,7 +185,7 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 		current := out[len(out)-1]
 		controls.Continue = pipelineRunControl{Eligible: detail.Run.State == "paused" && (detail.Run.PendingAction == "await_approval" || current.Result != nil && (current.Result.Outcome == state.OutcomeFailure || current.Result.Outcome == state.OutcomeBlocked)), Reason: "Approves success or sends recovery input to a new stage attempt."}
 		controls.Retry = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Retries the interrupted assignment on the same standing owner."}
-		controls.Replace = pipelineRunControl{Eligible: false, Reason: "Standing-owner replacement is unavailable for this run state."}
+		controls.Replace = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Replaces only the interrupted standing owner and retains stage work."}
 		controls.RepairCleanup = pipelineRunControl{Eligible: detail.Run.State == "stopping" && detail.Run.PendingAction == "cleanup_run", Reason: "Retries only the retained cleanup effects."}
 	}
 	return out, controls, nil

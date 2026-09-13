@@ -239,6 +239,38 @@ func TestContinueFailureCreatesAnotherDurableStageTaskForStandingOwner(t *testin
 	}
 }
 
+func TestReplaceInterruptedStandingOwnerFencesOldTask(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, _, err := manager.Start(context.Background(), StartRequest{RequestID: "v2-replace", TemplateID: "quality", Project: "proj", Goal: "ship", Inputs: map[string]string{"spec": "implement it"}, Orchestrator: RuntimeAssignment{Backend: "claude", Model: "sonnet"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _ := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if _, err := manager.store.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = 'old-owner' WHERE task_id = ?`, state.TaskInterrupted, stages[0].TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_stage_tasks SET standing_agent_id = 'old-owner' WHERE task_id = ?`, stages[0].TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'paused', pending_action = '', attention_reason = 'interrupted' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	detail, _ = manager.Detail(detail.Run.RunID)
+	replaced, err := manager.Replace(context.Background(), detail.Run.RunID, detail.Run.Revision, RuntimeAssignment{Backend: "codex", Model: "gpt"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, _ = manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	oldTask, _ := manager.store.ReadTask(stages[0].TaskID)
+	newTask, _ := manager.store.ReadTask(stages[1].TaskID)
+	if replaced.Run.State != "queued" || stages[0].State != "replaced" || stages[1].AttemptNumber != 2 || oldTask.Outcome != state.OutcomeCancelled || newTask.State != state.TaskReady || newTask.TargetKind != state.TargetLaunch || newTask.Model != "gpt" {
+		t.Fatalf("run=%#v stages=%#v old=%#v new=%#v", replaced.Run, stages, oldTask, newTask)
+	}
+	if _, err := manager.store.AcceptPipelineStageTaskResult(oldTask.TaskID, "old-owner", "", replaced.Run.Revision, state.TaskResult{Outcome: state.OutcomeSuccess, Summary: "stale"}); !errors.Is(err, state.ErrPipelineStageConflict) {
+		t.Fatalf("stale result error = %v", err)
+	}
+}
+
 // FS-14.A30: permission attention is derived, edge-triggered, and clears
 // without mutating the durable run revision or transition state.
 func TestPermissionAttentionIsDerivedAndIdempotent(t *testing.T) {

@@ -272,6 +272,59 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 	return m.Detail(runID)
 }
 
+func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision int64, runtime RuntimeAssignment) (RunDetail, error) {
+	lock := m.runLock(runID)
+	lock.Lock()
+	defer lock.Unlock()
+	run, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	if run.Revision != expectedRevision {
+		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before replacing the standing owner")
+	}
+	detail, err := m.Detail(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	stages, err := m.store.ListPipelineStageTasks(runID)
+	if err != nil || len(stages) == 0 {
+		return RunDetail{}, controlError("invalid_state", "there is no current stage task to replace")
+	}
+	current := stages[len(stages)-1]
+	task, err := m.store.ReadTask(current.TaskID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	stage, found := stageByID(detail.Template, current.StageID)
+	if !found || run.State != "paused" || task.State != state.TaskInterrupted || runtime.Backend == "" || runtime.Model == "" {
+		return RunDetail{}, controlError("invalid_state", "replacement requires an interrupted standing-owner task and a valid runtime")
+	}
+	if m.lifecycle != nil {
+		if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: detail.Template.OrchestratorRole, Project: run.Project, Backend: runtime.Backend, Model: runtime.Model, Effort: runtime.Effort, Fast: runtime.Fast}); err != nil {
+			return RunDetail{}, validationError("replacement runtime is unavailable", []Diagnostic{{Field: "orchestrator", Code: "unavailable", Message: err.Error()}})
+		}
+	}
+	id, err := m.store.NewTaskID()
+	if err != nil {
+		return RunDetail{}, err
+	}
+	instruction, digest := renderAssignment(run, detail.Template, stage, detail.Values, nil, "Replacement standing owner: inspect the retained stage work and continue from durable results.")
+	prepared, err := m.store.PreparePipelineStageReplacement(state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: run.Revision, StageIndex: current.StageIndex, AttemptNumber: current.AttemptNumber + 1, StageID: stage.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Task: state.Task{TaskID: id, Project: run.Project, DisplayName: stage.Title, Instruction: instruction, TargetKind: state.TargetLaunch, Role: detail.Template.OrchestratorRole, Backend: runtime.Backend, Model: runtime.Model, Effort: runtime.Effort, Fast: runtime.Fast, CreatedByKind: "pipeline"}}, current.TaskID)
+	if err != nil {
+		if errors.Is(err, state.ErrPipelineStageConflict) {
+			return RunDetail{}, controlError("invalid_state", "replacement lost to a newer stage state")
+		}
+		return RunDetail{}, err
+	}
+	updated, err := m.store.ActivatePipelineStageReplacement(runID, id, prepared.Revision)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	m.publish(updated)
+	return m.Detail(runID)
+}
+
 func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
 	lock := m.runLock(runID)
 	lock.Lock()

@@ -125,6 +125,16 @@ func (m *Manager) Reconcile(ctx context.Context, runID string) error {
 			return m.reconcileTaskStageRelease(run)
 		case "cleanup_run":
 			return m.reconcileRunCleanup(run)
+		case "activate_replacement":
+			stages, err := m.store.ListPipelineStageTasks(run.RunID)
+			if err != nil || len(stages) == 0 {
+				return err
+			}
+			updated, err := m.store.ActivatePipelineStageReplacement(run.RunID, stages[len(stages)-1].TaskID, run.Revision)
+			if err == nil {
+				m.publish(updated)
+			}
+			return err
 		default:
 			return nil
 		}

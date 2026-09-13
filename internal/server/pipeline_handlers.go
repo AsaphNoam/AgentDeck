@@ -247,13 +247,49 @@ func (s *Server) handleRetryPipelineRun(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, detail)
 }
 
+type pipelineReplaceRequest struct {
+	Revision     int64                      `json:"revision"`
+	Orchestrator pipeline.RuntimeAssignment `json:"orchestrator"`
+}
+
+func (s *Server) handleReplacePipelineRun(w http.ResponseWriter, r *http.Request) {
+	var request pipelineReplaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	detail, err := s.pipelineMgr.Replace(r.Context(), r.PathValue("id"), request.Revision, request.Orchestrator)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	s.dispatchReadyTasks(r.Context())
+	writeJSON(w, http.StatusOK, detail)
+}
+
 func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Request) {
 	var request pipelineControlRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
 		return
 	}
-	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), r.PathValue("id"), request.Revision)
+	runID := r.PathValue("id")
+	tasks, err := s.stateStore.ListTasksForPipelineRun(runID)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	for _, task := range tasks {
+		if task.CleanupUnsafe {
+			repaired, repairErr := s.stateStore.RepairTaskCleanup(task.TaskID)
+			if repairErr != nil {
+				writePipelineError(w, repairErr)
+				return
+			}
+			s.finishTaskCleanup(r.Context(), repaired)
+		}
+	}
+	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), runID, request.Revision)
 	if err != nil {
 		writePipelineError(w, err)
 		return
