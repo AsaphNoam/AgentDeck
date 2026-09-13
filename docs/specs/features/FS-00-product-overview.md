@@ -168,7 +168,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   share. Future activation kinds require their own feature requirements rather than inheriting mail
   semantics or using conversation as an implicit coordination API.
 
-- **R17** (planned) — **Mail delivery does not require an extra turn or pull.** Under
+- **R17** (shipped 2026-09-13) — **Mail delivery does not require an extra turn or pull.** Under
   FS-06.R30–R36, an independently authorized turn may receive bounded, attributed durable mail
   as intentional peer input. This extends R14–R15's input boundary without making unread mail or
   deferred-send facts an authorization to run. Waking mail owns an explicit activation opportunity;

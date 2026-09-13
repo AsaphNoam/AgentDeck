@@ -668,7 +668,7 @@ migration, which runs only with the dashboard stopped (FS-10.R18). The tmux sess
 `deckhand-`, while session discovery accepts both prefixes so a detached pre-rename session is still
 found, adopted, and torn down rather than orphaned (INV §4).
 
-**R53 — Waking/deferred mail shares the existing protocol and bounded prompt builder.** (planned)
+**R53 — Waking/deferred mail shares the existing protocol and bounded prompt builder.** (shipped 2026-09-13)
 Extend `send_message` with optional boolean `wake`, default true; reject non-booleans. Successful
 results retain message identity and include the effective `wake` plus `delivery: queued_waking` or
 `queued_deferred`; these describe scheduling intent, never guaranteed immediate execution. Expose

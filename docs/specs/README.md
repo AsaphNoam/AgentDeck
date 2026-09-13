@@ -32,7 +32,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Current | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact per-role seed-prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
-| FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Partial | Agent mail; planned waking/deferred delivery with bounded inline content |
+| FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent mail with waking/deferred delivery and bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
 | FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, per-backend capability matrix |
@@ -40,9 +40,9 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Product-native core interface design, future-skin boundary, and Sky & Grove skin |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
-| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Shipped pipelines; planned standing orchestration, managed stage coordinators and automatic cleanup |
+| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Current | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
-| FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Partial | Durable tasks and armed starts; planned orchestrator work inspection and repair |
+| FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks, armed starts, task waiting, lineage, and scoped repair |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, seed prompts free of polling instructions, and exact per-role prompt migration |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
@@ -59,8 +59,8 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Partial | Build tags, release runtime, action-client packaging, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Partial | Core visual architecture, presentation contracts, maintenance safeguards, local assets, renderer styling, and built-in skin selection |
-| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Shipped pipelines; planned ordered progression over durable stage tasks and clean legacy reset |
-| TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Partial | Durable tasks; planned dynamic lineage, scoped work management, and same-task wait/continuation |
+| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Ordered pipeline progression over durable stage tasks with clean legacy reset |
+| TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task lineage, scoped work management, and same-task wait/continuation |
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional delivery, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
@@ -84,9 +84,9 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 |---|---|---|
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
-| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped; efficient mail delivery specified in pipeline ready change |
-| Configurable pipelines | FS-14 templates, sequential runs, recovery, and supervision | Shipped; persistent replacement ready to implement |
-| Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped; orchestration extensions planned |
+| Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped, including waking/deferred bounded inline mail |
+| Configurable pipelines | FS-14 templates, task-backed ordered runs, recovery, and supervision | Shipped |
+| Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
 | Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |
 | Isolated parallel work | FS-19 worktree projects (fork, disposable checkout, consented cleanup) | Shipped |

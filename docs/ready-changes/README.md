@@ -43,9 +43,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`persistent-pipeline-orchestration.md`](persistent-pipeline-orchestration.md) — standing pipeline
-  orchestration through durable tasks, managed stage coordinators, automatic cleanup and bounded
-  waking/deferred inline mail.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 

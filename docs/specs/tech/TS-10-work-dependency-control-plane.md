@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -248,21 +248,21 @@ parallel copy of them.
 
 ### 2.1 Persistent assignment, dynamic work and durable waiting
 
-- **R25** (planned) — **Task lineage is durable and server-derived.** Add immutable parent task,
+- **R25** (shipped 2026-09-13) — **Task lineage is durable and server-derived.** Add immutable parent task,
   run, stage and creation-attempt provenance when a token-bound assignee creates work. Derive it from
   the caller's current assignment/managed execution, never caller-supplied ownership fields. Run
   members remain in one project and cannot detach from a live run. A reporting turn whose assignment
   has closed cannot fall back to creating unowned work. Store lineage separately from erasable task
   detail so a deleted intermediate task cannot hide descendants from cancellation or authorization.
   Lineage is provenance, not a dependency edge, and introduces no cycles into arms.
-- **R26** (planned) — **Inspection and repair share one authority.** Bounded list/read operations
+- **R26** (shipped 2026-09-13) — **Inspection and repair share one authority.** Bounded list/read operations
   expose state/revision, assignee selector, result, outputs, parent/run/stage and valid repair
   actions for owned work. Retry/Re-arm reuse existing state helpers. Creator authority survives
   resume; an assigned task can inspect/manage its descendants; the current run orchestrator can
   inspect/manage that run under TS-05.R22. No API supplies a creator, reporter, project override,
   or arbitrary context source. Unknown and unauthorized work share the same refusal. Results and
   lineage survive task-detail deletion, but deleted work cannot be re-armed/retried.
-- **R27** (planned) — **Waiting is an unfinished assignment, not another task.** Add `waiting`
+- **R27** (shipped 2026-09-13) — **Waiting is an unfinished assignment, not another task.** Add `waiting`
   plus a continuation-pending marker on ready/starting tasks, and a distinct `pending_yield` intent.
   `wait_for_tasks` accepts at most 64 `{task_id,after_revision}` observations of readable work; it
   atomically checks current assignment/execution, reads results/attention/deletion changes, and
@@ -272,7 +272,7 @@ parallel copy of them.
   A self wait or wait on work targeted to the same reserved assignee returns `wait_conflict` with
   a repair message. Watch creation and result registration serialize in one state transaction, so
   completion between read and subscribe cannot be lost. Ordinary dependency arms remain unchanged.
-- **R28** (planned) — **Yield releases runtime capacity, not assignment authority.** At matching
+- **R28** (shipped 2026-09-13) — **Yield releases runtime capacity, not assignment authority.** At matching
   turn-end, apply `pending_yield` through the existing release/stop seam. A created/woke runtime is
   stopped before clearing its capacity claim; a borrowed runtime is left intact. Preserve assignee
   membership, task identity and watch version. Represent runtime ownership/release separately from
@@ -281,7 +281,7 @@ parallel copy of them.
   `pending_yield` are distinct, mutually exclusive intents. Return the wait tool response before
   any stop, fence further task mutations from the yielded execution, and never set a task outcome.
   The existing task budget continues to count created/woke runtimes, with no pipeline exemption.
-- **R29** (planned) — **Wake is ordinary admission of the same assignment.** A watched change
+- **R29** (shipped 2026-09-13) — **Wake is ordinary admission of the same assignment.** A watched change
   commits a resume-needed marker keyed by task/wait version, checking the current execution handle,
   assignment generation and run/stage closure in the same CAS. Only after yield cleanup completes
   may one CAS return the waiting task to ready with continuation pending. Multiple changes coalesce;
@@ -294,7 +294,7 @@ parallel copy of them.
   the assignment interrupted with results still readable. Wake/read do not delete the source results.
   Manual input or mail for a waiting assignee routes through this same assignment continuation before
   ordinary turn delivery; it must not create an untracked wake or bypass capacity/closure checks.
-- **R30** (planned) — **Wait recovery never adopts processes.** Startup finishes pending yields
+- **R30** (shipped 2026-09-13) — **Wait recovery never adopts processes.** Startup finishes pending yields
   through the existing generation/PID-checked reaper, retains settled waits, re-evaluates watched
   facts, and recomputes capacity from outstanding runtime claims. A settled stopped wait can become
   ready automatically. A pre-crash running/ambiguous borrowed assignment becomes interrupted under
@@ -302,7 +302,7 @@ parallel copy of them.
   committed yield is not interruption. Failed yield cleanup retains intent/claim and blocks wake
   until repaired by automatic reconciliation under R35. Cancellation wins over pending yield/wake
   and prevents any later continuation.
-- **R31** (planned) — **Stages use the task result authority.** Add bounded named text outputs
+- **R31** (shipped 2026-09-13) — **Stages use the task result authority.** Add bounded named text outputs
   and shared checks to the task result store/read shape; preserve them in immutable result storage
   after task detail deletion. `report_task_result` uses one shared accepting transaction; a
   current standing-owner stage task additionally applies TS-09.R40's output/closure writes there.
@@ -312,7 +312,7 @@ parallel copy of them.
   waits, and validated when supplied for ordinary task reports; existing standalone report clients
   remain valid without it. This closes same-agent/same-runtime stale-report races without treating
   an opaque id as authorization.
-- **R32** (planned) — **Cancellation is scoped and replayable.** Task create/admit/repair/wake
+- **R32** (shipped 2026-09-13) — **Cancellation is scoped and replayable.** Task create/admit/repair/wake
   joins run/stage closure in its transaction. Run cleanup pages lineage, not agent creator history,
   and commits cancellations and release intents through the shared helper before effects. For a
   borrowed runtime, cancel only the task's generation/turn-scoped executing turn, wait for its
@@ -324,7 +324,7 @@ parallel copy of them.
   `Cancel(agentID)` is insufficient. Reuse the existing cancel→SIGINT grace policy, then bound the
   release attempt to ten seconds. Failure retains ownership/intent and enters automatic durable
   reconciliation under R35; it never hard-kills a later unrelated turn or immediately demands a click.
-- **R33** (planned) — **Waiting and observation are bounded durable data.** Work list pages have
+- **R33** (shipped 2026-09-13) — **Waiting and observation are bounded durable data.** Work list pages have
   a maximum of 100 items (default 25), waits 64 sources, result summaries/details/checks use existing
   shared limits, and named outputs reuse TS-09's text limits with a 256 KiB aggregate result limit.
   Scan/cancel/recovery batches are at most 100 rows with a shared in-flight cap of eight effects;
@@ -333,7 +333,7 @@ parallel copy of them.
   and lineage retain existing history semantics. No periodic provider prompt, unbounded graph walk,
   in-memory event history or extra broker is introduced. A dropped bus hint changes only latency;
   startup and bounded state sweeps discover unsettled work.
-- **R34** (planned) — **Expose changes through the existing surfaces.** On the current MCP
+- **R34** (shipped 2026-09-13) — **Expose changes through the existing surfaces.** On the current MCP
   authority add `list_tasks`, `get_task`, `retry_task`, `rearm_task`, `wait_for_tasks`; extend
   `get_assigned_task` and `report_task_result` as above. Control reads return explicit action
   eligibility and reasons; task HTTP/UI states include waiting and ready-to-resume, and stage
@@ -341,7 +341,7 @@ parallel copy of them.
   share FS-17 structured results/classification and TS-04 registration/redaction. The paused direct
   transport migration is not a prerequisite. Mutation effects precede neither committed intent nor
   the tool's safe reply boundary. No new provider capability or ACP extension is required.
-- **R35** (planned) — **Cleanup retries are durable reconciliation, not task retries.** The shared
+- **R35** (shipped 2026-09-13) — **Cleanup retries are durable reconciliation, not task retries.** The shared
   task release/yield/cancel path stores cleanup phase, effect key, consecutive failure count,
   first-failure time, next retry time, and bounded classified last error with its existing intent.
   One generation/intent-version CAS owns an effect at a time. Retry transient timeout, stop/reap
@@ -362,7 +362,7 @@ parallel copy of them.
 - **R36 — superseded 2026-09-12 by FS-14.R78 and FS-06.R30–R36:** Separate coordinator-update
   records, continuation requests and delivery watermarks are withdrawn. Intervention awareness uses
   ordinary deferred mail under TS-01.R31–R33, TS-02.R34 and TS-04.R53.
-- **R37** (planned) — **Coordinator replacement is explicit managed work.** Extend `create_task`
+- **R37** (shipped 2026-09-13) — **Coordinator replacement is explicit managed work.** Extend `create_task`
   with optional `replaces_coordinator_task_id`, accepted only from the current standing owner for
   its bound coordinator and only after the predecessor is terminal and its release is settled.
   Create a child beneath the standing assignment and CAS its coordinator binding in one transaction;

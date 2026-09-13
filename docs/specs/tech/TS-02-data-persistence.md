@@ -447,7 +447,7 @@ state as it already is, and the awaiting-approval attention value is derived rat
 (TS-09.R29). The `pipeline_attempts` and run tables are untouched, so no migration is written and
 no existing durable field changes meaning.
 
-**R34 — Deferred mail extends the inbox and existing turn budget.** (planned)
+**R34 — Deferred mail extends the inbox and existing turn budget.** (shipped 2026-09-13)
 Add `messages.wake` (boolean, non-null default true); an additive SQLite migration preserves
 existing mail and treats it as waking. Add nullable `inline_delivery_turn_key` and the `inline`
 delivered_via value for confirmed inline receipt; preserve existing poll provenance and read_at

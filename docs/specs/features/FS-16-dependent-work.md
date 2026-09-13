@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -345,44 +345,44 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 
 ### 4.1 Work management for a persistent orchestrator
 
-- **R30** (planned) — An orchestrator can inspect the durable state, assignee, and reported
+- **R30** (shipped 2026-09-13) — An orchestrator can inspect the durable state, assignee, and reported
   results of work it created, including after it resumes. Assignment context makes relevant prior
   results available without requiring an out-of-band completion message. Discovery is bounded and
   does not require repeatedly polling for completion. A current run orchestrator additionally reads
   and manages its run's work under FS-14.R73; this is scoped run authority, not project-wide control.
-- **R31** (planned) — An agent can perform the existing Retry and Re-arm repairs on work it
+- **R31** (shipped 2026-09-13) — An agent can perform the existing Retry and Re-arm repairs on work it
   created, with the same state validation and immutable-result rules as the human operations. It can
   cancel its unfinished work and create replacement or additional tasks, including tasks addressed
   to earlier implementors. Replacing work does not erase its history or rewrite an accepted result.
-- **R32** (planned) — An orchestrator holding an active stage task can receive durable child-work
+- **R32** (shipped 2026-09-13) — An orchestrator holding an active stage task can receive durable child-work
   outcomes and continue coordinating that same assignment without completing it merely to free its
   assignment slot. It can await relevant work without polling or creating a second active task for
   itself. A child failure is information it can act on, not an automatic failure of its stage task.
-- **R33** (planned) — An assigned agent can durably wait for a bounded set of work revisions to
+- **R33** (shipped 2026-09-13) — An assigned agent can durably wait for a bounded set of work revisions to
   change. Waiting leaves its assignment unfinished and exclusively assigned, records no outcome,
   and resumes it when any watched task changes to a result or needs attention. Already-changed work
   is returned immediately. No satisfying-outcome predicate is needed: the orchestrator decides what
   a failure, interruption, or cancellation means. Waiting on its own task or work targeting the
   same exclusively assigned agent is refused with an actionable error; waiting is not a task arm.
-- **R34** (planned) — A task that waits yields after its current reporting/tool turn ends.
+- **R34** (shipped 2026-09-13) — A task that waits yields after its current reporting/tool turn ends.
   AgentDeck stops only a runtime that task created or woke and releases its capacity slot while
   retaining assignment identity and attached-context membership. Wake resumes the same task and
   agent through normal admission; it never creates a second task or fabricates completion. A
   borrowed runtime stays up. Waiting and ready-to-resume are visible states distinct from an
   unexpected interruption. The operator confirmed this stop/resume design on 2026-09-12.
-- **R35** (planned) — Work created from an assigned task inherits durable parent and run/stage
+- **R35** (shipped 2026-09-13) — Work created from an assigned task inherits durable parent and run/stage
   provenance. Creating or repairing work checks its owner's closure atomically, so stopping a run
   cannot race with a delegate that adds escaping work. Reports keep source task identity, summary,
   details, and named outputs available for supervision and later assignments without copying full
   transcripts. Stage tasks use the same result operation as ordinary tasks, with the extra stage
   output and current-assignment checks required by FS-14.R64.
-- **R36** (planned) — Pipeline ownership specializes generic task controls only where required:
+- **R36** (shipped 2026-09-13) — Pipeline ownership specializes generic task controls only where required:
   stages cannot be directly re-armed, manually passed, or deleted out from under retained run history;
   run controls provide their valid recovery path. Cancelling a run's borrowed task cancels its
   matching executing turn before release, while preserving the borrowed runtime and unrelated turns.
   Ordinary unowned task behavior remains unchanged except for the explicit new inspection, repair,
   and wait capabilities.
-- **R37** (planned) — A dedicated stage coordinator is managed child work under FS-14.R75–R76,
+- **R37** (shipped 2026-09-13) — A dedicated stage coordinator is managed child work under FS-14.R75–R76,
   never the authoritative stage task. It reports its own result upward and manages its delegated
   descendants; only the standing owner holds run-wide authority and reports the stage outcome.
   Best-effort deferred mail under FS-14.R78 communicates material standing-owner interventions
@@ -390,7 +390,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   the delegated scope with context supplied by its owner through assignment or ordinary mail,
   without automatic inbox/history transfer, preserving original task lineage and
   immutable results. Automatic child creation and replay create no duplicate coordinator.
-- **R38** (planned) — Pending yield, stop and release cleanup retries transient failures
+- **R38** (shipped 2026-09-13) — Pending yield, stop and release cleanup retries transient failures
   automatically under FS-14.R77. Waiting/finishing/stopping remain honest about outstanding cleanup;
   ordinary contention or transient failure neither consumes a task execution attempt nor requires
   human Retry. Persistent or unsafe failures retain their claims and expose the reason and a
@@ -398,27 +398,27 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 
 ## 5. Acceptance criteria
 
-- **A20** (planned; R30–R32) — A fake-provider orchestrator holds one stage assignment while
+- **A20** (shipped 2026-09-13; R30–R32) — A fake-provider orchestrator holds one stage assignment while
   children complete or fail, receives their durable outcomes, inspects reported details, retries an
   interrupted child, repairs an unsatisfiable arm, and creates replacement work. Verify no polling
   turn or second active self-assignment is needed; restart retains outcomes, and the creator cannot
   use these operations to control unrelated work. Check that old results remain immutable.
-- **A21** (planned; R33–R34) — With task capacity one, a parent creates a child, yields, receives
+- **A21** (shipped 2026-09-13; R33–R34) — With task capacity one, a parent creates a child, yields, receives
   the child's failure without polling, repairs the work, and finishes. Repeat with nested parents,
   a borrowed runtime, a child completed before wait registration, and completion during parent
   release. Assert exclusive assignment, no lost wake or second prompt, and preserved conversation.
-- **A22** (planned; R33–R36) — Restart before/after wait registration, turn-end yield, stop, and
+- **A22** (shipped 2026-09-13; R33–R36) — Restart before/after wait registration, turn-end yield, stop, and
   wake admission; inject stale results and cleanup failures. Assert no false success, no capacity
   leak, no orphan adoption, and no stopped-run wake. Deleting a watched task wakes with retained
   result/deletion evidence; a same-assignee wait is refused instead of deadlocking.
-- **A23** (planned; R37) — Task/MCP tests prove a managed stage coordinator can manage its
+- **A23** (shipped 2026-09-13; R37) — Task/MCP tests prove a managed stage coordinator can manage its
   delegated subtree but cannot inspect unrelated run work or report for the standing stage task.
   Send a best-effort FYI about a standing intervention while the coordinator waits; queued mail
   arrives on its next natural turn. Missing mail never blocks an otherwise valid intervention.
   Replacement transfers no inbox; the standing owner supplies context through assignment or mail.
   No implicit ownership transfer, duplicate effect or second assignment occurs. An explicit
   successor inherits only the prior coordinator's scope; immutable history stays intact.
-- **A24** (planned; R38) — Inject transient and persistent yield/release/stop failures with a
+- **A24** (shipped 2026-09-13; R38) — Inject transient and persistent yield/release/stop failures with a
   fake clock and restart. Assert persisted backoff, one effect owner, eventual automatic success,
   no premature claim release and no provider polling turns. Only persistent/non-recoverable cases
   produce human attention; manual cleanup repair never reruns task execution or rewrites a result.

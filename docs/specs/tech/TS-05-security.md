@@ -190,7 +190,7 @@ sensitive-context sharing is a practical problem.
   fixture needs a path short enough for `sun_path`, and the FIFO open needs a bounded wait so a
   restored open-then-classify order fails instead of hanging the suite (`INV §17`).
 
-- **R22 (planned) — Run work authority is bounded by durable membership.** On the existing
+- **R22 (shipped 2026-09-13) — Run work authority is bounded by durable membership.** On the existing
   per-launch token/identity boundary, only the standing run orchestrator assigned the current
   authoritative stage task may list/read and
   perform valid repair/cancel operations on tasks in that run. A normal task assignee may inspect

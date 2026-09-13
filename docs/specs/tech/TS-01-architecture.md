@@ -399,7 +399,7 @@ domain's authorization transition.
   exempts, with no way to correct it short of a new agent. No path composes its own variant of the
   set (R9, INV §2).
 
-**R31 — Inline mail uses one shared turn preparation and settlement seam.** (planned)
+**R31 — Inline mail uses one shared turn preparation and settlement seam.** (shipped 2026-09-13)
 For FS-06.R30–R36, `runPromptTurn` and `StartActivation` use the same state-owned mail batch
 preparation after claiming the existing turn gate and before `session/prompt`. Initial user prompts,
 held follow-ups, task assignments/continuations and waking-mail turns all join this seam. Preserve
@@ -411,7 +411,7 @@ and inbound charge before provider I/O. Failure to prepare or persist aborts the
 ordinary surfaced error, releases its turn gate and leaves messages unread. This does not invent
 an extra activation retry or change task-owned assignment redelivery.
 
-**R32 — Provider completion confirms inline delivery; uncertainty preserves mail.** (planned)
+**R32 — Provider completion confirms inline delivery; uncertainty preserves mail.** (shipped 2026-09-13)
 Use a structurally valid successful `session/prompt` response with a recognized non-cancelled
 stop reason as the confirmation boundary. Successful dispatch, streaming output, an idle status,
 process existence, or selecting messages is insufficient. Before releasing/transferring the turn
@@ -425,7 +425,7 @@ authorized turn may include the same stable message ids again. No acknowledgemen
 delivery worker or deferred-mail replay wake is added. A failed settlement is surfaced and must not
 prevent ordinary turn cleanup; generation-checked state prevents late callbacks changing a new turn.
 
-**R33 — Waking opportunities and durable inbox contents have separate lifetimes.** (planned)
+**R33 — Waking opportunities and durable inbox contents have separate lifetimes.** (shipped 2026-09-13)
 Only waking sends coalesce the existing mail activation in the message-insert transaction; deferred
 sends insert mail without activating, scheduling a continuation or satisfying a task wait. Preserve
 the existing pre-effect attempted boundary and at-most-once activation policy. Uncertain content

@@ -14,16 +14,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `persistent-pipeline-orchestration` is in progress under `/work`.
+- **Active change:** None.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `/review` has no available unit; every unit through this release is closed.
+- **Review units:** `persistent-pipeline-orchestration` is available for `/review`.
   `stop-telling-agents-to-poll` shipped without entering this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `persistent-pipeline-orchestration.md` is Waiting to start, including the completed
-  deferred/inline mail technical contract. Its exact
-  requirements and acceptance gates are in `docs/ready-changes/persistent-pipeline-orchestration.md`.
-  `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
@@ -31,7 +28,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
   file is removed. Left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration and its mail extension are fully specified and ready to implement.
+  Persistent pipeline orchestration and its mail extension are shipped and available for review.
   TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete shared prompt preparation, bounded batches,
   transactional budget/read settlement, uncertain-delivery recovery and deferred retention.
   The clean legacy reset, descendant cancellation, project boundaries, subordinate stage
@@ -57,11 +54,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `persistent-pipeline-orchestration`
+**Change:** None.
 
-**State:** In progress. Implementation started 2026-09-12 from the completed FS/TS contract.
-The first slice is the shared bounded inline-mail preparation and settlement seam, followed by
-durable task waiting/repair and the task-backed pipeline replacement.
+**State:** `persistent-pipeline-orchestration` finished 2026-09-13 and is available for review.
+
+**Changelog — 2026-09-13 (work):** Replaced pipeline execution with durable standing-owner stage
+tasks, managed dedicated coordinators, task-owned reports and waits, explicit replacement, guarded
+cleanup recovery, bounded waking/deferred mail, and a one-time checkpointed v1 reset. Removed the
+old stage-result tool, lifecycle callbacks, wake veto and attempt-based supervision fallback. The
+repository test/build matrix and the 436-test UI suite pass; credentialed provider/browser gates in
+Acceptance gates remain explicitly open.
 
 **Changelog — 2026-09-12 (design-feature):** Completed the mail technical contract against existing
 runtime and state seams: optional wake intent, shared bounded inline preparation, provider-result
@@ -101,8 +103,8 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` has none; `/work` may take
-`persistent-pipeline-orchestration` or `rename-product-to-deckhand`; `/fix` may take BR-1;
+**Available by role:** `/review` may take `persistent-pipeline-orchestration`; `/work` may take
+`rename-product-to-deckhand`; `/fix` may take BR-1;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
