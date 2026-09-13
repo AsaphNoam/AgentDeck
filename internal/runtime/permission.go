@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"syscall"
 	"time"
@@ -136,24 +137,47 @@ func (c *ChatRuntime) Cancel(ctx context.Context, agentID string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
+	return c.cancel(as, "", "")
+}
+
+// CancelGuarded interrupts only the expected launch generation and active turn.
+// It is the task-cleanup path: a stale task must leave a resumed generation or
+// later human turn untouched. The guard is checked while the turn lock remains
+// held through the initial ACP cancel notification.
+func (c *ChatRuntime) CancelGuarded(ctx context.Context, agentID, expectedGeneration, expectedTurn string) (bool, error) {
+	as, err := c.lookup(agentID)
+	if err != nil {
+		return false, err
+	}
+	return c.cancel(as, expectedGeneration, expectedTurn)
+}
+
+func (c *ChatRuntime) cancel(as *agentState, expectedGeneration, expectedTurn string) (bool, error) {
+	guarded := expectedGeneration != "" || expectedTurn != ""
 
 	as.mu.Lock()
+	if guarded && (as.generation != expectedGeneration || !as.turnActive || expectedTurn != fmt.Sprintf("t_%012d", as.turnSeq)) {
+		as.mu.Unlock()
+		return false, nil
+	}
 	ids := make([]string, 0, len(as.pending))
 	for id := range as.pending {
 		ids = append(ids, id)
 	}
 	active := as.turnActive
 	armedTurn := as.turnSeq
+	cancelled := active || len(ids) > 0
+	// Keep the turn lock through the initial cancel. A turn cannot settle and a
+	// later turn cannot start between the guarded check and this side effect.
+	if cancelled {
+		_ = as.transport.Notify("session/cancel", map[string]any{"sessionId": as.sessionID})
+	}
 	as.mu.Unlock()
 
 	for _, id := range ids {
 		c.resolvePending(as, id, "cancelled", "")
 	}
 
-	cancelled := active || len(ids) > 0
-	if cancelled {
-		_ = as.transport.Notify("session/cancel", map[string]any{"sessionId": as.sessionID})
-	}
 	if active {
 		c.escalateCancel(as, armedTurn)
 	}

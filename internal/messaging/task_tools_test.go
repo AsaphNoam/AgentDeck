@@ -112,6 +112,38 @@ func TestGetAssignedTaskRefusesAnUnknownSession(t *testing.T) {
 	}
 }
 
+func TestWaitForTasksReturnsChangesOrPersistsYield(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
+	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
+	owner := assignTask(t, f.store, "a_impl", "coordinate", "wait for child", state.TaskRunning)
+	if _, err := f.store.DB().Exec(`UPDATE tasks SET execution_handle = ? WHERE task_id = ?`, "exec-1", owner.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	childID, err := f.store.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := f.store.CreateTask(state.Task{TaskID: childID, Project: "my-app", DisplayName: "child", Instruction: "do work", TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "agent", CreatedByAgentID: "a_impl"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	impl := connect(t, f.srv, "tok-impl")
+	result, isErr := call(t, impl, "wait_for_tasks", map[string]any{"execution_handle": "exec-1", "tasks": []any{map[string]any{"task_id": child.TaskID, "after_revision": 0}}})
+	if isErr || result["yielding"] != false {
+		t.Fatalf("already changed wait = %v", result)
+	}
+	result, isErr = call(t, impl, "wait_for_tasks", map[string]any{"execution_handle": "exec-1", "tasks": []any{map[string]any{"task_id": child.TaskID, "after_revision": child.Revision}}})
+	if isErr || result["ok"] != true || result["yielding"] != true {
+		t.Fatalf("wait result = %v", result)
+	}
+	waiting, err := f.store.ReadTask(owner.TaskID)
+	if err != nil || !waiting.PendingYield {
+		t.Fatalf("pending yield = %+v err %v", waiting, err)
+	}
+}
+
 // FS-16.R3, R20 / TS-10.R7 — an agent records the authoritative outcome for its
 // own assignment. The vocabulary is the one a pipeline stage report accepts, the
 // caller is the session token, and a second report is refused because a recorded
@@ -209,7 +241,17 @@ func TestReportTaskResultRefusesWorkTheCallerDoesNotHold(t *testing.T) {
 type stubTaskControl struct {
 	created   AgentTaskRequest
 	cancelled struct{ taskID, creator string }
-	err       error
+	listed    struct {
+		creator string
+		limit   int
+	}
+	read    struct{ taskID, creator string }
+	retried struct{ taskID, creator string }
+	rearmed struct {
+		taskID, creator string
+		arms            []state.TaskArm
+	}
+	err error
 }
 
 func (s *stubTaskControl) CreateAgentTask(req AgentTaskRequest) (state.Task, error) {
@@ -226,6 +268,38 @@ func (s *stubTaskControl) CancelAgentTask(taskID, creatorAgentID string) (state.
 		return state.Task{}, s.err
 	}
 	return state.Task{TaskID: taskID, State: state.TaskFinished, Outcome: state.OutcomeCancelled}, nil
+}
+
+func (s *stubTaskControl) ListAgentTasks(creatorAgentID string, limit int) ([]state.Task, error) {
+	s.listed.creator, s.listed.limit = creatorAgentID, limit
+	if s.err != nil {
+		return nil, s.err
+	}
+	return []state.Task{{TaskID: "tk_new", State: state.TaskArmed}}, nil
+}
+
+func (s *stubTaskControl) ReadAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	s.read.taskID, s.read.creator = taskID, creatorAgentID
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: taskID, State: state.TaskArmed}, nil
+}
+
+func (s *stubTaskControl) RetryAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	s.retried.taskID, s.retried.creator = taskID, creatorAgentID
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: taskID, State: state.TaskReady}, nil
+}
+
+func (s *stubTaskControl) RearmAgentTask(taskID, creatorAgentID string, arms []state.TaskArm) (state.Task, error) {
+	s.rearmed.taskID, s.rearmed.creator, s.rearmed.arms = taskID, creatorAgentID, arms
+	if s.err != nil {
+		return state.Task{}, s.err
+	}
+	return state.Task{TaskID: taskID, State: state.TaskArmed, Arms: arms}, nil
 }
 
 // FS-16.R12, R24 / TS-05.R17 — an agent creates work without a person in the
@@ -295,10 +369,50 @@ func TestCancelTaskAsksTheControlPlaneWhoCreatedIt(t *testing.T) {
 		t.Fatalf("cancel asked about %+v, want the caller's own identity", control.cancelled)
 	}
 
-	control.err = &ToolError{Code: "not_creator", Message: "No such task."}
+	control.err = &ToolError{Code: "task_not_found", Message: "No such task."}
 	res, isErr = call(t, impl, "cancel_task", map[string]any{"task_id": "tk_theirs"})
-	if !isErr || res["error"] != "not_creator" || res["message"] != "No such task." {
+	if !isErr || res["error"] != "task_not_found" || res["message"] != "No such task." {
 		t.Fatalf("cancelling another creator's task = %v", res)
+	}
+}
+
+func TestTaskControlToolsDeriveCreatorAndBoundTheList(t *testing.T) {
+	f := newContextFixture(t)
+	liveAgent(t, f.store, "a_impl", "Atlas", "implementer", "my-app")
+	f.srv.RegisterSession("tok-impl", "a_impl", "gen-a_impl")
+	control := &stubTaskControl{}
+	f.srv.SetTaskControl(control)
+	impl := connect(t, f.srv, "tok-impl")
+
+	res, isErr := call(t, impl, "list_tasks", map[string]any{})
+	if isErr || res["ok"] != true || control.listed.creator != "a_impl" || control.listed.limit != 25 {
+		t.Fatalf("default list = %v, control = %+v", res, control.listed)
+	}
+	res, isErr = call(t, impl, "list_tasks", map[string]any{"limit": 101})
+	if !isErr || res["error"] != "validation" {
+		t.Fatalf("oversized list = %v", res)
+	}
+
+	res, isErr = call(t, impl, "get_task", map[string]any{"task_id": "tk_mine"})
+	if isErr || res["ok"] != true || control.read.taskID != "tk_mine" || control.read.creator != "a_impl" {
+		t.Fatalf("get_task = %v, control = %+v", res, control.read)
+	}
+	res, isErr = call(t, impl, "retry_task", map[string]any{"task_id": "tk_mine"})
+	if isErr || res["task"].(map[string]any)["state"] != state.TaskReady || control.retried.creator != "a_impl" {
+		t.Fatalf("retry_task = %v, control = %+v", res, control.retried)
+	}
+	res, isErr = call(t, impl, "rearm_task", map[string]any{"task_id": "tk_mine", "arms": []map[string]any{{
+		"kind": "signal", "signal_name": "reviewed",
+	}}})
+	if isErr || len(control.rearmed.arms) != 1 || control.rearmed.arms[0].SignalName != "reviewed" || control.rearmed.creator != "a_impl" {
+		t.Fatalf("rearm_task = %v, control = %+v", res, control.rearmed)
+	}
+
+	control.err = &ToolError{Code: "task_not_found", Message: "No such task."}
+	unknown, unknownErr := call(t, impl, "get_task", map[string]any{"task_id": "tk_unknown"})
+	unauthorized, unauthorizedErr := call(t, impl, "get_task", map[string]any{"task_id": "tk_other"})
+	if !unknownErr || !unauthorizedErr || unknown["error"] != unauthorized["error"] || unknown["message"] != unauthorized["message"] {
+		t.Fatalf("unknown = %v, unauthorized = %v", unknown, unauthorized)
 	}
 }
 

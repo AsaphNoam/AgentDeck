@@ -443,4 +443,92 @@ ALTER TABLE running ADD COLUMN fast_available INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE running ADD COLUMN steering_available INTEGER NOT NULL DEFAULT 0;
 `,
 	},
+	{
+		// Durable mail delivery intent and restart-safe inline receipt state.
+		version: 26,
+		sql: `
+ALTER TABLE messages ADD COLUMN wake INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE messages ADD COLUMN inline_delivery_turn_key TEXT;
+ALTER TABLE turn_budget ADD COLUMN delivery_turn_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE turn_budget ADD COLUMN inline_message_ids TEXT NOT NULL DEFAULT '[]';
+`,
+	},
+	{
+		// Task-backed pipeline v2. These rows deliberately augment rather than
+		// reinterpret the v1 attempt history: the authorized reset can remove the
+		// old execution records without touching ordinary task history.
+		version: 27,
+		sql: `
+CREATE TABLE task_lineage (
+  task_id TEXT PRIMARY KEY,
+  parent_task_id TEXT NOT NULL DEFAULT '',
+  pipeline_run_id TEXT NOT NULL DEFAULT '',
+  pipeline_stage_id TEXT NOT NULL DEFAULT '',
+  creation_attempt_id TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_task_lineage_run_stage ON task_lineage(pipeline_run_id, pipeline_stage_id, task_id);
+CREATE INDEX idx_task_lineage_parent ON task_lineage(parent_task_id, task_id);
+
+CREATE TABLE pipeline_stage_tasks (
+  run_id TEXT NOT NULL,
+  stage_index INTEGER NOT NULL,
+  attempt_number INTEGER NOT NULL,
+  stage_id TEXT NOT NULL,
+  task_id TEXT NOT NULL UNIQUE REFERENCES tasks(task_id),
+  standing_agent_id TEXT NOT NULL DEFAULT '',
+  coordinator_task_id TEXT NOT NULL DEFAULT '',
+  assignment_digest TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'open',
+  closure_revision INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  closed_at TEXT,
+  PRIMARY KEY (run_id, stage_index, attempt_number)
+);
+CREATE UNIQUE INDEX idx_pipeline_stage_tasks_current
+  ON pipeline_stage_tasks(run_id, stage_index) WHERE state = 'open';
+CREATE INDEX idx_pipeline_stage_tasks_task ON pipeline_stage_tasks(task_id);
+
+CREATE TABLE task_result_outputs (
+  task_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY(task_id, name)
+);
+`,
+	},
+	{
+		// A wait keeps the task assignment while releasing only the runtime.
+		// Watches are durable so completion cannot be lost between a tool call and
+		// a later turn-end or a server restart (TS-10.R27-R30).
+		version: 28,
+		sql: `
+ALTER TABLE tasks ADD COLUMN execution_handle TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN continuation_pending INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN pending_yield INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN wait_version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN resume_needed INTEGER NOT NULL DEFAULT 0;
+DROP INDEX idx_tasks_active_assignee;
+CREATE UNIQUE INDEX idx_tasks_active_assignee
+  ON tasks(assigned_agent_id)
+  WHERE assigned_agent_id IS NOT NULL
+    AND (state IN ('starting', 'running', 'waiting') OR continuation_pending = 1);
+CREATE TABLE task_waits (
+  waiting_task_id TEXT NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+  wait_version INTEGER NOT NULL,
+  source_task_id TEXT NOT NULL,
+  after_revision INTEGER NOT NULL,
+  PRIMARY KEY(waiting_task_id, wait_version, source_task_id)
+);
+CREATE INDEX idx_task_waits_source ON task_waits(source_task_id, waiting_task_id);
+`,
+	},
+	{
+		// The stage association carries the frozen output contract so result
+		// acceptance remains state-authoritative without decoding config templates.
+		version: 29,
+		sql: `
+ALTER TABLE pipeline_stage_tasks ADD COLUMN output_values_json TEXT NOT NULL DEFAULT '{}';
+`,
+	},
 }

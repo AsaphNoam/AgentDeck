@@ -9,7 +9,149 @@ import (
 
 type pipelineRunDetailResponse struct {
 	pipeline.RunDetail
-	AgentsByAttempt map[string]pipelineAttemptAgents `json:"agents_by_attempt"`
+	AgentsByAttempt      map[string]pipelineAttemptAgents      `json:"agents_by_attempt"`
+	Orchestrator         pipeline.RuntimeAssignment            `json:"orchestrator"`
+	DedicatedAssignments map[string]pipeline.RuntimeAssignment `json:"dedicated_assignments"`
+	StageTasks           []pipelineStageTaskDetail             `json:"stage_tasks"`
+	Controls             pipelineRunControls                   `json:"controls"`
+}
+
+type pipelineRunControl struct {
+	Eligible bool   `json:"eligible"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+type pipelineRunControls struct {
+	Continue      pipelineRunControl `json:"continue"`
+	Retry         pipelineRunControl `json:"retry"`
+	Replace       pipelineRunControl `json:"replace"`
+	Stop          pipelineRunControl `json:"stop"`
+	RepairCleanup pipelineRunControl `json:"repair_cleanup"`
+}
+
+type pipelineStageTaskDetail struct {
+	TaskID         string               `json:"task_id"`
+	RunID          string               `json:"run_id"`
+	StageID        string               `json:"stage_id"`
+	StageIndex     int                  `json:"stage_index"`
+	AttemptNumber  int                  `json:"attempt_number"`
+	State          string               `json:"state"`
+	AssignmentText string               `json:"assignment_text"`
+	StandingOwner  pipelineStageOwner   `json:"standing_owner"`
+	Result         *pipelineStageResult `json:"result,omitempty"`
+	Work           []pipelineTaskWork   `json:"work"`
+	CreatedAt      time.Time            `json:"created_at"`
+	UpdatedAt      time.Time            `json:"updated_at"`
+}
+
+type pipelineStageOwner struct {
+	AgentID string                     `json:"agent_id,omitempty"`
+	Name    string                     `json:"name,omitempty"`
+	State   string                     `json:"state,omitempty"`
+	Route   string                     `json:"route"`
+	Runtime pipeline.RuntimeAssignment `json:"runtime"`
+}
+
+type pipelineStageResult struct {
+	Outcome string            `json:"outcome"`
+	Summary string            `json:"summary"`
+	Details string            `json:"details"`
+	Checks  string            `json:"checks"`
+	Outputs map[string]string `json:"outputs"`
+}
+
+type pipelineTaskWork struct {
+	TaskID      string             `json:"task_id"`
+	DisplayName string             `json:"display_name"`
+	State       string             `json:"state"`
+	Outcome     string             `json:"outcome,omitempty"`
+	Summary     string             `json:"summary,omitempty"`
+	AgentID     string             `json:"agent_id,omitempty"`
+	Route       string             `json:"route"`
+	Children    []pipelineTaskWork `json:"children"`
+}
+
+func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelineStageTaskDetail, pipelineRunControls, error) {
+	stages, err := s.stateStore.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil {
+		return nil, pipelineRunControls{}, err
+	}
+	agentIDs := make([]string, 0, len(stages))
+	for _, stage := range stages {
+		if stage.StandingAgentID != "" {
+			agentIDs = append(agentIDs, stage.StandingAgentID)
+		}
+	}
+	snapshots, err := s.stateStore.PipelineAgentSnapshots(agentIDs)
+	if err != nil {
+		return nil, pipelineRunControls{}, err
+	}
+	runTasks, err := s.stateStore.ListTasksForPipelineRun(detail.Run.RunID)
+	if err != nil {
+		return nil, pipelineRunControls{}, err
+	}
+	tasksByID := make(map[string]state.Task, len(runTasks))
+	childrenByParent := map[string][]string{}
+	for _, task := range runTasks {
+		tasksByID[task.TaskID] = task
+		lineage, lineageErr := s.stateStore.ReadTaskLineage(task.TaskID)
+		if lineageErr != nil {
+			return nil, pipelineRunControls{}, lineageErr
+		}
+		if lineage.ParentTaskID != "" {
+			childrenByParent[lineage.ParentTaskID] = append(childrenByParent[lineage.ParentTaskID], task.TaskID)
+		}
+	}
+	var projectWork func(string) []pipelineTaskWork
+	projectWork = func(parentID string) []pipelineTaskWork {
+		items := []pipelineTaskWork{}
+		for _, taskID := range childrenByParent[parentID] {
+			task := tasksByID[taskID]
+			route := "unavailable"
+			if task.AssignedAgentID != "" {
+				if _, readErr := s.stateStore.ReadAgent(task.AssignedAgentID); readErr == nil {
+					route = "archive"
+					if _, runningErr := s.stateStore.ReadRunning(task.AssignedAgentID); runningErr == nil {
+						route = "live"
+					}
+				}
+			}
+			items = append(items, pipelineTaskWork{TaskID: task.TaskID, DisplayName: task.DisplayName, State: task.State, Outcome: task.Outcome, Summary: task.OutcomeSummary, AgentID: task.AssignedAgentID, Route: route, Children: projectWork(task.TaskID)})
+		}
+		return items
+	}
+	out := make([]pipelineStageTaskDetail, 0, len(stages))
+	for _, stage := range stages {
+		task, err := s.stateStore.ReadTask(stage.TaskID)
+		if err != nil {
+			return nil, pipelineRunControls{}, err
+		}
+		owner := pipelineStageOwner{AgentID: stage.StandingAgentID, Name: stage.StandingAgentID, State: "unknown", Route: "unavailable", Runtime: pipeline.RuntimeAssignment{Backend: task.Backend, Model: task.Model, Effort: task.Effort, Fast: task.Fast}}
+		if stage.StandingAgentID != "" {
+			card := pipelineAgentCard(snapshots[stage.StandingAgentID], stage.StandingAgentID, stage.StandingAgentID, task.OutcomeSummary)
+			owner.Name, owner.State, owner.Route = card.Name, card.State, card.Route
+		}
+		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: projectWork(task.TaskID), CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		if task.Outcome != "" {
+			outputs, err := s.stateStore.ReadTaskResultOutputs(task.TaskID)
+			if err != nil {
+				return nil, pipelineRunControls{}, err
+			}
+			item.Result = &pipelineStageResult{Outcome: task.Outcome, Summary: task.OutcomeSummary, Details: task.OutcomeDetails, Outputs: outputs}
+		}
+		out = append(out, item)
+	}
+	controls := pipelineRunControls{}
+	terminal := detail.Run.State == "completed" || detail.Run.State == "stopped"
+	controls.Stop = pipelineRunControl{Eligible: !terminal && detail.Run.State != "stopping", Reason: "Stops the run and cancels unfinished work."}
+	if len(out) > 0 {
+		current := out[len(out)-1]
+		controls.Continue = pipelineRunControl{Eligible: detail.Run.State == "paused" && (detail.Run.PendingAction == "await_approval" || current.Result != nil && (current.Result.Outcome == state.OutcomeFailure || current.Result.Outcome == state.OutcomeBlocked)), Reason: "Approves success or sends recovery input to a new stage attempt."}
+		controls.Retry = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Retries the interrupted assignment on the same standing owner."}
+		controls.Replace = pipelineRunControl{Eligible: false, Reason: "Standing-owner replacement is unavailable for this run state."}
+		controls.RepairCleanup = pipelineRunControl{Eligible: detail.Run.State == "stopping" && detail.Run.PendingAction == "cleanup_run", Reason: "Retries only the retained cleanup effects."}
+	}
+	return out, controls, nil
 }
 
 type pipelineAttemptAgents struct {

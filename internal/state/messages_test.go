@@ -7,6 +7,91 @@ import (
 	"time"
 )
 
+func TestDurableMailInlineReservationSemantics(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_mail", "Nova", "reviewer", "my-app")
+	base := Message{FromAgent: "a_sender", FromAddress: "impl@my-app", FromName: "Atlas", ToAgent: "a_mail"}
+	deferred := base
+	deferred.Body = "deferred"
+	if _, err := st.InsertMessageWithWake(deferred, false); err != nil {
+		t.Fatal(err)
+	}
+	waking := base
+	waking.Body = "waking"
+	if _, err := st.InsertMessageWithWake(waking, true); err != nil {
+		t.Fatal(err)
+	}
+	acts, err := st.PendingActivations(ActivationKindMail, "a_mail", 10)
+	if err != nil || len(acts) != 1 {
+		t.Fatalf("activations=%d err=%v", len(acts), err)
+	}
+	if err := st.ResetTurnBudget("a_mail", "turn-1"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.PrepareInlineMail("a_mail", 50, 15, 10000, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.Messages) != 2 || b.Messages[0].Body != "waking" || b.Messages[1].Body != "deferred" {
+		t.Fatalf("batch=%+v", b.Messages)
+	}
+	if b.RemainingWaking != 0 || b.RemainingDeferred != 0 {
+		t.Fatalf("remaining=%+v", b)
+	}
+	again, err := st.PrepareInlineMail("a_mail", 50, 15, 10000, true)
+	if err != nil || len(again.Messages) != 2 || again.Messages[0].MessageID != b.Messages[0].MessageID {
+		t.Fatalf("idempotence=%+v err=%v", again, err)
+	}
+	status, _ := st.CurrentTurnBudget("a_mail", 50)
+	if status.Inbound != 2 {
+		t.Fatalf("inbound=%d", status.Inbound)
+	}
+	if err := st.MarkRead([]string{b.Messages[0].MessageID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SettleInlineMail("a_mail", b.DeliveryTurnKey); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := st.ListMessages("a_mail", false, 10)
+	for _, m := range got {
+		if m.MessageID == b.Messages[0].MessageID && m.DeliveredVia != DeliveryPoll {
+			t.Fatalf("poll provenance lost: %+v", m)
+		}
+	}
+}
+
+func TestInlineReservationClearAndResetRecovery(t *testing.T) {
+	st, _ := newTestStore(t)
+	liveAgent(t, st, "a_mail", "Nova", "reviewer", "my-app")
+	if _, err := st.InsertMessageWithWake(Message{FromAgent: "s", FromAddress: "x", FromName: "X", ToAgent: "a_mail", Body: "one"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ResetTurnBudget("a_mail", "turn-1"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.PrepareInlineMail("a_mail", 50, 15, 10000, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ClearInlineReservation("a_mail", b.DeliveryTurnKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ResetTurnBudget("a_mail", "turn-2"); err != nil {
+		t.Fatal(err)
+	}
+	b2, err := st.PrepareInlineMail("a_mail", 50, 15, 10000, true)
+	if err != nil || len(b2.Messages) != 1 {
+		t.Fatalf("eligible after clear=%+v err=%v", b2, err)
+	}
+	if err := st.ResetTurnBudget("a_mail", "turn-3"); err != nil {
+		t.Fatal(err)
+	}
+	b3, err := st.PrepareInlineMail("a_mail", 50, 15, 10000, true)
+	if err != nil || len(b3.Messages) != 1 {
+		t.Fatalf("stale recovery=%+v err=%v", b3, err)
+	}
+}
+
 // directory is the addressable set these tests resolve against, assembled the
 // way the dashboard assembles it (FS-06.R22): the running registry plus the
 // stopped chat agents a message can wake.

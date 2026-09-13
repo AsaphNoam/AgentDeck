@@ -11,15 +11,12 @@ import { RunBrowser, RunsLedger } from "./RunBrowser";
 import { PipelineRunPage } from "./PipelinesPage";
 
 const template = {
-  version: 1,
+  version: 2,
   title: "Delivery",
+  orchestrator_role: "implementer",
   inputs: [],
   stages: [{
-    id: "work", title: "Work", role: "implementer", instruction: "Do the work.", inputs: [], outputs: [], max_visits: 2,
-    transitions: {
-      success: { final: "success", approval: "automatic" },
-      failure: { final: "failure", approval: "required" },
-    },
+    id: "work", title: "Work", objective: "Do the work.", coordination: "standing", inputs: [], outputs: [],
   }],
 };
 
@@ -34,7 +31,8 @@ function attempt(attemptID: string, agentID: string, attemptNo: number, state: s
 
 const run = {
   run_id: "run_1", template_id: "delivery", template_snapshot: template, display_name: "Ship",
-  project: "app", goal: "Ship it", inputs: {}, assignments: { work: { backend: "codex", model: "gpt-5.6-sol" } },
+  project: "app", goal: "Ship it", inputs: {}, assignments: { standing: { backend: "codex", model: "gpt-5.6-sol" } },
+  orchestrator: { backend: "codex", model: "gpt-5.6-sol" }, dedicated_assignments: {},
   state: "running", revision: 4, pending_action: "await_result", current_stage_id: "work",
   current_attempt_id: "at_2", current_agent_id: "a_live", attention_reason: "", final_outcome: "",
   created_at: "2026-07-26T00:00:00Z", updated_at: "2026-07-26T00:00:00Z",
@@ -44,7 +42,7 @@ const detail = {
   run,
   template,
   inputs: {},
-  assignments: { work: { backend: "codex", model: "gpt-5.6-sol" } },
+  assignments: { standing: { backend: "codex", model: "gpt-5.6-sol" } },
   attempts: [attempt("at_1", "a_stopped", 1, "crashed"), attempt("at_2", "a_live", 2, "running")],
   values: [],
   diagnostics: [],
@@ -274,7 +272,7 @@ describe("looping timeline", () => {
   it("shows each visit as its own entry and marks an unreported attempt", async () => {
     const stages = [
       ...template.stages,
-      { id: "review", title: "Review", role: "reviewer", instruction: "Review it.", inputs: [], outputs: [], max_visits: 2, transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } } },
+      { id: "review", title: "Review", objective: "Review it.", coordination: "standing", inputs: [], outputs: [] },
     ];
     const looped = {
       ...detail,
@@ -298,7 +296,7 @@ describe("looping timeline", () => {
       </QueryClientProvider>,
     );
 
-    await screen.findByText("4 attempts");
+    await screen.findByText("4 tasks");
     const entries = [...container.querySelectorAll('[data-slot="attempt"]')];
     expect(entries).toHaveLength(4);
     expect(entries.map((entry) => entry.querySelector("strong")?.textContent))
@@ -409,11 +407,31 @@ describe("pauses whose stage agent is not running", () => {
 
     await screen.findByRole("heading", { name: "Ship", level: 2 });
     expect(screen.getByRole("link", { name: "Open agent" })).toHaveAttribute("href", "/agent/a_live");
-    expect(screen.getByText("Continue needs new input for the blocked stage.")).toBeInTheDocument();
+    expect(screen.getByText("Continue needs new input for this stage.")).toBeInTheDocument();
     expect(screen.getByText("Retry starts a fresh agent with bounded summaries of prior attempts.")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "use the cache" } });
-    expect(screen.getByText("Continue sends this input to the same stage agent.")).toBeInTheDocument();
+    expect(screen.getByText("Continue sends this input to the standing owner.")).toBeInTheDocument();
   });
+});
+
+it("uses task-provenance controls and requires recovery input for a failed stage task", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({
+    ...detail,
+    run: { ...run, state: "paused", current_task_id: "task_1", current_attempt_id: "" },
+    stage_tasks: [{
+      task_id: "task_1", run_id: "run_1", stage_id: "work", stage_index: 0, attempt_number: 1, state: "finished", assignment_text: "Do the work.",
+      standing_owner: { agent_id: "a_live", name: "Standing", state: "waiting", route: "live", runtime: { backend: "codex", model: "gpt-5.6-sol" } },
+      result: { outcome: "blocked", summary: "Need a decision", details: "", checks: "", outputs: {} }, work: [], created_at: "2026-07-26T00:00:00Z", updated_at: "2026-07-26T00:00:00Z",
+    }],
+    controls: { continue: { eligible: true, reason: "Recovery input starts a new standing-owner task." }, retry: { eligible: false, reason: "" }, replace: { eligible: false, reason: "" }, stop: { eligible: true, reason: "" }, repair_cleanup: { eligible: false, reason: "" } },
+  })));
+  const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+  render(<QueryClientProvider client={client}><MemoryRouter><RunBrowser selectedID="run_1" /></MemoryRouter></QueryClientProvider>);
+
+  expect(await screen.findByText("Standing")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Continue stage" })).toBeDisabled();
+  expect(screen.getByText("Continue needs new input for this stage.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Retry stage" })).not.toBeInTheDocument();
 });
 
 it("renders a same-revision permission attention reason on the run page", async () => {

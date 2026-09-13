@@ -25,7 +25,7 @@ func newPipelineCmd() *cobra.Command {
 		return runPipelineRequest(http.MethodGet, "/api/pipelines", nil)
 	}})
 	var templateID, templateFile string
-	validate := &cobra.Command{Use: "validate", Short: "Validate a version-1 template JSON file", RunE: func(*cobra.Command, []string) error {
+	validate := &cobra.Command{Use: "validate", Short: "Validate a version-2 template JSON file", RunE: func(*cobra.Command, []string) error {
 		data, err := os.ReadFile(templateFile)
 		if err != nil {
 			return err
@@ -45,8 +45,9 @@ func newPipelineCmd() *cobra.Command {
 
 	runs := &cobra.Command{Use: "run", Short: "Start and control pipeline runs"}
 	var startTemplate, startName, startProject, startGoal, startRequestID string
+	var orchestratorBackend, orchestratorModel, orchestratorEffort string
 	var startInputs, startStages []string
-	var acknowledge bool
+	var orchestratorFast, acknowledge bool
 	start := &cobra.Command{Use: "start", Short: "Start a configured pipeline run", RunE: func(*cobra.Command, []string) error {
 		inputs, err := parseKeyValues(startInputs)
 		if err != nil {
@@ -59,16 +60,25 @@ func newPipelineCmd() *cobra.Command {
 		if startRequestID == "" {
 			startRequestID = newPipelineRequestID()
 		}
+		// Keep the legacy assignments projection populated with the standing
+		// runtime while the API transitions to the explicit v2 shape. Dedicated
+		// stage coordinators are sent separately and never become stage owners.
+		standing := pipeline.RuntimeAssignment{Backend: orchestratorBackend, Model: orchestratorModel, Effort: orchestratorEffort, Fast: orchestratorFast}
+		assignments["standing"] = standing
 		body := struct {
 			pipeline.StartRequest
 			Acknowledge bool `json:"acknowledge_shared_workspace"`
-		}{StartRequest: pipeline.StartRequest{RequestID: startRequestID, TemplateID: startTemplate, DisplayName: startName, Project: startProject, Goal: startGoal, Inputs: inputs, Assignments: assignments}, Acknowledge: acknowledge}
+		}{StartRequest: pipeline.StartRequest{RequestID: startRequestID, TemplateID: startTemplate, DisplayName: startName, Project: startProject, Goal: startGoal, Inputs: inputs, Assignments: assignments, Orchestrator: standing, DedicatedAssignments: dedicatedAssignments(assignments)}, Acknowledge: acknowledge}
 		return runPipelineRequest(http.MethodPost, "/api/pipeline-runs", body)
 	}}
 	start.Flags().StringVar(&startTemplate, "template", "", "saved template id")
 	start.Flags().StringVar(&startName, "name", "", "run display name")
 	start.Flags().StringVar(&startProject, "project", "", "project id")
 	start.Flags().StringVar(&startGoal, "goal", "", "run goal")
+	start.Flags().StringVar(&orchestratorBackend, "backend", "", "standing orchestrator backend")
+	start.Flags().StringVar(&orchestratorModel, "model", "", "standing orchestrator model")
+	start.Flags().StringVar(&orchestratorEffort, "effort", "", "standing orchestrator reasoning effort")
+	start.Flags().BoolVar(&orchestratorFast, "fast", false, "use fast mode for the standing orchestrator")
 	start.Flags().StringVar(&startRequestID, "request-id", "", "idempotency request id")
 	start.Flags().StringSliceVar(&startInputs, "input", nil, "named input as name=value (repeatable)")
 	start.Flags().StringSliceVar(&startStages, "stage", nil, "runtime as stage=backend/model (repeatable)")
@@ -76,6 +86,8 @@ func newPipelineCmd() *cobra.Command {
 	_ = start.MarkFlagRequired("template")
 	_ = start.MarkFlagRequired("project")
 	_ = start.MarkFlagRequired("goal")
+	_ = start.MarkFlagRequired("backend")
+	_ = start.MarkFlagRequired("model")
 	runs.AddCommand(start)
 	runs.AddCommand(&cobra.Command{Use: "show <run_id>", Args: cobra.ExactArgs(1), RunE: func(_ *cobra.Command, args []string) error {
 		return runPipelineRequest(http.MethodGet, "/api/pipeline-runs/"+args[0], nil)
@@ -172,6 +184,16 @@ func parseStageAssignments(values []string) (map[string]pipeline.RuntimeAssignme
 		out[stage] = pipeline.RuntimeAssignment{Backend: backend, Model: model}
 	}
 	return out, nil
+}
+
+func dedicatedAssignments(values map[string]pipeline.RuntimeAssignment) map[string]pipeline.RuntimeAssignment {
+	out := make(map[string]pipeline.RuntimeAssignment)
+	for stage, assignment := range values {
+		if stage != "standing" {
+			out[stage] = assignment
+		}
+	}
+	return out
 }
 
 func newPipelineRequestID() string {

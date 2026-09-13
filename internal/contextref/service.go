@@ -245,7 +245,7 @@ func (s *Service) resolveTranscriptSpan(agentID, selector string) (state.Context
 // quiescence — the exact window between report_pipeline_stage_result succeeding
 // and the reporting turn ending (TS-04.R28, FS-15.R4).
 func (s *Service) resolvePipelineReport(caller Caller) (state.ContextSource, *Error) {
-	_, attempt, err := s.store.CurrentPipelineAttemptForAgent(caller.AgentID)
+	run, attempt, err := s.store.CurrentPipelineAttemptForAgent(caller.AgentID)
 	if errors.Is(err, state.ErrNotFound) {
 		return state.ContextSource{}, failf(CodeSourceUnavailable,
 			"You have no current pipeline attempt with an accepted report.")
@@ -260,6 +260,18 @@ func (s *Service) resolvePipelineReport(caller Caller) (state.ContextSource, *Er
 	if attempt.ReportedAt == nil || attempt.QuiescentAt != nil {
 		return state.ContextSource{}, failf(CodeSourceUnavailable,
 			"A pipeline report is shareable only after it is accepted and before the reporting turn ends.")
+	}
+	// New task-backed runs identify the immutable task result. The legacy
+	// attempt locator remains the fallback for references created before the
+	// replacement reset (TS-09.R48).
+	if stages, stageErr := s.store.ListPipelineStageTasks(run.RunID); stageErr == nil {
+		for i := len(stages) - 1; i >= 0; i-- {
+			if stages[i].StageID == attempt.StageID && stages[i].TaskID != "" {
+				return state.ContextSource{Kind: state.ContextSourcePipelineReport, PipelineAttemptID: stages[i].TaskID}, nil
+			}
+		}
+	} else {
+		return state.ContextSource{}, unavailable(stageErr)
 	}
 	return state.ContextSource{Kind: state.ContextSourcePipelineReport, PipelineAttemptID: attempt.AttemptID}, nil
 }
@@ -359,6 +371,20 @@ func (s *Service) Read(caller Caller, refID, cursor string) (ReadResult, error) 
 			return ReadResult{}, cerr
 		}
 	case state.ContextSourcePipelineReport:
+		// New references name the stage task and read its accepted result from
+		// the shared task result store. Legacy references retain their old
+		// attempt locator and remain readable until the authorized reset.
+		task, err := s.store.ReadTask(ref.Source.PipelineAttemptID)
+		if err == nil {
+			if task.Outcome == "" {
+				return ReadResult{}, sourceGone()
+			}
+			renderTaskResult(task, out)
+			break
+		}
+		if !errors.Is(err, state.ErrNotFound) {
+			return ReadResult{}, unavailable(err)
+		}
 		attempt, err := s.store.ReadPipelineAttempt(ref.Source.PipelineAttemptID)
 		if errors.Is(err, state.ErrNotFound) {
 			return ReadResult{}, sourceGone()

@@ -83,22 +83,21 @@ func pipelineManagerFixture(t *testing.T) (*Manager, *fakeLifecycle, *fakePublis
 	if err := configStore.EnsureLayout(); err != nil {
 		t.Fatal(err)
 	}
-	for _, role := range []string{"implementer", "reviewer"} {
+	for _, role := range []string{"implementer", "reviewer", "orchestrator"} {
 		if err := configStore.WriteRole(role, config.Role{Title: role}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	template := Template{
-		Version: 1, Title: "Quality loop",
+		Version: 2, Title: "Quality", OrchestratorRole: "orchestrator",
 		Inputs: []ValueDecl{{Name: "spec", Description: "Specification", Required: true}},
 		Stages: []Stage{
-			{ID: "work", Title: "Work", Role: "implementer", Instruction: "Implement.", MaxVisits: 2,
-				Inputs:      []StageInput{{Name: "specification", Value: "spec", Required: true}},
-				Outputs:     []StageOutput{{Name: "implementation", Value: "implementation", Description: "What changed"}},
-				Transitions: OutcomeTransitions{Success: Transition{Stage: "review", Approval: "automatic"}, Failure: Transition{Final: "failure", Approval: "required"}}},
-			{ID: "review", Title: "Review", Role: "reviewer", Instruction: "Review.", MaxVisits: 2,
-				Inputs: []StageInput{{Name: "implementation", Value: "implementation", Required: true}}, Outputs: []StageOutput{},
-				Transitions: OutcomeTransitions{Success: Transition{Final: "success", Approval: "automatic"}, Failure: Transition{Stage: "work", Approval: "automatic"}}},
+			{ID: "work", Title: "Work", Objective: "Implement.", Instruction: "Implement.",
+				Inputs:  []StageInput{{Name: "specification", Value: "spec", Required: true}},
+				Outputs: []StageOutput{{Name: "implementation", Value: "implementation", Description: "What changed"}},
+			},
+			{ID: "review", Title: "Review", Objective: "Review.", Instruction: "Review.",
+				Inputs: []StageInput{{Name: "implementation", Value: "implementation", Required: true}}, Outputs: []StageOutput{}},
 		},
 	}
 	templates := NewTemplateStore(configStore)
@@ -117,6 +116,10 @@ func pipelineManagerFixture(t *testing.T) (*Manager, *fakeLifecycle, *fakePublis
 
 func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
 	t.Helper()
+	// The remaining callers exercise the removed v1 direct-launch executor.
+	// v2 dispatch is owned by the shared task dispatcher and is covered by the
+	// task-backed start test below.
+	t.Skip("superseded v1 direct-launch pipeline test")
 	detail, replay, err := manager.Start(context.Background(), StartRequest{
 		RequestID: requestID, TemplateID: "quality", DisplayName: "Ship", Project: "app", Goal: "Implement the spec",
 		Inputs: map[string]string{"spec": "Requirements"},
@@ -128,6 +131,75 @@ func startPipeline(t *testing.T, manager *Manager, requestID string) RunDetail {
 		t.Fatalf("Start = %+v replay=%v err=%v", detail, replay, err)
 	}
 	return detail
+}
+
+func TestStartCreatesOneStandingStageTaskWithoutDirectLaunch(t *testing.T) {
+	manager, lifecycle, _ := pipelineManagerFixture(t)
+	detail, replay, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "v2-start", TemplateID: "quality", Project: "proj", Goal: "ship",
+		Inputs:      map[string]string{"spec": "implement it"},
+		Assignments: map[string]RuntimeAssignment{"standing": {Backend: "claude", Model: "sonnet"}},
+	})
+	if err != nil || replay {
+		t.Fatalf("Start = %#v, replay=%v, err=%v", detail, replay, err)
+	}
+	if lifecycle.launches != nil {
+		t.Fatalf("v2 Start launched directly: %#v", lifecycle.launches)
+	}
+	var taskID string
+	if err := manager.store.DB().QueryRow(`SELECT task_id FROM pipeline_stage_tasks WHERE run_id = ?`, detail.Run.RunID).Scan(&taskID); err != nil {
+		t.Fatal(err)
+	}
+	task, err := manager.store.ReadTask(taskID)
+	if err != nil || task.Role != "orchestrator" || task.State != state.TaskReady {
+		t.Fatalf("stage task = %#v, %v", task, err)
+	}
+}
+
+func TestContinueFailureCreatesAnotherDurableStageTaskForStandingOwner(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, _, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "v2-continue", TemplateID: "quality", Project: "proj", Goal: "ship",
+		Inputs: map[string]string{"spec": "implement it"},
+		Assignments: map[string]RuntimeAssignment{
+			"standing": {Backend: "claude", Model: "sonnet"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 1 {
+		t.Fatalf("stage tasks = %#v, err=%v", stages, err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_stage_tasks SET state = 'closing', standing_agent_id = 'agent-standing' WHERE task_id = ?`, stages[0].TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE tasks SET state = ?, outcome = ? WHERE task_id = ?`, state.TaskFinished, state.OutcomeFailure, stages[0].TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'paused', pending_action = '', attention_reason = 'failure' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	detail, err = manager.Detail(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	continued, err := manager.Continue(context.Background(), detail.Run.RunID, detail.Run.Revision, "Correct the failed check")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages, err = manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 2 {
+		t.Fatalf("stage tasks = %#v, err=%v", stages, err)
+	}
+	retry, err := manager.store.ReadTask(stages[1].TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if continued.Run.State != "queued" || continued.Run.PendingAction != "dispatch_stage_task" || stages[1].AttemptNumber != 2 || retry.TargetKind != state.TargetAgent || retry.TargetAgentID != "agent-standing" || !strings.Contains(retry.Instruction, "Correct the failed check") {
+		t.Fatalf("continued=%#v stage=%#v task=%#v", continued.Run, stages[1], retry)
+	}
 }
 
 // FS-14.A30: permission attention is derived, edge-triggered, and clears
@@ -191,8 +263,8 @@ func TestStartAcceptsSeededCodexModelID(t *testing.T) {
 	if err != nil || replay {
 		t.Fatalf("Start = %+v replay=%v err=%v", detail, replay, err)
 	}
-	if len(lifecycle.launches) != 1 || lifecycle.launches[0].Model != "gpt-5.6-sol" {
-		t.Fatalf("launches = %+v", lifecycle.launches)
+	if len(lifecycle.launches) != 0 {
+		t.Fatalf("v2 Start launched directly: %+v", lifecycle.launches)
 	}
 }
 
@@ -247,17 +319,12 @@ func TestRunProposalDerivesAStableRequestIDFromExactPayload(t *testing.T) {
 
 func TestTemplateProposalEnforcesTheCentralPayloadBound(t *testing.T) {
 	manager, _, _ := pipelineManagerFixture(t)
-	template := Template{Version: 1, Title: "Oversized", Inputs: []ValueDecl{}, Stages: []Stage{}}
+	template := Template{Version: 2, Title: "Oversized", OrchestratorRole: "orchestrator", Inputs: []ValueDecl{}, Stages: []Stage{}}
 	for i := 0; i < MaxStages; i++ {
 		stageID := fmt.Sprintf("stage-%d", i)
-		success := Transition{Final: "success", Approval: "automatic"}
-		if i+1 < MaxStages {
-			success = Transition{Stage: fmt.Sprintf("stage-%d", i+1), Approval: "automatic"}
-		}
 		template.Stages = append(template.Stages, Stage{
-			ID: stageID, Title: stageID, Role: "implementer", Instruction: strings.Repeat("x", 9000),
+			ID: stageID, Title: stageID, Objective: strings.Repeat("x", 9000), Instruction: strings.Repeat("x", 9000),
 			Inputs: []StageInput{}, Outputs: []StageOutput{},
-			Transitions: OutcomeTransitions{Success: success, Failure: Transition{Final: "failure", Approval: "required"}},
 		})
 	}
 	_, err := manager.ProposeTemplate("oversized", template)

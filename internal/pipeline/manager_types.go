@@ -10,18 +10,20 @@ import (
 type RuntimeAssignment struct {
 	Backend string `json:"backend"`
 	Model   string `json:"model"`
-	Effort  string `json:"effort"`
-	Fast    bool   `json:"fast"`
+	Effort  string `json:"effort,omitempty"`
+	Fast    bool   `json:"fast,omitempty"`
 }
 
 type StartRequest struct {
-	RequestID   string                       `json:"request_id"`
-	TemplateID  string                       `json:"template_id"`
-	DisplayName string                       `json:"display_name"`
-	Project     string                       `json:"project"`
-	Goal        string                       `json:"goal"`
-	Inputs      map[string]string            `json:"inputs"`
-	Assignments map[string]RuntimeAssignment `json:"assignments"`
+	RequestID            string                       `json:"request_id"`
+	TemplateID           string                       `json:"template_id"`
+	DisplayName          string                       `json:"display_name"`
+	Project              string                       `json:"project"`
+	Goal                 string                       `json:"goal"`
+	Inputs               map[string]string            `json:"inputs"`
+	Assignments          map[string]RuntimeAssignment `json:"assignments,omitempty"`
+	Orchestrator         RuntimeAssignment            `json:"orchestrator"`
+	DedicatedAssignments map[string]RuntimeAssignment `json:"dedicated_assignments"`
 }
 
 type StageExecution struct {

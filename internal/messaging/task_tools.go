@@ -55,22 +55,58 @@ func (s *Server) handleGetAssignedTask(_ context.Context, req *mcp.CallToolReque
 		})
 	}
 	return jsonResult(map[string]any{
-		"ok":           true,
-		"assigned":     true,
-		"task_id":      task.TaskID,
-		"display_name": task.DisplayName,
-		"instruction":  task.Instruction,
-		"state":        task.State,
-		"attachments":  out,
+		"ok":               true,
+		"assigned":         true,
+		"task_id":          task.TaskID,
+		"display_name":     task.DisplayName,
+		"instruction":      task.Instruction,
+		"state":            task.State,
+		"execution_handle": task.ExecutionHandle,
+		"attachments":      out,
 	})
+}
+
+// --- wait_for_tasks (FS-16.R30, TS-10.R27-R29) ---
+
+type waitTaskObservation struct {
+	TaskID        string `json:"task_id" jsonschema:"a readable task created by this assignee"`
+	AfterRevision int    `json:"after_revision" jsonschema:"last task revision already observed"`
+}
+
+type waitForTasksArgs struct {
+	ExecutionHandle string                `json:"execution_handle" jsonschema:"handle returned by get_assigned_task for this execution"`
+	Tasks           []waitTaskObservation `json:"tasks" jsonschema:"one to 64 task revisions to watch"`
+}
+
+func (s *Server) handleWaitForTasks(_ context.Context, req *mcp.CallToolRequest, input waitForTasksArgs) (*mcp.CallToolResult, any, error) {
+	identity, ok := s.caller(req)
+	if !ok {
+		return sessionUnknown()
+	}
+	observations := make([]state.TaskWaitObservation, 0, len(input.Tasks))
+	for _, item := range input.Tasks {
+		observations = append(observations, state.TaskWaitObservation{TaskID: item.TaskID, AfterRevision: item.AfterRevision})
+	}
+	changes, task, err := s.store.WaitForTasks(identity.AgentID, identity.Generation, input.ExecutionHandle, observations)
+	switch {
+	case errors.Is(err, state.ErrTaskWaitConflict):
+		return errResult(map[string]any{"ok": false, "error": "wait_conflict", "message": "The assignment or execution handle is stale, the wait set is invalid, or it includes this task."})
+	case errors.Is(err, state.ErrTaskWaitScope), errors.Is(err, state.ErrNotFound):
+		return errResult(map[string]any{"ok": false, "error": "not_found", "message": "One or more watched tasks are unavailable to this assignment."})
+	case err != nil:
+		s.log.Debug("register task wait failed", "agent", identity.AgentID, "err", err)
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Could not register the task wait."})
+	}
+	return jsonResult(map[string]any{"ok": true, "yielding": task.PendingYield, "changes": changes, "wait_version": task.WaitVersion})
 }
 
 // --- report_task_result (FS-16.R3, R20, TS-04.R29) ---
 
 type reportTaskArgs struct {
-	Outcome string `json:"outcome" jsonschema:"success, failure, or blocked"`
-	Summary string `json:"summary" jsonschema:"bounded human-readable result summary"`
-	Details string `json:"details,omitempty" jsonschema:"optional bounded result details"`
+	Outcome string            `json:"outcome" jsonschema:"success, failure, or blocked"`
+	Summary string            `json:"summary" jsonschema:"bounded human-readable result summary"`
+	Details string            `json:"details,omitempty" jsonschema:"optional bounded result details"`
+	Outputs map[string]string `json:"outputs,omitempty" jsonschema:"optional declared named outputs"`
 }
 
 // handleReportTaskResult records the caller's own result for its own assignment.
@@ -91,8 +127,24 @@ func (s *Server) handleReportTaskResult(_ context.Context, req *mcp.CallToolRequ
 		s.log.Debug("read assigned task failed", "agent", identity.AgentID, "err", err)
 		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Could not read your assignment."})
 	}
-	finished, err := s.store.RecordAgentTaskResult(task.TaskID, identity.AgentID, identity.Generation,
-		state.TaskResult{Outcome: input.Outcome, Summary: input.Summary, Details: input.Details})
+	var finished state.Task
+	if stage, stageErr := s.store.ReadPipelineStageTaskByTask(task.TaskID); stageErr == nil {
+		run, runErr := s.store.ReadPipelineRun(stage.RunID)
+		if runErr != nil {
+			err = runErr
+		} else {
+			_, err = s.store.AcceptPipelineStageTaskResult(task.TaskID, identity.AgentID, identity.Generation, run.Revision,
+				state.TaskResult{Outcome: input.Outcome, Summary: input.Summary, Details: input.Details, Outputs: input.Outputs})
+			if err == nil {
+				finished, err = s.store.ReadTask(task.TaskID)
+			}
+		}
+	} else if errors.Is(stageErr, state.ErrNotFound) {
+		finished, err = s.store.RecordAgentTaskResult(task.TaskID, identity.AgentID, identity.Generation,
+			state.TaskResult{Outcome: input.Outcome, Summary: input.Summary, Details: input.Details, Outputs: input.Outputs})
+	} else {
+		err = stageErr
+	}
 	switch {
 	case errors.Is(err, state.ErrInvalidOutcome):
 		return errResult(map[string]any{
@@ -109,7 +161,7 @@ func (s *Server) handleReportTaskResult(_ context.Context, req *mcp.CallToolRequ
 			"ok": false, "error": "not_assigned",
 			"message": "This assignment belongs to another agent or to an earlier session.",
 		})
-	case errors.Is(err, state.ErrWorkResultRecorded), errors.Is(err, state.ErrTaskNotReportable):
+	case errors.Is(err, state.ErrWorkResultRecorded), errors.Is(err, state.ErrTaskNotReportable), errors.Is(err, state.ErrPipelineStageConflict):
 		return errResult(map[string]any{
 			"ok": false, "error": "already_reported",
 			"message": "This task already has a recorded result.",
@@ -170,6 +222,10 @@ type AgentTaskRequest struct {
 type TaskControl interface {
 	CreateAgentTask(req AgentTaskRequest) (state.Task, error)
 	CancelAgentTask(taskID, creatorAgentID string) (state.Task, error)
+	ListAgentTasks(creatorAgentID string, limit int) ([]state.Task, error)
+	ReadAgentTask(taskID, creatorAgentID string) (state.Task, error)
+	RetryAgentTask(taskID, creatorAgentID string) (state.Task, error)
+	RearmAgentTask(taskID, creatorAgentID string, arms []state.TaskArm) (state.Task, error)
 }
 
 // SetTaskControl wires the task tools to the control plane.
@@ -310,6 +366,107 @@ func (s *Server) handleCancelTask(_ context.Context, req *mcp.CallToolRequest, i
 	return jsonResult(map[string]any{
 		"ok": true, "task_id": task.TaskID, "state": task.State, "outcome": task.Outcome,
 	})
+}
+
+const (
+	defaultTaskListLimit = 25
+	maxTaskListLimit     = 100
+)
+
+type listTasksArgs struct {
+	Limit int `json:"limit,omitempty" jsonschema:"maximum tasks to return; defaults to 25 and cannot exceed 100"`
+}
+
+func (s *Server) handleListTasks(_ context.Context, req *mcp.CallToolRequest, input listTasksArgs) (*mcp.CallToolResult, any, error) {
+	identity, ok := s.caller(req)
+	if !ok {
+		return sessionUnknown()
+	}
+	limit := input.Limit
+	if limit == 0 {
+		limit = defaultTaskListLimit
+	}
+	if limit < 0 || limit > maxTaskListLimit {
+		return errResult(map[string]any{"ok": false, "error": "validation", "message": "limit must be between 1 and 100."})
+	}
+	control := s.taskControl()
+	if control == nil {
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Task control plane is unavailable."})
+	}
+	tasks, err := control.ListAgentTasks(identity.AgentID, limit)
+	if err != nil {
+		return taskToolError(err)
+	}
+	return jsonResult(map[string]any{"ok": true, "tasks": tasks})
+}
+
+type getTaskArgs struct {
+	TaskID string `json:"task_id" jsonschema:"the id of a task you created"`
+}
+
+func (s *Server) handleGetTask(_ context.Context, req *mcp.CallToolRequest, input getTaskArgs) (*mcp.CallToolResult, any, error) {
+	identity, ok := s.caller(req)
+	if !ok {
+		return sessionUnknown()
+	}
+	control := s.taskControl()
+	if control == nil {
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Task control plane is unavailable."})
+	}
+	task, err := control.ReadAgentTask(input.TaskID, identity.AgentID)
+	if err != nil {
+		return taskToolError(err)
+	}
+	return jsonResult(map[string]any{"ok": true, "task": task})
+}
+
+type retryTaskArgs struct {
+	TaskID string `json:"task_id" jsonschema:"the id of an eligible task you created"`
+}
+
+func (s *Server) handleRetryTask(_ context.Context, req *mcp.CallToolRequest, input retryTaskArgs) (*mcp.CallToolResult, any, error) {
+	identity, ok := s.caller(req)
+	if !ok {
+		return sessionUnknown()
+	}
+	control := s.taskControl()
+	if control == nil {
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Task control plane is unavailable."})
+	}
+	task, err := control.RetryAgentTask(input.TaskID, identity.AgentID)
+	if err != nil {
+		return taskToolError(err)
+	}
+	return jsonResult(map[string]any{"ok": true, "task": task})
+}
+
+type rearmTaskArgs struct {
+	TaskID string           `json:"task_id" jsonschema:"the id of a task you created"`
+	Arms   []createArmInput `json:"arms" jsonschema:"replacement prerequisites; at most 32"`
+}
+
+func (s *Server) handleRearmTask(_ context.Context, req *mcp.CallToolRequest, input rearmTaskArgs) (*mcp.CallToolResult, any, error) {
+	identity, ok := s.caller(req)
+	if !ok {
+		return sessionUnknown()
+	}
+	if len(input.Arms) > 32 {
+		return errResult(map[string]any{"ok": false, "error": "validation", "message": "too many prerequisites"})
+	}
+	arms := make([]state.TaskArm, 0, len(input.Arms))
+	for _, arm := range input.Arms {
+		arms = append(arms, state.TaskArm{Kind: arm.Kind, SourceKind: arm.SourceKind, SourceID: arm.SourceID,
+			SatisfyingOutcomes: arm.SatisfyingOutcomes, SignalName: arm.SignalName})
+	}
+	control := s.taskControl()
+	if control == nil {
+		return errResult(map[string]any{"ok": false, "error": "internal", "message": "Task control plane is unavailable."})
+	}
+	task, err := control.RearmAgentTask(input.TaskID, identity.AgentID, arms)
+	if err != nil {
+		return taskToolError(err)
+	}
+	return jsonResult(map[string]any{"ok": true, "task": task})
 }
 
 // taskToolError maps the control plane's refusals onto stable outcome codes. An

@@ -220,3 +220,21 @@ func renderPipelineReport(attempt state.PipelineAttemptRecord, out *pageWriter) 
 		out.write(section("outputs", strings.TrimRight(b.String(), "\n")))
 	}
 }
+
+// renderTaskResult is the v2 pipeline report projection. Task results are the
+// shared immutable result source; the pipeline package only owns ordering and
+// the short-lived share window (TS-09.R48, FS-16.R3).
+func renderTaskResult(task state.Task, out *pageWriter) {
+	out.write(section("outcome", task.Outcome))
+	out.write(section("summary", task.OutcomeSummary))
+	if task.OutcomeDetails != "" {
+		out.write(section("details", task.OutcomeDetails))
+	}
+	if len(task.Outputs) > 0 {
+		var b strings.Builder
+		for _, name := range sortedKeys(task.Outputs) {
+			b.WriteString(name + ": " + task.Outputs[name] + "\n")
+		}
+		out.write(section("outputs", strings.TrimRight(b.String(), "\n")))
+	}
+}

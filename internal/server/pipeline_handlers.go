@@ -144,9 +144,25 @@ func (s *Server) handlePipelineRun(w http.ResponseWriter, r *http.Request) {
 		writePipelineError(w, err)
 		return
 	}
+	stageTasks, controls, err := s.pipelineTaskRunProjection(detail)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	orchestrator := detail.Assignments["standing"]
+	dedicated := map[string]pipeline.RuntimeAssignment{}
+	for stageID, assignment := range detail.Assignments {
+		if stageID != "standing" {
+			dedicated[stageID] = assignment
+		}
+	}
 	writeJSON(w, http.StatusOK, pipelineRunDetailResponse{
-		RunDetail:       detail,
-		AgentsByAttempt: agentsByAttempt,
+		RunDetail:            detail,
+		AgentsByAttempt:      agentsByAttempt,
+		Orchestrator:         orchestrator,
+		DedicatedAssignments: dedicated,
+		StageTasks:           stageTasks,
+		Controls:             controls,
 	})
 }
 
@@ -187,6 +203,11 @@ func (s *Server) handleStartPipelineRun(w http.ResponseWriter, r *http.Request) 
 	status := http.StatusCreated
 	if replay {
 		status = http.StatusOK
+	} else {
+		// The task dispatcher is the sole launch authority. Kick it after the
+		// durable start transaction so normal ticker latency is not part of a run
+		// start, while the periodic sweep remains the recovery path.
+		s.dispatchReadyTasks(r.Context())
 	}
 	writeJSON(w, status, map[string]any{"run": detail, "replay": replay, "workspace_conflicts": conflicts})
 }
@@ -207,6 +228,7 @@ func (s *Server) handleContinuePipelineRun(w http.ResponseWriter, r *http.Reques
 		writePipelineError(w, err)
 		return
 	}
+	s.dispatchReadyTasks(r.Context())
 	writeJSON(w, http.StatusOK, detail)
 }
 
@@ -217,6 +239,21 @@ func (s *Server) handleRetryPipelineRun(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	detail, err := s.pipelineMgr.Retry(r.Context(), r.PathValue("id"), request.Revision)
+	if err != nil {
+		writePipelineError(w, err)
+		return
+	}
+	s.dispatchReadyTasks(r.Context())
+	writeJSON(w, http.StatusOK, detail)
+}
+
+func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Request) {
+	var request pipelineControlRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeAPIError(w, apiError(runtime.CodeValidation, "invalid JSON body"))
+		return
+	}
+	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), r.PathValue("id"), request.Revision)
 	if err != nil {
 		writePipelineError(w, err)
 		return
@@ -234,6 +271,37 @@ func (s *Server) handleStopPipelineRun(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writePipelineError(w, err)
 		return
+	}
+	if detail.Run.State == "stopping" && detail.Run.PendingAction == "cleanup_run" {
+		tasks, listErr := s.stateStore.ListTasksForPipelineRun(detail.Run.RunID)
+		if listErr != nil {
+			writePipelineError(w, listErr)
+			return
+		}
+		for _, task := range tasks {
+			if task.State == state.TaskFinished {
+				continue
+			}
+			cancelled, cancelErr := s.stateStore.CancelTask(task.TaskID)
+			if cancelErr != nil {
+				writePipelineError(w, cancelErr)
+				return
+			}
+			s.finishInterruptedRelease(r.Context(), cancelled)
+			s.publishTaskUpdate(cancelled)
+		}
+		latest, readErr := s.pipelineMgr.Detail(detail.Run.RunID)
+		if readErr != nil {
+			writePipelineError(w, readErr)
+			return
+		}
+		if finished, finishErr := s.pipelineMgr.FinishStopCleanup(detail.Run.RunID, latest.Run.Revision); finishErr == nil {
+			detail = finished
+		} else {
+			// A retained release/yield intent is durable; the run honestly remains
+			// stopping for the dispatcher/recovery sweep instead of claiming success.
+			detail = latest
+		}
 	}
 	writeJSON(w, http.StatusOK, detail)
 }

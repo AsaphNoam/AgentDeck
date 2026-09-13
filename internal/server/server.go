@@ -186,13 +186,14 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	stateMgr := state.NewManager(stateStore, eventBus)
 	ix := persistindex.New(stateStore.DB())
 	msg := messaging.New(stateStore, log)
-	msg.SetBudgetProvider(func() int {
+	messageBudgetProvider := func() int {
 		current, err := cfgStore.ReadConfig()
 		if err != nil || current.MessageBudgetPerTurn <= 0 {
 			return config.DefaultConfig().MessageBudgetPerTurn
 		}
 		return current.MessageBudgetPerTurn
-	})
+	}
+	msg.SetBudgetProvider(messageBudgetProvider)
 	activationCh := make(chan string, 32)
 	touch := func(agentID string) {
 		if _, err := stateMgr.Touch(agentID); err != nil {
@@ -201,6 +202,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	}
 	var term *terminal.Runtime
 	if registry != nil {
+		registry.SetMessageBudgetProvider(messageBudgetProvider)
 		registry.SetPersistence(cfgStore.Home(), func(home, agentID string, meta *runtime.SessionMetaData) (runtime.TranscriptWriter, error) {
 			return transcript.Open(home, agentID, meta)
 		}, ix)

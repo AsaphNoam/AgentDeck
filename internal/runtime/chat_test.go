@@ -1192,7 +1192,7 @@ func TestChatEffortPostSessionFailureLeavesNoAgent(t *testing.T) {
 	}
 }
 
-func TestStartActivationInjectsPayloadFreeMailTurn(t *testing.T) {
+func TestStartActivationInjectsInlineMailTurn(t *testing.T) {
 	c, spec := newChatTest(t, "stream_text")
 	dump := filepath.Join(t.TempDir(), "prompt.json")
 	spec.Env = append(spec.Env, "FAKEACP_PROMPT_DUMP="+dump)
@@ -1208,23 +1208,32 @@ func TestStartActivationInjectsPayloadFreeMailTurn(t *testing.T) {
 		t.Fatalf("Subscribe: %v", err)
 	}
 	defer unsub()
+	if _, err := c.store.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "reviewer@test", FromName: "Nova",
+		ToAgent: h.AgentID, Subject: "Review", Body: "Please review the durable result.",
+	}); err != nil {
+		t.Fatal(err)
+	}
 	started, err := c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
 		return c.store.ResetTurnBudget(h.AgentID, turnID)
 	})
 	if err != nil || !started {
 		t.Fatalf("StartActivation = %v, %v; want started", started, err)
 	}
-	if budget, err := c.store.CurrentTurnBudget(h.AgentID, 15); err != nil || budget.TurnID != "t_000000000001" || budget.Remaining != 15 {
-		t.Fatalf("turn budget after nudge = %+v err=%v, want fresh t_000000000001", budget, err)
+	if budget, err := c.store.CurrentTurnBudget(h.AgentID, 15); err != nil || budget.TurnID != "t_000000000001" || budget.Inbound != 1 || budget.Remaining != 14 {
+		t.Fatalf("turn budget after inline mail = %+v err=%v, want one inbound charge", budget, err)
 	}
 	_ = drainTurn(t, ch)
+	if unread, err := c.store.UnreadCount(h.AgentID); err != nil || unread != 0 {
+		t.Fatalf("unread after confirmed inline receipt = %d, %v; want 0", unread, err)
+	}
 
 	raw, err := os.ReadFile(dump)
 	if err != nil {
 		t.Fatalf("read prompt dump: %v", err)
 	}
-	if !strings.Contains(string(raw), "check_messages") {
-		t.Fatalf("nudge prompt = %s, want check_messages instruction", raw)
+	if !strings.Contains(string(raw), "Please review the durable result.") || strings.Contains(string(raw), "Call the check_messages") {
+		t.Fatalf("nudge prompt = %s, want inline peer mail without a mandatory mailbox fetch", raw)
 	}
 	final, err := c.store.ReadStatus(h.AgentID)
 	if err != nil {
@@ -1252,6 +1261,12 @@ func TestStartActivationStatusWriteFailureSendsNoPrompt(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+	if _, err := c.store.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "reviewer@test", FromName: "Nova",
+		ToAgent: h.AgentID, Body: "status-boundary mail",
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Fail status writes only; reads keep working, so the activation reaches the
 	// write instead of being turned away by the idle gate above it.
@@ -1264,7 +1279,7 @@ BEGIN SELECT RAISE(ABORT, 'injected status write failure'); END`); err != nil {
 	before := 0
 	started, err := c.StartActivation(ctx, h.AgentID, "mail", func(turnID string) error {
 		before++
-		return nil
+		return c.store.ResetTurnBudget(h.AgentID, turnID)
 	})
 	if started || err == nil {
 		t.Fatalf("StartActivation = %v, %v; want not started with the status error surfaced", started, err)
@@ -1307,6 +1322,12 @@ func TestStartActivationRefusesAKindWithNoRegisteredContract(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+	if _, err := c.store.InsertMessage(state.Message{
+		FromAgent: "a_sender", FromAddress: "reviewer@test", FromName: "Nova",
+		ToAgent: h.AgentID, Body: "registered-kind mail",
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	called := false
 	started, err := c.StartActivation(ctx, h.AgentID, "not-a-registered-kind", func(string) error {

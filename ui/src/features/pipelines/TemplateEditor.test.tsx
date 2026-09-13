@@ -9,14 +9,10 @@ import type { PipelineTemplate } from "../../schemas/pipeline";
 import { TemplateEditor } from "./TemplateEditor";
 
 const stages = Array.from({ length: 32 }, (_, index) => ({
-  id: `stage-${index + 1}`, title: `Stage ${index + 1}`, role: "implementer", instruction: `Instruction ${index + 1}`,
-  inputs: [], outputs: [], max_visits: 1,
-  transitions: {
-    success: { stage: "", final: "success", approval: "automatic" as const },
-    failure: { stage: "", final: "failure", approval: "required" as const },
-  },
+  id: `stage-${index + 1}`, title: `Stage ${index + 1}`, objective: `Instruction ${index + 1}`,
+  coordination: "standing" as const, inputs: [], outputs: [],
 }));
-const template: PipelineTemplate = { version: 1, title: "Maximum delivery", inputs: [], stages };
+const template: PipelineTemplate = { version: 2, title: "Maximum delivery", orchestrator_role: "implementer", inputs: [], stages };
 const server = setupServer(
   http.get("/api/pipelines", () => HttpResponse.json([{ id: "maximum", template, valid: true, diagnostics: [] }])),
   http.get("/api/roles", () => HttpResponse.json({ implementer: { title: "Implementer", system_prompt: "", skip_permissions: false } })),

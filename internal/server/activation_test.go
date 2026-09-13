@@ -103,10 +103,10 @@ func pendingActivations(t *testing.T, srv *Server, agentID string) []state.Activ
 	return pending
 }
 
-// FS-06.A13/A14 (R24–R26) — several messages waiting before the opportunity is
-// claimed produce exactly one payload-free provider turn. Leaving them unread
-// does not re-arm that opportunity across sweeps, idle transitions, or a restart;
-// mail inserted after the claim produces exactly one later turn.
+// FS-06.A20/A22 — several messages waiting before the opportunity is claimed
+// produce exactly one provider turn containing the bounded whole-message batch.
+// Confirmed inline receipt does not re-arm across sweeps, idle transitions, or
+// restart; mail inserted after the claim produces exactly one later turn.
 func TestCoalescedMailProducesOnePromptAndIsNeverReplayed(t *testing.T) {
 	srv, ts, promptLog := activationTestServer(t)
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
@@ -119,25 +119,24 @@ func TestCoalescedMailProducesOnePromptAndIsNeverReplayed(t *testing.T) {
 	srv.executePendingMailActivations(context.Background(), id)
 	waitPrompts(t, promptLog, 1)
 
-	// A14: the instruction is code-owned and carries no message payload.
+	// Inline peer mail is attributed and needs no mandatory mailbox round trip.
 	raw, err := os.ReadFile(promptLog)
 	if err != nil {
 		t.Fatalf("read prompt log: %v", err)
 	}
-	if !strings.Contains(string(raw), "check_messages") {
-		t.Fatalf("activation prompt = %s, want the check_messages instruction", raw)
-	}
 	for _, body := range []string{"first", "second", "third"} {
-		if strings.Contains(string(raw), body) {
-			t.Fatalf("activation prompt leaked message body %q: %s", body, raw)
+		if !strings.Contains(string(raw), body) {
+			t.Fatalf("activation prompt omitted message body %q: %s", body, raw)
 		}
 	}
+	if strings.Contains(string(raw), "Call the check_messages") {
+		t.Fatalf("activation prompt requires a redundant mailbox fetch: %s", raw)
+	}
 
-	// The agent never called check_messages, so the mail is still unread. That is
-	// explicitly not a reason to activate again (R25/R26).
+	// Provider completion confirms delivery and projects the ordinary read state.
 	msgs, err := srv.stateStore.ListMessages(id, true, 0)
-	if err != nil || len(msgs) != 3 {
-		t.Fatalf("ListMessages unread = %d, %v; want the three durable rows", len(msgs), err)
+	if err != nil || len(msgs) != 0 {
+		t.Fatalf("ListMessages unread = %d, %v; want confirmed inline mail read", len(msgs), err)
 	}
 	holdPrompts(t, srv, promptLog, 1)
 

@@ -121,11 +121,99 @@ func (m *Manager) Reconcile(ctx context.Context, runID string) error {
 			}
 			m.publish(finished)
 			return nil
+		case "release_stage_task":
+			return m.reconcileTaskStageRelease(run)
+		case "cleanup_run":
+			return m.reconcileRunCleanup(run)
 		default:
 			return nil
 		}
 	}
 	return fmt.Errorf("pipeline: reconcile step limit reached for %s", runID)
+}
+
+// reconcileRunCleanup repairs a crash after the run closure fence but before
+// every lineage member was marked cancelled. Runtime release remains owned by
+// the shared task recovery path; this cursor only finalizes once those durable
+// effects are settled.
+func (m *Manager) reconcileRunCleanup(run state.PipelineRunRecord) error {
+	tasks, err := m.store.ListTasksForPipelineRun(run.RunID)
+	if err != nil {
+		return err
+	}
+	settled := true
+	for _, task := range tasks {
+		if task.State != state.TaskFinished {
+			cancelled, cancelErr := m.store.CancelTask(task.TaskID)
+			if cancelErr != nil && !errors.Is(cancelErr, state.ErrTaskNotReportable) {
+				return cancelErr
+			}
+			if cancelErr == nil {
+				task = cancelled
+			}
+		}
+		if task.PendingRelease || task.PendingYield {
+			settled = false
+		}
+	}
+	if !settled {
+		return nil
+	}
+	stopped, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+		State: "stopped", PendingAction: "", CurrentStageID: run.CurrentStageID,
+		CurrentAgentID: "", FinalOutcome: state.OutcomeCancelled,
+	})
+	if err == nil {
+		m.publish(stopped)
+		m.notify(stopped, "completed")
+	}
+	return err
+}
+
+// reconcileTaskStageRelease advances only after the task dispatcher completed
+// the report's durable release. The stage task result is the authority; a turn
+// boundary or child lifecycle event is never interpreted as success.
+func (m *Manager) reconcileTaskStageRelease(run state.PipelineRunRecord) error {
+	stages, err := m.store.ListPipelineStageTasks(run.RunID)
+	if err != nil {
+		return err
+	}
+	if len(stages) == 0 {
+		return nil
+	}
+	current := stages[len(stages)-1]
+	task, err := m.store.ReadTask(current.TaskID)
+	if err != nil {
+		return err
+	}
+	if task.PendingRelease {
+		return nil
+	}
+	detail, err := m.Detail(run.RunID)
+	if err != nil {
+		return err
+	}
+	stage, found := stageByID(detail.Template, current.StageID)
+	if !found {
+		return controlError("invalid_state", "current stage is missing")
+	}
+	if task.Outcome != state.OutcomeSuccess {
+		paused, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{State: "paused", PendingAction: "", CurrentStageID: stage.ID, AttentionReason: task.Outcome})
+		if err == nil {
+			m.publish(paused)
+			m.notify(paused, "needs_attention")
+		}
+		return err
+	}
+	if stage.ApprovalAfterSuccess {
+		paused, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{State: "paused", PendingAction: "await_approval", CurrentStageID: stage.ID, AttentionReason: "approval_required"})
+		if err == nil {
+			m.publish(paused)
+			m.notify(paused, "needs_attention")
+		}
+		return err
+	}
+	return m.advanceTaskStage(run, detail, current, stage)
 }
 
 func startsProcess(action string) bool {

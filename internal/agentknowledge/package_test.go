@@ -112,8 +112,21 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 			t.Errorf("SKILL.md contains reference-owned detail %q", forbidden)
 		}
 	}
-	if !strings.Contains(string(files["references/coordinate-work.md"]), "budget of 50 combined sends and reads") {
-		t.Error("coordination reference is missing the messaging budget")
+	coordination := string(files["references/coordinate-work.md"])
+	for _, phrase := range []string{
+		"budget of 50 combined sends and reads",
+		"`send_message` `wake` option defaults to `true`",
+		"Set `wake: false` for a deferred FYI",
+		"creates no turn,\n  wake, continuation, or retry opportunity",
+		"receive a bounded batch of pending mail directly",
+		"attributed to its sender",
+		"`check_messages` remains available for deliberate mailbox reads",
+		"Failed or ambiguous delivery preserves the message",
+		"same stable id",
+	} {
+		if !strings.Contains(coordination, phrase) {
+			t.Errorf("coordination reference is missing %q", phrase)
+		}
 	}
 	pipeline := string(files["references/build-and-run-pipelines.md"])
 	for _, phrase := range []string{"`blocked`", "Continue", "AgentDecker"} {

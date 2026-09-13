@@ -17,14 +17,10 @@ import (
 
 func apiTemplate() pipeline.Template {
 	return pipeline.Template{
-		Version: 1, Title: "One stage", Inputs: []pipeline.ValueDecl{},
+		Version: 2, Title: "One stage", OrchestratorRole: "implementer", Inputs: []pipeline.ValueDecl{},
 		Stages: []pipeline.Stage{{
-			ID: "work", Title: "Work", Role: "implementer", Instruction: "Do the work.",
+			ID: "work", Title: "Work", Objective: "Do the work.", Coordination: "standing",
 			Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{},
-			Transitions: pipeline.OutcomeTransitions{
-				Success: pipeline.Transition{Final: "success", Approval: "automatic"},
-				Failure: pipeline.Transition{Final: "failure", Approval: "required"},
-			},
 		}},
 	}
 }
@@ -50,13 +46,13 @@ func TestPipelineTemplateAPICRUDAndValidation(t *testing.T) {
 		t.Fatalf("template list = %+v", list)
 	}
 	invalid := apiTemplate()
-	invalid.Stages[0].Role = "missing-role"
+	invalid.OrchestratorRole = "missing-role"
 	rec = doRequest(t, handler, http.MethodPut, "/api/pipelines/one-stage", invalid)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid update = %d %s", rec.Code, rec.Body.String())
 	}
 	stored, err := srv.pipelineTemplates.Read("one-stage")
-	if err != nil || stored.Template.Stages[0].Role != "implementer" {
+	if err != nil || stored.Template.OrchestratorRole != "implementer" {
 		t.Fatalf("invalid update changed template: %+v err=%v", stored, err)
 	}
 	rec = doRequest(t, handler, http.MethodDelete, "/api/pipelines/one-stage", nil)
@@ -245,7 +241,7 @@ func TestPipelineStartRequiresSharedWorkspaceAcknowledgement(t *testing.T) {
 	}
 	request := startPipelineRequest{StartRequest: pipeline.StartRequest{
 		RequestID: "request-shared", TemplateID: "one-stage", Project: "shared", Goal: "Do it",
-		Inputs: map[string]string{}, Assignments: map[string]pipeline.RuntimeAssignment{"work": {Backend: "claude", Model: "sonnet"}},
+		Inputs: map[string]string{}, Orchestrator: pipeline.RuntimeAssignment{Backend: "claude", Model: "sonnet"}, DedicatedAssignments: map[string]pipeline.RuntimeAssignment{},
 	}}
 	rec := doRequest(t, srv.routes(), http.MethodPost, "/api/pipeline-runs", request)
 	if rec.Code != http.StatusConflict {
@@ -275,7 +271,7 @@ func TestOrdinaryStageAgentStopPausesPipelineRun(t *testing.T) {
 	handler := srv.routes()
 	rec := doRequest(t, handler, http.MethodPost, "/api/pipeline-runs", startPipelineRequest{StartRequest: pipeline.StartRequest{
 		RequestID: "request-stage-stop", TemplateID: "one-stage", Project: "pipeline-stop", Goal: "Do it",
-		Inputs: map[string]string{}, Assignments: map[string]pipeline.RuntimeAssignment{"work": {Backend: "claude", Model: "sonnet"}},
+		Inputs: map[string]string{}, Orchestrator: pipeline.RuntimeAssignment{Backend: "claude", Model: "sonnet"}, DedicatedAssignments: map[string]pipeline.RuntimeAssignment{},
 	}})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("start run = %d %s", rec.Code, rec.Body.String())
@@ -286,9 +282,19 @@ func TestOrdinaryStageAgentStopPausesPipelineRun(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &started); err != nil {
 		t.Fatal(err)
 	}
-	agentID := started.Run.Run.CurrentAgentID
+	var agentID string
+	startDeadline := time.Now().Add(3 * time.Second)
+	for agentID == "" && time.Now().Before(startDeadline) {
+		stages, err := srv.stateStore.ListPipelineStageTasks(started.Run.Run.RunID)
+		if err == nil && len(stages) == 1 {
+			agentID = stages[0].StandingAgentID
+		}
+		if agentID == "" {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	if agentID == "" || !srv.registry.Owns(agentID) {
-		t.Fatalf("started run has no live stage agent: %+v", started.Run.Run)
+		t.Fatalf("started run has no live stage task owner: %+v", started.Run.Run)
 	}
 
 	rec = doRequest(t, handler, http.MethodPost, "/api/sessions/"+agentID+"/stop", nil)
@@ -303,7 +309,7 @@ func TestOrdinaryStageAgentStopPausesPipelineRun(t *testing.T) {
 			t.Fatal(err)
 		}
 		if detail.Run.State == "paused" {
-			if detail.Run.AttentionReason != "agent_stopped" || detail.Run.PendingAction != "" {
+			if detail.Run.AttentionReason != "interrupted" || detail.Run.PendingAction != "" {
 				t.Fatalf("paused run = %+v", detail.Run)
 			}
 			if _, err := srv.pipelineMgr.Retry(t.Context(), detail.Run.RunID, detail.Run.Revision); err != nil {
@@ -404,7 +410,7 @@ VALUES (?, 'my-app', ?, '', 'agent', 'finished', 'agent', ?, 'g1', ?, 'success',
 func TestPipelineRunsAddFrozenTitleAndExactTotalHeader(t *testing.T) {
 	srv := testServer(t, true)
 	now := time.Now().UTC()
-	snapshot, err := json.Marshal(pipeline.Template{Version: 1, Stages: []pipeline.Stage{{ID: "work", Title: "Frozen work"}}})
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "Frozen", OrchestratorRole: "implementer", Stages: []pipeline.Stage{{ID: "work", Title: "Frozen work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}}}})
 	if err != nil {
 		t.Fatal(err)
 	}

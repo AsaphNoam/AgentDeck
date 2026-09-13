@@ -549,14 +549,14 @@ func TestAgentCancelAuthorityIsTheRecordedCreator(t *testing.T) {
 	// A peer cannot cancel it, and the refusal says nothing about its existence.
 	_, err = srv.CancelAgentTask(mine.TaskID, "a_someone_else")
 	var toolErr *messaging.ToolError
-	if !errors.As(err, &toolErr) || toolErr.Code != "not_creator" {
-		t.Fatalf("peer cancel = %v, want not_creator", err)
+	if !errors.As(err, &toolErr) || toolErr.Code != "task_not_found" {
+		t.Fatalf("peer cancel = %v, want task_not_found", err)
 	}
 	// Neither can an agent cancel a person's work.
 	theirs := createTaskHTTP(t, ts, launchTaskBody("person's"))
 	if _, err := srv.CancelAgentTask(theirs.TaskID, creator); !errors.As(err, &toolErr) ||
-		toolErr.Code != "not_creator" {
-		t.Fatalf("cancelling a person's task = %v, want not_creator", err)
+		toolErr.Code != "task_not_found" {
+		t.Fatalf("cancelling a person's task = %v, want task_not_found", err)
 	}
 
 	// The stable id is the authority, so a new generation is not a new principal:
@@ -570,6 +570,54 @@ func TestAgentCancelAuthorityIsTheRecordedCreator(t *testing.T) {
 	}
 	if cancelled.State != state.TaskFinished || cancelled.Outcome != state.OutcomeCancelled {
 		t.Fatalf("cancelled = %s/%s", cancelled.State, cancelled.Outcome)
+	}
+}
+
+func TestAgentTaskControlUsesCreatorAuthorityAndBoundedList(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	creator := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	other := launchAndWaitIdle(t, ts, "reviewer", "tmpproj")
+	mine, err := srv.CreateAgentTask(messaging.AgentTaskRequest{
+		CreatorAgentID: creator, CreatorGeneration: srv.registry.Generation(creator),
+		Project: "tmpproj", DisplayName: "mine", Instruction: "do it", Role: "impl",
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentTask: %v", err)
+	}
+	if _, err := srv.CreateAgentTask(messaging.AgentTaskRequest{
+		CreatorAgentID: other, CreatorGeneration: srv.registry.Generation(other),
+		Project: "tmpproj", DisplayName: "theirs", Instruction: "do it", Role: "impl",
+	}); err != nil {
+		t.Fatalf("CreateAgentTask other: %v", err)
+	}
+	listed, err := srv.ListAgentTasks(creator, 1)
+	if err != nil || len(listed) != 1 || listed[0].TaskID != mine.TaskID {
+		t.Fatalf("ListAgentTasks = %+v, %v; want only the creator's bounded task", listed, err)
+	}
+	read, err := srv.ReadAgentTask(mine.TaskID, creator)
+	if err != nil || read.TaskID != mine.TaskID {
+		t.Fatalf("ReadAgentTask = %+v, %v", read, err)
+	}
+	_, unauthorizedErr := srv.ReadAgentTask(mine.TaskID, other)
+	_, unknownErr := srv.ReadAgentTask("tk_missing", other)
+	var unauthorized, unknown *messaging.ToolError
+	if !errors.As(unauthorizedErr, &unauthorized) || !errors.As(unknownErr, &unknown) ||
+		unauthorized.Code != unknown.Code || unauthorized.Message != unknown.Message {
+		t.Fatalf("unauthorized = %v, unknown = %v", unauthorizedErr, unknownErr)
+	}
+	rearmed, err := srv.RearmAgentTask(mine.TaskID, creator, []state.TaskArm{{
+		Kind: state.ArmSignal, SignalName: "reviewed",
+	}})
+	if err != nil || rearmed.State != state.TaskArmed || len(rearmed.Arms) != 1 {
+		t.Fatalf("RearmAgentTask = %+v, %v", rearmed, err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, attention_reason = ? WHERE task_id = ?`,
+		state.TaskInterrupted, "agent stopped", mine.TaskID); err != nil {
+		t.Fatalf("park task for retry: %v", err)
+	}
+	retried, err := srv.RetryAgentTask(mine.TaskID, creator)
+	if err != nil || retried.State != state.TaskReady {
+		t.Fatalf("RetryAgentTask = %+v, %v", retried, err)
 	}
 }
 

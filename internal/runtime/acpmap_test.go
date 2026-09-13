@@ -106,6 +106,27 @@ func TestContextUsageFromRealClaudeAdapterShapes(t *testing.T) {
 	}
 }
 
+func TestValidInlineReceiptRequiresRecognizedNonCancelledResult(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{"completed", `{"stopReason":"end_turn"}`, true},
+		{"token limit", `{"stopReason":"max_tokens"}`, true},
+		{"cancelled", `{"stopReason":"cancelled"}`, false},
+		{"missing reason", `{}`, false},
+		{"malformed", `{`, false},
+		{"unknown", `{"stopReason":"future_value"}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := validInlineReceipt(json.RawMessage(tc.raw)); got != tc.want {
+				t.Fatalf("validInlineReceipt(%s) = %v, want %v", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
 // commandsUpdateParams builds an available_commands_update session/update params
 // with a raw availableCommands array (TS-04.R24).
 func commandsUpdateParams(commandsJSON string) json.RawMessage {

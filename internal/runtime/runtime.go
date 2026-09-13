@@ -187,6 +187,11 @@ type Runtime interface {
 	// pending permission was actually interrupted. Does not stop the process.
 	Cancel(ctx context.Context, agentID string) (bool, error)
 
+	// CancelGuarded interrupts only the expected live launch generation and turn.
+	// A stale generation or turn is a false, nil no-op so task cleanup can never
+	// interrupt a later unrelated turn. Cancel remains the unguarded human path.
+	CancelGuarded(ctx context.Context, agentID, expectedGeneration, expectedTurn string) (bool, error)
+
 	// Stop terminates the process group, removes the running row from state.db,
 	// and sets the status row's state. Idempotent.
 	Stop(ctx context.Context, agentID string) error

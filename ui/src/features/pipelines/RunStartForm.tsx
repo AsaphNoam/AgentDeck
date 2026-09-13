@@ -10,14 +10,36 @@ import {
 import type {
   PipelineDiagnostic,
   PipelineProposal,
+  PipelineRuntimeAssignment,
   PipelineStartRequest,
   PipelineWorkspaceConflict,
 } from "../../schemas/pipeline";
+import type { Backend } from "../../schemas/backends";
 
 function requestID() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? `ui_${crypto.randomUUID()}`
     : `ui_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function RuntimeAssignment({ label, field, number = 1, value, backends, entries, onChange }: {
+  label: string;
+  field: string;
+  number?: number;
+  value: PipelineRuntimeAssignment;
+  backends: Record<string, Backend> | undefined;
+  entries: [string, Backend][];
+  onChange: (value: PipelineRuntimeAssignment) => void;
+}) {
+  const backend = backends?.[value.backend];
+  return <div className="pipeline-runtime-row" data-field={field}>
+    <span className="pipeline-stage-number">{number}</span>
+    <div><strong>{label}</strong><small>Frozen for this run</small></div>
+    <label className="form-field"><span>Backend</span><select value={value.backend} onChange={(event) => { const backendID = event.target.value; const selected = backends?.[backendID]; const model = selected?.default_model || Object.keys(selected?.models ?? {})[0] || ""; onChange({ backend: backendID, model, effort: selected?.models[model]?.default_effort || "", fast: false }); }}><option value="">Select configured backend</option>{entries.map(([backendID, item]) => <option key={backendID} value={backendID}>{item.name} ({backendID})</option>)}</select></label>
+    <label className="form-field"><span>Model</span><select value={value.model} onChange={(event) => { const model = backend?.models[event.target.value]; onChange({ ...value, model: event.target.value, effort: model?.default_effort || "", fast: false }); }}><option value="">Select configured model</option>{Object.entries(backend?.models ?? {}).map(([modelID, model]) => <option key={modelID} value={modelID}>{model.name} ({modelID})</option>)}</select></label>
+    {(backend?.models[value.model]?.efforts ?? []).length > 0 && <label className="form-field"><span>Effort</span><select value={value.effort} onChange={(event) => onChange({ ...value, effort: event.target.value })}>{(backend?.models[value.model]?.efforts ?? []).map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}
+    {backend?.models[value.model]?.fast && <label className="form-field"><span>Speed</span><span><input type="checkbox" checked={value.fast} onChange={(event) => onChange({ ...value, fast: event.target.checked })} /> Fast mode</span></label>}
+  </div>;
 }
 
 export function RunStartForm({
@@ -41,7 +63,8 @@ export function RunStartForm({
   const [project, setProject] = useState("");
   const [goal, setGoal] = useState("");
   const [inputs, setInputs] = useState<Record<string, string>>({});
-  const [assignments, setAssignments] = useState<PipelineStartRequest["assignments"]>({});
+  const [orchestrator, setOrchestrator] = useState<PipelineStartRequest["orchestrator"]>({ backend: "", model: "", effort: "", fast: false });
+  const [dedicatedAssignments, setDedicatedAssignments] = useState<PipelineStartRequest["dedicated_assignments"]>({});
   const [proposal, setProposal] = useState<typeof proposalSeed>();
   const [pendingRequest, setPendingRequest] = useState<PipelineStartRequest | null>(null);
   const [conflicts, setConflicts] = useState<PipelineWorkspaceConflict[]>([]);
@@ -67,7 +90,8 @@ export function RunStartForm({
     setProject(payload.project);
     setGoal(payload.goal);
     setInputs({ ...payload.inputs });
-    setAssignments(structuredClone(payload.assignments));
+    setOrchestrator(structuredClone(payload.orchestrator));
+    setDedicatedAssignments(structuredClone(payload.dedicated_assignments));
     setProposal(proposalSeed);
     setPendingRequest(null);
     setConflicts([]);
@@ -97,7 +121,13 @@ export function RunStartForm({
   useEffect(() => {
     if (!template || proposal) return;
     setInputs((current) => Object.fromEntries(template.inputs.map((input) => [input.name, current[input.name] ?? ""])));
-    setAssignments((current) => Object.fromEntries(template.stages.map((stage) => {
+    setOrchestrator((current) => {
+      const backendID = current.backend || defaultBackend;
+      const backend = backends.data?.backends[backendID];
+      const model = current.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
+      return { backend: backendID, model, effort: current.effort || backend?.models[model]?.default_effort || "", fast: current.fast ?? false };
+    });
+    setDedicatedAssignments((current) => Object.fromEntries(template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => {
       const backendID = current[stage.id]?.backend || defaultBackend;
       const backend = backends.data?.backends[backendID];
       const model = current[stage.id]?.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
@@ -122,7 +152,8 @@ export function RunStartForm({
     project,
     goal,
     inputs,
-    assignments,
+    orchestrator,
+    dedicated_assignments: dedicatedAssignments,
   });
 
   const submit = (acknowledge: boolean) => {
@@ -146,7 +177,7 @@ export function RunStartForm({
           setDiagnostics(pipelineDiagnostics(reason));
           setError(shared.length === 0 ? (reason instanceof Error ? reason.message : String(reason)) : null);
           const fields = pipelineDiagnostics(reason).map((item) => item.field);
-          if (fields.some((field) => field.startsWith("assignments."))) setStep(1);
+          if (fields.some((field) => field.startsWith("orchestrator") || field.startsWith("dedicated_assignments."))) setStep(1);
           else if (fields.length > 0) setStep(0);
         },
       },
@@ -155,7 +186,7 @@ export function RunStartForm({
 
   const missingInputs = template?.inputs.filter((input) => input.required && !inputs[input.name]?.trim()) ?? [];
   const requiredMissing = template ? missingInputs.length > 0 : true;
-  const assignmentsMissing = template?.stages.some((stage) => !assignments[stage.id]?.backend || !assignments[stage.id]?.model) ?? true;
+  const assignmentsMissing = !orchestrator.backend || !orchestrator.model || (template?.stages.some((stage) => stage.coordination === "dedicated" && (!dedicatedAssignments[stage.id]?.backend || !dedicatedAssignments[stage.id]?.model)) ?? true);
   const projectAvailable = Boolean(project && projects.data?.[project] && !projects.data[project].archived);
   const cannotStart = !template || !projectAvailable || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
   const setupIncomplete = !template || !projectAvailable || !goal.trim() || requiredMissing;
@@ -170,7 +201,7 @@ export function RunStartForm({
         : missingInputs.length > 0
           ? `Fill the required named input${missingInputs.length === 1 ? "" : "s"}: ${missingInputs.map((input) => input.name).join(", ")}`
           : null;
-  const blocker = setupBlocker ?? (assignmentsMissing && (!stepMode || step > 0) ? "Assign a backend and model to every stage." : null);
+  const blocker = setupBlocker ?? (assignmentsMissing && (!stepMode || step > 0) ? "Assign a runtime to the standing owner and every dedicated coordinator." : null);
 
   return (
     <section ref={formRef} className={stepMode ? "pipeline-run-start pipeline-run-start-dialog" : "pipeline-panel pipeline-run-start"} data-ui="pipeline-start-dialog">
@@ -208,41 +239,17 @@ export function RunStartForm({
       </div>}</div>}
 
       {template && (!stepMode || step === 1) && <div className={stepMode ? "pipeline-start-pane" : "pipeline-subsection"} data-slot="content">
-        <h3>Stage runtimes</h3>
+        <h3>Runtime assignments</h3>
         <div className="pipeline-runtime-list">
-          {template.stages.map((stage, index) => {
-            const assignment = assignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false };
-            const backend = backends.data?.backends[assignment.backend];
-            return <div className="pipeline-runtime-row" data-field={`assignments.${stage.id}`} key={stage.id}>
-              <span className="pipeline-stage-number">{index + 1}</span>
-              <div><strong>{stage.title}</strong><small>{stage.role}</small></div>
-              <label className="form-field"><span>Backend</span><select value={assignment.backend} onChange={(event) => {
-                edit();
-                const backendID = event.target.value;
-                const selected = backends.data?.backends[backendID];
-                const model = selected?.default_model || Object.keys(selected?.models ?? {})[0] || "";
-                setAssignments((current) => ({ ...current, [stage.id]: { backend: backendID, model, effort: selected?.models[model]?.default_effort || "", fast: false } }));
-              }}>
-                <option value="">Select configured backend</option>
-                {backendEntries.map(([backendID, item]) => <option key={backendID} value={backendID}>{item.name} ({backendID})</option>)}
-              </select></label>
-              <label className="form-field"><span>Model</span><select value={assignment.model} onChange={(event) => { edit(); const model = backend?.models[event.target.value]; setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, model: event.target.value, effort: model?.default_effort || "", fast: false } })); }}>
-                <option value="">Select configured model</option>
-                {Object.entries(backend?.models ?? {}).map(([modelID, model]) => <option key={modelID} value={modelID}>{model.name} ({modelID})</option>)}
-              </select></label>
-              {(backend?.models[assignment.model]?.efforts ?? []).length > 0 && <label className="form-field"><span>Effort</span><select value={assignment.effort} onChange={(event) => { edit(); setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, effort: event.target.value } })); }}>
-                {(backend?.models[assignment.model]?.efforts ?? []).map((effort) => <option key={effort} value={effort}>{effort}</option>)}
-              </select></label>}
-              {backend?.models[assignment.model]?.fast && <label className="form-field"><span>Speed</span><span><input type="checkbox" checked={assignment.fast} onChange={(event) => { edit(); setAssignments((current) => ({ ...current, [stage.id]: { ...assignment, fast: event.target.checked } })); }} /> Fast mode</span></label>}
-            </div>;
-          })}
+          <RuntimeAssignment label={`Standing owner · ${template.orchestrator_role}`} field="orchestrator" value={orchestrator} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setOrchestrator(value); }} />
+          {template.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => <RuntimeAssignment key={stage.id} label={`${stage.title} · coordinator ${stage.dedicated_role}`} field={`dedicated_assignments.${stage.id}`} number={index + 2} value={dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false }} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setDedicatedAssignments((current) => ({ ...current, [stage.id]: value })); }} />)}
         </div>
       </div>}
 
       {stepMode && step === 2 && <div className="pipeline-start-pane pipeline-start-review" data-slot="content">
         <div className="pipeline-review-hero"><p className="pipeline-eyebrow">Ready to launch</p><h3>{displayName || template?.title || "Untitled run"}</h3><p>{goal}</p></div>
         <dl className="pipeline-review-facts"><div><dt>Template</dt><dd>{template?.title || templateID}</dd></div><div><dt>Project</dt><dd>{projects.data?.[project]?.title || project}</dd></div><div><dt>Stages</dt><dd>{template?.stages.length ?? 0}</dd></div><div><dt>Named inputs</dt><dd>{Object.values(inputs).filter((value) => value.trim()).length}</dd></div></dl>
-        <ol className="pipeline-review-runtimes">{template?.stages.map((stage, index) => { const runtime = assignments[stage.id]; return <li key={stage.id}><span>{index + 1}</span><div><strong>{stage.title}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ")}</small></div></li>; })}</ol>
+        <ol className="pipeline-review-runtimes"><li><span>1</span><div><strong>Standing owner · {template?.orchestrator_role}</strong><small>{[orchestrator.backend, orchestrator.model, orchestrator.effort].filter(Boolean).join(" · ")}</small></div></li>{template?.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => { const runtime = dedicatedAssignments[stage.id]; return <li key={stage.id}><span>{index + 2}</span><div><strong>{stage.title} coordinator · {stage.dedicated_role}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ")}</small></div></li>; })}</ol>
       </div>}
 
       {proposal && (!stepMode || step === 2) && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}

@@ -25,14 +25,27 @@ func TestRenderAssignmentPreservesReportingProtocolAtMaximumInput(t *testing.T) 
 		t.Fatalf("assignment has %d runes, max %d", utf8.RuneCountInString(text), maxAssignmentRunes)
 	}
 	for _, required := range []string{
-		"call report_pipeline_stage_result",
+		"call report_task_result",
 		"Your part ends only when AgentDeck accepts the result",
-		"A refused call records nothing",
+		"sole authority for the stage result",
 		"outcome success, failure, or blocked",
 		"Declared outputs (use these local names):\n- implementation",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("assignment lost required protocol %q", required)
 		}
+	}
+}
+
+func TestRenderAssignmentUsesVersionTwoObjective(t *testing.T) {
+	run := state.PipelineRunRecord{RunID: "pr_1", DisplayName: "Release", Goal: "ship it"}
+	stage := Stage{ID: "build", Title: "Build", Objective: "Implement the accepted design", Instruction: "obsolete legacy instruction"}
+
+	prompt, _ := renderAssignment(run, Template{Version: 2}, stage, nil, nil, "")
+	if !strings.Contains(prompt, "Responsibility:\nImplement the accepted design") {
+		t.Fatalf("assignment does not contain v2 objective: %s", prompt)
+	}
+	if strings.Contains(prompt, "obsolete legacy instruction") {
+		t.Fatalf("assignment contains legacy instruction: %s", prompt)
 	}
 }

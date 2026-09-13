@@ -17,6 +17,7 @@ const (
 	TaskReady            = "ready"
 	TaskStarting         = "starting"
 	TaskRunning          = "running"
+	TaskWaiting          = "waiting"
 	TaskInterrupted      = "interrupted"
 	TaskFinished         = "finished"
 	TaskDependencyFailed = "dependency_failed"
@@ -78,6 +79,10 @@ var ErrTaskAttachmentReference = errors.New("state: unknown context reference")
 // Registrations are immutable (TS-10.R8).
 var ErrWorkResultRecorded = errors.New("state: work result already registered")
 
+// ErrTaskRunClosed refuses new descendant work after its inherited pipeline
+// stage/run closure fence has committed.
+var ErrTaskRunClosed = errors.New("state: governing pipeline run or stage is closed")
+
 // Task is one durable unit of dependent work (FS-16.R1).
 type Task struct {
 	TaskID      string `json:"task_id"`
@@ -111,8 +116,15 @@ type Task struct {
 	AssignedGeneration string `json:"assigned_generation,omitempty"`
 	RuntimeClaim       string `json:"runtime_claim,omitempty"`
 	PendingRelease     bool   `json:"pending_release"`
-	StartAttemptID     string `json:"start_attempt_id,omitempty"`
-	StartAttemptCount  int    `json:"start_attempt_count"`
+	// ExecutionHandle identifies one confirmed execution attempt. It is not an
+	// authority token: task ownership still comes from the bound MCP session.
+	ExecutionHandle     string `json:"execution_handle,omitempty"`
+	ContinuationPending bool   `json:"continuation_pending"`
+	PendingYield        bool   `json:"pending_yield"`
+	WaitVersion         int    `json:"wait_version"`
+	ResumeNeeded        bool   `json:"resume_needed"`
+	StartAttemptID      string `json:"start_attempt_id,omitempty"`
+	StartAttemptCount   int    `json:"start_attempt_count"`
 
 	Revision int `json:"revision"`
 
@@ -123,7 +135,9 @@ type Task struct {
 	StartedAt      *time.Time `json:"started_at,omitempty"`
 	FinishedAt     *time.Time `json:"finished_at,omitempty"`
 
-	Arms []TaskArm `json:"arms"`
+	Arms    []TaskArm         `json:"arms"`
+	Lineage TaskLineage       `json:"lineage,omitempty"`
+	Outputs map[string]string `json:"outputs,omitempty"`
 
 	// RetryEligible projects the same eligibility RetryTask enforces (FS-16.R23,
 	// R25) onto the task JSON, computed by ReadTask/ListTasks once Arms are
@@ -310,6 +324,34 @@ func (s *Store) CreateTaskWithAttachments(task Task, attachments []TaskAttachmen
 	}
 	defer tx.Rollback()
 
+	var inherited *TaskLineage
+	if task.CreatedByKind == "agent" && task.CreatedByAgentID != "" {
+		var lineage TaskLineage
+		var created string
+		err := tx.QueryRow(`
+SELECT l.task_id, l.parent_task_id, l.pipeline_run_id, l.pipeline_stage_id, l.creation_attempt_id, l.created_at
+FROM tasks parent JOIN task_lineage l ON l.task_id = parent.task_id
+WHERE parent.assigned_agent_id = ? AND parent.assigned_generation = ?
+  AND parent.state IN (?, ?)
+ORDER BY parent.updated_at DESC LIMIT 1`, task.CreatedByAgentID, task.CreatedByGeneration, TaskRunning, TaskWaiting).
+			Scan(&lineage.TaskID, &lineage.ParentTaskID, &lineage.PipelineRunID, &lineage.PipelineStageID, &lineage.CreationAttemptID, &created)
+		if err == nil {
+			if lineage.CreatedAt, err = parseTime(created); err != nil {
+				return Task{}, err
+			}
+			var runState, stageState string
+			if err := tx.QueryRow(`SELECT r.state, p.state FROM pipeline_runs r JOIN pipeline_stage_tasks p ON p.run_id = r.run_id AND p.stage_id = ? AND p.attempt_number = CAST(? AS INTEGER) WHERE r.run_id = ?`, lineage.PipelineStageID, lineage.CreationAttemptID, lineage.PipelineRunID).Scan(&runState, &stageState); err != nil {
+				return Task{}, ErrTaskRunClosed
+			}
+			if runState == "stopping" || runState == "stopped" || runState == "completed" || stageState != "open" {
+				return Task{}, ErrTaskRunClosed
+			}
+			inherited = &lineage
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return Task{}, fmt.Errorf("state: read creator task lineage: %w", err)
+		}
+	}
+
 	now := timeNow()
 	task.CreatedAt, task.UpdatedAt = now, now
 	task.Revision = 1
@@ -348,6 +390,11 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	}
 	if err := insertTaskAttachments(tx, task.TaskID, attachments, creatorAgentID, now); err != nil {
 		return Task{}, err
+	}
+	if inherited != nil {
+		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, task.TaskID, inherited.TaskID, inherited.PipelineRunID, inherited.PipelineStageID, inherited.CreationAttemptID, formatTime(now)); err != nil {
+			return Task{}, fmt.Errorf("state: insert inherited task lineage: %w", err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return Task{}, fmt.Errorf("state: commit create task: %w", err)
@@ -566,7 +613,22 @@ func (s *Store) ReadTask(taskID string) (Task, error) {
 		return Task{}, err
 	}
 	task.Arms = arms
+	return s.hydrateTask(task)
+}
+
+func (s *Store) hydrateTask(task Task) (Task, error) {
 	task.RetryEligible = retryEligible(task)
+	outputs, err := s.ReadTaskResultOutputs(task.TaskID)
+	if err != nil {
+		return Task{}, err
+	}
+	task.Outputs = outputs
+	lineage, err := s.ReadTaskLineage(task.TaskID)
+	if err == nil {
+		task.Lineage = lineage
+	} else if !errors.Is(err, ErrNotFound) {
+		return Task{}, err
+	}
 	return task, nil
 }
 
@@ -594,7 +656,69 @@ func (s *Store) ListTasks(project string) ([]Task, error) {
 			return nil, err
 		}
 		tasks[i].Arms = arms
-		tasks[i].RetryEligible = retryEligible(tasks[i])
+		tasks[i], err = s.hydrateTask(tasks[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tasks, nil
+}
+
+// ListTasksForPipelineRun follows durable lineage rather than creator identity,
+// so a reused orchestrator cannot pull unrelated work into run cleanup.
+func (s *Store) ListTasksForPipelineRun(runID string) ([]Task, error) {
+	rows, err := s.db.Query(taskSelect+` WHERE EXISTS (
+SELECT 1 FROM task_lineage l WHERE l.task_id = tasks.task_id AND l.pipeline_run_id = ?
+) ORDER BY created_at, task_id`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("state: list pipeline run tasks: %w", err)
+	}
+	defer rows.Close()
+	out := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate pipeline run tasks: %w", err)
+	}
+	return out, nil
+}
+
+// ListTasksCreatedBy returns at most limit tasks created by one agent in one
+// project, newest first. It is the bounded control-plane query for an agent's
+// own work; ListTasks remains the person-facing project view.
+func (s *Store) ListTasksCreatedBy(project, agentID string, limit int) ([]Task, error) {
+	rows, err := s.db.Query(taskSelect+` WHERE project = ? AND created_by_kind = ? AND created_by_agent_id = ?
+ORDER BY created_at DESC, task_id LIMIT ?`, project, "agent", agentID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list creator tasks: %w", err)
+	}
+	defer rows.Close()
+	tasks := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate creator tasks: %w", err)
+	}
+	for i := range tasks {
+		arms, err := s.readTaskArms(tasks[i].TaskID)
+		if err != nil {
+			return nil, err
+		}
+		tasks[i].Arms = arms
+		tasks[i], err = s.hydrateTask(tasks[i])
+		if err != nil {
+			return nil, err
+		}
 	}
 	return tasks, nil
 }
@@ -635,21 +759,23 @@ const taskSelect = `
 SELECT task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend,
   model, effort, fast, state, outcome, outcome_source, outcome_summary, outcome_details, attention_reason,
   created_by_kind, created_by_agent_id, created_by_generation, assigned_agent_id,
-  assigned_generation, runtime_claim, pending_release, start_attempt_id, start_attempt_count,
+  assigned_generation, runtime_claim, pending_release, execution_handle, continuation_pending,
+  pending_yield, wait_version, resume_needed, start_attempt_id, start_attempt_count,
   revision, ready_at, start_claimed_at, created_at, updated_at, started_at, finished_at
 FROM tasks`
 
 func scanTask(row rowScanner) (Task, error) {
 	var t Task
 	var assignedAgentID sql.NullString
-	var pendingRelease int
+	var pendingRelease, continuationPending, pendingYield, resumeNeeded int
 	var readyAt, startClaimedAt, startedAt, finishedAt sql.NullString
 	var createdAt, updatedAt string
 	if err := row.Scan(&t.TaskID, &t.Project, &t.DisplayName, &t.Instruction, &t.TargetKind,
 		&t.TargetAgentID, &t.Role, &t.Backend, &t.Model, &t.Effort, &t.Fast, &t.State, &t.Outcome, &t.OutcomeSource,
 		&t.OutcomeSummary, &t.OutcomeDetails, &t.AttentionReason, &t.CreatedByKind,
 		&t.CreatedByAgentID, &t.CreatedByGeneration, &assignedAgentID, &t.AssignedGeneration,
-		&t.RuntimeClaim, &pendingRelease, &t.StartAttemptID, &t.StartAttemptCount, &t.Revision,
+		&t.RuntimeClaim, &pendingRelease, &t.ExecutionHandle, &continuationPending, &pendingYield,
+		&t.WaitVersion, &resumeNeeded, &t.StartAttemptID, &t.StartAttemptCount, &t.Revision,
 		&readyAt, &startClaimedAt, &createdAt, &updatedAt, &startedAt, &finishedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Task{}, err
@@ -658,6 +784,9 @@ func scanTask(row rowScanner) (Task, error) {
 	}
 	t.AssignedAgentID = assignedAgentID.String
 	t.PendingRelease = pendingRelease != 0
+	t.ContinuationPending = continuationPending != 0
+	t.PendingYield = pendingYield != 0
+	t.ResumeNeeded = resumeNeeded != 0
 
 	var err error
 	if t.CreatedAt, err = parseTime(createdAt); err != nil {
@@ -1106,10 +1235,37 @@ WHERE task_id = ? AND state = ?
 // (TS-10.R4, FS-16.R6). The attempt id is required, so a start abandoned and
 // re-admitted cannot be confirmed by its predecessor's late success.
 func (s *Store) ConfirmTaskStart(taskID, attemptID string) (Task, bool, error) {
-	return s.settleTaskStart(taskID, attemptID, `
-UPDATE tasks SET state = ?, started_at = ?, revision = revision + 1, updated_at = ?
+	tx, err := s.db.Begin()
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: begin confirm task start: %w", err)
+	}
+	defer tx.Rollback()
+	now := formatTime(timeNow())
+	res, err := tx.Exec(`
+UPDATE tasks SET state = ?, started_at = ?, execution_handle = ?,
+  continuation_pending = 0, resume_needed = 0, revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ? AND start_attempt_id = ?`,
-		[]any{TaskRunning, formatTime(timeNow())}, "confirm task start")
+		TaskRunning, now, attemptID, now, taskID, TaskStarting, attemptID)
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: confirm task start: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return Task{}, false, fmt.Errorf("state: confirm task start rows: %w", err)
+	}
+	if n == 0 {
+		return Task{}, false, nil
+	}
+	// A new continuation has observed its saved changes. Do not let a watch
+	// from the prior execution wake this one again (TS-10.R29/R33).
+	if _, err := tx.Exec(`DELETE FROM task_waits WHERE waiting_task_id = ?`, taskID); err != nil {
+		return Task{}, false, fmt.Errorf("state: settle task waits: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return Task{}, false, fmt.Errorf("state: commit confirm task start: %w", err)
+	}
+	task, err := s.ReadTask(taskID)
+	return task, err == nil, err
 }
 
 // SetTaskStartGeneration replaces a stopped agent's provisional attempt id
@@ -1191,12 +1347,12 @@ func (s *Store) settleTaskStart(taskID, attemptID, stmt string, leading []any, w
 	return task, err == nil, err
 }
 
-// AssignedTask returns the one task this agent is executing — starting or
-// running — or ErrNotFound. The partial unique index guarantees there is at most
+// AssignedTask returns the one task this agent owns — starting, running, or
+// waiting — or ErrNotFound. The partial unique index guarantees there is at most
 // one, so this needs no ordering or tie-break (FS-16.R2, TS-10.R18).
 func (s *Store) AssignedTask(agentID string) (Task, error) {
 	task, err := scanTask(s.db.QueryRow(taskSelect+`
-WHERE assigned_agent_id = ? AND state IN (?, ?)`, agentID, TaskStarting, TaskRunning))
+WHERE assigned_agent_id = ? AND state IN (?, ?, ?)`, agentID, TaskStarting, TaskRunning, TaskWaiting))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, ErrNotFound
 	}
@@ -1252,6 +1408,38 @@ type TaskResult struct {
 	Outcome string
 	Summary string
 	Details string
+	// Outputs are immutable named values accepted with this result. They are
+	// intentionally task-owned: pipeline stages consume the same result record
+	// as ordinary dependent work rather than maintaining a second report store.
+	Outputs map[string]string
+}
+
+// TaskLineage is server-derived provenance retained independently of erasable
+// task detail. Empty fields mean ordinary, non-pipeline work.
+type TaskLineage struct {
+	TaskID            string    `json:"task_id"`
+	ParentTaskID      string    `json:"parent_task_id,omitempty"`
+	PipelineRunID     string    `json:"pipeline_run_id,omitempty"`
+	PipelineStageID   string    `json:"pipeline_stage_id,omitempty"`
+	CreationAttemptID string    `json:"creation_attempt_id,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+// PipelineStageTask is the authoritative association between one ordered stage
+// attempt and its standing-owner task. It is not inferred from an agent id.
+type PipelineStageTask struct {
+	RunID             string     `json:"run_id"`
+	StageIndex        int        `json:"stage_index"`
+	AttemptNumber     int        `json:"attempt_number"`
+	StageID           string     `json:"stage_id"`
+	TaskID            string     `json:"task_id"`
+	StandingAgentID   string     `json:"standing_agent_id,omitempty"`
+	CoordinatorTaskID string     `json:"coordinator_task_id,omitempty"`
+	AssignmentDigest  string     `json:"assignment_digest,omitempty"`
+	State             string     `json:"state"`
+	ClosureRevision   int64      `json:"closure_revision"`
+	CreatedAt         time.Time  `json:"created_at"`
+	ClosedAt          *time.Time `json:"closed_at,omitempty"`
 }
 
 // RecordAgentTaskResult commits the assignee's result and a durable intent to
@@ -1274,9 +1462,10 @@ func (s *Store) RecordAgentTaskResult(taskID, agentID, generation string, result
 	defer tx.Rollback()
 
 	var taskState, assignedAgent, assignedGeneration string
+	var pendingYield int
 	err = tx.QueryRow(`
-SELECT state, COALESCE(assigned_agent_id, ''), assigned_generation
-FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assignedGeneration)
+SELECT state, COALESCE(assigned_agent_id, ''), assigned_generation, pending_yield
+FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assignedGeneration, &pendingYield)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, ErrNotFound
 	}
@@ -1289,7 +1478,7 @@ FROM tasks WHERE task_id = ?`, taskID).Scan(&taskState, &assignedAgent, &assigne
 	// A result is accepted from the assignment's own states only. A finished task
 	// is immutable, and an interrupted one has no live assignee to report it
 	// (FS-16.R3, R22).
-	if taskState != TaskStarting && taskState != TaskRunning {
+	if pendingYield != 0 || (taskState != TaskStarting && taskState != TaskRunning) {
 		return Task{}, ErrTaskNotReportable
 	}
 	now := timeNow()
@@ -1307,6 +1496,9 @@ WHERE task_id = ? AND state = ?`,
 		SourceKind: SourceTask, SourceID: taskID, Outcome: result.Outcome,
 		Summary: result.Summary,
 	}, now); err != nil {
+		return Task{}, err
+	}
+	if err := insertTaskResultOutputs(tx, taskID, result.Outputs); err != nil {
 		return Task{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -1356,14 +1548,14 @@ WHERE task_id = ? AND pending_release = 1`, formatTime(timeNow()), taskID); err 
 // result is untouched, which is what makes the stop that follows a report safe.
 func (s *Store) InterruptTaskForAgent(agentID, generation, reason string) (Task, bool, error) {
 	return s.interrupt(reason, `
-WHERE assigned_agent_id = ? AND assigned_generation = ? AND state IN (?, ?)`,
+WHERE assigned_agent_id = ? AND assigned_generation = ? AND pending_yield = 0 AND state IN (?, ?)`,
 		[]any{agentID, generation, TaskStarting, TaskRunning})
 }
 
 // InterruptTask interrupts one task by id, for a recovery sweep that already
 // knows which rows it is resolving (TS-10.R15).
 func (s *Store) InterruptTask(taskID, reason string) (Task, bool, error) {
-	return s.interrupt(reason, `WHERE task_id = ? AND state IN (?, ?)`,
+	return s.interrupt(reason, `WHERE task_id = ? AND pending_yield = 0 AND state IN (?, ?)`,
 		[]any{taskID, TaskStarting, TaskRunning})
 }
 
@@ -1377,10 +1569,11 @@ func (s *Store) interrupt(reason, where string, args []any) (Task, bool, error) 
 		return Task{}, false, fmt.Errorf("state: find task to interrupt: %w", err)
 	}
 	res, err := s.db.Exec(`
-UPDATE tasks SET state = ?, attention_reason = ?, assigned_generation = '',
+UPDATE tasks SET state = ?, attention_reason = ?, assigned_generation = '', pending_yield = 0,
+  continuation_pending = 0, resume_needed = 0,
   runtime_claim = '', start_attempt_id = '', start_claimed_at = NULL,
   revision = revision + 1, updated_at = ?
-WHERE task_id = ? AND state IN (?, ?)`,
+WHERE task_id = ? AND pending_yield = 0 AND state IN (?, ?)`,
 		TaskInterrupted, reason, formatTime(timeNow()), taskID, TaskStarting, TaskRunning)
 	if err != nil {
 		return Task{}, false, fmt.Errorf("state: interrupt task: %w", err)
@@ -1497,7 +1690,7 @@ var ErrTaskNotRearmable = errors.New("state: task arms cannot be replaced in thi
 // TS-10.R19).
 func (s *Store) CancelTask(taskID string) (Task, error) {
 	return s.finishTask(taskID, TaskResult{Outcome: OutcomeCancelled, Summary: "cancelled"}, "",
-		[]string{TaskArmed, TaskReady, TaskStarting, TaskRunning, TaskInterrupted, TaskDependencyFailed})
+		[]string{TaskArmed, TaskReady, TaskStarting, TaskRunning, TaskWaiting, TaskInterrupted, TaskDependencyFailed})
 }
 
 // RecordPersonTaskResult is the only non-cancelling way to resolve work whose
@@ -1541,7 +1734,8 @@ func (s *Store) finishTask(taskID string, result TaskResult, source string, from
 	}
 	if _, err := tx.Exec(`
 UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?,
-  outcome_details = ?, attention_reason = '', pending_release = ?, finished_at = ?,
+  outcome_details = ?, attention_reason = '', pending_release = ?, pending_yield = 0,
+  continuation_pending = 0, resume_needed = 0, finished_at = ?,
   revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ?`,
 		TaskFinished, result.Outcome, source, result.Summary, result.Details,
@@ -1553,10 +1747,50 @@ WHERE task_id = ? AND state = ?`,
 	}, now); err != nil && !errors.Is(err, ErrWorkResultRecorded) {
 		return Task{}, err
 	}
+	if err := insertTaskResultOutputs(tx, taskID, result.Outputs); err != nil {
+		return Task{}, err
+	}
+	if _, err := tx.Exec(`DELETE FROM task_waits WHERE waiting_task_id = ?`, taskID); err != nil {
+		return Task{}, fmt.Errorf("state: clear cancelled task waits: %w", err)
+	}
 	if err := tx.Commit(); err != nil {
 		return Task{}, fmt.Errorf("state: commit finish task: %w", err)
 	}
 	return s.ReadTask(taskID)
+}
+
+func insertTaskResultOutputs(tx *sql.Tx, taskID string, outputs map[string]string) error {
+	for name, value := range outputs {
+		if strings.TrimSpace(name) == "" {
+			return fmt.Errorf("state: task result output name is required")
+		}
+		if _, err := tx.Exec(`INSERT INTO task_result_outputs(task_id, name, value) VALUES (?, ?, ?)`, taskID, name, value); err != nil {
+			return fmt.Errorf("state: insert task result output: %w", err)
+		}
+	}
+	return nil
+}
+
+// ReadTaskResultOutputs returns immutable accepted output values. A task with
+// no declared outputs returns an empty map, never nil.
+func (s *Store) ReadTaskResultOutputs(taskID string) (map[string]string, error) {
+	rows, err := s.db.Query(`SELECT name, value FROM task_result_outputs WHERE task_id = ? ORDER BY name`, taskID)
+	if err != nil {
+		return nil, fmt.Errorf("state: read task result outputs: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var name, value string
+		if err := rows.Scan(&name, &value); err != nil {
+			return nil, fmt.Errorf("state: scan task result output: %w", err)
+		}
+		out[name] = value
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate task result outputs: %w", err)
+	}
+	return out, nil
 }
 
 // retryEligible reports whether a task's current state and arms qualify for
@@ -1694,8 +1928,8 @@ func (s *Store) DeleteTask(taskID string) ([]Task, error) {
 	}
 	res, err := tx.Exec(`
 DELETE FROM tasks
-WHERE task_id = ? AND state NOT IN (?, ?) AND pending_release = 0`,
-		taskID, TaskStarting, TaskRunning)
+WHERE task_id = ? AND state NOT IN (?, ?, ?) AND pending_release = 0 AND pending_yield = 0`,
+		taskID, TaskStarting, TaskRunning, TaskWaiting)
 	if err != nil {
 		return nil, fmt.Errorf("state: delete task: %w", err)
 	}

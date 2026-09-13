@@ -20,21 +20,20 @@ export interface TemplateEditorSeed {
   proposal?: Extract<PipelineProposal, { kind: "save_template" }>;
 }
 
-const blankTransition = () => ({ stage: "", final: "success", approval: "automatic" as const });
-
 const blankTemplate = (): PipelineTemplate => ({
-  version: 1,
+  version: 2,
   title: "",
+  orchestrator_role: "implementer",
   inputs: [],
   stages: [{
     id: "work",
     title: "Work",
-    role: "implementer",
-    instruction: "",
+    objective: "",
     inputs: [],
     outputs: [],
-    max_visits: 1,
-    transitions: { success: blankTransition(), failure: { ...blankTransition(), final: "failure" } },
+    coordination: "standing",
+    dedicated_role: "",
+    approval_after_success: false,
   }],
 });
 
@@ -156,7 +155,7 @@ export function TemplateEditor({
       <Link className="pipeline-back-link" to="/pipelines/templates">← All templates</Link>
       <div className="pipeline-editor-heading">
         <div>
-          <p className="pipeline-eyebrow">Reusable definition · version 1</p>
+          <p className="pipeline-eyebrow">Reusable definition · version 2</p>
           <h2>{draft.title || (savedID ? id : "New template")}</h2>
           <p>Shape one stage at a time. Runtime choices remain outside the reusable definition.</p>
         </div>
@@ -175,6 +174,13 @@ export function TemplateEditor({
         <label className="form-field">
           <span>Title</span>
           <input value={draft.title} onChange={(event) => mutate((next) => { next.title = event.target.value; })} />
+        </label>
+        <label className="form-field">
+          <span>Standing orchestrator role</span>
+          <select value={draft.orchestrator_role} onChange={(event) => mutate((next) => { next.orchestrator_role = event.target.value; })}>
+            {Object.entries(roles.data ?? {}).map(([roleID, role]) => <option key={roleID} value={roleID}>{role.title} ({roleID})</option>)}
+            {!roles.data?.[draft.orchestrator_role] && <option value={draft.orchestrator_role}>{draft.orchestrator_role || "Select role"}</option>}
+          </select>
         </label>
       </div>
 
@@ -203,14 +209,14 @@ export function TemplateEditor({
           <button type="button" onClick={() => mutate((next) => next.stages.push({
             id: `stage-${next.stages.length + 1}`,
             title: "",
-            role: roles.data?.implementer ? "implementer" : Object.keys(roles.data ?? {})[0] ?? "implementer",
-            instruction: "",
+            objective: "",
             inputs: [],
             outputs: [],
-            max_visits: 1,
-            transitions: { success: blankTransition(), failure: { ...blankTransition(), final: "failure" } },
+            coordination: "standing",
+            dedicated_role: "",
+            approval_after_success: false,
           }))}>+</button></div>
-          <ol>{draft.stages.map((stage, stageIndex) => <li key={`nav-${stageIndex}`}><button type="button" className={selectedStage === stageIndex ? "pipeline-stage-nav-item pipeline-stage-nav-item-active" : "pipeline-stage-nav-item"} onClick={() => setSelectedStage(stageIndex)}><span>{String(stageIndex + 1).padStart(2, "0")}</span><span><strong>{stage.title || stage.id || "Untitled stage"}</strong><small>{stage.role || "No role"}</small></span>{diagnostics.some((item) => item.field.includes(`stages.${stageIndex}`) || item.field.includes(`stages[${stageIndex}]`)) && <em>!</em>}</button></li>)}</ol>
+          <ol>{draft.stages.map((stage, stageIndex) => <li key={`nav-${stageIndex}`}><button type="button" className={selectedStage === stageIndex ? "pipeline-stage-nav-item pipeline-stage-nav-item-active" : "pipeline-stage-nav-item"} onClick={() => setSelectedStage(stageIndex)}><span>{String(stageIndex + 1).padStart(2, "0")}</span><span><strong>{stage.title || stage.id || "Untitled stage"}</strong><small>{stage.coordination === "dedicated" ? `Dedicated · ${stage.dedicated_role || "role needed"}` : "Standing owner"}</small></span>{diagnostics.some((item) => item.field.includes(`stages.${stageIndex}`) || item.field.includes(`stages[${stageIndex}]`)) && <em>!</em>}</button></li>)}</ol>
         </aside>
         <div className="pipeline-stage-focus" data-slot="stage">
           {draft.stages.map((stage, stageIndex) => stageIndex === selectedStage && (
@@ -220,16 +226,13 @@ export function TemplateEditor({
                 <strong>{stage.title || stage.id || "Untitled stage"}</strong>
                 <button type="button" disabled={draft.stages.length === 1} onClick={() => { mutate((next) => { next.stages.splice(stageIndex, 1); }); setSelectedStage(Math.max(0, stageIndex - 1)); }}>Remove stage</button>
               </div>
-              <div className="pipeline-form-grid pipeline-form-grid-three">
+              <div className="pipeline-form-grid">
                 <label className="form-field"><span>Stage id</span><input value={stage.id} onChange={(event) => mutate((next) => { next.stages[stageIndex].id = event.target.value; })} /></label>
                 <label className="form-field"><span>Title</span><input value={stage.title} onChange={(event) => mutate((next) => { next.stages[stageIndex].title = event.target.value; })} /></label>
-                <label className="form-field"><span>Role</span><select value={stage.role} onChange={(event) => mutate((next) => { next.stages[stageIndex].role = event.target.value; })}>
-                  {Object.entries(roles.data ?? {}).map(([roleID, role]) => <option key={roleID} value={roleID}>{role.title} ({roleID})</option>)}
-                  {!roles.data?.[stage.role] && <option value={stage.role}>{stage.role || "Select role"}</option>}
-                </select></label>
               </div>
-              <label className="form-field"><span>Instruction</span><textarea rows={4} value={stage.instruction} onChange={(event) => mutate((next) => { next.stages[stageIndex].instruction = event.target.value; })} /></label>
-              <label className="form-field pipeline-small-field"><span>Maximum visits</span><input type="number" min={1} value={stage.max_visits} onChange={(event) => mutate((next) => { next.stages[stageIndex].max_visits = Number(event.target.value); })} /></label>
+              <label className="form-field"><span>Stage objective</span><textarea rows={4} value={stage.objective ?? ""} onChange={(event) => mutate((next) => { next.stages[stageIndex].objective = event.target.value; })} /></label>
+              <fieldset className="pipeline-coordination"><legend>Coordination</legend><label className="pipeline-check"><input type="radio" checked={stage.coordination === "standing"} onChange={() => mutate((next) => { next.stages[stageIndex].coordination = "standing"; next.stages[stageIndex].dedicated_role = ""; })} /> Standing owner</label><label className="pipeline-check"><input type="radio" checked={stage.coordination === "dedicated"} onChange={() => mutate((next) => { next.stages[stageIndex].coordination = "dedicated"; })} /> Dedicated coordinator</label>{stage.coordination === "dedicated" && <label className="form-field"><span>Coordinator role</span><select value={stage.dedicated_role} onChange={(event) => mutate((next) => { next.stages[stageIndex].dedicated_role = event.target.value; })}>{Object.entries(roles.data ?? {}).map(([roleID, role]) => <option key={roleID} value={roleID}>{role.title} ({roleID})</option>)}<option value="">Select role</option></select></label>}</fieldset>
+              <label className="pipeline-check"><input type="checkbox" checked={stage.approval_after_success} onChange={(event) => mutate((next) => { next.stages[stageIndex].approval_after_success = event.target.checked; })} /> Require approval after success</label>
 
               <StageBindings
                 kind="inputs"
@@ -243,40 +246,6 @@ export function TemplateEditor({
                 items={stage.outputs}
                 mutate={mutate}
               />
-              <div className="pipeline-transitions">
-                {(["success", "failure"] as const).map((outcome) => {
-                  const transition = stage.transitions[outcome];
-                  const destinationType = transition.stage ? "stage" : "final";
-                  return (
-                    <fieldset key={outcome}>
-                      <legend>{outcome} route</legend>
-                      <select aria-label={`${stage.id} ${outcome} destination type`} value={destinationType} onChange={(event) => mutate((next) => {
-                        next.stages[stageIndex].transitions[outcome] = event.target.value === "stage"
-                          ? { stage: next.stages[stageIndex].id, final: "", approval: transition.approval }
-                          : { stage: "", final: outcome, approval: transition.approval };
-                      })}>
-                        <option value="stage">Stage</option>
-                        <option value="final">Final outcome</option>
-                      </select>
-                      {destinationType === "stage" ? (
-                        <select aria-label={`${stage.id} ${outcome} stage`} value={transition.stage} onChange={(event) => mutate((next) => { next.stages[stageIndex].transitions[outcome].stage = event.target.value; })}>
-                          <option value="">Select stage</option>
-                          {draft.stages.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.title || candidate.id}</option>)}
-                        </select>
-                      ) : (
-                        <select aria-label={`${stage.id} ${outcome} final`} value={transition.final} onChange={(event) => mutate((next) => { next.stages[stageIndex].transitions[outcome].final = event.target.value; })}>
-                          <option value="success">Success</option>
-                          <option value="failure">Failure</option>
-                        </select>
-                      )}
-                      <select aria-label={`${stage.id} ${outcome} approval`} value={transition.approval} onChange={(event) => mutate((next) => { next.stages[stageIndex].transitions[outcome].approval = event.target.value as "automatic" | "required"; })}>
-                        <option value="automatic">Automatic</option>
-                        <option value="required">Approval required</option>
-                      </select>
-                    </fieldset>
-                  );
-                })}
-              </div>
             </article>
           ))}
         </div>

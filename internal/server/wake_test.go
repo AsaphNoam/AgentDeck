@@ -603,7 +603,7 @@ func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
 // FS-06.A11 / TS-04.R26 (INV §15) — a wake attempt claims the mail it wakes for
 // before spawning anything, so an adapter that completes its handshake and then
 // dies before the first check_messages nudge is not respawned by every sweep.
-func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
+func TestWakeAdapterDeathPreservesUnconfirmedMailWithoutReplay(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	stopped := launchThenStop(t, srv, ts)
 
@@ -617,14 +617,14 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 	srv.executePendingMailActivations(context.Background(), stopped)
 	waitRunning(t, srv, stopped, true)
 
-	// Mail remains independently unread; the attempted activation itself is
-	// removed after the provider handoff and cannot replay after a crash.
+	// Resuming the process is not confirmation that its inline prompt completed.
+	// A fast fake provider may already confirm it; otherwise it remains pending.
 	msgs, err := srv.stateStore.ListMessages(stopped, false, 0)
 	if err != nil {
 		t.Fatalf("ListMessages: %v", err)
 	}
-	if len(msgs) != 1 || msgs[0].Read || msgs[0].DeliveredVia != state.DeliveryPending {
-		t.Fatalf("mail after activation = %+v, want unread pending mail", msgs)
+	if len(msgs) != 1 || (msgs[0].Read && msgs[0].DeliveredVia != state.DeliveryInline) || (!msgs[0].Read && msgs[0].DeliveredVia != state.DeliveryPending) {
+		t.Fatalf("mail after resume = %+v, want pending or confirmed inline receipt", msgs)
 	}
 
 	// The adapter dies before it is ever nudged.
@@ -636,6 +636,10 @@ func TestSuccessfulWakeConsumesMailEvenIfAdapterDiesBeforeNudge(t *testing.T) {
 		t.Fatalf("kill woken adapter: %v", err)
 	}
 	waitRunning(t, srv, stopped, false)
+	msgs, err = srv.stateStore.ListMessages(stopped, false, 0)
+	if err != nil || len(msgs) != 1 || msgs[0].MessageID == "" {
+		t.Fatalf("mail after transport loss = %+v, %v; want stable durable message", msgs, err)
+	}
 
 	// The mail is still unread, but it no longer makes the agent a wake candidate,
 	// so no sweep — including one after a dashboard restart's empty nudge map —

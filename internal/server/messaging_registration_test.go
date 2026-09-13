@@ -102,7 +102,7 @@ func TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance(t *testing.T
 
 	deadline := time.Now().Add(3 * time.Second)
 	for {
-		if raw, err := os.ReadFile(promptDump); err == nil && strings.Contains(string(raw), "check_messages") {
+		if raw, err := os.ReadFile(promptDump); err == nil && strings.Contains(string(raw), "please review") {
 			break
 		}
 		if time.Now().After(deadline) {
@@ -114,8 +114,8 @@ func TestMailActivationStartsIdleAgentWithoutMutatingMailProvenance(t *testing.T
 	if err != nil {
 		t.Fatalf("ListMessages: %v", err)
 	}
-	if len(msgs) != 1 || msgs[0].MessageID != msgID || msgs[0].DeliveredVia != state.DeliveryPending {
-		t.Fatalf("message after activation = %+v, want unread mail left pending", msgs)
+	if len(msgs) != 1 || msgs[0].MessageID != msgID || !msgs[0].Read || msgs[0].DeliveredVia != state.DeliveryInline {
+		t.Fatalf("message after activation = %+v, want confirmed inline receipt", msgs)
 	}
 }
 

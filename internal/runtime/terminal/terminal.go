@@ -303,6 +303,13 @@ func (r *Runtime) Cancel(ctx context.Context, agentID string) (bool, error) {
 	return false, nil
 }
 
+// CancelGuarded is unavailable for terminal agents because the terminal driver
+// has no turn identity to verify. Task-owned cancellation must therefore be a
+// no-op rather than risk signalling a later command.
+func (r *Runtime) CancelGuarded(ctx context.Context, agentID, expectedGeneration, expectedTurn string) (bool, error) {
+	return false, nil
+}
+
 // Stop terminates the process group, closes the emulator tab, removes the
 // running row, and sets the status row to done (kept for the archive/UI). The
 // liveness watcher self-suppresses once stopped is set (§3.1).

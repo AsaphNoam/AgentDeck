@@ -68,7 +68,7 @@ const templateProposal = {
   kind: "save_template",
   digest: "digest-123",
   created_at: "2026-09-04T09:00:00Z",
-  payload: { id: "review", template: { version: 1, title: "Review", inputs: [], stages: [] } },
+  payload: { id: "review", template: { version: 2, title: "Review", orchestrator_role: "implementer", inputs: [], stages: [] } },
 };
 
 const runProposal = {
@@ -78,7 +78,7 @@ const runProposal = {
   created_at: "2026-09-04T09:00:00Z",
   payload: {
     request_id: "req_1", template_id: "delivery", display_name: "Ship", project: "app",
-    goal: "Ship it", inputs: {}, assignments: {},
+    goal: "Ship it", inputs: {}, orchestrator: { backend: "claude", model: "sonnet" }, dedicated_assignments: {},
   },
 };
 
@@ -218,11 +218,9 @@ function stagedTemplateProposal(stages: number) {
     payload: {
       id: "review",
       template: {
-        version: 1, title: "Thirty-two stage review", inputs: [],
+        version: 2, title: "Thirty-two stage review", orchestrator_role: "implementer", inputs: [],
         stages: Array.from({ length: stages }, (_, index) => ({
-          id: `s${index}`, title: `Stage ${index}`, role: "implementer", instruction: "Do the work.",
-          inputs: [], outputs: [], max_visits: 1,
-          transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } },
+          id: `s${index}`, title: `Stage ${index}`, objective: "Do the work.", inputs: [], outputs: [], coordination: "standing", dedicated_role: "", approval_after_success: false,
         })),
       },
     },
@@ -276,7 +274,7 @@ describe("AgentDeckerBuilder proposal collapse", () => {
 
   it("summarizes each of the pending and declined × save and start cases", async () => {
     server.use(http.get("/api/pipelines", () => HttpResponse.json([
-      { id: "delivery", template: { version: 1, title: "Delivery loop", inputs: [], stages: [] }, valid: true, diagnostics: [] },
+      { id: "delivery", template: { version: 2, title: "Delivery loop", orchestrator_role: "implementer", inputs: [], stages: [] }, valid: true, diagnostics: [] },
     ])));
     renderProposals(
       [templateProposal, runProposal],

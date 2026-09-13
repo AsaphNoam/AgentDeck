@@ -689,6 +689,9 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 	}
 	task.TaskID = id
 	created, err := s.stateStore.CreateTaskWithAttachments(task, req.Attachments, req.CreatorAgentID)
+	if errors.Is(err, state.ErrTaskRunClosed) {
+		return state.Task{}, &messaging.ToolError{Code: "invalid_state", Message: "the governing pipeline stage is closing and cannot accept new work"}
+	}
 	if err != nil {
 		return state.Task{}, err
 	}
@@ -704,12 +707,8 @@ func (s *Server) CreateAgentTask(req messaging.AgentTaskRequest) (state.Task, er
 func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, error) {
 	unlock := s.lockTaskStart(taskID)
 	defer unlock()
-	existing, err := s.stateStore.ReadTask(taskID)
-	if err != nil {
+	if _, err := s.agentOwnedTask(taskID, creatorAgentID); err != nil {
 		return state.Task{}, err
-	}
-	if existing.CreatedByKind != "agent" || existing.CreatedByAgentID != creatorAgentID {
-		return state.Task{}, &messaging.ToolError{Code: "not_creator", Message: "No such task."}
 	}
 	task, err := s.stateStore.CancelTask(taskID)
 	if err != nil {
@@ -719,4 +718,62 @@ func (s *Server) CancelAgentTask(taskID, creatorAgentID string) (state.Task, err
 	s.evaluateTaskResult(task.TaskID)
 	s.publishTaskUpdate(task)
 	return s.rereadTask(task), nil
+}
+
+// ListAgentTasks returns only the caller's own work. The project is derived
+// from the durable agent record, never accepted from an MCP argument.
+func (s *Server) ListAgentTasks(creatorAgentID string, limit int) ([]state.Task, error) {
+	creator, err := s.stateStore.ReadAgent(creatorAgentID)
+	if err != nil {
+		return nil, err
+	}
+	return s.stateStore.ListTasksCreatedBy(creator.Project, creatorAgentID, limit)
+}
+
+// agentOwnedTask keeps unknown and unauthorized task ids indistinguishable on
+// every creator-scoped control operation.
+func (s *Server) agentOwnedTask(taskID, creatorAgentID string) (state.Task, error) {
+	task, err := s.stateStore.ReadTask(taskID)
+	if err != nil {
+		if errors.Is(err, state.ErrNotFound) {
+			return state.Task{}, &messaging.ToolError{Code: "task_not_found", Message: "No such task."}
+		}
+		return state.Task{}, err
+	}
+	if task.CreatedByKind != "agent" || task.CreatedByAgentID != creatorAgentID {
+		return state.Task{}, &messaging.ToolError{Code: "task_not_found", Message: "No such task."}
+	}
+	return task, nil
+}
+
+func (s *Server) ReadAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	return s.agentOwnedTask(taskID, creatorAgentID)
+}
+
+func (s *Server) RetryAgentTask(taskID, creatorAgentID string) (state.Task, error) {
+	existing, err := s.agentOwnedTask(taskID, creatorAgentID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	if ae := s.retryAssigneeGate(existing); ae != nil {
+		return state.Task{}, &messaging.ToolError{Code: "target_ineligible", Message: ae.Message}
+	}
+	task, err := s.stateStore.RetryTask(taskID)
+	if err != nil {
+		return state.Task{}, err
+	}
+	s.publishTaskUpdate(task)
+	return task, nil
+}
+
+func (s *Server) RearmAgentTask(taskID, creatorAgentID string, arms []state.TaskArm) (state.Task, error) {
+	if _, err := s.agentOwnedTask(taskID, creatorAgentID); err != nil {
+		return state.Task{}, err
+	}
+	task, err := s.stateStore.RearmTask(taskID, arms)
+	if err != nil {
+		return state.Task{}, err
+	}
+	s.publishTaskUpdate(task)
+	return task, nil
 }

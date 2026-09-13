@@ -8,8 +8,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { PipelineTemplatePage, PipelinesIndex, PipelinesLayout, RunsPage, TemplatesPage } from "./PipelinesPage";
 
 const template = {
-  version: 1, title: "Delivery", inputs: [],
-  stages: [{ id: "work", title: "Work", role: "implementer", instruction: "Do the work", inputs: [], outputs: [], max_visits: 1, transitions: { success: { final: "success", approval: "automatic" }, failure: { final: "failure", approval: "required" } } }],
+  version: 2, title: "Delivery", orchestrator_role: "implementer", inputs: [],
+  stages: [{ id: "work", title: "Work", objective: "Do the work", coordination: "standing", inputs: [], outputs: [] }],
 };
 const server = setupServer(
   http.get("/api/pipeline-proposals", () => HttpResponse.json({ pending: [], declined: [] })),

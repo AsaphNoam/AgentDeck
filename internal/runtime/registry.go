@@ -62,6 +62,12 @@ func NewRegistry(s *state.Store) *Registry {
 	return r
 }
 
+// SetMessageBudgetProvider keeps provider-turn inline delivery on the same
+// configured budget authority as the messaging tools.
+func (r *Registry) SetMessageBudgetProvider(fn func() int) {
+	r.chat.SetMessageBudgetProvider(fn)
+}
+
 // forget drops the ownership record for an agent. Called by an owning runtime
 // when its live handle disappears outside a Stop (crash teardown).
 func (r *Registry) forget(agentID string) {
@@ -367,6 +373,23 @@ func (r *Registry) Cancel(ctx context.Context, agentID string) (bool, error) {
 	return rt.Cancel(ctx, agentID)
 }
 
+// CancelGuarded routes a task-owned cancellation only when the registry still
+// owns the expected launch generation. The runtime then checks the matching
+// active turn under its turn lock before signalling the ACP peer.
+func (r *Registry) CancelGuarded(ctx context.Context, agentID, expectedGeneration, expectedTurn string) (bool, error) {
+	r.mu.Lock()
+	rt, ok := r.rtByAgent[agentID]
+	generation := r.generationByAgent[agentID]
+	r.mu.Unlock()
+	if !ok || rt == nil {
+		return false, ErrNoHandle
+	}
+	if generation != expectedGeneration {
+		return false, nil
+	}
+	return rt.CancelGuarded(ctx, agentID, expectedGeneration, expectedTurn)
+}
+
 // Stop routes a stop to the owning runtime and forgets the agent.
 // The agent is removed from rtByAgent before rt.Stop() so that concurrent
 // SendPrompt/Permission calls get ErrNoHandle immediately rather than racing
@@ -475,6 +498,10 @@ func (n notImplementedRuntime) SendPrompt(context.Context, string, string) error
 }
 
 func (n notImplementedRuntime) Cancel(context.Context, string) (bool, error) {
+	return false, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
+}
+
+func (n notImplementedRuntime) CancelGuarded(context.Context, string, string, string) (bool, error) {
 	return false, fmt.Errorf("%w: %s runtime", ErrNotImplemented, n.name)
 }
 

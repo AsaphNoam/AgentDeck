@@ -4,10 +4,14 @@ package pipeline
 // pipelines/{id}.json. Its immutable id comes from the filename and therefore
 // is not duplicated in this document.
 type Template struct {
-	Version int         `json:"version"`
-	Title   string      `json:"title"`
-	Inputs  []ValueDecl `json:"inputs"`
-	Stages  []Stage     `json:"stages"`
+	Version          int         `json:"version"`
+	Title            string      `json:"title"`
+	OrchestratorRole string      `json:"orchestrator_role"`
+	Inputs           []ValueDecl `json:"inputs"`
+	Stages           []Stage     `json:"stages"`
+	// Executor is retained solely to diagnose old documents. It is not valid
+	// in version 2 templates.
+	Executor string `json:"executor,omitempty"`
 }
 
 type ValueDecl struct {
@@ -17,14 +21,20 @@ type ValueDecl struct {
 }
 
 type Stage struct {
-	ID          string             `json:"id"`
-	Title       string             `json:"title"`
-	Role        string             `json:"role"`
-	Instruction string             `json:"instruction"`
+	ID                   string `json:"id"`
+	Title                string `json:"title"`
+	Objective            string `json:"objective"`
+	Coordination         string `json:"coordination,omitempty"`
+	DedicatedRole        string `json:"dedicated_role,omitempty"`
+	ApprovalAfterSuccess bool   `json:"approval_after_success,omitempty"`
+	// Legacy fields remain decodable so hand-edited v1 files can receive a
+	// useful diagnostic instead of silently losing data.
+	Role        string             `json:"role,omitempty"`
+	Instruction string             `json:"instruction,omitempty"`
 	Inputs      []StageInput       `json:"inputs"`
 	Outputs     []StageOutput      `json:"outputs"`
 	MaxVisits   int                `json:"max_visits,omitempty"`
-	Transitions OutcomeTransitions `json:"transitions"`
+	Transitions OutcomeTransitions `json:"transitions,omitempty"`
 }
 
 type StageInput struct {

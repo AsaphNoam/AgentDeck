@@ -1,4 +1,22 @@
 @layer ad-features {
+  .pipeline-coordination {
+    display: grid;
+    gap: var(--ad-space-2);
+  }
+
+  .pipeline-owner-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ad-space-4);
+    margin-block: var(--ad-space-3);
+    color: var(--ad-text-secondary);
+  }
+
+  .pipeline-owner-strip > div {
+    display: grid;
+    gap: var(--ad-space-1);
+  }
+
 .pipelines-page {
   display: grid;
   gap: var(--ad-space-4);

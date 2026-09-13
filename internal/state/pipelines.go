@@ -121,6 +121,27 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 			return PipelineRunRecord{}, false, err
 		}
 	}
+	if params.InitialStageTask != nil {
+		p := *params.InitialStageTask
+		if p.RunID != run.RunID || p.ExpectedRevision != run.Revision || p.StageIndex != 0 || p.AttemptNumber != 1 || p.StageID != run.CurrentStageID {
+			return PipelineRunRecord{}, false, ErrPipelineStageConflict
+		}
+		now := run.CreatedAt
+		p.Task.CreatedAt, p.Task.UpdatedAt, p.Task.Revision, p.Task.State = now, now, 1, TaskReady
+		if _, err := tx.Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, target_agent_id, role, backend, model, effort, fast, state, attention_reason, created_by_kind, created_by_agent_id, created_by_generation, revision, ready_at, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.Task.Project, p.Task.DisplayName, p.Task.Instruction, p.Task.TargetKind, p.Task.TargetAgentID, p.Task.Role, p.Task.Backend, p.Task.Model, p.Task.Effort, p.Task.Fast, p.Task.State, p.Task.CreatedByKind, p.Task.CreatedByAgentID, p.Task.CreatedByGeneration, p.Task.Revision, formatTime(now), formatTime(now), formatTime(now)); err != nil {
+			return PipelineRunRecord{}, false, fmt.Errorf("state: insert initial pipeline stage task: %w", err)
+		}
+		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
+			return PipelineRunRecord{}, false, err
+		}
+		outputJSON, err := json.Marshal(p.OutputValues)
+		if err != nil {
+			return PipelineRunRecord{}, false, err
+		}
+		if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, assignment_digest, output_values_json, created_at) VALUES (?, 0, 1, ?, ?, ?, ?, ?)`, p.RunID, p.StageID, p.Task.TaskID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
+			return PipelineRunRecord{}, false, err
+		}
+	}
 	if _, err := tx.Exec(`
 INSERT INTO pipeline_requests(request_id, request_hash, run_id, created_at)
 VALUES (?, ?, ?, ?)`, params.RequestID, params.RequestHash, run.RunID, formatTime(run.CreatedAt)); err != nil {

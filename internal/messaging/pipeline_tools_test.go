@@ -48,14 +48,10 @@ func proposalTemplateArgs() map[string]any {
 	return map[string]any{
 		"id": "quality",
 		"template": map[string]any{
-			"version": 1, "title": "Quality", "inputs": []any{},
+			"version": 2, "title": "Quality", "orchestrator_role": "implementer", "inputs": []any{},
 			"stages": []any{map[string]any{
-				"id": "work", "title": "Work", "role": "implementer", "instruction": "Do the work.",
+				"id": "work", "title": "Work", "objective": "Do the work.", "coordination": "standing",
 				"inputs": []any{}, "outputs": []any{},
-				"transitions": map[string]any{
-					"success": map[string]any{"final": "success", "approval": "automatic"},
-					"failure": map[string]any{"final": "failure", "approval": "required"},
-				},
 			}},
 		},
 	}

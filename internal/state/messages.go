@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -117,7 +118,8 @@ const (
 	// DeliveryPending — inserted mail nobody has delivered yet.
 	DeliveryPending = "pending"
 	// DeliveryPoll — the recipient read the mail itself.
-	DeliveryPoll = "poll"
+	DeliveryPoll   = "poll"
+	DeliveryInline = "inline"
 )
 
 // scanAgents runs one addressable-agent query and stamps each row with the
@@ -223,6 +225,11 @@ func toRefs(agents []LiveAgent) []AgentRef {
 // The payload remains in messages; activation is only the coalesced control
 // signal that durable mail work exists.
 func (s *Store) InsertMessage(m Message) (string, error) {
+	return s.InsertMessageWithWake(m, true)
+}
+
+func (s *Store) InsertMessageWithWake(m Message, wake bool) (string, error) {
+	m.Wake = wake
 	if m.DeliveredVia == "" {
 		m.DeliveredVia = DeliveryPending
 	}
@@ -235,7 +242,7 @@ func (s *Store) InsertMessage(m Message) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if m.DeliveredVia == DeliveryPending {
+	if m.DeliveredVia == DeliveryPending && m.Wake {
 		if err := EnsurePendingMailActivationTx(tx, m.ToAgent); err != nil {
 			return "", err
 		}
@@ -268,10 +275,10 @@ func insertMessageTx(exec messageExecer, m Message) (string, error) {
 		}
 		id := "m_" + hex.EncodeToString(b[:])
 		_, err := exec.Exec(`
-INSERT INTO messages(message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
+INSERT INTO messages(message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to, wake)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?)`,
 			id, m.FromAgent, m.FromAddress, m.FromName, m.ToAgent, m.Subject, m.Body,
-			formatTime(m.CreatedAt), m.DeliveredVia, inReplyTo)
+			formatTime(m.CreatedAt), m.DeliveredVia, inReplyTo, boolInt(m.Wake))
 		if err == nil {
 			return id, nil
 		}
@@ -287,6 +294,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)`,
 // sender's turn budget in the same transaction. On breach, the message is not
 // inserted and the budget row is marked breached.
 func (s *Store) InsertMessageWithBudget(m Message, limit int) (string, BudgetStatus, bool, error) {
+	return s.InsertMessageWithBudgetWake(m, limit, true)
+}
+
+func (s *Store) InsertMessageWithBudgetWake(m Message, limit int, wake bool) (string, BudgetStatus, bool, error) {
+	m.Wake = wake
 	if m.DeliveredVia == "" {
 		m.DeliveredVia = DeliveryPending
 	}
@@ -310,7 +322,7 @@ func (s *Store) InsertMessageWithBudget(m Message, limit int) (string, BudgetSta
 	if err != nil {
 		return "", BudgetStatus{}, false, err
 	}
-	if m.DeliveredVia == DeliveryPending {
+	if m.DeliveredVia == DeliveryPending && m.Wake {
 		if err := EnsurePendingMailActivationTx(tx, m.ToAgent); err != nil {
 			return "", BudgetStatus{}, false, err
 		}
@@ -331,7 +343,7 @@ func isUniqueViolation(err error) bool {
 // (techspec §3.2, §3.5).
 func (s *Store) ListMessages(recipientID string, unreadOnly bool, limit int) ([]Message, error) {
 	q := `
-SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to
+SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to, wake, inline_delivery_turn_key
 FROM messages
 WHERE to_agent = ?`
 	if unreadOnly {
@@ -373,12 +385,16 @@ func scanMessage(rows *sql.Rows) (Message, error) {
 	var readAt sql.NullString
 	var inReplyTo sql.NullString
 	var readInt int
+	var wakeInt int
+	var inlineKey sql.NullString
 	if err := rows.Scan(&m.MessageID, &m.FromAgent, &m.FromAddress, &m.FromName, &m.ToAgent,
-		&m.Subject, &m.Body, &createdAt, &readInt, &readAt, &m.DeliveredVia, &inReplyTo); err != nil {
+		&m.Subject, &m.Body, &createdAt, &readInt, &readAt, &m.DeliveredVia, &inReplyTo, &wakeInt, &inlineKey); err != nil {
 		return Message{}, fmt.Errorf("state: scan message: %w", err)
 	}
 	m.Read = readInt != 0
 	m.InReplyTo = inReplyTo.String
+	m.Wake = wakeInt != 0
+	m.InlineDeliveryTurnKey = inlineKey.String
 	var err error
 	if m.CreatedAt, err = parseTime(createdAt); err != nil {
 		return Message{}, wrapTimeErr("message.created_at", err)
@@ -465,16 +481,21 @@ func (s *Store) ResetTurnBudget(agentID, turnID string) error {
 // so callers already holding a tx (e.g. Manager.ApplyHook's terminal turn
 // boundary) can reset without opening a second connection.
 func resetTurnBudgetTx(tx *sql.Tx, agentID, turnID string) error {
+	var raw [16]byte
+	if _, err := randRead(raw[:]); err != nil {
+		return fmt.Errorf("state: delivery key: %w", err)
+	}
+	deliveryKey := "d_" + hex.EncodeToString(raw[:])
 	if _, err := tx.Exec(`DELETE FROM turn_budget WHERE agent_id = ? AND turn_id <> ?`, agentID, turnID); err != nil {
 		return fmt.Errorf("state: prune turn budget rows: %w", err)
 	}
 	if _, err := tx.Exec(`
-INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached)
-VALUES (?, ?, 0, 0, 0)
+INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached, delivery_turn_key, inline_message_ids)
+VALUES (?, ?, 0, 0, 0, ?, '[]')
 ON CONFLICT(agent_id, turn_id) DO UPDATE SET
     inbound = 0,
     outbound = 0,
-    breached = 0`, agentID, turnID); err != nil {
+    breached = 0, delivery_turn_key = excluded.delivery_turn_key, inline_message_ids = '[]'`, agentID, turnID, deliveryKey); err != nil {
 		return fmt.Errorf("state: reset turn budget: %w", err)
 	}
 	return nil
@@ -482,12 +503,14 @@ ON CONFLICT(agent_id, turn_id) DO UPDATE SET
 
 // BudgetStatus is the current per-turn messaging budget row for an agent.
 type BudgetStatus struct {
-	AgentID   string
-	TurnID    string
-	Inbound   int
-	Outbound  int
-	Breached  bool
-	Remaining int
+	AgentID          string
+	TurnID           string
+	Inbound          int
+	Outbound         int
+	Breached         bool
+	Remaining        int
+	DeliveryTurnKey  string
+	InlineMessageIDs []string
 }
 
 // ConsumeTurnBudget atomically increments the latest budget row for agentID by
@@ -558,23 +581,25 @@ func (s *Store) CurrentTurnBudget(agentID string, limit int) (BudgetStatus, erro
 func currentBudgetTx(tx *sql.Tx, agentID string, limit int) (BudgetStatus, error) {
 	var cur BudgetStatus
 	var breached int
+	var idsJSON string
 	err := tx.QueryRow(`
-SELECT agent_id, turn_id, inbound, outbound, breached
+SELECT agent_id, turn_id, inbound, outbound, breached, delivery_turn_key, inline_message_ids
 FROM turn_budget
 WHERE agent_id = ?
 ORDER BY rowid DESC
-LIMIT 1`, agentID).Scan(&cur.AgentID, &cur.TurnID, &cur.Inbound, &cur.Outbound, &breached)
+	LIMIT 1`, agentID).Scan(&cur.AgentID, &cur.TurnID, &cur.Inbound, &cur.Outbound, &breached, &cur.DeliveryTurnKey, &idsJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		cur = BudgetStatus{AgentID: agentID, TurnID: "t_000000000000"}
 		if _, err := tx.Exec(`
-INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached)
-VALUES (?, ?, 0, 0, 0)`, cur.AgentID, cur.TurnID); err != nil {
+INSERT INTO turn_budget(agent_id, turn_id, inbound, outbound, breached, delivery_turn_key, inline_message_ids)
+VALUES (?, ?, 0, 0, 0, '', '[]')`, cur.AgentID, cur.TurnID); err != nil {
 			return BudgetStatus{}, fmt.Errorf("state: create implicit budget: %w", err)
 		}
 	} else if err != nil {
 		return BudgetStatus{}, fmt.Errorf("state: read budget: %w", err)
 	}
 	cur.Breached = breached != 0
+	_ = json.Unmarshal([]byte(idsJSON), &cur.InlineMessageIDs)
 	cur.Remaining = max(0, limit-cur.Inbound-cur.Outbound)
 	return cur, nil
 }
@@ -599,14 +624,21 @@ func (s *Store) TakeMessagesWithBudget(recipientID string, unreadOnly bool, limi
 	msgs := []Message{}
 	if limit > 0 {
 		q := `
-SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to
+SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to, wake, inline_delivery_turn_key
 FROM messages
 WHERE to_agent = ?`
 		if unreadOnly {
 			q += ` AND read = 0`
 		}
+		args := []any{recipientID}
+		if unreadOnly && len(budget.InlineMessageIDs) > 0 {
+			p, reservedArgs := inClause(budget.InlineMessageIDs)
+			q += ` AND message_id NOT IN (` + p + `)`
+			args = append(args, reservedArgs...)
+		}
 		q += ` ORDER BY created_at, message_id LIMIT ?`
-		rows, err := tx.Query(q, recipientID, limit)
+		args = append(args, limit)
+		rows, err := tx.Query(q, args...)
 		if err != nil {
 			return nil, BudgetStatus{}, false, fmt.Errorf("state: list messages for budget: %w", err)
 		}
@@ -625,7 +657,22 @@ WHERE to_agent = ?`
 		rows.Close()
 	}
 
-	budget, breached, err := consumeBudgetTx(tx, recipientID, len(msgs), 0, budgetLimit)
+	// Explicit history reads may include the current inline reservation, but
+	// those messages were already charged when reserved.
+	charge := 0
+	for _, m := range msgs {
+		reserved := false
+		for _, id := range budget.InlineMessageIDs {
+			if id == m.MessageID {
+				reserved = true
+				break
+			}
+		}
+		if !reserved {
+			charge++
+		}
+	}
+	budget, breached, err := consumeBudgetTx(tx, recipientID, charge, 0, budgetLimit)
 	if err != nil {
 		return nil, BudgetStatus{}, false, err
 	}
@@ -672,12 +719,185 @@ func (s *Store) DeleteExpiredMessages(now time.Time, readTTL, hardTTL time.Durat
 		return 0, 0, fmt.Errorf("state: delete read expired messages: %w", err)
 	}
 	readDeleted, _ = res.RowsAffected()
-	res, err = s.db.Exec(`DELETE FROM messages WHERE created_at < ?`, hardCutoff)
+	res, err = s.db.Exec(`DELETE FROM messages WHERE created_at < ? AND (read = 1 OR wake = 1)`, hardCutoff)
 	if err != nil {
 		return readDeleted, 0, fmt.Errorf("state: delete hard expired messages: %w", err)
 	}
 	hardDeleted, _ = res.RowsAffected()
 	return readDeleted, hardDeleted, nil
+}
+
+// InlineMailBatch is the durable reservation handed to the runtime before a
+// provider prompt. Rows remain unread until SettleInlineMail succeeds.
+type InlineMailBatch struct {
+	Messages          []Message
+	DeliveryTurnKey   string
+	RemainingWaking   int
+	RemainingDeferred int
+}
+
+// PrepareInlineMail reserves a bounded, whole-message batch and charges the
+// existing inbound turn budget atomically. A repeated call for the same turn
+// returns the existing reservation without charging again.
+func (s *Store) PrepareInlineMail(agentID string, budgetLimit, maxMessages, maxBytes int, wakingFirst bool) (InlineMailBatch, error) {
+	if maxMessages <= 0 || maxMessages > 15 {
+		maxMessages = 15
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return InlineMailBatch{}, err
+	}
+	defer tx.Rollback()
+	b, err := currentBudgetTx(tx, agentID, budgetLimit)
+	if err != nil {
+		return InlineMailBatch{}, err
+	}
+	if b.DeliveryTurnKey == "" {
+		return InlineMailBatch{}, errors.New("state: turn has no delivery key")
+	}
+	if len(b.InlineMessageIDs) > 0 {
+		msgs, err := messagesByIDsTx(tx, agentID, b.InlineMessageIDs)
+		if err != nil {
+			return InlineMailBatch{}, err
+		}
+		rw, rd := 0, 0
+		p, a := inClause(b.InlineMessageIDs)
+		args := append([]any{agentID}, a...)
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND message_id NOT IN (`+p+`) AND wake=1`, args...).Scan(&rw)
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND message_id NOT IN (`+p+`) AND wake=0`, args...).Scan(&rd)
+		return InlineMailBatch{Messages: msgs, DeliveryTurnKey: b.DeliveryTurnKey, RemainingWaking: rw, RemainingDeferred: rd}, nil
+	}
+	allow := b.Remaining
+	if allow < 0 {
+		allow = 0
+	}
+	if allow < maxMessages {
+		maxMessages = allow
+	}
+	order := "created_at, message_id"
+	if wakingFirst {
+		order = "wake DESC, created_at, message_id"
+	}
+	rows, err := tx.Query(`SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to, wake, inline_delivery_turn_key FROM messages WHERE to_agent = ? AND read = 0 AND (inline_delivery_turn_key IS NULL OR inline_delivery_turn_key = '') ORDER BY `+order+` LIMIT 15`, agentID)
+	if err != nil {
+		return InlineMailBatch{}, err
+	}
+	defer rows.Close()
+	msgs := []Message{}
+	used := 0
+	for rows.Next() {
+		m, e := scanMessage(rows)
+		if e != nil {
+			return InlineMailBatch{}, e
+		}
+		n, _ := json.Marshal(m)
+		if len(msgs) >= maxMessages || (maxBytes > 0 && len(msgs) > 0 && used+len(n) > maxBytes) {
+			break
+		}
+		if maxBytes > 0 && used+len(n) > maxBytes {
+			break
+		}
+		msgs = append(msgs, m)
+		used += len(n)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return InlineMailBatch{}, err
+	}
+	ids := make([]string, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.MessageID
+	}
+	b, breached, err := consumeBudgetTx(tx, agentID, len(ids), 0, budgetLimit)
+	if err != nil {
+		return InlineMailBatch{}, err
+	}
+	if breached {
+		return InlineMailBatch{}, errors.New("state: inline mail budget exceeded")
+	}
+	encoded, _ := json.Marshal(ids)
+	if _, err := tx.Exec(`UPDATE turn_budget SET inline_message_ids = ? WHERE agent_id = ? AND turn_id = ?`, string(encoded), agentID, b.TurnID); err != nil {
+		return InlineMailBatch{}, err
+	}
+	var rw, rd int
+	if len(ids) > 0 {
+		p, a := inClause(ids)
+		args := append([]any{agentID}, a...)
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND wake=1 AND message_id NOT IN (`+p+`)`, args...).Scan(&rw)
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND wake=0 AND message_id NOT IN (`+p+`)`, args...).Scan(&rd)
+	} else {
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND wake=1`, agentID).Scan(&rw)
+		_ = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE to_agent=? AND read=0 AND wake=0`, agentID).Scan(&rd)
+	}
+	if err := tx.Commit(); err != nil {
+		return InlineMailBatch{}, err
+	}
+	return InlineMailBatch{Messages: msgs, DeliveryTurnKey: b.DeliveryTurnKey, RemainingWaking: rw, RemainingDeferred: rd}, nil
+}
+
+func messagesByIDsTx(tx *sql.Tx, agentID string, ids []string) ([]Message, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	p, args := inClause(ids)
+	args = append([]any{agentID}, args...)
+	rows, e := tx.Query(`SELECT message_id, from_agent, from_address, from_name, to_agent, subject, body, created_at, read, read_at, delivered_via, in_reply_to, wake, inline_delivery_turn_key FROM messages WHERE to_agent = ? AND message_id IN (`+p+`)`, args...)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	byID := map[string]Message{}
+	for rows.Next() {
+		m, e := scanMessage(rows)
+		if e != nil {
+			return nil, e
+		}
+		byID[m.MessageID] = m
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]Message, 0, len(ids))
+	for _, id := range ids {
+		if m, ok := byID[id]; ok {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+// SettleInlineMail confirms delivery for the matching reserved turn.
+func (s *Store) SettleInlineMail(agentID, deliveryKey string) error {
+	tx, e := s.db.Begin()
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	var turn string
+	var raw string
+	if e = tx.QueryRow(`SELECT turn_id, inline_message_ids FROM turn_budget WHERE agent_id=? AND delivery_turn_key=?`, agentID, deliveryKey).Scan(&turn, &raw); e != nil {
+		return e
+	}
+	var ids []string
+	if e = json.Unmarshal([]byte(raw), &ids); e != nil {
+		return e
+	}
+	now := formatTime(time.Now().UTC())
+	for _, id := range ids {
+		if _, e = tx.Exec(`UPDATE messages SET read=1, read_at=COALESCE(read_at,?), delivered_via=CASE WHEN delivered_via='pending' THEN 'inline' ELSE delivered_via END, inline_delivery_turn_key=CASE WHEN read=0 THEN ? ELSE inline_delivery_turn_key END WHERE message_id=? AND to_agent=? AND read=0`, now, deliveryKey, id, agentID); e != nil {
+			return e
+		}
+	}
+	if _, e = tx.Exec(`UPDATE turn_budget SET inline_message_ids='[]' WHERE agent_id=? AND turn_id=?`, agentID, turn); e != nil {
+		return e
+	}
+	return tx.Commit()
+}
+
+// ClearInlineReservation clears a known failed reservation without changing read state.
+func (s *Store) ClearInlineReservation(agentID, deliveryKey string) error {
+	_, e := s.db.Exec(`UPDATE turn_budget SET inline_message_ids='[]' WHERE agent_id=? AND delivery_turn_key=?`, agentID, deliveryKey)
+	return e
 }
 
 func max(a, b int) int {

@@ -103,13 +103,12 @@ func TestApprovedRunProposalStopsBeingPendingAfterReload(t *testing.T) {
 func TestApprovedTemplateProposalIsConsumedByItsExactSave(t *testing.T) {
 	manager, _, publisher := pipelineManagerFixture(t)
 	template := Template{
-		Version: 1, Title: "Revised loop",
+		Version: 2, Title: "Revised loop", OrchestratorRole: "orchestrator",
 		Inputs: []ValueDecl{{Name: "spec", Description: "Specification", Required: true}},
 		Stages: []Stage{{
-			ID: "work", Title: "Work", Role: "implementer", Instruction: "Implement it.", MaxVisits: 1,
-			Inputs:      []StageInput{{Name: "specification", Value: "spec", Required: true}},
-			Outputs:     []StageOutput{},
-			Transitions: OutcomeTransitions{Success: Transition{Final: "success", Approval: "automatic"}, Failure: Transition{Final: "failure", Approval: "required"}},
+			ID: "work", Title: "Work", Objective: "Implement it.", Instruction: "Implement it.",
+			Inputs:  []StageInput{{Name: "specification", Value: "spec", Required: true}},
+			Outputs: []StageOutput{},
 		}},
 	}
 	proposal, err := manager.ProposeTemplate("quality", template)
@@ -166,13 +165,12 @@ func TestListProposalsIsolatesAnUndecodableRecord(t *testing.T) {
 
 func proposalTemplateFixture() Template {
 	return Template{
-		Version: 1, Title: "Revised loop",
+		Version: 2, Title: "Revised loop", OrchestratorRole: "orchestrator",
 		Inputs: []ValueDecl{{Name: "spec", Description: "Specification", Required: true}},
 		Stages: []Stage{{
-			ID: "work", Title: "Work", Role: "implementer", Instruction: "Implement it.", MaxVisits: 1,
-			Inputs:      []StageInput{{Name: "specification", Value: "spec", Required: true}},
-			Outputs:     []StageOutput{},
-			Transitions: OutcomeTransitions{Success: Transition{Final: "success", Approval: "automatic"}, Failure: Transition{Final: "failure", Approval: "required"}},
+			ID: "work", Title: "Work", Objective: "Implement it.", Instruction: "Implement it.",
+			Inputs:  []StageInput{{Name: "specification", Value: "spec", Required: true}},
+			Outputs: []StageOutput{},
 		}},
 	}
 }

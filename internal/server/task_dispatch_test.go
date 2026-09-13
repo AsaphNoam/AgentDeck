@@ -466,6 +466,40 @@ func TestATaskForAStoppedAgentWakesIt(t *testing.T) {
 	waitRunning(t, srv, agentID, false)
 }
 
+func TestYieldedTaskReleasesThenResumesOnWatchedResult(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	owner := newLaunchTask(t, srv, "orchestrate")
+	srv.dispatchReadyTasks(context.Background())
+	running := waitTaskState(t, srv, owner.TaskID, state.TaskRunning)
+	childID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := srv.stateStore.CreateTask(state.Task{
+		TaskID: childID, Project: "tmpproj", DisplayName: "child", Instruction: "do child work",
+		TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "agent", CreatedByAgentID: running.AssignedAgentID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.WaitForTasks(running.AssignedAgentID, running.AssignedGeneration, running.ExecutionHandle,
+		[]state.TaskWaitObservation{{TaskID: child.TaskID, AfterRevision: child.Revision}}); err != nil {
+		t.Fatalf("WaitForTasks: %v", err)
+	}
+	srv.dispatchTurnEnd(running.AssignedAgentID, running.AssignedGeneration)
+	waiting := waitTaskState(t, srv, owner.TaskID, state.TaskWaiting)
+	if waiting.RuntimeClaim != "" || waiting.AssignedAgentID != running.AssignedAgentID {
+		t.Fatalf("yielded task lost assignment or capacity: %+v", waiting)
+	}
+	if _, err := srv.stateStore.NotifyTaskWaiters(child.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	ready := waitTaskState(t, srv, owner.TaskID, state.TaskReady)
+	if !ready.ContinuationPending || !ready.ResumeNeeded {
+		t.Fatalf("watched change did not request continuation: %+v", ready)
+	}
+}
+
 // FS-16.R25 / TS-10.R4 — once a wake delivered the assignment turn, losing
 // its generation before confirmation spends the attempt and never strands the
 // task in starting.

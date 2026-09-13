@@ -7,7 +7,11 @@ description: Use when answering AgentDeck product questions or operating, coordi
 
 Use AgentDeck's current tool definitions for exact arguments, validation, authority, effects, and results. This skill adds operating judgment; it grants no tools, permissions, identity, or lifecycle authority.
 
-- Send a message for immediate coordination with a known live or wakeable collaborator.
+- Send a message for immediate coordination with a known live or wakeable collaborator. `send_message`
+  wakes by default; pass `wake: false` for a durable FYI that must not start a turn.
+- A turn that is already independently authorized may receive bounded pending mail inline, with each
+  message attributed to its sender. Do not require a `check_messages` call just to receive supplied
+  mail; use it deliberately for older history or retained overflow.
 - Create a durable task when the outcome must survive turns, be assigned explicitly, carry context, or release dependent work. Express future dependencies through AgentDeck instead of polling.
 - Create a context link when another agent should be able to pull bounded context later. Links are pull-only and do not wake recipients.
 - Use a pipeline for a repeatable, supervised sequence of model-neutral stages with durable artifacts and recovery.

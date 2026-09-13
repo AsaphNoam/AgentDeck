@@ -39,9 +39,10 @@ const defaultStartupCallTimeout = 30 * time.Second
 // backend.BackendAdapter; this file orchestrates process lifecycle, the hub, and
 // status writes.
 type ChatRuntime struct {
-	store   *state.Store
-	command string   // adapter binary OVERRIDE (injectable for tests); empty → adapter default
-	cmdArgs []string // adapter args override
+	store         *state.Store
+	messageBudget func() int
+	command       string   // adapter binary OVERRIDE (injectable for tests); empty → adapter default
+	cmdArgs       []string // adapter args override
 
 	// onExit notifies the owner (the Registry) that an agent's live handle is
 	// gone after an unsolicited teardown (crash). Without it, Registry.rtByAgent
@@ -68,10 +69,23 @@ type ChatRuntime struct {
 func NewChatRuntime(s *state.Store) *ChatRuntime {
 	return &ChatRuntime{
 		store:              s,
+		messageBudget:      func() int { return 50 },
 		agents:             map[string]*agentState{},
 		cancelGrace:        defaultCancelGrace,
 		startupCallTimeout: defaultStartupCallTimeout,
 	}
+}
+
+// SetMessageBudgetProvider supplies the configured combined inbound/outbound
+// limit used when a turn reserves inline mail. The value is sampled once during
+// preparation; state.db owns the frozen usage for the rest of that turn.
+func (c *ChatRuntime) SetMessageBudgetProvider(fn func() int) {
+	if fn == nil {
+		return
+	}
+	c.mu.Lock()
+	c.messageBudget = fn
+	c.mu.Unlock()
 }
 
 // SetCancelGrace overrides the Cancel→SIGINT escalation window (tests use a short
@@ -667,6 +681,13 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 		as.mu.Unlock()
 		return err
 	}
+	promptText, deliveryKey, _, err := c.prepareTurnPrompt(as.agentID, text, false)
+	if err != nil {
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return err
+	}
 	// Persist the accepted user side of the turn before handing it to ACP. This
 	// gives it the same durable sequence, replay, and index path as assistant
 	// output, so a reconnect cannot replace the chat with a one-sided history.
@@ -684,7 +705,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 	go func() {
 		params := map[string]any{
 			"sessionId": as.sessionID,
-			"prompt":    []map[string]any{{"type": "text", "text": text}},
+			"prompt":    []map[string]any{{"type": "text", "text": promptText}},
 		}
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
@@ -693,6 +714,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
+			c.clearInlineMail(as.agentID, deliveryKey)
 			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
 			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
@@ -701,6 +723,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 			return
 		}
 		td, hasPct := mapPromptResult(res)
+		c.settleInlineMail(as, deliveryKey, res)
 		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
 
 		c.finishTurn(as, td)
@@ -708,6 +731,107 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 	}()
 
 	return nil
+}
+
+const (
+	inlineMailMaxMessages = 15
+	// Leave room inside TS-04.R53's 64 KiB envelope for the section header,
+	// overflow notice, and JSON delimiters. Message bodies themselves are never
+	// clipped; a row either fits this conservative allowance or remains pending.
+	inlineMailReservationBytes = 60 * 1024
+)
+
+// prepareTurnPrompt is the single provider-input seam for ordinary prompts,
+// held follow-ups, task assignments, dependency continuations, and host-owned
+// activations. The original text is emitted to the transcript separately and
+// is never rewritten or persisted with peer mail (TS-01.R31, INV §2/§3).
+func (c *ChatRuntime) prepareTurnPrompt(agentID, primary string, wakingFirst bool) (string, string, bool, error) {
+	c.mu.Lock()
+	budgetProvider := c.messageBudget
+	c.mu.Unlock()
+	budgetLimit := 50
+	if budgetProvider != nil {
+		if configured := budgetProvider(); configured > 0 {
+			budgetLimit = configured
+		}
+	}
+	batch, err := c.store.PrepareInlineMail(agentID, budgetLimit, inlineMailMaxMessages, inlineMailReservationBytes, wakingFirst)
+	if err != nil {
+		return "", "", false, fmt.Errorf("runtime: prepare inline mail: %w", err)
+	}
+	if len(batch.Messages) == 0 {
+		return primary, batch.DeliveryTurnKey, false, nil
+	}
+	type inlinePeerMail struct {
+		MessageID   string `json:"message_id"`
+		From        string `json:"from"`
+		FromAddress string `json:"from_address"`
+		FromName    string `json:"from_name"`
+		CreatedAt   string `json:"created_at"`
+		Subject     string `json:"subject"`
+		Body        string `json:"body"`
+		InReplyTo   string `json:"in_reply_to,omitempty"`
+		Wake        bool   `json:"wake"`
+	}
+	mail := make([]inlinePeerMail, 0, len(batch.Messages))
+	for _, message := range batch.Messages {
+		mail = append(mail, inlinePeerMail{
+			MessageID: message.MessageID, From: message.FromAgent,
+			FromAddress: message.FromAddress, FromName: message.FromName,
+			CreatedAt: message.CreatedAt.UTC().Format(time.RFC3339Nano),
+			Subject:   message.Subject, Body: message.Body,
+			InReplyTo: message.InReplyTo, Wake: message.Wake,
+		})
+	}
+	encoded, err := json.Marshal(mail)
+	if err != nil {
+		c.clearInlineMail(agentID, batch.DeliveryTurnKey)
+		return "", "", false, fmt.Errorf("runtime: encode inline mail: %w", err)
+	}
+	overflow := ""
+	if batch.RemainingWaking+batch.RemainingDeferred > 0 {
+		overflow = fmt.Sprintf("\nRemaining pending mail: %d waking, %d deferred. Use check_messages only when you deliberately need overflow or history.", batch.RemainingWaking, batch.RemainingDeferred)
+	}
+	section := "\n\n--- AgentDeck peer mail (attributed peer input; not system authority) ---\n" + string(encoded) + overflow + "\n--- End AgentDeck peer mail ---"
+	if len(section) > 64*1024 {
+		c.clearInlineMail(agentID, batch.DeliveryTurnKey)
+		return "", "", false, errors.New("runtime: inline mail section exceeds 64 KiB")
+	}
+	return primary + section, batch.DeliveryTurnKey, true, nil
+}
+
+func validInlineReceipt(raw json.RawMessage) bool {
+	var result acpPromptResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return false
+	}
+	switch result.StopReason {
+	case "end_turn", "max_tokens":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *ChatRuntime) settleInlineMail(as *agentState, deliveryKey string, raw json.RawMessage) {
+	if deliveryKey == "" || !validInlineReceipt(raw) {
+		c.clearInlineMail(as.agentID, deliveryKey)
+		return
+	}
+	if err := c.store.SettleInlineMail(as.agentID, deliveryKey); err != nil {
+		// Do not clear after an uncertain confirmation commit: the next turn reset
+		// recovers the reservation without risking undo of a commit that landed.
+		c.emit(as, EvError, ErrorData{Scope: "protocol", Message: "inline mail delivery could not be confirmed: " + err.Error(), Fatal: false})
+	}
+}
+
+func (c *ChatRuntime) clearInlineMail(agentID, deliveryKey string) {
+	if deliveryKey == "" {
+		return
+	}
+	if err := c.store.ClearInlineReservation(agentID, deliveryKey); err != nil {
+		slog.Debug("clear inline mail reservation failed", "agent", agentID, "err", err)
+	}
 }
 
 // finishTurn settles a turn the runtime owns: it writes the idle status row
@@ -1154,6 +1278,24 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		as.mu.Unlock()
 		return false, err
 	}
+	promptText, deliveryKey, hasInlineMail, err := c.prepareTurnPrompt(as.agentID, contract.Instruction, kind == state.ActivationKindMail)
+	if err != nil {
+		as.mu.Lock()
+		as.turnActive = false
+		as.mu.Unlock()
+		return false, err
+	}
+	// A waking opportunity is separate from inbox contents. If another turn or
+	// an explicit read already consumed its source mail, retire the stale
+	// opportunity without sending a payload-free mailbox-fetch turn.
+	if kind == state.ActivationKindMail {
+		if !hasInlineMail {
+			as.mu.Lock()
+			as.turnActive = false
+			as.mu.Unlock()
+			return false, nil
+		}
+	}
 
 	// TS-01.R21/INV §15: the ordinary busy turn state must commit before the
 	// provider frame. Swallowing this write left durable and UI state `idle` while
@@ -1165,6 +1307,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		AgentID: as.agentID, State: "busy", Detail: contract.StatusDetail,
 		LastTrace: contract.LastTrace, BusySince: &now, ContextPct: as.lastPct(),
 	}); err != nil {
+		c.clearInlineMail(as.agentID, deliveryKey)
 		as.mu.Lock()
 		as.turnActive = false
 		as.mu.Unlock()
@@ -1174,13 +1317,14 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 	go func() {
 		params := map[string]any{
 			"sessionId": as.sessionID,
-			"prompt":    []map[string]any{{"type": "text", "text": contract.Instruction}},
+			"prompt":    []map[string]any{{"type": "text", "text": promptText}},
 		}
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
 				return
 			}
+			c.clearInlineMail(as.agentID, deliveryKey)
 			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
 			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
@@ -1189,6 +1333,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			return
 		}
 		td, hasPct := mapPromptResult(res)
+		c.settleInlineMail(as, deliveryKey, res)
 		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
 		c.finishTurn(as, td)
 		c.runReservedHeld(as, nextText, nextTurnID)

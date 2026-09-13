@@ -24,6 +24,45 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 		lock.Unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before continuing")
 	}
+	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
+		current := stages[len(stages)-1]
+		detail, detailErr := m.Detail(runID)
+		if detailErr != nil {
+			lock.Unlock()
+			return RunDetail{}, detailErr
+		}
+		task, taskErr := m.store.ReadTask(current.TaskID)
+		if taskErr != nil {
+			lock.Unlock()
+			return RunDetail{}, taskErr
+		}
+		stage, found := stageByID(detail.Template, current.StageID)
+		if !found {
+			lock.Unlock()
+			return RunDetail{}, controlError("invalid_state", "current stage is missing")
+		}
+		var continueErr error
+		switch {
+		case run.State == "paused" && run.PendingAction == "await_approval" && task.Outcome == state.OutcomeSuccess:
+			continueErr = m.advanceTaskStage(run, detail, current, stage)
+		case run.State == "paused" && run.PendingAction == "" && (task.Outcome == state.OutcomeFailure || task.Outcome == state.OutcomeBlocked):
+			if strings.TrimSpace(input) == "" || utf8.RuneCountInString(input) > MaxValueRunes {
+				continueErr = validationError("continuation input is required", []Diagnostic{{Field: "input", Code: "invalid", Message: "input is required and must fit the pipeline value limit"}})
+				break
+			}
+			continueErr = m.continueTaskStage(run, detail, current, stage, input)
+		default:
+			continueErr = controlError("invalid_state", "continue is not valid for the current run state")
+		}
+		lock.Unlock()
+		if continueErr != nil {
+			return RunDetail{}, continueErr
+		}
+		return m.Detail(runID)
+	} else if stageErr != nil {
+		lock.Unlock()
+		return RunDetail{}, stageErr
+	}
 	release, err := m.acquireProjectStart(ctx, run.Project)
 	if err != nil {
 		lock.Unlock()
@@ -83,6 +122,92 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 	return m.Detail(runID)
 }
 
+func (m *Manager) continueTaskStage(run state.PipelineRunRecord, detail RunDetail, current state.PipelineStageTask, stage Stage, input string) error {
+	queued, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+		State: "queued", PendingAction: "create_stage_task", CurrentStageID: stage.ID,
+		CurrentAgentID: current.StandingAgentID,
+	})
+	if err != nil {
+		return err
+	}
+	taskID, err := m.store.NewTaskID()
+	if err != nil {
+		return err
+	}
+	instruction, digest := renderAssignment(queued, detail.Template, stage, detail.Values, nil, input)
+	assignment := standingAssignment(detail.Assignments, stage.ID)
+	targetKind := state.TargetLaunch
+	if current.StandingAgentID != "" {
+		targetKind = state.TargetAgent
+	}
+	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
+		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex,
+		AttemptNumber: current.AttemptNumber + 1, StageID: stage.ID, AssignmentDigest: digest,
+		ParentTaskID: current.TaskID, OutputValues: stageOutputValues(stage), Task: state.Task{
+			TaskID: taskID, Project: queued.Project, DisplayName: stage.Title, Instruction: instruction,
+			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
+			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
+			CreatedByKind: "pipeline",
+		},
+	})
+	if err == nil {
+		updated, readErr := m.store.ReadPipelineRun(run.RunID)
+		if readErr == nil {
+			m.publish(updated)
+		}
+	}
+	return err
+}
+
+func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail, current state.PipelineStageTask, stage Stage) error {
+	if current.StageIndex+1 >= len(detail.Template.Stages) {
+		completed, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+			State: "completed", PendingAction: "", CurrentStageID: stage.ID,
+			CurrentAgentID: "", FinalOutcome: state.OutcomeSuccess,
+		})
+		if err == nil {
+			m.publish(completed)
+			m.notify(completed, "completed")
+		}
+		return err
+	}
+	next := detail.Template.Stages[current.StageIndex+1]
+	queued, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+		State: "queued", PendingAction: "create_stage_task", CurrentStageID: next.ID,
+		CurrentAgentID: current.StandingAgentID,
+	})
+	if err != nil {
+		return err
+	}
+	taskID, err := m.store.NewTaskID()
+	if err != nil {
+		return err
+	}
+	instruction, digest := renderAssignment(queued, detail.Template, next, detail.Values, nil, "")
+	assignment := standingAssignment(detail.Assignments, next.ID)
+	targetKind := state.TargetLaunch
+	if current.StandingAgentID != "" {
+		targetKind = state.TargetAgent
+	}
+	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
+		RunID: queued.RunID, ExpectedRevision: queued.Revision, StageIndex: current.StageIndex + 1,
+		AttemptNumber: 1, StageID: next.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID,
+		OutputValues: stageOutputValues(next), Task: state.Task{
+			TaskID: taskID, Project: queued.Project, DisplayName: next.Title, Instruction: instruction,
+			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
+			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
+			CreatedByKind: "pipeline",
+		},
+	})
+	if err == nil {
+		updated, readErr := m.store.ReadPipelineRun(run.RunID)
+		if readErr == nil {
+			m.publish(updated)
+		}
+	}
+	return err
+}
+
 func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
 	lock := m.runLock(runID)
 	lock.Lock()
@@ -94,6 +219,23 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 	if run.Revision != expectedRevision {
 		lock.Unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before retrying")
+	}
+	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
+		current := stages[len(stages)-1]
+		updated, retryErr := m.store.RetryInterruptedPipelineStageTask(runID, current.TaskID, expectedRevision)
+		if retryErr != nil {
+			lock.Unlock()
+			if errors.Is(retryErr, state.ErrPipelineStageConflict) {
+				return RunDetail{}, controlError("invalid_state", "retry is not valid for the current stage task")
+			}
+			return RunDetail{}, retryErr
+		}
+		m.publish(updated)
+		lock.Unlock()
+		return m.Detail(runID)
+	} else if stageErr != nil {
+		lock.Unlock()
+		return RunDetail{}, stageErr
 	}
 	release, err := m.acquireProjectStart(ctx, run.Project)
 	if err != nil {
@@ -138,6 +280,23 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 		lock.Unlock()
 		return m.Detail(runID)
 	}
+	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr == nil && len(stages) > 0 {
+		updated, stopErr := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
+			State: "stopping", PendingAction: "cleanup_run", CurrentStageID: run.CurrentStageID,
+			CurrentAgentID: stages[len(stages)-1].StandingAgentID, FinalOutcome: "",
+		})
+		if stopErr == nil {
+			m.publish(updated)
+		}
+		lock.Unlock()
+		if stopErr != nil {
+			return RunDetail{}, stopErr
+		}
+		return m.Detail(runID)
+	} else if stageErr != nil {
+		lock.Unlock()
+		return RunDetail{}, stageErr
+	}
 	updated, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
 		State: "stopped", PendingAction: "stop_run_agent", CurrentStageID: run.CurrentStageID,
 		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID, FinalOutcome: "stopped",
@@ -148,6 +307,60 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 	lock.Unlock()
 	if err != nil {
 		return RunDetail{}, err
+	}
+	if err := m.Reconcile(ctx, runID); err != nil {
+		return RunDetail{}, err
+	}
+	return m.Detail(runID)
+}
+
+// FinishStopCleanup commits the terminal run outcome only after every lineage
+// member is terminal and its runtime release has settled.
+func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDetail, error) {
+	lock := m.runLock(runID)
+	lock.Lock()
+	defer lock.Unlock()
+	run, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	if run.Revision != expectedRevision {
+		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before finishing cleanup")
+	}
+	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
+		return RunDetail{}, controlError("invalid_state", "run cleanup is not pending")
+	}
+	tasks, err := m.store.ListTasksForPipelineRun(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	for _, task := range tasks {
+		if task.State != state.TaskFinished || task.PendingRelease || task.PendingYield {
+			return RunDetail{}, controlError("cleanup_pending", "run cleanup still has unfinished task effects")
+		}
+	}
+	stopped, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
+		State: "stopped", PendingAction: "", CurrentStageID: run.CurrentStageID,
+		CurrentAgentID: "", FinalOutcome: state.OutcomeCancelled,
+	})
+	if err != nil {
+		return RunDetail{}, err
+	}
+	m.publish(stopped)
+	m.notify(stopped, "completed")
+	return m.Detail(runID)
+}
+
+func (m *Manager) RepairCleanup(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
+	run, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	if run.Revision != expectedRevision {
+		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before repairing cleanup")
+	}
+	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
+		return RunDetail{}, controlError("invalid_state", "cleanup repair is not valid for the current run state")
 	}
 	if err := m.Reconcile(ctx, runID); err != nil {
 		return RunDetail{}, err
@@ -181,7 +394,7 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	run, attempt, err := m.store.CurrentPipelineAttemptForAgent(agentID)
 	if err != nil {
 		if errors.Is(err, state.ErrNotFound) {
-			return refuseReport(run, attempt, agentID, generation, controlError("assignment_unknown", "caller has no current pipeline assignment"))
+			return m.reportStageTask(agentID, generation, report)
 		}
 		return RunDetail{}, err
 	}
@@ -278,6 +491,64 @@ func (m *Manager) Report(agentID, generation string, report StageReport) (RunDet
 	}
 	m.publish(updated)
 	return m.Detail(run.RunID)
+}
+
+// reportStageTask keeps the historical manager entry point usable while the
+// shared task tool is wired by the server. Its acceptance path is task-owned;
+// it never writes a pipeline attempt/report row.
+func (m *Manager) reportStageTask(agentID, generation string, report StageReport) (RunDetail, error) {
+	stageTask, task, err := m.store.PipelineStageTaskForAssignee(agentID, generation)
+	if errors.Is(err, state.ErrNotFound) {
+		return RunDetail{}, controlError("assignment_unknown", "caller has no current pipeline stage task")
+	}
+	if err != nil {
+		return RunDetail{}, err
+	}
+	detail, err := m.Detail(stageTask.RunID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	stage, found := stageByID(detail.Template, stageTask.StageID)
+	if !found {
+		return RunDetail{}, controlError("invalid_state", "current stage is missing")
+	}
+	if err := state.ValidateAgentReport(report.Outcome, report.Summary, report.Details, report.Checks); err != nil {
+		return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "summary", Code: "invalid", Message: "summary is required and report fields must fit their documented limits"}})
+	}
+	if report.Outputs == nil {
+		report.Outputs = map[string]string{}
+	}
+	declared := map[string]StageOutput{}
+	for _, output := range stage.Outputs {
+		declared[output.Name] = output
+	}
+	for name, value := range report.Outputs {
+		if _, ok := declared[name]; !ok {
+			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + name, Code: "undeclared", Message: "output is not declared by the current stage"}})
+		}
+		if utf8.RuneCountInString(value) > MaxValueRunes {
+			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + name, Code: "too_long", Message: "output exceeds the pipeline value limit"}})
+		}
+	}
+	for _, output := range stage.Outputs {
+		if output.Value == "" {
+			continue
+		}
+		// Declared outputs are required on success; partial values remain legal for
+		// failure/blocked and are still retained on the immutable task result.
+		if report.Outcome == state.OutcomeSuccess && strings.TrimSpace(report.Outputs[output.Name]) == "" {
+			return RunDetail{}, validationError("invalid task result", []Diagnostic{{Field: "outputs." + output.Name, Code: "required", Message: "success requires every declared output"}})
+		}
+	}
+	updated, err := m.store.AcceptPipelineStageTaskResult(task.TaskID, agentID, generation, detail.Run.Revision, state.TaskResult{Outcome: report.Outcome, Summary: report.Summary, Details: report.Details, Outputs: report.Outputs})
+	if errors.Is(err, state.ErrPipelineStageConflict) {
+		return RunDetail{}, controlError("stale_assignment", "the stage task is no longer current")
+	}
+	if err != nil {
+		return RunDetail{}, err
+	}
+	m.publish(updated)
+	return m.Detail(stageTask.RunID)
 }
 
 // refuseReport logs every refused stage result at Warn before returning it. The

@@ -14,7 +14,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None; the next role picks from the queues below.
+- **Active change:** `persistent-pipeline-orchestration` is in progress under `/work`.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
 - **Review units:** `/review` has no available unit; every unit through this release is closed.
@@ -57,7 +57,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None.
+**Change:** `persistent-pipeline-orchestration`
+
+**State:** In progress. Implementation started 2026-09-12 from the completed FS/TS contract.
+The first slice is the shared bounded inline-mail preparation and settlement seam, followed by
+durable task waiting/repair and the task-backed pipeline replacement.
 
 **Changelog — 2026-09-12 (design-feature):** Completed the mail technical contract against existing
 runtime and state seams: optional wake intent, shared bounded inline preparation, provider-result

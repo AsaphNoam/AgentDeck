@@ -130,6 +130,7 @@ type sendMessageArgs struct {
 	Body      string `json:"body" jsonschema:"message body, 1..8000 chars"`
 	Subject   string `json:"subject,omitempty" jsonschema:"optional subject, <=200 chars"`
 	InReplyTo string `json:"in_reply_to,omitempty" jsonschema:"optional message_id being replied to"`
+	Wake      *bool  `json:"wake,omitempty" jsonschema:"request a recipient turn; defaults true; false queues durable mail for the next independently authorized turn"`
 }
 
 func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, in sendMessageArgs) (*mcp.CallToolResult, any, error) {
@@ -146,7 +147,14 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 			"message": fmt.Sprintf("subject must be <=%d chars.", maxSubjectLen)})
 	}
 
+	wake := true
+	if in.Wake != nil {
+		wake = *in.Wake
+	}
 	addressable, err := s.addressableAgents()
+	if !wake {
+		addressable, err = s.deferredMailRecipients()
+	}
 	if err != nil {
 		return storeUnavailable(err)
 	}
@@ -181,7 +189,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 	}
 
 	budgetLimit := s.budgetLimit(self)
-	msgID, budget, breached, err := s.store.InsertMessageWithBudget(state.Message{
+	msgID, budget, breached, err := s.store.InsertMessageWithBudgetWake(state.Message{
 		FromAgent:   self,
 		FromAddress: sender.Role + "@" + sender.Project,
 		FromName:    sender.Name,
@@ -189,7 +197,7 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 		Subject:     in.Subject,
 		Body:        in.Body,
 		InReplyTo:   in.InReplyTo,
-	}, budgetLimit)
+	}, budgetLimit, wake)
 	if err != nil {
 		return storeUnavailable(err)
 	}
@@ -203,13 +211,45 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 			"used":    budgetLimit,
 		})
 	}
-	s.messageInserted(self, toID)
+	if wake {
+		s.messageInserted(self, toID)
+	}
 	return jsonResult(map[string]any{
 		"ok":         true,
 		"message_id": msgID,
 		"to":         toID,
 		"to_address": recipient.Role + "@" + recipient.Project,
+		"wake":       wake,
+		"delivery":   map[bool]string{true: "waking", false: "deferred"}[wake],
 	})
+}
+
+// deferredMailRecipients is broader than the waking directory: stopped chat
+// identities remain addressable even when current task/run ownership forbids a
+// wake. Project availability is still required and terminal/archived identities
+// remain excluded (FS-06.R35).
+func (s *Server) deferredMailRecipients() ([]state.LiveAgent, error) {
+	recipients, err := s.store.ContextRecipients()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	projectAvailable := s.projectAvailable
+	s.mu.RUnlock()
+	out := make([]state.LiveAgent, 0, len(recipients))
+	for _, recipient := range recipients {
+		if projectAvailable != nil {
+			available, gateErr := projectAvailable(recipient.Project)
+			if gateErr != nil {
+				return nil, gateErr
+			}
+			if !available {
+				continue
+			}
+		}
+		out = append(out, recipient)
+	}
+	return out, nil
 }
 
 func (s *Server) pipelineRecipientRefusal(selector string) (string, bool) {
@@ -253,14 +293,16 @@ type checkMessagesArgs struct {
 
 // outMessage is the per-message shape check_messages returns (techspec §3.5).
 type outMessage struct {
-	MessageID   string `json:"message_id"`
-	From        string `json:"from"`
-	FromAddress string `json:"from_address"`
-	FromName    string `json:"from_name"`
-	Subject     string `json:"subject"`
-	Body        string `json:"body"`
-	CreatedAt   string `json:"created_at"`
-	InReplyTo   string `json:"in_reply_to,omitempty"`
+	MessageID    string `json:"message_id"`
+	From         string `json:"from"`
+	FromAddress  string `json:"from_address"`
+	FromName     string `json:"from_name"`
+	Subject      string `json:"subject"`
+	Body         string `json:"body"`
+	CreatedAt    string `json:"created_at"`
+	InReplyTo    string `json:"in_reply_to,omitempty"`
+	Wake         bool   `json:"wake"`
+	DeliveredVia string `json:"delivered_via"`
 }
 
 func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest, in checkMessagesArgs) (*mcp.CallToolResult, any, error) {
@@ -291,14 +333,16 @@ func (s *Server) handleCheckMessages(_ context.Context, req *mcp.CallToolRequest
 	out := make([]outMessage, len(msgs))
 	for i, m := range msgs {
 		out[i] = outMessage{
-			MessageID:   m.MessageID,
-			From:        m.FromAgent,
-			FromAddress: m.FromAddress,
-			FromName:    m.FromName,
-			Subject:     m.Subject,
-			Body:        m.Body,
-			CreatedAt:   m.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
-			InReplyTo:   m.InReplyTo,
+			MessageID:    m.MessageID,
+			From:         m.FromAgent,
+			FromAddress:  m.FromAddress,
+			FromName:     m.FromName,
+			Subject:      m.Subject,
+			Body:         m.Body,
+			CreatedAt:    m.CreatedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+			InReplyTo:    m.InReplyTo,
+			Wake:         m.Wake,
+			DeliveredVia: m.DeliveredVia,
 		}
 	}
 

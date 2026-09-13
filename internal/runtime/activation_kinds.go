@@ -24,7 +24,7 @@ type ActivationKind struct {
 // rather than prompting a model with another kind's instruction.
 var activationKinds = map[string]ActivationKind{
 	state.ActivationKindMail: {
-		Instruction:  "You have new messages. Call the check_messages tool and handle them.",
+		Instruction:  "Handle the attributed peer mail supplied with this turn.",
 		StatusDetail: "checking messages",
 		LastTrace:    "MailActivation",
 	},

@@ -136,18 +136,20 @@ type HookPayload struct {
 // dashboard server is the sole writer. from_agent is always the sender's
 // session-bound agent_id (never a spoofable argument).
 type Message struct {
-	MessageID    string     `json:"message_id"`
-	FromAgent    string     `json:"from_agent"`
-	FromAddress  string     `json:"from_address"`
-	FromName     string     `json:"from_name"`
-	ToAgent      string     `json:"to_agent"`
-	Subject      string     `json:"subject"`
-	Body         string     `json:"body"`
-	CreatedAt    time.Time  `json:"created_at"`
-	Read         bool       `json:"read"`
-	ReadAt       *time.Time `json:"read_at,omitempty"`
-	DeliveredVia string     `json:"delivered_via"`
-	InReplyTo    string     `json:"in_reply_to,omitempty"`
+	MessageID             string     `json:"message_id"`
+	FromAgent             string     `json:"from_agent"`
+	FromAddress           string     `json:"from_address"`
+	FromName              string     `json:"from_name"`
+	ToAgent               string     `json:"to_agent"`
+	Subject               string     `json:"subject"`
+	Body                  string     `json:"body"`
+	CreatedAt             time.Time  `json:"created_at"`
+	Read                  bool       `json:"read"`
+	ReadAt                *time.Time `json:"read_at,omitempty"`
+	DeliveredVia          string     `json:"delivered_via"`
+	Wake                  bool       `json:"wake"`
+	InlineDeliveryTurnKey string     `json:"inline_delivery_turn_key,omitempty"`
+	InReplyTo             string     `json:"in_reply_to,omitempty"`
 }
 
 // Availability values for LiveAgent: an agent that is running right now, or a
@@ -192,24 +194,26 @@ type AgentRef struct {
 // immutable model-neutral template/run snapshot and are decoded by
 // internal/pipeline, keeping internal/state independent of the orchestrator.
 type PipelineRunRecord struct {
-	RunID            string          `json:"run_id"`
-	TemplateID       string          `json:"template_id"`
-	TemplateSnapshot json.RawMessage `json:"template_snapshot"`
-	DisplayName      string          `json:"display_name"`
-	Project          string          `json:"project"`
-	Goal             string          `json:"goal"`
-	Inputs           json.RawMessage `json:"inputs"`
-	Assignments      json.RawMessage `json:"assignments"`
-	State            string          `json:"state"`
-	Revision         int64           `json:"revision"`
-	PendingAction    string          `json:"pending_action"`
-	CurrentStageID   string          `json:"current_stage_id"`
-	CurrentAttemptID string          `json:"current_attempt_id"`
-	CurrentAgentID   string          `json:"current_agent_id"`
-	AttentionReason  string          `json:"attention_reason"`
-	FinalOutcome     string          `json:"final_outcome"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
+	RunID               string          `json:"run_id"`
+	TemplateID          string          `json:"template_id"`
+	TemplateSnapshot    json.RawMessage `json:"template_snapshot"`
+	DisplayName         string          `json:"display_name"`
+	Project             string          `json:"project"`
+	Goal                string          `json:"goal"`
+	Inputs              json.RawMessage `json:"inputs"`
+	Assignments         json.RawMessage `json:"assignments"`
+	State               string          `json:"state"`
+	Revision            int64           `json:"revision"`
+	PendingAction       string          `json:"pending_action"`
+	CurrentStageID      string          `json:"current_stage_id"`
+	CurrentTaskID       string          `json:"current_task_id,omitempty"`
+	OrchestratorAgentID string          `json:"orchestrator_agent_id,omitempty"`
+	CurrentAttemptID    string          `json:"current_attempt_id"`
+	CurrentAgentID      string          `json:"current_agent_id"`
+	AttentionReason     string          `json:"attention_reason"`
+	FinalOutcome        string          `json:"final_outcome"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
 type PipelineAttemptRecord struct {
@@ -310,6 +314,9 @@ type CreatePipelineRunParams struct {
 	RequestHash    string
 	Values         []PipelineValueRecord
 	InitialAttempt *PipelineAttemptRecord
+	// InitialStageTask is inserted in the same transaction as a v2 run. It is
+	// nil only for retained legacy callers.
+	InitialStageTask *CreatePipelineStageTaskParams
 }
 
 type PipelineRunUpdate struct {

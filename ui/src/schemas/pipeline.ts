@@ -24,29 +24,21 @@ export const pipelineStageOutputSchema = z.object({
   description: z.string(),
 });
 
-export const pipelineTransitionSchema = z.object({
-  stage: z.string().optional().default(""),
-  final: z.string().optional().default(""),
-  approval: z.enum(["automatic", "required"]),
-});
-
 export const pipelineStageSchema = z.object({
   id: z.string(),
   title: z.string(),
-  role: z.string(),
-  instruction: z.string(),
+  objective: z.string(),
   inputs: z.array(pipelineStageInputSchema),
   outputs: z.array(pipelineStageOutputSchema),
-  max_visits: z.number().int().optional().default(1),
-  transitions: z.object({
-    success: pipelineTransitionSchema,
-    failure: pipelineTransitionSchema,
-  }),
+  coordination: z.enum(["standing", "dedicated"]).optional().default("standing"),
+  dedicated_role: z.string().optional().default(""),
+  approval_after_success: z.boolean().optional().default(false),
 });
 
 export const pipelineTemplateSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   title: z.string(),
+  orchestrator_role: z.string(),
   inputs: z.array(pipelineValueDeclSchema),
   stages: z.array(pipelineStageSchema),
 });
@@ -72,7 +64,8 @@ export const pipelineStartRequestSchema = z.object({
   project: z.string(),
   goal: z.string(),
   inputs: z.record(z.string()),
-  assignments: z.record(pipelineRuntimeAssignmentSchema),
+  orchestrator: pipelineRuntimeAssignmentSchema,
+  dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema),
 });
 
 export const pipelineRunSchema = z.object({
@@ -83,11 +76,14 @@ export const pipelineRunSchema = z.object({
   project: z.string(),
   goal: z.string(),
   inputs: z.record(z.string()),
-  assignments: z.record(pipelineRuntimeAssignmentSchema),
+  orchestrator: pipelineRuntimeAssignmentSchema.optional().default({ backend: "", model: "", effort: "", fast: false }),
+  dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
   state: z.string(),
   revision: z.number().int(),
   pending_action: z.string(),
   current_stage_id: z.string(),
+  current_task_id: z.string().optional().default(""),
+  orchestrator_agent_id: z.string().optional().default(""),
   current_attempt_id: z.string(),
   current_agent_id: z.string(),
   attention_reason: z.string(),
@@ -96,30 +92,62 @@ export const pipelineRunSchema = z.object({
   updated_at: z.string(),
 });
 
-export const pipelineAttemptSchema = z.object({
-  attempt_id: z.string(),
+export const pipelineTaskWorkSchema: z.ZodType<{
+  task_id: string; display_name: string; state: string; outcome?: string; summary?: string; agent_id?: string; agent_name?: string; route?: "live" | "archive" | "unavailable"; children?: unknown[];
+}> = z.object({
+  task_id: z.string(),
+  display_name: z.string(),
+  state: z.string(),
+  outcome: z.string().optional().default(""),
+  summary: z.string().optional().default(""),
+  agent_id: z.string().optional().default(""),
+  agent_name: z.string().optional().default(""),
+  route: z.enum(["live", "archive", "unavailable"]).optional().default("unavailable"),
+  children: z.array(z.lazy(() => pipelineTaskWorkSchema)).optional().default([]),
+});
+
+export const pipelineStageTaskSchema = z.object({
+  task_id: z.string(),
   run_id: z.string(),
   stage_id: z.string(),
-  attempt_no: z.number().int(),
-  visit_no: z.number().int(),
-  parent_attempt_id: z.string().optional().default(""),
-  agent_id: z.string().optional().default(""),
-  agent_generation: z.string().optional().default(""),
-  backend: z.string(),
-  model: z.string(),
+  stage_index: z.number().int(),
+  attempt_number: z.number().int(),
   state: z.string(),
   assignment_text: z.string(),
-  assignment_hash: z.string(),
-  assignment_version: z.number().int(),
-  report_outcome: z.string().optional().default(""),
-  report_summary: z.string().optional().default(""),
-  report_details: z.string().optional().default(""),
-  report_checks: z.string().optional().default(""),
-  report_outputs: z.record(z.string()),
-  reported_at: z.string().nullable().optional(),
-  quiescent_at: z.string().nullable().optional(),
+  standing_owner: z.object({
+    agent_id: z.string().optional().default(""),
+    name: z.string().optional().default(""),
+    state: z.string().optional().default(""),
+    route: z.enum(["live", "archive", "unavailable"]).optional().default("unavailable"),
+    runtime: pipelineRuntimeAssignmentSchema.optional(),
+  }),
+  coordinator: z.object({
+    task_id: z.string().optional().default(""),
+    agent_id: z.string().optional().default(""),
+    name: z.string().optional().default(""),
+    state: z.string().optional().default(""),
+    route: z.enum(["live", "archive", "unavailable"]).optional().default("unavailable"),
+    report_summary: z.string().optional().default(""),
+    runtime: pipelineRuntimeAssignmentSchema.optional(),
+  }).optional(),
+  result: z.object({
+    outcome: z.string().optional().default(""),
+    summary: z.string().optional().default(""),
+    details: z.string().optional().default(""),
+    checks: z.string().optional().default(""),
+    outputs: z.record(z.string()).optional().default({}),
+  }).optional(),
+  work: z.array(pipelineTaskWorkSchema).optional().default([]),
+  cleanup: z.object({ state: z.string().optional().default(""), reason: z.string().optional().default("") }).optional(),
   created_at: z.string(),
   updated_at: z.string(),
+});
+
+// Kept as a read-only compatibility projection until the server detail route
+// switches to task provenance. New UI chooses `stage_tasks` whenever present.
+export const pipelineAttemptSchema = z.object({
+  attempt_id: z.string(), run_id: z.string(), stage_id: z.string(), attempt_no: z.number().int(), visit_no: z.number().int(),
+  parent_attempt_id: z.string().optional().default(""), agent_id: z.string().optional().default(""), agent_generation: z.string().optional().default(""), backend: z.string(), model: z.string(), state: z.string(), assignment_text: z.string(), assignment_hash: z.string(), assignment_version: z.number().int(), report_outcome: z.string().optional().default(""), report_summary: z.string().optional().default(""), report_details: z.string().optional().default(""), report_checks: z.string().optional().default(""), report_outputs: z.record(z.string()), reported_at: z.string().nullable().optional(), quiescent_at: z.string().nullable().optional(), created_at: z.string(), updated_at: z.string(),
 });
 
 export const pipelineValueSchema = z.object({
@@ -135,37 +163,23 @@ export const pipelineRunDetailSchema = z.object({
   run: pipelineRunSchema,
   template: pipelineTemplateSchema,
   inputs: z.record(z.string()),
-  assignments: z.record(pipelineRuntimeAssignmentSchema),
-  attempts: z.array(pipelineAttemptSchema),
+  orchestrator: pipelineRuntimeAssignmentSchema.optional(),
+  dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
+  stage_tasks: z.array(pipelineStageTaskSchema).optional().default([]),
+  assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
+  attempts: z.array(pipelineAttemptSchema).optional().default([]),
   values: z.array(pipelineValueSchema),
   diagnostics: z.array(pipelineDiagnosticSchema),
+  controls: z.object({
+    continue: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
+    retry: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
+    replace: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
+    stop: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
+    repair_cleanup: z.object({ eligible: z.boolean(), reason: z.string().optional().default("") }),
+  }).optional(),
   agents_by_attempt: z.record(z.object({
-    stage_agent: z.object({
-      agent_id: z.string(),
-      name: z.string(),
-      running: z.boolean(),
-      state: z.string(),
-      preview: z.string(),
-      route: z.enum(["live", "archive", "unavailable"]),
-      available: z.boolean(),
-      fast: z.boolean().optional().default(false),
-    }).nullable(),
-    delegated_agents: z.array(z.object({
-      agent_id: z.string(),
-      name: z.string(),
-      running: z.boolean(),
-      state: z.string(),
-      preview: z.string(),
-      route: z.enum(["live", "archive", "unavailable"]),
-      available: z.boolean(),
-      fast: z.boolean().optional().default(false),
-      task_id: z.string(),
-      display_name: z.string(),
-      task_state: z.string().optional().default(""),
-      outcome: z.string(),
-    })),
-    delegated_total: z.number().int(),
-    delegated_running_count: z.number().int(),
+    stage_agent: z.object({ agent_id: z.string(), name: z.string(), running: z.boolean(), state: z.string(), preview: z.string(), route: z.enum(["live", "archive", "unavailable"]), available: z.boolean(), fast: z.boolean().optional().default(false) }).nullable(),
+    delegated_agents: z.array(z.object({ agent_id: z.string(), name: z.string(), running: z.boolean(), state: z.string(), preview: z.string(), route: z.enum(["live", "archive", "unavailable"]), available: z.boolean(), fast: z.boolean().optional().default(false), task_id: z.string(), display_name: z.string(), task_state: z.string().optional().default(""), outcome: z.string() })), delegated_total: z.number().int(), delegated_running_count: z.number().int(),
   })).optional().default({}),
 });
 

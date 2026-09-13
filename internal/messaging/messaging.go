@@ -214,11 +214,11 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, s.handleListAgents)
 	addTool(s, &mcp.Tool{
 		Name:        "send_message",
-		Description: "Send a message to another agent, running or stopped-wakeable; a stopped recipient is woken to receive it, which takes longer. `to` is role@project, an agent name, or an agent_id.",
+		Description: "Send durable mail to another chat agent. `wake` defaults true and requests a recipient turn; set it false for a deferred FYI delivered with the recipient's next independently authorized turn. `to` is role@project, agent name, or agent_id.",
 	}, s.handleSendMessage)
 	addTool(s, &mcp.Tool{
 		Name:        "check_messages",
-		Description: "Read your pending messages; flags them read (or deletes) as requested.",
+		Description: "Deliberately retrieve pending or historical mail, including overflow not supplied inline; flags returned messages read (or deletes) as requested.",
 	}, s.handleCheckMessages)
 	addTool(s, &mcp.Tool{
 		Name:        "report_pipeline_stage_result",
@@ -244,6 +244,26 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "cancel_task",
 		Description: "Cancel a task you created. Its outcome becomes cancelled and anything waiting on it is resolved.",
 	}, s.handleCancelTask)
+	addTool(s, &mcp.Tool{
+		Name:        "list_tasks",
+		Description: "List up to 100 durable tasks you created, newest first. Defaults to 25.",
+	}, s.handleListTasks)
+	addTool(s, &mcp.Tool{
+		Name:        "get_task",
+		Description: "Read one durable task you created, including its state, result, prerequisites, and repair eligibility.",
+	}, s.handleGetTask)
+	addTool(s, &mcp.Tool{
+		Name:        "retry_task",
+		Description: "Retry one eligible task you created without changing its prerequisites.",
+	}, s.handleRetryTask)
+	addTool(s, &mcp.Tool{
+		Name:        "rearm_task",
+		Description: "Replace the prerequisites of one rearmable task you created.",
+	}, s.handleRearmTask)
+	addTool(s, &mcp.Tool{
+		Name:        "wait_for_tasks",
+		Description: "Observe changes to tasks you created or durably yield this assignment until one changes. Requires the current execution handle from get_assigned_task.",
+	}, s.handleWaitForTasks)
 	addTool(s, &mcp.Tool{
 		Name:        "report_task_result",
 		Description: "Record the authoritative success, failure, or blocked result for the task you are assigned. Your runtime is released after this turn ends, so you still receive this response.",

@@ -356,6 +356,12 @@ func (s *Server) confirmTaskStart(task state.Task) {
 	} else if !ok {
 		s.log.Debug("task start was settled by someone else", "task", task.TaskID)
 	} else {
+		// A pipeline association becomes standing-owner authority only after the
+		// dispatcher confirmed this exact task/runtime assignment. A coordinator
+		// or an unstarted task can therefore never report a stage by lineage alone.
+		if err := s.stateStore.BindPipelineStageTaskStandingAgent(confirmed.TaskID, confirmed.AssignedAgentID); err != nil && !errors.Is(err, state.ErrNotFound) && !errors.Is(err, state.ErrPipelineStageConflict) {
+			s.log.Debug("bind pipeline standing task failed", "task", confirmed.TaskID, "err", err)
+		}
 		s.publishTaskUpdate(confirmed)
 	}
 }
@@ -412,12 +418,51 @@ func (s *Server) taskConcurrencyBudget() int {
 // nothing may stop it until the turn ends — so this is one dispatch with two
 // subscribers rather than two paths (TS-10.R19, TS-09.R9–R11, INV §2).
 func (s *Server) dispatchTurnEnd(agentID, generation string) {
+	s.releaseYieldedTask(context.Background(), agentID, generation)
+	s.releaseReportedTask(context.Background(), agentID, generation)
 	if s.pipelineMgr != nil {
+		// Legacy attempts still receive their compatibility callback; v2 stage
+		// advancement observes the released task association below.
 		if err := s.pipelineMgr.OnTurnEnd(agentID, generation); err != nil {
 			s.log.Warn("pipeline turn boundary", "agent_id", agentID, "err", err)
 		}
+		task, _, err := s.stateStore.PipelineStageTaskForAssignee(agentID, generation)
+		if err == nil {
+			if err := s.pipelineMgr.Reconcile(context.Background(), task.RunID); err != nil {
+				s.log.Warn("pipeline task release reconcile", "task", task.TaskID, "err", err)
+			}
+		}
 	}
-	s.releaseReportedTask(context.Background(), agentID, generation)
+}
+
+// releaseYieldedTask applies a durable wait only after the wait tool response's
+// turn has ended. Created/woke runtimes release capacity through the ordinary
+// stop path; borrowed conversations remain running and only release assignment
+// execution ownership.
+func (s *Server) releaseYieldedTask(ctx context.Context, agentID, generation string) {
+	task, err := s.stateStore.PendingYieldTask(agentID, generation)
+	if errors.Is(err, state.ErrNotFound) {
+		return
+	}
+	if err != nil {
+		s.log.Debug("read pending task yield failed", "agent", agentID, "err", err)
+		return
+	}
+	if task.RuntimeClaim == state.ClaimCreated || task.RuntimeClaim == state.ClaimWoke {
+		if err := s.StopStage(ctx, agentID); err != nil {
+			s.log.Debug("stop yielded task runtime failed", "task", task.TaskID, "agent", agentID, "err", err)
+			return
+		}
+	}
+	settled, err := s.stateStore.CompleteTaskYield(task.TaskID)
+	if err != nil {
+		s.log.Debug("complete task yield failed", "task", task.TaskID, "err", err)
+		return
+	}
+	s.publishTaskUpdate(settled)
+	if settled.State == state.TaskReady {
+		go s.dispatchReadyTasks(context.Background())
+	}
 }
 
 // releaseReportedTask completes the release a recorded result already promised:
@@ -451,6 +496,17 @@ func (s *Server) releaseReportedTask(ctx context.Context, agentID, generation st
 // (TS-10.R3).
 func (s *Server) evaluateTaskResult(taskID string) {
 	s.evaluateSourceResult(state.SourceTask, taskID)
+	changed, err := s.stateStore.NotifyTaskWaiters(taskID)
+	if err != nil {
+		s.log.Debug("notify task waiters failed", "task", taskID, "err", err)
+		return
+	}
+	for _, task := range changed {
+		s.publishTaskUpdate(task)
+		if task.State == state.TaskReady {
+			go s.dispatchReadyTasks(context.Background())
+		}
+	}
 }
 
 func (s *Server) evaluateSourceResult(sourceKind, sourceID string) {
@@ -500,11 +556,18 @@ func (s *Server) recoverTasks(ctx context.Context) error {
 	for _, task := range awaiting {
 		s.finishInterruptedRelease(ctx, task)
 	}
-	unfinished, err := s.stateStore.TasksInStates(state.TaskStarting, state.TaskRunning)
+	unfinished, err := s.stateStore.TasksInStates(state.TaskStarting, state.TaskRunning, state.TaskWaiting)
 	if err != nil {
 		return err
 	}
 	for _, task := range unfinished {
+		if task.State == state.TaskWaiting {
+			continue
+		}
+		if task.PendingYield {
+			s.releaseYieldedTask(ctx, task.AssignedAgentID, task.AssignedGeneration)
+			continue
+		}
 		if task.State == state.TaskRunning {
 			// Its agent is an unowned orphan now, which the ordinary reconciliation
 			// sweep reaps. Nothing is resumed on a guess and no outcome is invented.
@@ -601,6 +664,11 @@ func (s *Server) interruptTaskOnExit(agentID, generation, cause string) {
 		s.log.Warn("interrupt task on agent exit", "agent_id", agentID, "err", err)
 	} else if ok {
 		s.publishTaskUpdate(task)
+		if s.pipelineMgr != nil {
+			if err := s.pipelineMgr.OnStageTaskInterrupted(task.TaskID); err != nil {
+				s.log.Warn("pause pipeline after stage task exit", "task", task.TaskID, "err", err)
+			}
+		}
 		s.log.Info("task interrupted by agent exit", "agent_id", agentID, "cause", cause)
 	}
 }

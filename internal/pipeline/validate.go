@@ -8,187 +8,143 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 )
 
-// ValidateTemplate is the canonical pure validator used by config reads, CRUD,
-// run start, and proposal handling. roles is the current configured role-id set.
-func ValidateTemplate(id string, template Template, roles map[string]bool) []Diagnostic {
-	t := NormalizeTemplate(template)
-	diagnostics := []Diagnostic{}
-	add := func(field, code, message string) {
-		if len(diagnostics) >= MaxDeclarations {
-			return
+// ValidateTemplate is the canonical pure validator for version-2 templates.
+func ValidateTemplate(id string, t Template, roles map[string]bool) []Diagnostic {
+	t = NormalizeTemplate(t)
+	d := []Diagnostic{}
+	add := func(f, c, m string) {
+		if len(d) < MaxDeclarations {
+			d = append(d, Diagnostic{Field: f, Code: c, Message: m})
 		}
-		diagnostics = append(diagnostics, Diagnostic{Field: field, Code: code, Message: message})
 	}
-
 	if !config.ValidSlug(id) {
 		add("id", "invalid_slug", "pipeline id must be a lowercase filename-safe slug")
 	}
-	if t.Version != 1 {
-		add("version", "unsupported_version", fmt.Sprintf("version must be 1, got %d", t.Version))
-		return diagnostics
+	if t.Version != 2 {
+		add("version", "unsupported_version", fmt.Sprintf("version must be 2, got %d", t.Version))
+		return d
 	}
-	validateText(&diagnostics, "title", t.Title, true, MaxTitleRunes)
+	validateText(&d, "title", t.Title, true, MaxTitleRunes)
+	if t.Executor != "" {
+		add("executor", "legacy_field", "executor is not supported in version 2")
+	}
+	if !config.ValidSlug(t.OrchestratorRole) || !roles[t.OrchestratorRole] {
+		add("orchestrator_role", "unknown_role", "orchestrator_role must name an existing configured role")
+	}
 	if len(t.Inputs) > MaxDeclarations {
 		add("inputs", "too_many", fmt.Sprintf("at most %d run inputs are allowed", MaxDeclarations))
 	}
 	if len(t.Stages) == 0 {
 		add("stages", "required", "at least one stage is required")
-	} else if len(t.Stages) > MaxStages {
-		add("stages", "too_many", fmt.Sprintf("at most %d stages are allowed", MaxStages))
+	} else if len(t.Stages) > 32 {
+		add("stages", "too_many", "at most 32 stages are allowed")
 	}
-
 	values := map[string]bool{}
-	runInputNames := map[string]bool{}
-	for i, input := range t.Inputs {
-		base := fmt.Sprintf("inputs.%d", i)
-		validateName(&diagnostics, base+".name", input.Name)
-		validateText(&diagnostics, base+".description", input.Description, true, MaxDescriptionRunes)
-		if runInputNames[input.Name] {
-			add(base+".name", "duplicate", "run input names must be unique")
+	names := map[string]bool{}
+	for i, in := range t.Inputs {
+		f := fmt.Sprintf("inputs.%d", i)
+		validateName(&d, f+".name", in.Name)
+		validateText(&d, f+".description", in.Description, true, MaxDescriptionRunes)
+		if names[in.Name] {
+			add(f+".name", "duplicate", "run input names must be unique")
 		}
-		runInputNames[input.Name] = true
-		values[input.Name] = true
+		names[in.Name] = true
+		values[in.Name] = true
 	}
-
-	stageByID := map[string]int{}
-	for i, stage := range t.Stages {
-		base := fmt.Sprintf("stages.%d", i)
-		validateName(&diagnostics, base+".id", stage.ID)
-		if _, exists := stageByID[stage.ID]; exists {
-			add(base+".id", "duplicate", "stage ids must be unique")
-		} else {
-			stageByID[stage.ID] = i
+	ids := map[string]bool{}
+	produced := map[string]int{}
+	for i, st := range t.Stages {
+		b := fmt.Sprintf("stages.%d", i)
+		validateName(&d, b+".id", st.ID)
+		if ids[st.ID] {
+			add(b+".id", "duplicate", "stage ids must be unique")
 		}
-		validateText(&diagnostics, base+".title", stage.Title, true, MaxTitleRunes)
-		if !config.ValidSlug(stage.Role) || !roles[stage.Role] {
-			add(base+".role", "unknown_role", "stage role must name an existing configured role")
+		ids[st.ID] = true
+		validateText(&d, b+".title", st.Title, true, MaxTitleRunes)
+		validateText(&d, b+".objective", st.Objective, true, MaxInstructionRunes)
+		if st.Instruction != "" && st.Instruction != st.Objective {
+			add(b+".instruction", "legacy_field", "instruction is replaced by objective")
 		}
-		validateText(&diagnostics, base+".instruction", stage.Instruction, true, MaxInstructionRunes)
-		if len(stage.Inputs) > MaxDeclarations {
-			add(base+".inputs", "too_many", fmt.Sprintf("at most %d inputs are allowed", MaxDeclarations))
+		if st.Role != "" {
+			add(b+".role", "legacy_field", "stage role is replaced by orchestrator_role")
 		}
-		if len(stage.Outputs) > MaxDeclarations {
-			add(base+".outputs", "too_many", fmt.Sprintf("at most %d outputs are allowed", MaxDeclarations))
+		c := st.Coordination
+		if c == "" {
+			c = "standing"
 		}
-		if stage.MaxVisits < 0 || stage.MaxVisits > MaxVisits {
-			add(base+".max_visits", "out_of_range", fmt.Sprintf("max_visits must be between 0 and %d", MaxVisits))
+		if c != "standing" && c != "dedicated" {
+			add(b+".coordination", "invalid_coordination", "coordination must be standing or dedicated")
 		}
-		localNames := map[string]bool{}
-		for j, input := range stage.Inputs {
-			field := fmt.Sprintf("%s.inputs.%d", base, j)
-			validateName(&diagnostics, field+".name", input.Name)
-			validateName(&diagnostics, field+".value", input.Value)
-			if localNames[input.Name] {
-				add(field+".name", "duplicate", "stage-local declaration names must be unique")
+		if c == "dedicated" {
+			if !config.ValidSlug(st.DedicatedRole) || !roles[st.DedicatedRole] {
+				add(b+".dedicated_role", "unknown_role", "dedicated_role must name an existing configured role")
 			}
-			localNames[input.Name] = true
+		} else if st.DedicatedRole != "" {
+			add(b+".dedicated_role", "unexpected", "dedicated_role requires dedicated coordination")
 		}
-		for j, output := range stage.Outputs {
-			field := fmt.Sprintf("%s.outputs.%d", base, j)
-			validateName(&diagnostics, field+".name", output.Name)
-			validateName(&diagnostics, field+".value", output.Value)
-			validateText(&diagnostics, field+".description", output.Description, true, MaxDescriptionRunes)
-			if localNames[output.Name] {
-				add(field+".name", "duplicate", "stage-local declaration names must be unique")
-			}
-			localNames[output.Name] = true
-			values[output.Value] = true
+		if st.MaxVisits != 0 {
+			add(b+".max_visits", "legacy_field", "max_visits and cyclic routing are not supported in version 2")
 		}
-	}
-
-	graph := map[string][]string{}
-	for i, stage := range t.Stages {
-		base := fmt.Sprintf("stages.%d", i)
-		for j, input := range stage.Inputs {
-			if input.Value != "" && !values[input.Value] {
-				add(fmt.Sprintf("%s.inputs.%d.value", base, j), "unresolved_value", "input binding must name a declared run input or stage output")
-			}
+		if st.Transitions != (OutcomeTransitions{}) {
+			add(b+".transitions", "legacy_field", "transitions are not supported in version 2")
 		}
-		for outcome, transition := range map[string]Transition{"success": stage.Transitions.Success, "failure": stage.Transitions.Failure} {
-			field := base + ".transitions." + outcome
-			if (transition.Stage == "") == (transition.Final == "") {
-				add(field, "invalid_destination", "transition must contain exactly one stage or final destination")
+		if len(st.Inputs) > MaxDeclarations {
+			add(b+".inputs", "too_many", fmt.Sprintf("at most %d inputs are allowed", MaxDeclarations))
+		}
+		if len(st.Outputs) > MaxDeclarations {
+			add(b+".outputs", "too_many", fmt.Sprintf("at most %d outputs are allowed", MaxDeclarations))
+		}
+		local := map[string]bool{}
+		for j, in := range st.Inputs {
+			f := fmt.Sprintf("%s.inputs.%d", b, j)
+			validateName(&d, f+".name", in.Name)
+			validateName(&d, f+".value", in.Value)
+			if local[in.Name] {
+				add(f+".name", "duplicate", "stage-local declaration names must be unique")
 			}
-			if transition.Stage != "" {
-				if _, ok := stageByID[transition.Stage]; !ok {
-					add(field+".stage", "unknown_stage", "transition destination does not exist")
-				} else {
-					graph[stage.ID] = append(graph[stage.ID], transition.Stage)
-				}
-			}
-			if transition.Final != "" && transition.Final != "success" && transition.Final != "failure" {
-				add(field+".final", "invalid_outcome", "final outcome must be success or failure")
-			}
-			if transition.Approval != "automatic" && transition.Approval != "required" {
-				add(field+".approval", "invalid_approval", "approval must be automatic or required")
+			local[in.Name] = true
+			if !values[in.Value] {
+				add(f+".value", "unresolved_value", "input binding must name a run input or an output of an earlier stage")
+			} else if p, ok := produced[in.Value]; ok && p >= i {
+				add(f+".value", "future_binding", "input binding must name an output of an earlier stage")
 			}
 		}
-	}
-
-	if len(t.Stages) > 0 {
-		reachable := map[string]bool{}
-		var visit func(string)
-		visit = func(id string) {
-			if reachable[id] {
-				return
+		for j, out := range st.Outputs {
+			f := fmt.Sprintf("%s.outputs.%d", b, j)
+			validateName(&d, f+".name", out.Name)
+			validateName(&d, f+".value", out.Value)
+			validateText(&d, f+".description", out.Description, true, MaxDescriptionRunes)
+			if local[out.Name] {
+				add(f+".name", "duplicate", "stage-local declaration names must be unique")
 			}
-			reachable[id] = true
-			for _, next := range graph[id] {
-				visit(next)
-			}
-		}
-		visit(t.Stages[0].ID)
-		for i, stage := range t.Stages {
-			if !reachable[stage.ID] {
-				add(fmt.Sprintf("stages.%d.id", i), "unreachable", "stage is not reachable from the first stage")
-			}
-			if participatesInCycle(stage.ID, graph) && stage.MaxVisits <= 0 {
-				add(fmt.Sprintf("stages.%d.max_visits", i), "unbounded_cycle", "every stage in a cycle requires a positive max_visits")
+			local[out.Name] = true
+			if _, ok := produced[out.Value]; ok {
+				add(f+".value", "duplicate", "stage output value keys must have one producer")
+			} else {
+				produced[out.Value] = i
+				values[out.Value] = true
 			}
 		}
 	}
-	return diagnostics
+	return d
 }
-
-func validateName(diagnostics *[]Diagnostic, field, value string) {
-	if !config.ValidSlug(value) {
-		*diagnostics = appendBounded(*diagnostics, Diagnostic{Field: field, Code: "invalid_name", Message: "must be a lowercase slug up to 63 characters"})
+func validateName(d *[]Diagnostic, f, v string) {
+	if !config.ValidSlug(v) {
+		*d = appendBounded(*d, Diagnostic{Field: f, Code: "invalid_name", Message: "must be a lowercase slug up to 63 characters"})
 	}
 }
-
-func validateText(diagnostics *[]Diagnostic, field, value string, required bool, limit int) {
-	if required && strings.TrimSpace(value) == "" {
-		*diagnostics = appendBounded(*diagnostics, Diagnostic{Field: field, Code: "required", Message: "value is required"})
+func validateText(d *[]Diagnostic, f, v string, req bool, limit int) {
+	if req && strings.TrimSpace(v) == "" {
+		*d = appendBounded(*d, Diagnostic{Field: f, Code: "required", Message: "value is required"})
 		return
 	}
-	if utf8.RuneCountInString(value) > limit {
-		*diagnostics = appendBounded(*diagnostics, Diagnostic{Field: field, Code: "too_long", Message: fmt.Sprintf("must be at most %d characters", limit)})
+	if utf8.RuneCountInString(v) > limit {
+		*d = appendBounded(*d, Diagnostic{Field: f, Code: "too_long", Message: fmt.Sprintf("must be at most %d characters", limit)})
 	}
 }
-
-func appendBounded(items []Diagnostic, item Diagnostic) []Diagnostic {
-	if len(items) >= MaxDeclarations {
-		return items
+func appendBounded(x []Diagnostic, v Diagnostic) []Diagnostic {
+	if len(x) >= MaxDeclarations {
+		return x
 	}
-	return append(items, item)
-}
-
-func participatesInCycle(start string, graph map[string][]string) bool {
-	seen := map[string]bool{}
-	var reaches func(string) bool
-	reaches = func(current string) bool {
-		for _, next := range graph[current] {
-			if next == start {
-				return true
-			}
-			if !seen[next] {
-				seen[next] = true
-				if reaches(next) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-	return reaches(start)
+	return append(x, v)
 }

@@ -7,15 +7,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { RunStartForm } from "./RunStartForm";
 
 const template = {
-  version: 1,
+  version: 2,
   title: "Delivery",
+  orchestrator_role: "implementer",
   inputs: [],
   stages: [{
-    id: "work", title: "Work", role: "implementer", instruction: "Do the work.", inputs: [], outputs: [], max_visits: 1,
-    transitions: {
-      success: { final: "success", approval: "automatic" },
-      failure: { final: "failure", approval: "required" },
-    },
+    id: "work", title: "Work", objective: "Do the work.", coordination: "standing", inputs: [], outputs: [],
   }],
 };
 
@@ -37,7 +34,7 @@ const server = setupServer(
       code: "validation_failed",
       message: "run cannot start",
       details: {
-        diagnostics: [{ field: "assignments.work", code: "unavailable", message: "unknown model \"gpt-5.6-sol\"" }],
+        diagnostics: [{ field: "orchestrator", code: "unavailable", message: "unknown model \"gpt-5.6-sol\"" }],
       },
     },
   }, { status: 422 })),
@@ -62,7 +59,7 @@ describe("RunStartForm", () => {
     await waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
 
-    expect(await screen.findByText("assignments.work")).toBeInTheDocument();
+    expect(await screen.findByText("orchestrator")).toBeInTheDocument();
     expect(screen.getByText(/unknown model "gpt-5.6-sol"/)).toBeInTheDocument();
     expect(screen.getByLabelText("Backend")).toHaveFocus();
   });
@@ -105,7 +102,7 @@ describe("RunStartForm", () => {
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
     await waitFor(() => expect(screen.getByRole("button", { name: "Next" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByText("Stage runtimes")).toBeInTheDocument();
+    expect(screen.getByText("Runtime assignments")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("heading", { name: "Release train" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));

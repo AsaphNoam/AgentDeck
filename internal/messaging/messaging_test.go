@@ -151,6 +151,77 @@ func TestSendAndCheckRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSendMessageWakeIntentDefaultsAndDefers(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+
+	srv := New(st, nil)
+	srv.Register("tok-impl", "a_impl")
+	cs := connect(t, srv, "tok-impl")
+
+	result, failed := call(t, cs, "send_message", map[string]any{
+		"to": "a_rev", "body": "action needed",
+	})
+	if failed || result["wake"] != true || result["delivery"] != "waking" {
+		t.Fatalf("default waking send = %v failed=%v", result, failed)
+	}
+	result, failed = call(t, cs, "send_message", map[string]any{
+		"to": "a_rev", "body": "FYI only", "wake": false,
+	})
+	if failed || result["wake"] != false || result["delivery"] != "deferred" {
+		t.Fatalf("deferred send = %v failed=%v", result, failed)
+	}
+
+	messages, err := st.ListMessages("a_rev", true, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wakeByBody := map[string]bool{}
+	for _, message := range messages {
+		wakeByBody[message.Body] = message.Wake
+	}
+	if len(messages) != 2 || !wakeByBody["action needed"] || wakeByBody["FYI only"] {
+		t.Fatalf("stored wake intent = %+v", messages)
+	}
+	activations, err := st.PendingActivations(state.ActivationKindMail, "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(activations) != 1 || activations[0].AgentID != "a_rev" {
+		t.Fatalf("pending activations = %+v, want one coalesced waking opportunity", activations)
+	}
+}
+
+func TestDeferredMailAddressesStoppedChatWithoutWaking(t *testing.T) {
+	st := newStore(t)
+	liveAgent(t, st, "a_impl", "Atlas", "implementer", "my-app")
+	liveAgent(t, st, "a_rev", "Nova", "reviewer", "my-app")
+	if err := st.DeleteRunning("a_rev"); err != nil {
+		t.Fatal(err)
+	}
+
+	srv := New(st, nil)
+	srv.Register("tok-impl", "a_impl")
+	cs := connect(t, srv, "tok-impl")
+
+	if result, failed := call(t, cs, "send_message", map[string]any{
+		"to": "a_rev", "body": "wake me", "wake": true,
+	}); !failed || result["error"] != "recipient_not_found" {
+		t.Fatalf("waking send to non-wakeable stopped chat = %v failed=%v", result, failed)
+	}
+	result, failed := call(t, cs, "send_message", map[string]any{
+		"to": "a_rev", "body": "FYI while stopped", "wake": false,
+	})
+	if failed || result["delivery"] != "deferred" {
+		t.Fatalf("deferred send to stopped chat = %v failed=%v", result, failed)
+	}
+	activations, err := st.PendingActivations(state.ActivationKindMail, "a_rev", 10)
+	if err != nil || len(activations) != 0 {
+		t.Fatalf("deferred activation = %+v, %v; want none", activations, err)
+	}
+}
+
 // TestCheckMessagesFiresReadSink guards the J10 blocker: reading mail must
 // refresh the recipient's state so its unread_messages badge clears. Without
 // the sink, send_message bumps the badge but check_messages never recomputes it.
@@ -213,8 +284,8 @@ func TestSendIdentityNotSpoofable(t *testing.T) {
 		{"send_message", map[string]any{"to": "reviewer@my-app", "body": "hi"}},
 		{"check_messages", nil},
 		{"report_pipeline_stage_result", map[string]any{"outcome": "success", "summary": "done"}},
-		{"propose_pipeline_template", map[string]any{"id": "quality", "template": map[string]any{"version": 1, "title": "Quality", "inputs": []any{}, "stages": []any{}}}},
-		{"propose_pipeline_run", map[string]any{"run": map[string]any{"request_id": "proposal", "template_id": "quality", "display_name": "Run", "project": "app", "goal": "goal", "inputs": map[string]any{}, "assignments": map[string]any{}}}},
+		{"propose_pipeline_template", map[string]any{"id": "quality", "template": map[string]any{"version": 2, "title": "Quality", "orchestrator_role": "implementer", "inputs": []any{}, "stages": []any{}}}},
+		{"propose_pipeline_run", map[string]any{"run": map[string]any{"request_id": "proposal", "template_id": "quality", "display_name": "Run", "project": "app", "goal": "goal", "inputs": map[string]any{}, "orchestrator": map[string]any{"backend": "codex", "model": "gpt"}, "dedicated_assignments": map[string]any{}}}},
 	}
 	for _, c := range anonCalls {
 		res, isErr := call(t, anonCS, c.tool, c.args)

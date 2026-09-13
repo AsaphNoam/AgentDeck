@@ -10,28 +10,20 @@ import (
 
 func validTemplate() Template {
 	return Template{
-		Version: 1,
-		Title:   "Implement and verify",
-		Inputs:  []ValueDecl{{Name: "spec", Description: "Specification", Required: true}},
+		Version:          2,
+		Title:            "Implement and verify",
+		OrchestratorRole: "implementer",
+		Inputs:           []ValueDecl{{Name: "spec", Description: "Specification", Required: true}},
 		Stages: []Stage{
 			{
-				ID: "work", Title: "Work", Role: "implementer", Instruction: "Implement the change.",
+				ID: "work", Title: "Work", Objective: "Implement the change.", Instruction: "Implement the change.",
 				Inputs:  []StageInput{{Name: "specification", Value: "spec", Required: true}},
 				Outputs: []StageOutput{{Name: "implementation", Value: "implementation", Description: "What changed"}},
-				Transitions: OutcomeTransitions{
-					Success: Transition{Stage: "review", Approval: "automatic"},
-					Failure: Transition{Final: "failure", Approval: "required"},
-				},
 			},
 			{
-				ID: "review", Title: "Review", Role: "reviewer", Instruction: "Review the change.",
+				ID: "review", Title: "Review", Objective: "Review the change.", Instruction: "Review the change.",
 				Inputs:  []StageInput{{Name: "implementation", Value: "implementation", Required: true}},
 				Outputs: []StageOutput{},
-				Transitions: OutcomeTransitions{
-					Success: Transition{Final: "success", Approval: "automatic"},
-					Failure: Transition{Stage: "work", Approval: "automatic"},
-				},
-				MaxVisits: 2,
 			},
 		},
 	}
@@ -53,15 +45,11 @@ func newTemplateStore(t *testing.T) (*TemplateStore, *config.Store) {
 	return NewTemplateStore(store), store
 }
 
-// FS-14.A9: bindings and bounded routing are rejected before a run can start.
-func TestTemplateValidationCoversRoutesBindingsAndCycles(t *testing.T) {
+// Version 2 only permits forward bindings and a single standing owner.
+func TestTemplateValidationCoversBindingsAndVersionTwoShape(t *testing.T) {
 	template := validTemplate()
 	diagnostics := ValidateTemplate("quality", template, map[string]bool{"implementer": true, "reviewer": true})
-	if len(diagnostics) == 0 || diagnostics[0].Code != "unbounded_cycle" {
-		t.Fatalf("diagnostics = %+v, want unbounded work cycle", diagnostics)
-	}
-	template.Stages[0].MaxVisits = 2
-	if diagnostics := ValidateTemplate("quality", template, map[string]bool{"implementer": true, "reviewer": true}); len(diagnostics) != 0 {
+	if len(diagnostics) != 0 {
 		t.Fatalf("valid template diagnostics = %+v", diagnostics)
 	}
 	template.Stages[1].Inputs[0].Value = "missing"
@@ -74,7 +62,6 @@ func TestTemplateValidationCoversRoutesBindingsAndCycles(t *testing.T) {
 func TestTemplateStoreRoundTripAndInvalidHandEdit(t *testing.T) {
 	service, configStore := newTemplateStore(t)
 	template := validTemplate()
-	template.Stages[0].MaxVisits = 2
 	record, err := service.Create("quality", template)
 	if err != nil || !record.Valid {
 		t.Fatalf("Create = %+v err %v", record, err)
@@ -103,11 +90,12 @@ func TestTemplateStoreRoundTripAndInvalidHandEdit(t *testing.T) {
 func TestTemplateCreateRefusesInvalidAndExisting(t *testing.T) {
 	service, _ := newTemplateStore(t)
 	template := validTemplate()
+	template.Version = 1
 	record, err := service.Create("quality", template)
-	if err != nil || record.Valid || !hasDiagnostic(record.Diagnostics, "unbounded_cycle") {
+	if err != nil || record.Valid || !hasDiagnostic(record.Diagnostics, "unsupported_version") {
 		t.Fatalf("invalid Create = %+v err %v", record, err)
 	}
-	template.Stages[0].MaxVisits = 2
+	template.Version = 2
 	if record, err = service.Create("quality", template); err != nil || !record.Valid {
 		t.Fatalf("valid Create = %+v err %v", record, err)
 	}

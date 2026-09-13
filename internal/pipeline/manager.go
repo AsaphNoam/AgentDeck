@@ -57,11 +57,7 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	if err != nil {
 		return RunDetail{}, false, err
 	}
-	attemptID, err := m.store.NewPipelineAttemptID()
-	if err != nil {
-		return RunDetail{}, false, err
-	}
-	agentID, err := m.store.NewAgentID()
+	taskID, err := m.store.NewTaskID()
 	if err != nil {
 		return RunDetail{}, false, err
 	}
@@ -74,23 +70,17 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 		RunID: runID, TemplateID: request.TemplateID, TemplateSnapshot: templateJSON,
 		DisplayName: request.DisplayName, Project: request.Project, Goal: request.Goal,
 		Inputs: inputsJSON, Assignments: assignmentsJSON, State: "queued", Revision: 1,
-		PendingAction: "launch_stage", CurrentStageID: first.ID, CurrentAttemptID: attemptID,
-		CurrentAgentID: agentID, CreatedAt: now, UpdatedAt: now,
+		PendingAction: "dispatch_stage_task", CurrentStageID: first.ID, CreatedAt: now, UpdatedAt: now,
 	}
 	values := make([]state.PipelineValueRecord, 0, len(request.Inputs))
 	for name, value := range request.Inputs {
 		values = append(values, state.PipelineValueRecord{RunID: runID, Name: name, Value: value, SourceKind: "run_input", UpdatedAt: now})
 	}
 	assignmentText, assignmentHash := renderAssignment(run, record.Template, first, values, nil, "")
-	assignment := request.Assignments[first.ID]
-	attempt := &state.PipelineAttemptRecord{
-		AttemptID: attemptID, RunID: runID, StageID: first.ID, AttemptNo: 1, VisitNo: 1,
-		AgentID: agentID, AgentGeneration: attemptID, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
-		State: "queued", AssignmentText: assignmentText, AssignmentHash: assignmentHash,
-		AssignmentVersion: assignmentVersion, ReportOutputs: json.RawMessage(`{}`), CreatedAt: now, UpdatedAt: now,
-	}
+	assignment := standingAssignment(request.Assignments, first.ID)
 	created, replay, err := m.store.CreatePipelineRun(state.CreatePipelineRunParams{
-		Run: run, RequestID: request.RequestID, RequestHash: requestHash, Values: values, InitialAttempt: attempt,
+		Run: run, RequestID: request.RequestID, RequestHash: requestHash, Values: values,
+		InitialStageTask: &state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}},
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineRequestConflict) {
@@ -103,11 +93,57 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 	// simply matches no record (FS-14.R33, TS-09.R26).
 	m.consumeProposal(request.RequestID)
 	m.publish(created)
-	if err := m.Reconcile(ctx, created.RunID); err != nil {
-		return RunDetail{}, replay, err
-	}
 	detail, err := m.Detail(created.RunID)
 	return detail, replay, err
+}
+
+// OnStageTaskInterrupted projects an unexpected standing-owner exit onto the
+// run without guessing an outcome. Retry remains an explicit operator action.
+func (m *Manager) OnStageTaskInterrupted(taskID string) error {
+	stage, err := m.store.ReadPipelineStageTaskByTask(taskID)
+	if errors.Is(err, state.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	run, err := m.store.ReadPipelineRun(stage.RunID)
+	if err != nil {
+		return err
+	}
+	if run.State == "completed" || run.State == "stopped" || run.State == "stopping" {
+		return nil
+	}
+	updated, err := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+		State: "paused", PendingAction: "", CurrentStageID: stage.StageID,
+		CurrentAgentID: stage.StandingAgentID, AttentionReason: "interrupted",
+	})
+	if errors.Is(err, state.ErrPipelineConflict) {
+		return nil
+	}
+	if err == nil {
+		m.publish(updated)
+		m.notify(updated, "needs_attention")
+	}
+	return err
+}
+
+func stageOutputValues(stage Stage) map[string]string {
+	out := make(map[string]string, len(stage.Outputs))
+	for _, output := range stage.Outputs {
+		out[output.Name] = output.Value
+	}
+	return out
+}
+
+// standingAssignment accepts the temporary stage-keyed HTTP shape while v2
+// callers move to the explicit standing key. The standing owner is the only
+// stage executor; dedicated coordinators are child-task configuration.
+func standingAssignment(assignments map[string]RuntimeAssignment, firstStageID string) RuntimeAssignment {
+	if a, ok := assignments["standing"]; ok {
+		return a
+	}
+	return assignments[firstStageID]
 }
 
 func startRequestHash(request StartRequest) (string, error) {
@@ -147,6 +183,18 @@ func (m *Manager) acquireProjectStart(ctx context.Context, project string) (func
 }
 
 func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (TemplateRecord, error) {
+	// V2 names the standing owner and optional dedicated coordinators directly.
+	// Keep one canonical frozen assignment map internally while older local
+	// callers finish migrating.
+	if request.Assignments == nil {
+		request.Assignments = map[string]RuntimeAssignment{}
+	}
+	if request.Orchestrator.Backend != "" || request.Orchestrator.Model != "" {
+		request.Assignments["standing"] = request.Orchestrator
+	}
+	for stageID, assignment := range request.DedicatedAssignments {
+		request.Assignments[stageID] = assignment
+	}
 	diagnostics := []Diagnostic{}
 	add := func(field, code, message string) {
 		diagnostics = appendBounded(diagnostics, Diagnostic{Field: field, Code: code, Message: message})
@@ -183,9 +231,6 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 	if request.Inputs == nil {
 		request.Inputs = map[string]string{}
 	}
-	if request.Assignments == nil {
-		request.Assignments = map[string]RuntimeAssignment{}
-	}
 	declaredInputs := map[string]ValueDecl{}
 	for _, input := range record.Template.Inputs {
 		declaredInputs[input.Name] = input
@@ -209,23 +254,14 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 			}
 		}
 	}
-	stages := map[string]Stage{}
-	for _, stage := range record.Template.Stages {
-		stages[stage.ID] = stage
-		assignment, ok := request.Assignments[stage.ID]
-		if !ok || assignment.Backend == "" || assignment.Model == "" {
-			add("assignments."+stage.ID, "required", "every stage requires a configured backend and model")
-			continue
-		}
-		if m.lifecycle != nil {
-			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: stage.Role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
-				add("assignments."+stage.ID, "unavailable", err.Error())
+	if len(record.Template.Stages) > 0 {
+		assignment := standingAssignment(request.Assignments, record.Template.Stages[0].ID)
+		if assignment.Backend == "" || assignment.Model == "" {
+			add("assignments.standing", "required", "the standing orchestrator requires a configured backend and model")
+		} else if m.lifecycle != nil {
+			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: record.Template.Stages[0].ID, StageTitle: record.Template.Stages[0].Title, Role: record.Template.OrchestratorRole, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
+				add("assignments.standing", "unavailable", err.Error())
 			}
-		}
-	}
-	for stageID := range request.Assignments {
-		if _, ok := stages[stageID]; !ok {
-			add("assignments."+stageID, "unknown", "assignment does not match a template stage")
 		}
 	}
 	if len(diagnostics) > 0 {
@@ -261,7 +297,15 @@ func (m *Manager) Detail(runID string) (RunDetail, error) {
 		return RunDetail{}, err
 	}
 	detail.Values, err = m.store.ListPipelineValues(runID)
-	if err == nil && m.hasPendingPermission(runID, run.CurrentAgentID) {
+	if stages, stageErr := m.store.ListPipelineStageTasks(runID); stageErr != nil {
+		return RunDetail{}, stageErr
+	} else if len(stages) > 0 {
+		current := stages[len(stages)-1]
+		detail.Run.CurrentTaskID = current.TaskID
+		detail.Run.OrchestratorAgentID = current.StandingAgentID
+		detail.Run.CurrentAgentID = current.StandingAgentID
+	}
+	if err == nil && m.hasPendingPermission(runID, detail.Run.CurrentAgentID) {
 		detail.Run.AttentionReason = "awaiting permission approval"
 	}
 	return detail, err

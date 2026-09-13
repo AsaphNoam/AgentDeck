@@ -150,6 +150,22 @@ export function retryPipelineRun(id: string, revision: number) {
   });
 }
 
+export function replacePipelineOrchestrator(id: string, revision: number, runtime: PipelineStartRequest["orchestrator"]) {
+  return request(`/api/pipeline-runs/${encodeURIComponent(id)}/replace`, pipelineRunDetailSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision, orchestrator: runtime }),
+  });
+}
+
+export function repairPipelineCleanup(id: string, revision: number) {
+  return request(`/api/pipeline-runs/${encodeURIComponent(id)}/repair-cleanup`, pipelineRunDetailSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision }),
+  });
+}
+
 export function stopPipelineRun(id: string, revision: number) {
   return request(`/api/pipeline-runs/${encodeURIComponent(id)}/stop`, pipelineRunDetailSchema, {
     method: "POST",
@@ -242,12 +258,17 @@ export function useStartPipelineRun() {
   });
 }
 
-export function usePipelineControl(action: "continue" | "retry" | "stop") {
+export function usePipelineControl(action: "continue" | "retry" | "replace" | "repair-cleanup" | "stop") {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, revision, input = "" }: { id: string; revision: number; input?: string }) => {
+    mutationFn: ({ id, revision, input = "", orchestrator }: { id: string; revision: number; input?: string; orchestrator?: PipelineStartRequest["orchestrator"] }) => {
       if (action === "continue") return continuePipelineRun(id, revision, input);
       if (action === "retry") return retryPipelineRun(id, revision);
+      if (action === "replace") {
+        if (!orchestrator) throw new Error("Choose an orchestrator runtime before replacing the standing owner.");
+        return replacePipelineOrchestrator(id, revision, orchestrator);
+      }
+      if (action === "repair-cleanup") return repairPipelineCleanup(id, revision);
       return stopPipelineRun(id, revision);
     },
     onSuccess: (detail) => updateRunCaches(qc, detail),

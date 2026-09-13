@@ -79,6 +79,8 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const detail = usePipelineRun(runID);
   const continueRun = usePipelineControl("continue");
   const retryRun = usePipelineControl("retry");
+  const replaceOwner = usePipelineControl("replace");
+  const repairCleanup = usePipelineControl("repair-cleanup");
   const stopRun = usePipelineControl("stop");
   const deleteRun = useDeletePipelineRun();
   const [continuation, setContinuation] = useState("");
@@ -102,13 +104,19 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
 
   const data = detail.data;
   const run = data.run;
+  const orchestratorRuntime = data.orchestrator ?? run.orchestrator;
   const stage = data.template.stages.find((item) => item.id === run.current_stage_id);
   const attempt = data.attempts.find((item) => item.attempt_id === run.current_attempt_id);
+  const currentTask = data.stage_tasks.find((item) => item.task_id === run.current_task_id) ?? data.stage_tasks.find((item) => item.stage_id === run.current_stage_id && item.state !== "completed");
   const paused = run.state === "paused";
   const blocked = paused && run.attention_reason === "blocked" && attempt?.report_outcome === "blocked";
   const approval = paused && run.pending_action === "await_approval";
-  const canContinue = blocked || approval;
-  const canRetry = paused && !approval && run.attention_reason !== "loop_limit_reached";
+  // Detail controls are the server's current task-provenance decision. The
+  // legacy derivation remains only for an older start/control response, which
+  // has not yet been hydrated through the detail projection.
+  const canContinue = data.controls?.continue.eligible ?? (blocked || approval);
+  const canRetry = data.controls?.retry.eligible ?? (paused && !approval && run.attention_reason !== "loop_limit_reached");
+  const continuationRequired = blocked || (data.controls?.continue.eligible === true && (currentTask?.result?.outcome === "failure" || currentTask?.result?.outcome === "blocked"));
   // A pause whose stage agent is no longer running — a restart stopped it, its launch
   // failed, or its resume failed — is a pause no chat can resolve: Continue rejects the
   // state, and an ordinary chat resume of that agent mints an unrelated generation whose
@@ -117,7 +125,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const restarted = run.attention_reason.startsWith("restart_");
   const recovered = paused && (restarted || run.attention_reason === "launch_failed" || run.attention_reason === "resume_failed");
   const terminal = run.state === "completed" || run.state === "stopped";
-  const busy = continueRun.isPending || retryRun.isPending || stopRun.isPending || deleteRun.isPending;
+  const busy = continueRun.isPending || retryRun.isPending || replaceOwner.isPending || repairCleanup.isPending || stopRun.isPending || deleteRun.isPending;
 
   const control = (action: "continue" | "retry" | "stop") => {
     setError(null);
@@ -133,30 +141,33 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
       <Link className="pipeline-back-link" to="/pipelines/runs">← All runs</Link>
       <section className="pipeline-run-hero" data-slot="live">
         <div className="pipeline-run-kicker"><code>{run.run_id}</code><span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span></div>
-        <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{attempt && <span>Visit {attempt.visit_no} · attempt {attempt.attempt_no}</span>}</div></div>
+        <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{currentTask ? <span>Task {currentTask.task_id}</span> : attempt && <span>Visit {attempt.visit_no} · attempt {attempt.attempt_no}</span>}</div></div>
+        {currentTask && <div className="pipeline-owner-strip"><div><small>Standing owner</small><strong>{currentTask.standing_owner.name || currentTask.standing_owner.agent_id || "Starting"}</strong><span>{humanize(currentTask.standing_owner.state || currentTask.state)}</span></div>{currentTask.coordinator && <div><small>Stage coordinator</small><strong>{currentTask.coordinator.name || currentTask.coordinator.agent_id || "Starting"}</strong><span>{currentTask.coordinator.report_summary ? "Reports to standing owner" : humanize(currentTask.coordinator.state || "assigned")}</span></div>}</div>}
         {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>{restarted ? "The stage agent was stopped when AgentDeck restarted" : "The stage agent is not running after this failure"}, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
         <div className="pipeline-run-actions" data-slot="actions">
           {run.current_agent_id && !recovered && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
-          {canContinue && <div className="pipeline-action-choice"><button type="button" disabled={busy || (blocked && !continuation.trim())} onClick={() => control("continue")}>{approval ? "Approve and continue" : "Continue"}</button>{blocked && <small>{continuation.trim() ? "Continue sends this input to the same stage agent." : "Continue needs new input for the blocked stage."}</small>}</div>}
+          {canContinue && <div className="pipeline-action-choice"><button type="button" disabled={busy || (continuationRequired && !continuation.trim())} onClick={() => control("continue")}>{continuationRequired ? "Continue stage" : "Approve and continue"}</button>{continuationRequired && <small>{continuation.trim() ? "Continue sends this input to the standing owner." : "Continue needs new input for this stage."}</small>}</div>}
           {canRetry && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button><small>Retry starts a fresh agent with bounded summaries of prior attempts.</small></div>}
-          {!terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
+          {data.controls?.replace.eligible && <div className="pipeline-action-choice"><button type="button" disabled={busy || !orchestratorRuntime.backend || !orchestratorRuntime.model} onClick={() => replaceOwner.mutate({ id: run.run_id, revision: run.revision, orchestrator: orchestratorRuntime }, { onError: (reason) => setError(messageOf(reason)) })}>Replace standing owner</button><small>{data.controls.replace.reason || "Cancels the unfinished assignment and retains stage work for the replacement."}</small></div>}
+          {data.controls?.repair_cleanup.eligible && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => repairCleanup.mutate({ id: run.run_id, revision: run.revision }, { onError: (reason) => setError(messageOf(reason)) })}>Repair cleanup</button><small>{data.controls.repair_cleanup.reason || "Retries only the recorded cleanup work."}</small></div>}
+          {!terminal && (data.controls?.stop.eligible ?? true) && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
           {terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => deleteRun.mutate(run.run_id, { onSuccess: onDeleted, onError: (reason) => setError(messageOf(reason)) })}>Delete run record</button>}
         </div>
-        {blocked && <label className="form-field pipeline-continuation"><span>New input for the blocked stage</span><textarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
+        {continuationRequired && <label className="form-field pipeline-continuation"><span>New input for this stage</span><textarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
         {error && <p className="form-error">{error}</p>}
       </section>
 
       <div className="pipeline-run-workspace">
         <section className="pipeline-timeline" data-slot="timeline">
-          <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Execution timeline</p><h3>{data.attempts.length} attempt{data.attempts.length === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
+          <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Durable stage work</p><h3>{data.stage_tasks.length || data.attempts.length} task{(data.stage_tasks.length || data.attempts.length) === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
           <ol>
-            {data.attempts.map((item) => <TimelineAttempt key={item.attempt_id} data={data} attemptID={item.attempt_id} appended={appended.has(item.attempt_id)} current={item.attempt_id === run.current_attempt_id} attention={item.attempt_id === run.current_attempt_id && Boolean(run.attention_reason)} />)}
+            {data.stage_tasks.length > 0 ? data.stage_tasks.map((item) => <StageTask key={item.task_id} task={item} current={item.task_id === run.current_task_id} />) : data.attempts.map((item) => <TimelineAttempt key={item.attempt_id} data={data} attemptID={item.attempt_id} appended={appended.has(item.attempt_id)} current={item.attempt_id === run.current_attempt_id} attention={item.attempt_id === run.current_attempt_id && Boolean(run.attention_reason)} />)}
           </ol>
         </section>
         <aside className="pipeline-run-rail">
           <details className="pipeline-disclosure" open data-slot="setup"><summary>Frozen setup <span>{data.template.stages.length} stages</span></summary><div className="pipeline-disclosure-body">
             <dl className="pipeline-rail-facts"><div><dt>Project</dt><dd>{run.project}</dd></div><div><dt>Template</dt><dd>{data.template.title}</dd></div><div><dt>Started</dt><dd>{formatDate(run.created_at)}</dd></div><div><dt>Revision</dt><dd>{run.revision}</dd></div></dl>
-            <ol className="pipeline-setup-list">{data.template.stages.map((item, index) => { const runtime = data.assignments[item.id]; return <li key={item.id}><span>{index + 1}</span><div><strong>{item.title}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>; })}</ol>
+            <ol className="pipeline-setup-list"><li><span>1</span><div><strong>Standing owner · {data.template.orchestrator_role}</strong><small>{[orchestratorRuntime.backend, orchestratorRuntime.model, orchestratorRuntime.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>{data.template.stages.filter((item) => item.coordination === "dedicated").map((item, index) => { const runtime = data.dedicated_assignments[item.id]; return <li key={item.id}><span>{index + 2}</span><div><strong>{item.title} coordinator · {item.dedicated_role}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>; })}</ol>
           </div></details>
           <details className="pipeline-disclosure" open={terminal} data-slot="values"><summary>Named values <span>{data.values.length}</span></summary><div className="pipeline-disclosure-body">{data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">{data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}</dl>}</div></details>
         </aside>
@@ -195,6 +206,28 @@ function TimelineAttempt({ data, attemptID, appended, current, attention }: { da
       </div>
     </details>
   </li>;
+}
+
+function StageTask({ task, current }: { task: PipelineRunDetail["stage_tasks"][number]; current: boolean }) {
+  const outcome = task.result?.outcome || task.state;
+  return <li className={current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"} data-slot="attempt">
+    <span className="pipeline-timeline-line" aria-hidden="true" />
+    <details open={current}>
+      <summary><span className="pipeline-stage-number">{task.stage_index + 1}</span><span className="pipeline-attempt-identity"><strong>{task.stage_id}</strong><small>{task.standing_owner.name || task.standing_owner.agent_id || "Standing owner"} · attempt {task.attempt_number}</small></span><span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span><span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span></summary>
+      <div className="pipeline-attempt-body">
+        {task.result?.summary ? <p className="pipeline-result-summary">{task.result.summary}</p> : <p className="pipeline-unreported">{current ? "The standing owner has not accepted a stage outcome yet." : "No stage outcome was recorded."}</p>}
+        {task.coordinator && <section><h4>Coordinator report to standing owner</h4><p>{task.coordinator.report_summary || "No coordinator report recorded."}</p></section>}
+        {task.result?.details && <section><h4>Result details</h4><pre>{task.result.details}</pre></section>}
+        {Object.entries(task.result?.outputs ?? {}).map(([name, value]) => <section key={name}><h4>Output · {name}</h4><pre>{value}</pre></section>)}
+        {task.work.length > 0 && <TaskWork items={task.work} />}
+        {task.cleanup?.state && <p className="pipeline-unreported">Cleanup: {humanize(task.cleanup.state)}{task.cleanup.reason ? ` · ${humanize(task.cleanup.reason)}` : ""}</p>}
+      </div>
+    </details>
+  </li>;
+}
+
+function TaskWork({ items }: { items: PipelineRunDetail["stage_tasks"][number]["work"] }) {
+  return <section className="pipeline-attempt-agents" data-slot="agents"><div className="pipeline-agent-heading"><h4>Stage work</h4></div><div className="pipeline-agent-grid">{items.map((item) => <div className="pipeline-agent-card" key={item.task_id}><span className={`pipeline-agent-dot pipeline-agent-dot-${item.state}`} /><span><strong>{item.display_name}</strong><small>{humanize(item.state)}{item.outcome ? ` · ${humanize(item.outcome)}` : ""}</small><em>{item.summary || "No result summary"}</em></span></div>)}</div></section>;
 }
 
 function AttemptAgents({ agents }: { agents: PipelineAttemptAgents }) {

@@ -513,6 +513,52 @@ func TestCancelEscalatesToSIGINT(t *testing.T) {
 	}
 }
 
+func TestCancelGuardedLeavesStaleTurnRunning(t *testing.T) {
+	c, spec := newChatTest(t, "ignore_cancel")
+	spec.Generation = "g_guarded_cancel"
+	c.SetCancelGrace(100 * time.Millisecond)
+
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Stop(context.Background(), h.AgentID) })
+	if err := c.SendPrompt(context.Background(), h.AgentID, "go"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+
+	if cancelled, err := c.CancelGuarded(context.Background(), h.AgentID, "wrong-generation", "t_000000000001"); err != nil {
+		t.Fatalf("CancelGuarded stale generation: %v", err)
+	} else if cancelled {
+		t.Fatal("CancelGuarded stale generation interrupted the turn")
+	}
+	if cancelled, err := c.CancelGuarded(context.Background(), h.AgentID, spec.Generation, "t_000000000002"); err != nil {
+		t.Fatalf("CancelGuarded stale turn: %v", err)
+	} else if cancelled {
+		t.Fatal("CancelGuarded stale turn interrupted the turn")
+	}
+
+	// The peer ignores cooperative cancellation. If either stale guard sent one,
+	// its grace escalation would reap the process before this check.
+	time.Sleep(2 * c.cancelGrace)
+	if _, err := c.store.ReadRunning(h.AgentID); err != nil {
+		t.Fatalf("stale guarded cancel reaped running agent: %v", err)
+	}
+
+	if cancelled, err := c.CancelGuarded(context.Background(), h.AgentID, spec.Generation, "t_000000000001"); err != nil {
+		t.Fatalf("CancelGuarded matching turn: %v", err)
+	} else if !cancelled {
+		t.Fatal("CancelGuarded matching turn reported no-op")
+	}
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); {
+		if _, err := c.store.ReadRunning(h.AgentID); err != nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("matching guarded cancel did not escalate to SIGINT")
+}
+
 func TestReconcileStale(t *testing.T) {
 	st, err := state.Open(t.TempDir())
 	if err != nil {

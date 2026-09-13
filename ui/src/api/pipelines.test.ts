@@ -4,15 +4,13 @@ import { PipelineAPIError, listPipelineRuns, listPipelineTemplates, startPipelin
 afterEach(() => vi.unstubAllGlobals());
 
 const template = {
-  version: 1 as const,
+  version: 2 as const,
   title: "Delivery",
+  orchestrator_role: "implementer",
   inputs: [],
   stages: [{
-    id: "work", title: "Work", role: "implementer", instruction: "Do the work.", inputs: [], outputs: [], max_visits: 1,
-    transitions: {
-      success: { stage: "", final: "success", approval: "automatic" as const },
-      failure: { stage: "", final: "failure", approval: "required" as const },
-    },
+    id: "work", title: "Work", objective: "Do the work.", coordination: "standing" as const,
+    dedicated_role: "", approval_after_success: false, inputs: [], outputs: [],
   }],
 };
 
@@ -32,7 +30,7 @@ describe("pipeline API", () => {
     vi.stubGlobal("fetch", fetchMock);
     const request = {
       request_id: "ui_1", template_id: "delivery", display_name: "Delivery", project: "app", goal: "Ship it", inputs: {},
-      assignments: { work: { backend: "claude", model: "sonnet" } },
+      orchestrator: { backend: "claude", model: "sonnet" }, dedicated_assignments: {},
     };
 
     await expect(startPipelineRun(request, true)).rejects.toBeInstanceOf(PipelineAPIError);

@@ -59,6 +59,7 @@ func (s *Server) routes() http.Handler {
 	api("DELETE /api/pipeline-runs/{id}", s.handleDeletePipelineRun)
 	api("POST /api/pipeline-runs/{id}/continue", s.handleContinuePipelineRun)
 	api("POST /api/pipeline-runs/{id}/retry", s.handleRetryPipelineRun)
+	api("POST /api/pipeline-runs/{id}/repair-cleanup", s.handleRepairPipelineCleanup)
 	api("POST /api/pipeline-runs/{id}/stop", s.handleStopPipelineRun)
 
 	// Durable dependent work: tasks, their arms, and project-scoped signals
