@@ -2,7 +2,8 @@
 
 **Live agent state.** Read the **Current position** and **Active change** below, then open the
 requirements they name. Settled state is archived in `../archive/state/`: the dated
-[`HANDOFF-through-2026-09-12`](../archive/state/HANDOFF-through-2026-09-12.md),
+[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md),
+[`-12`](../archive/state/HANDOFF-through-2026-09-12.md),
 [`-11`](../archive/state/HANDOFF-through-2026-09-11.md),
 [`-10`](../archive/state/HANDOFF-through-2026-09-10.md),
 [`-09`](../archive/state/HANDOFF-through-2026-09-09.md),
@@ -39,9 +40,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
 - **Open findings:** `persistent-pipeline-orchestration` is closed; all fourteen findings are fixed
-  with regression tests. Still open: the
-  injected-steer lifetime edge case, live-gate finding durability, provider-contract oracles, and the
-  unverified OpenCode/OpenHands paths. See **Review findings**.
+  with regression tests. Still open in BR-1: provider-contract oracles and the unverified
+  OpenCode/OpenHands paths. Live-gate finding durability is fixed. The injected-steer lifetime edge
+  case is named here but was never recorded as a finding; it needs `/investigate-bug` before `/fix`
+  can take it. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
   fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed; BR-2 is fixed and closed.
   BR-1's still-open findings are listed above. Pinned Claude model delivery
@@ -56,33 +58,18 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None.
+**Change:** `/fix` on BR-1. Finding 1 (live-gate finding durability) is closed; findings 2
+(provider-contract oracles) and 3 (OpenCode/OpenHands) follow in that order. Settled 2026-09-13
+changelog entries moved to [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Changelog — 2026-09-13 (workflow):** Clarified verified slice commits versus final closure,
-required checkpoint/resumption notes and stable delegation ownership, and added an actionable-work
-check before ending a turn. This administrative update leaves the product work and role queues intact.
-Diff checks pass; `make check-specs` reports 14 existing finding-label errors, also present in `HEAD`.
-Skill frontmatter is unchanged; its validator could not run because the available Python lacks PyYAML.
-
-**State:** `persistent-pipeline-orchestration` is closed; its fourteen findings were fixed on
-2026-09-13, each with a regression test that fails without the fix.
-
-**Changelog — 2026-09-13 (fix: persistent-pipeline-orchestration):** Cleanup gained one stage/run
-convergence contract that pages and cancels scoped members, holds the cursor until every
-release/yield settles, re-drives the run after a settled effect, and offers repair on `finishing`
-too (INV §5/§15/§16). Inherited closure became one SQL fence applied by admission, retry, re-arm and
-both wait paths; stage acceptance now fences on run state rather than a caller-read revision, so a
-report after Stop cannot un-stop a run, and a failed startup reconcile keeps the stop (INV
-§2/§5/§15). Stage reports require a matching execution handle and reject a standing yield (INV
-§5/§11). Managed-work authority derives from the live standing-stage binding, not creation
-provenance, and assignments now carry the managed child and prior accepted results (INV §2/§10).
-Report sharing resolves the task-backed result directly (INV §10). The run projection separates
-stage succession from delegated work, surfaces retained cleanup, and is bounded and batched (INV
-§7/§8/§11/§16). Deferred-only mail no longer starts a turn (INV §5/§15). Also removed the dead v1
-report/lifecycle engine and its skipped tests, shared one task-row insert, refcounted the per-run
-lock, added one ordered run-cursor accessor, and moved the report branch to the control plane that
-owns runs so it publishes the run update it commits (INV §1/§2/§16/§17). `make test`, `make build`,
-the UI suite and spec checks pass; credentialed provider and browser gates remain unverified.
+**Changelog — 2026-09-13 (fix: BR-1 live-gate durability):** Workflow §4 makes a failed acceptance
+gate or live-provider check live state: recorded under `## Review findings` in the §7 format before
+the role that ran it closes, with the archived run record as supporting evidence rather than the
+only trace. A blocked state-file write leaves the role explicitly blocked under §3 instead of
+archiving the finding, and a commit or review carrying an acceptance run record first reconciles
+every Must-fix in it against the live findings. §16.6 repeats the rule where release acceptance
+reports are produced. Documentation-only (INV §1/§10), so no code test applies; `make check-specs`
+and `git diff --check` pass.
 
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
@@ -131,17 +118,6 @@ regression tests, and the unit is no longer open for review or fixes.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 
-- **Must fix** — BR-1 finding state was not durable across concurrent roles (**confirmed**).
-  **Where:** `docs/archive/reviews/live-provider-acceptance-2026-07-26.md` recorded the exact Codex
-  model failure as a Must-fix on July 26, but the live acceptance session could not edit HANDOFF
-  while another session owned the shared docs. The report and a contradictory effort design were
-  then swept into `7d294fb` without the finding entering HANDOFF. **Why it matters:** the mandatory
-  read order made the archived report invisible to every later role, so an already-detected critical
-  defect was treated as an open gate for another six weeks. **Requirement:** workflow §§1.1/12,
-  `INV §1`, `INV §10`. **Suggested fix/test:** a failed live gate must be recorded in HANDOFF before
-  its role can close; if state-file ownership blocks that write, leave the role explicitly blocked
-  rather than archiving the only finding. A commit/review that contains an acceptance report must
-  reconcile every Must-fix in it with live state.
 - **Must fix** — provider-contract claims can still be proved by a self-authored oracle
   (**confirmed**). **Where:** TS-04.R18 asserted a `model[effort]` request shape after inspecting
   `codex-acp`'s internal `ModelId` parser without tracing `session/new` to `threadStart`; FS-09.A15

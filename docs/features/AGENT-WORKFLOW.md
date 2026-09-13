@@ -111,6 +111,16 @@ known sandbox requirements, and important file/interface locations. Read these n
 or after compaction before repeating discovery; re-check facts when the relevant code has changed.
 Routine checkpoints must keep the work resumable without anticipating quota exhaustion.
 
+A failed acceptance gate or live-provider check is live state, not a report artifact. Record it
+under `## Review findings` in the §7 format before the role that ran it closes, and keep the
+archived run record as supporting evidence rather than as the only trace. If that write is
+impossible — another session owns the state file, or the write conflicts — leave the role explicitly
+blocked under §3 instead of archiving the finding: §1.1's read order never reaches an archived
+report, so an unrecorded failure is invisible to every later role and an already-detected defect
+goes on being treated as an open gate. A commit or review that carries an acceptance run record
+reconciles every **Must fix** in that record against the live findings before the record is
+archived.
+
 Delegate bounded work with an explicit deliverable, file/interface ownership, dependencies, and
 verification criteria. Keep shared migration ordering and tightly coupled lifecycle changes under
 one owner; use a read-only audit when a stable implementation boundary is unavailable. The main
@@ -657,7 +667,8 @@ behavior; when the release range needs one of those, that work happens first und
    components, checksum rejection, and a fresh installation (TS-06.R21). Check that its run succeeded
    and that the archive, checksum, and manifest are attached to the GitHub Release. The credentialed
    Claude and Codex checks remain manual gates: name them as owed rather than implying this release
-   passed them.
+   passed them. A gate that was run and failed is recorded as a §4 finding before this role closes,
+   never left to the run record alone.
 
 7. **Close.** Record the released version and the gates still owed in `HANDOFF.md`, commit the state
    file (§5), and finish with the §6 human update.
