@@ -36,7 +36,13 @@ precise requirement, not process vocabulary.
 
 ## 2. Make a change
 
-Work in small, complete pieces. For each piece:
+For a large change, record a compact plan in the active handoff (or link a temporary plan): the next
+few coherent slices, their dependencies, and the focused evidence needed to close each. Keep one
+integration slice active in the parent; independent delegated work may proceed alongside it. If a
+slice cannot be verified independently, revise its boundary rather than accumulating unrelated
+unfinished work or forcing an arbitrary tiny commit.
+
+For each piece:
 
 1. If it changes what a user sees or changes an architectural rule, update the relevant specification
    first. Add or change its R/A items and mark unshipped behavior `(planned)`. A bug fix that restores
@@ -44,29 +50,32 @@ Work in small, complete pieces. For each piece:
 2. Implement the work and add or keep the test that demonstrates the requirement.
 3. Run the narrow test, type check, or syntax check that gives useful feedback for that piece. Do
    not run the full closure matrix after every edit.
-4. Before committing the completed request, run the applicable closure matrix once after the final
-   relevant edit. Product-code changes run:
+4. Check that the specifications match the piece, update the handoff (§4), and inspect the selected
+   diff for unfinished or accidental changes. Commit the verified piece with its specification and
+   handoff updates on `main` (§5), then immediately continue with the next piece. Do not defer these
+   checkpoints until the whole request passes final closure.
 
-   ```bash
-   make test
-   make build                          # unless make dist follows
-   (cd ui && npm test)                 # when ui/ changed
-   (cd ui && npm run build)            # when ui/ changed and make dist does not follow
-   make dist  # when producing a distributable or refreshing embedded UI output
-   ```
+At request completion, run the applicable closure matrix once after the final relevant edit,
+before the final closure commit. Product-code changes run:
 
-   `make test` already runs `make check-specs`; do not repeat it separately in the same closure pass.
-   `make dist` already rebuilds the UI and binary. Run it only when producing a distributable or
-   refreshing embedded UI output. Documentation-only work runs `make check-specs`, appropriate
-   syntax or rendering checks, and `git diff --check`. Re-run a closure check only after a relevant
-   edit or when diagnosing a failure.
-5. Before committing, check that the specifications describe what shipped, the active work state is
-   accurate, and the diff has no unfinished or accidental changes.
-6. Commit the completed work, its specification update when needed, and the handoff update together
-   on `main`. When the substantive change finishes, add it to the available review units without
-   replacing or blocking units already there; §8 governs a commit that closes existing review
-   findings. Continue with the next piece until the request is complete or there is a real reason to
-   stop.
+```bash
+make test
+make build                          # unless make dist follows
+(cd ui && npm test)                 # when ui/ changed
+(cd ui && npm run build)            # when ui/ changed and make dist does not follow
+make dist  # when producing a distributable or refreshing embedded UI output
+```
+
+`make test` already runs `make check-specs`; do not repeat it separately in the same closure pass.
+`make dist` already rebuilds the UI and binary. Run it only when producing a distributable or
+refreshing embedded UI output. Documentation-only work runs `make check-specs`, appropriate
+syntax or rendering checks, and `git diff --check`. Re-run a closure check only after a relevant
+edit or when diagnosing a failure.
+
+Commit final specification/handoff closure and any remaining verified work. When the substantive
+change finishes, add it to the available review units without replacing or blocking units already
+there; §8 governs a commit that closes existing review findings. Passing checks, a clean tree, a
+commit, or a progress summary is a checkpoint, not a reason to end an unfinished request.
 
 Implement the smallest change that satisfies the requirement. Extend an existing seam, pattern, or
 interface before inventing a parallel one (INV §2 and its canonical-helpers registry), and do not
@@ -95,7 +104,17 @@ originating units, and a short changelog. Review state lists substantive units i
 not a raw commit ledger or an ordered pipeline. Remove finished steps and resolved findings. Keep
 completed details in specifications, tests, commits, and Git history.
 
-When delegation is available, use it for bounded independent work such as a repository search, a focused audit, or an isolated test. The main agent remains responsible for interpreting requirements, combining the work, and doing final verification.
+Update the active handoff at each verified checkpoint and before an intentional interruption:
+briefly identify completed slices, current unfinished work, the next action, and checks already
+passed or still owed. Retain only execution facts useful for resumption: canonical test commands,
+known sandbox requirements, and important file/interface locations. Read these notes on resumption
+or after compaction before repeating discovery; re-check facts when the relevant code has changed.
+Routine checkpoints must keep the work resumable without anticipating quota exhaustion.
+
+Delegate bounded work with an explicit deliverable, file/interface ownership, dependencies, and
+verification criteria. Keep shared migration ordering and tightly coupled lifecycle changes under
+one owner; use a read-only audit when a stable implementation boundary is unavailable. The main
+agent remains responsible for interpreting requirements, integration, and final verification.
 
 ## 5. Commit and resume safely
 
@@ -107,7 +126,15 @@ means that file plus whatever that section explicitly allows. A state-only role 
 administrative closure, not a new review obligation. If a review finds no eligible unit, report that
 and make no empty state commit.
 
-At the end of a session, either leave a verified commit or clearly describe unfinished work in the handoff. Never pretend interrupted work is complete.
+Before a final response, check whether authorized work remains that can be performed now. If so,
+continue. End only when the request is complete, the user stops or redirects it, a concrete blocker
+prevents further progress (§3), or an actual execution/usage limit forces an interruption. State the
+completed outcome or the specific blocker; a planned next slice is not a blocker.
+
+Before an intentional exit, leave verified work committed and describe any unfinished work and its
+verification state in the handoff. Preserve unverified edits without presenting them as complete;
+do not discard them to obtain a clean tree. An abrupt limit may prevent this final update, which is
+why checkpoint updates are required throughout the work.
 
 ## 6. Human update
 

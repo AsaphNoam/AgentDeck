@@ -59,6 +59,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** None.
 
+**Changelog — 2026-09-13 (workflow):** Clarified verified slice commits versus final closure,
+required checkpoint/resumption notes and stable delegation ownership, and added an actionable-work
+check before ending a turn. This administrative update leaves the product work and role queues intact.
+Diff checks pass; `make check-specs` reports 14 existing finding-label errors, also present in `HEAD`.
+Skill frontmatter is unchanged; its validator could not run because the available Python lacks PyYAML.
+
 **State:** `persistent-pipeline-orchestration` was reviewed again and consolidated on 2026-09-13;
 seven Must-fix and seven Worth-fixing findings remain. See **Review findings** for fix routing.
 
