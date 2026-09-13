@@ -17,9 +17,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None.
 - **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
   contents. `v0.4.2` and earlier are in the state archive.
-- **Review units:** `persistent-pipeline-orchestration` is available for `/review`.
-  `stop-telling-agents-to-poll` shipped without entering this queue on the operator's explicit
-  2026-09-10 instruction; it can be added later.
+- **Review units:** `persistent-pipeline-orchestration` was reviewed 2026-09-13 and stays open on its
+  findings; `/fix` may take it. `stop-telling-agents-to-poll` shipped without entering this queue on
+  the operator's explicit 2026-09-10 instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport
@@ -32,14 +32,15 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete shared prompt preparation, bounded batches,
   transactional budget/read settlement, uncertain-delivery recovery and deferred retention.
   The clean legacy reset, descendant cancellation, project boundaries, subordinate stage
-  coordination and ordinary stop/resume remain confirmed.
-  Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
+  coordination and ordinary stop/resume remain confirmed. Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
-- **Open findings:** The separate injected-steer lifetime edge case remains outside the closed
-  host-owned fallback unit. Also open: live-gate finding durability, provider-contract oracles, and
-  the unverified OpenCode/OpenHands paths. See **Review findings**.
+- **Open findings:** `persistent-pipeline-orchestration` carries four Must-fix findings — stalled run
+  cursor after deferred cleanup, unreachable dedicated coordination, dead pipeline-report sharing,
+  and stages rendered as their predecessor's work — plus five Worth-fixing. Also open: the
+  injected-steer lifetime edge case, live-gate finding durability, provider-contract oracles, and the
+  unverified OpenCode/OpenHands paths. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
   fixed and closed. BR-1's Codex model/effort defect is fixed and reviewed; BR-2 is fixed and closed.
   BR-1's still-open findings are listed above. Pinned Claude model delivery
@@ -56,7 +57,21 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** None.
 
-**State:** `persistent-pipeline-orchestration` finished 2026-09-13 and is available for review.
+**State:** `persistent-pipeline-orchestration` was reviewed 2026-09-13 and stays open on four
+Must-fix and five Worth-fixing findings. **Fix model:** difficult — Codex Sol.
+
+**Changelog — 2026-09-13 (review):** Reviewed `persistent-pipeline-orchestration`
+(`c18b43d..a7af504`). Classes 2, 5, 8, 10, 15, 16 and 17 had applicable surfaces; 1, 3, 4, 6, 7, 9,
+11, 12, 13 and 14 had none in this diff. Four Must-fix: deferred task cleanup never re-drives the run
+cursor and no control recovers a `finishing` run; a dedicated coordinator is invisible to its
+standing owner through assignment, wait and read scope; `resolvePipelineReport` still requires a v1
+attempt row, so no task-backed run can share its report; stage lineage makes every stage render as
+the previous stage's delegated work. Five Worth-fixing: unemitted per-stage cleanup projection, the
+retained v1 report/turn-end/exit engine and its tests, an unfiltered
+`PipelineStageTaskForAssignee`, assignments rendered without prior stage results, and unbounded run
+task reads. Go tests for `pipeline`, `state`, `server`, `messaging` and `runtime` pass. No product
+code or specification changed; four settled 2026-09-12 changelog entries were archived for the
+header budget.
 
 **Changelog — 2026-09-13 (work):** Replaced pipeline execution with durable standing-owner stage
 tasks, managed dedicated coordinators, task-owned reports and waits, explicit replacement, guarded
@@ -65,37 +80,6 @@ old stage-result tool, lifecycle callbacks, wake veto and attempt-based supervis
 repository test/build matrix and the 436-test UI suite pass; credentialed provider/browser gates in
 Acceptance gates remain explicitly open.
 
-**Changelog — 2026-09-12 (design-feature):** Completed the mail technical contract against existing
-runtime and state seams: optional wake intent, shared bounded inline preparation, provider-result
-confirmation, stable-id recovery without extra wakes, turn-budget reservation and deferred retention.
-Added TS-01.R31–R33, TS-02.R34 and TS-04.R53; completed readiness references and moved the pipeline
-unit to Waiting to start. Removed its completed source idea. Spec checks, twin-skill and diff checks
-pass. No product code changed; implementation and provider acceptance remain future work.
-
-**Changelog — 2026-09-12 (design-feature):** Drafted waking/deferred durable mail and bounded
-inline delivery in FS-06.R30–R36/A20–A25, FS-00.R17 and FS-14.R78/A45. Withdrew the separate
-coordinator-update queue and delivery watermark in TS-09.R50 / TS-10.R36; intervention awareness
-uses ordinary deferred mail. The expanded pipeline unit is paused for unread deferred-mail
-retention, feature confirmation and the matching technical contract. Spec checks, twin skills and
-diff checks pass; no product code changed.
-
-**Changelog — 2026-09-12 (fix):** Closed all four `file-read-nonregular-kind` findings. Added
-socket and FIFO regressions that fail without the pre-open kind check instead of skipping on macOS,
-moved the replacement hook into the real stat/open window, and split a contained-but-unopenable file
-out of `path_refused` into a new `file_unreadable` refusal. Restated TS-05.R21 as
-classify-through-the-root-then-open with `os.Root` authoritative over `withinRoot`; extended
-FS-03.A37 and TS-03.R40. Classes 2, 8, 10, 17. File-read tests pass under `-race`; the paused
-pipeline work's messaging/pipeline failures are pre-existing and unrelated.
-
-**Changelog — 2026-09-12 (design-feature):** Revised persistent orchestration so the standing
-agent always owns and reports the stage; configured dedicated coordinators are managed children and
-the normal coordination contact, with durable awareness of material direct intervention. Cleanup
-now automatically reconciles transient failures with persisted backoff and attention only for
-persistent/unsafe conditions. Confirmed same-identity stop/resume and assignment re-delivery. Updated
-FS-14.R61–R77/A35–A44, FS-16.R30–R38/A20–A24, TS-09.R35–R50, TS-10.R25–R37 and TS-05.R22;
-R60 is superseded by R75. Promoted the source idea to the waiting ready change. Spec checks, twin
-skills and diff checks pass; no product code changed and no implementation is active.
-
 **Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
 the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
 darwin/arm64 archive, `install.sh`, and a manifest declaring `0.4.3` with its SHA-256.
@@ -103,8 +87,8 @@ The release shipped with five open Must-fix findings on the operator's explicit 
 are now closed. The credentialed Claude and Codex journeys under
 **Acceptance gates** are owed; real steering has never been exercised against a provider.
 
-**Available by role:** `/review` may take `persistent-pipeline-orchestration`; `/work` may take
-`rename-product-to-deckhand`; `/fix` may take BR-1;
+**Available by role:** `/review` has no eligible unit; `/work` may take
+`rename-product-to-deckhand`; `/fix` may take `persistent-pipeline-orchestration` or BR-1;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -137,6 +121,120 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 - None.
 
 ## Review findings
+
+### persistent-pipeline-orchestration — **Fix model:** difficult — Codex Sol.
+
+- **Must fix** — a deferred cleanup effect never re-drives the run cursor, so a run can park in
+  `finishing` or `stopping` for the rest of the process lifetime. **Where:**
+  `internal/server/task_dispatcher.go` `finishTaskCleanup`/`reconcileTaskCleanup` complete a release
+  or yield without telling the pipeline manager; the only callers of `Manager.Reconcile` are
+  `dispatchTurnEnd` in the same file and `Manager.Startup`. **Trigger:** a stage report is accepted,
+  the turn ends, `StopStage` fails once (busy handle, reap race), the failure is recorded with
+  backoff, and the retry timer later succeeds — `CompleteTaskRelease` commits and nothing advances
+  the run past `finishing`/`release_stage_task`. The same shape leaves a `stopping`/`cleanup_run` run
+  short of `stopped` after `Startup` cancels its members. **Why it matters:** the run stops
+  progressing with no agent left to produce another turn boundary, and there is no recovery control:
+  `pipelineRunControls.RepairCleanup` is eligible only when `run.State == "stopping"`
+  (`internal/server/pipeline_projection.go`) and `Manager.RepairCleanup` refuses anything else, so a
+  stuck `finishing` run offers only Stop. **Requirement:** TS-09.R42 ("transient failure resumes
+  automatically"), R41, `INV §10`, `INV §15`. **Suggested fix/test:** after a successful
+  `CompleteTaskRelease`/`CompleteTaskYield`, resolve the stage task's run and reconcile it (finishing
+  stop cleanup when the pending action is `cleanup_run`); regression test injects one `StopStage`
+  failure, runs the cleanup pass, and asserts the next stage task exists.
+
+- **Must fix** — a `coordination: dedicated` stage's coordinator is invisible and unmanageable to the
+  standing owner it exists to serve. **Where:** `Manager.coordinatorTask`
+  (`internal/pipeline/manager.go`) creates the child with `CreatedByKind: "pipeline_coordinator"` and
+  no `CreatedByAgentID`, and `renderAssignment` (`internal/pipeline/assignment.go`) never mentions
+  the child at all. `WaitForTasks` (`internal/state/task_waits.go`) refuses any source whose
+  `created_by_agent_id` is not the caller, and `agentOwnedTask`
+  (`internal/server/task_handlers.go`) requires `CreatedByKind == "agent"`. **Trigger:** start any run
+  whose stage declares `coordination: dedicated`. The standing owner is never told a coordinator
+  exists; `wait_for_tasks`, `get_task`, `list_tasks` and `cancel_task` all answer "no such task" for
+  it. **Why it matters:** R49's "the standing owner yields to let it run" and "its result is
+  delivered upward through durable task observation" cannot happen, so the owner reports the stage
+  without the delegated work; the child likewise gets no standing-owner identity to report to.
+  **Requirement:** TS-09.R39, TS-09.R49, `INV §10`. **Suggested fix/test:** render the child's task id
+  and objective into the standing assignment and the owner's identity into the child's instruction,
+  and make the bound standing owner an authorized observer of its coordinator in the wait/read scope;
+  test a dedicated stage end to end through `wait_for_tasks`.
+
+- **Must fix** — no task-backed run can create a pipeline-report context reference. **Where:**
+  `Service.resolvePipelineReport` (`internal/contextref/service.go`) still resolves the friendly
+  selector through `store.CurrentPipelineAttemptForAgent`, which reads `pipeline_attempts`; v2 runs
+  write no attempt row, so the function returns "You have no current pipeline attempt with an
+  accepted report" and the stage-task branch added directly below it is unreachable. **Trigger:** a v2
+  stage agent calls `share_context` with the current-pipeline-report selector after its result is
+  accepted. **Why it matters:** the `Read` side was adapted to render a task result, so the feature
+  looks shipped while its only creation path is dead for every new run. **Requirement:** TS-09.R48,
+  FS-15.R4, `INV §10`. **Suggested fix/test:** resolve from `PipelineStageTaskForAssignee` and the
+  accepted task result first, keeping the attempt lookup only as the legacy fallback; test the share
+  window on a task-backed run.
+
+- **Must fix** — every stage task is rendered as "Stage work" belonging to the previous stage.
+  **Where:** `advanceTaskStage`, `continueTaskStage` and `Replace`
+  (`internal/pipeline/actions.go`) pass `ParentTaskID: current.TaskID`, so `task_lineage` chains the
+  stages together; `pipelineTaskRunProjection`
+  (`internal/server/pipeline_projection.go`) builds `childrenByParent` from that column and filters
+  only the coordinator, and `RunBrowser.tsx` renders `task.work` as delegated stage work.
+  **Trigger:** any run that reaches stage 2 — stage 1's card lists stage 2's task, whose children list
+  stage 3's, and so on. **Why it matters:** the run page misattributes each stage as agent-created
+  work of its predecessor and repeats the whole tail of the run under every earlier stage.
+  **Requirement:** TS-09.R44, FS-14.R39, `INV §8`. **Suggested fix/test:** exclude tasks that have
+  their own `pipeline_stage_tasks` row from the descendant projection; add a two-stage projection
+  test asserting an empty `work` list.
+
+- **Worth fixing** — retained cleanup state never reaches the stage view. **Where:**
+  `ui/src/schemas/pipeline.ts` declares `stage_tasks[].cleanup` and `RunBrowser.tsx` renders it, but
+  `pipelineStageTaskDetail` (`internal/server/pipeline_projection.go`) has no such field.
+  **Trigger:** a release whose effect is retained with `cleanup_unsafe` set. **Why it matters:** the
+  `cleanup_phase`/`cleanup_unsafe`/`cleanup_last_error` columns R42 says must expose human attention
+  are written and never displayed. **Requirement:** TS-09.R42, FS-14.R44, `INV §8`, `INV §10`.
+  **Suggested fix/test:** emit the per-stage cleanup projection the schema already expects and assert
+  it in the run-detail handler test.
+
+- **Worth fixing** — the v1 engine survives the cutover R46 said would remove it. **Where:**
+  `Manager.Report`'s attempt branch, `reportStageTask`, `refuseReport`, `currentAttempt`, `OnTurnEnd`
+  and `OnExit` in `internal/pipeline/actions.go` now have no production caller — this change unwired
+  `OnTurnEnd`/`OnExit` in `internal/server/server.go` and `task_dispatcher.go`. **Trigger:** none at
+  runtime; it is reachable only from `internal/pipeline/*_test.go`. **Why it matters:** `reportStageTask`
+  is a second implementation of the stage-report validation `handleReportTaskResult` and
+  `AcceptPipelineStageTaskResult` own, and its tests assert behaviour the product no longer executes,
+  so the suite reports coverage the shipped path does not have. **Requirement:** TS-09.R46, `INV §2`,
+  `INV §10`, `INV §17`. **Suggested fix/test:** delete the dead entry points with their attempt-era
+  tests, and move any case still worth keeping onto the task report path.
+
+- **Worth fixing** — `PipelineStageTaskForAssignee` can resolve a closed stage. **Where:**
+  `internal/state/pipeline_tasks.go` — the query filters neither `p.state = 'open'` nor the task
+  state and has no ordering, though its comment promises "only a live standing-owner assignment".
+  **Trigger:** a stage dispatched onto an already-running standing agent takes `ClaimBorrowed`, whose
+  release does not stop the runtime, so the next stage task is admitted under the same
+  `(assigned_agent_id, assigned_generation)` and two rows match; `QueryRow` returns an arbitrary one.
+  **Why it matters:** `Manager.OnPermissionEvent` then sees `stage.State != "open"` and silently drops
+  the run's "awaiting permission approval" attention while the stage really is blocked on a prompt.
+  **Requirement:** TS-09.R40, `INV §2`, `INV §5`, `INV §8`. **Suggested fix/test:** restrict the query
+  to `p.state = 'open'` (and the assignment's live task states); test two successive borrowed stage
+  tasks on one generation.
+
+- **Worth fixing** — replacement and continuation assignments carry no prior stage results.
+  **Where:** every v2 caller of `renderAssignment` (`internal/pipeline/manager.go`,
+  `internal/pipeline/actions.go`) passes `attempts = nil`, so its "Prior structured results" block
+  never renders. **Trigger:** replace an interrupted standing owner — the new agent starts on a fresh
+  conversation with the stage objective, bound input values and one sentence telling it to inspect
+  retained work, and no record of what earlier stages reported. **Why it matters:** the replacement
+  has to rediscover the run's history from tools rather than from its frozen handoff.
+  **Requirement:** TS-09.R39 ("relevant prior report summaries"), TS-09.R41. **Suggested fix/test:**
+  render accepted prior stage task results into the assignment; assert a replacement assignment
+  contains the previous stage's summary.
+
+- **Worth fixing** — run cleanup and run detail read a run's tasks unbounded. **Where:**
+  `ListTasksForPipelineRun` (`internal/state/tasks.go`) has no `LIMIT`, and
+  `pipelineTaskRunProjection` then issues a `ReadTaskLineage` per task plus a recursive
+  `ReadAgent`/`ReadRunning` per work node on a single-connection store. **Trigger:** a long run whose
+  stages create many descendants. **Why it matters:** R42 specifies keyset-paged cleanup and R28
+  specifies a bounded targeted read; both are whole-table reads here. **Requirement:** TS-09.R42,
+  TS-09.R28, `INV §16`. **Suggested fix/test:** page the cleanup sweep and batch the projection's
+  lineage/agent reads; assert the query count does not grow per descendant.
 
 ### BR-1 — **Fix model:** difficult — Codex Sol.
 
