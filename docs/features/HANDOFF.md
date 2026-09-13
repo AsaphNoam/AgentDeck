@@ -36,9 +36,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
-- **Open findings:** `persistent-pipeline-orchestration` carries four Must-fix findings — stalled run
+- **Open findings:** `persistent-pipeline-orchestration` carries five Must-fix findings — stalled run
   cursor after deferred cleanup, unreachable dedicated coordination, dead pipeline-report sharing,
-  and stages rendered as their predecessor's work — plus five Worth-fixing. Also open: the
+  stages rendered as their predecessor's work, and an unfenced run state machine — plus ten
+  Worth-fixing. Also open: the
   injected-steer lifetime edge case, live-gate finding durability, provider-contract oracles, and the
   unverified OpenCode/OpenHands paths. See **Review findings**.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated and archived with this release; BR-3 is
@@ -57,8 +58,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** None.
 
-**State:** `persistent-pipeline-orchestration` was reviewed 2026-09-13 and stays open on four
-Must-fix and five Worth-fixing findings. **Fix model:** difficult — Codex Sol.
+**State:** `persistent-pipeline-orchestration` was reviewed 2026-09-13 and stays open on five
+Must-fix and ten Worth-fixing findings. **Fix model:** difficult — Codex Sol.
 
 **Changelog — 2026-09-13 (review):** Reviewed `persistent-pipeline-orchestration`
 (`c18b43d..a7af504`). Classes 2, 5, 8, 10, 15, 16 and 17 had applicable surfaces; 1, 3, 4, 6, 7, 9,
@@ -66,12 +67,18 @@ Must-fix and five Worth-fixing findings. **Fix model:** difficult — Codex Sol.
 cursor and no control recovers a `finishing` run; a dedicated coordinator is invisible to its
 standing owner through assignment, wait and read scope; `resolvePipelineReport` still requires a v1
 attempt row, so no task-backed run can share its report; stage lineage makes every stage render as
-the previous stage's delegated work. Five Worth-fixing: unemitted per-stage cleanup projection, the
-retained v1 report/turn-end/exit engine and its tests, an unfiltered
-`PipelineStageTaskForAssignee`, assignments rendered without prior stage results, and unbounded run
-task reads. Go tests for `pipeline`, `state`, `server`, `messaging` and `runtime` pass. No product
-code or specification changed; four settled 2026-09-12 changelog entries were archived for the
-header budget.
+the previous stage's delegated work. A second pass on abstraction and integration added a fifth
+Must-fix: `UpdatePipelineRunCAS` validates no transition, six divergent caller-side terminal
+predicates stand in for it, and `pauseStartupRun` can move a `stopping` run back to `paused` and
+re-enable Retry. Ten Worth-fixing: unemitted per-stage cleanup projection, the retained v1
+report/turn-end/exit engine and its tests, an unfiltered `PipelineStageTaskForAssignee`, assignments
+rendered without prior stage results, unbounded run task reads, an unpublished run mutation on
+result acceptance, "current stage task" open-coded eight times, five parallel `INSERT INTO tasks`
+statements, leaking run locks with a `Reconcile` loop that never iterates, and `internal/messaging`
+reaching past its own control-plane seam into pipeline tables. The task layer is soundly built; the
+run layer no longer has a single owner. Go tests for `pipeline`, `state`, `server`, `messaging` and
+`runtime` pass. No product code or specification changed; four settled 2026-09-12 changelog entries
+were archived for the header budget.
 
 **Changelog — 2026-09-13 (work):** Replaced pipeline execution with durable standing-owner stage
 tasks, managed dedicated coordinators, task-owned reports and waits, explicit replacement, guarded
@@ -183,6 +190,93 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
   **Requirement:** TS-09.R44, FS-14.R39, `INV §8`. **Suggested fix/test:** exclude tasks that have
   their own `pipeline_stage_tasks` row from the descendant projection; add a two-stage projection
   test asserting an empty `work` list.
+
+- **Must fix** — the run state machine has no transition legality, only six divergent caller-side
+  guards, and one of them can reopen a stopped run. **Where:** `UpdatePipelineRunCAS`
+  (`internal/state/pipelines.go`) is a bare revision CAS: any caller may move a run from any state to
+  any state. Legality lives in hand-written predicates that disagree — `Stop` and
+  `pauseStartupRun` (`internal/pipeline/actions.go`, `manager.go`) treat only
+  `completed|stopped` as closed, `OnStageTaskInterrupted` adds `stopping`, and
+  `CreatePipelineStageTask` (`internal/state/pipeline_tasks.go`) uses
+  `stopping|stopped|completed`. **Trigger:** a run is stopping when the server restarts; `Startup`
+  calls `Reconcile`, `reconcileRunCleanup` fails on a store read or `CancelTask`, and
+  `pauseStartupRun` CASes the run to `paused` because `stopping` is not in its closed set. From
+  `paused`, `pipelineRunControls` offers Continue/Retry/Replace and
+  `RetryInterruptedPipelineStageTask` — which requires exactly `state = 'paused'` — re-admits the
+  stage task, so the dispatcher relaunches the agent of a run the operator stopped. **Why it
+  matters:** Stop is the safety control; R42 makes `stopping` plus a closure revision a fence that
+  creation, admission, wake, Retry and Re-arm must respect, and a reconcile error silently reverts
+  it. The same rootless modelling shows up as roughly eighty bare state strings across
+  `internal/pipeline`, `internal/state` and `internal/server`, where the task domain in this same
+  change defines `TaskReady`/`TaskRunning`/`TaskWaiting` constants. **Requirement:** TS-09.R41,
+  TS-09.R42, `INV §2`, `INV §5`. **Suggested fix/test:** give the run states and pending actions
+  named constants and one `closedToNewWork` predicate, and push the legal from-states into
+  `UpdatePipelineRunCAS` as a `WHERE state IN (...)` fence; test that a failed startup reconcile
+  leaves a stopping run stopping and Retry refused.
+
+- **Worth fixing** — accepting a stage result commits a run mutation that nothing publishes.
+  **Where:** `handleReportTaskResult` (`internal/messaging/task_tools.go`) discards the
+  `PipelineRunRecord` returned by `AcceptPipelineStageTaskResult`, and `internal/messaging` holds no
+  pipeline publisher; the only `m.publish` on a report path is in the now-dead `reportStageTask`.
+  **Trigger:** any stage report — the run moves to `finishing` with a new revision and an attention
+  reason, and the Pipelines page keeps showing the pre-report state until the reporting turn ends.
+  **Why it matters:** R17 requires every committed run mutation to publish a bounded
+  `pipeline_update`; routing the report around the manager dropped the manager's publication and
+  notification duties along with its run lock, and when the release stalls the staleness becomes
+  permanent. **Requirement:** TS-09.R17, `INV §1`. **Suggested fix/test:** have the report path
+  commit through a manager entry point that owns the lock and the publish, or hand the tool a
+  pipeline update sink; assert a `pipeline_update` is emitted on acceptance.
+
+- **Worth fixing** — "the current stage task" is reimplemented eight times. **Where:**
+  `stages[len(stages)-1]` appears in `internal/pipeline/actions.go` (four sites),
+  `manager.go`, `reconcile.go` (two sites) and as `out[len(out)-1]` in
+  `internal/server/pipeline_projection.go`. Each site re-lists every stage task of the run and
+  depends on an implicit `ORDER BY stage_index, attempt_number`. **Trigger:** none on its own; it is
+  the shared cause of the `PipelineStageTaskForAssignee` finding above and of `Detail` and
+  `Reconcile` disagreeing about which stage is current after a concurrent write. **Why it matters:**
+  `pipeline_stage_tasks` already carries `idx_pipeline_stage_tasks_current`, a partial unique index
+  on `(run_id, stage_index) WHERE state = 'open'` that defines "current" exactly, and no call site
+  uses it. **Requirement:** `INV §2`. **Suggested fix/test:** add one `CurrentPipelineStageTask(runID)`
+  accessor keyed on `state = 'open'` and route every caller through it.
+
+- **Worth fixing** — five hand-written `INSERT INTO tasks(...)` statements now bypass the canonical
+  task-creation path. **Where:** `internal/state/pipeline_tasks.go` (three) and
+  `internal/state/pipelines.go` (two) each spell their own column list beside
+  `CreateTaskWithAttachments` in `internal/state/tasks.go`; three distinct lists already exist.
+  **Trigger:** this change added twelve columns to `tasks` (`execution_handle`, `pending_yield`,
+  `wait_version`, the `cleanup_*` family, `execution_turn`), and each new site had to be audited by
+  hand. **Why it matters:** the drift already happened — the coordinator and replacement inserts omit
+  `created_by_agent_id`, `created_by_generation` and `ready_at` entirely, which is the direct cause
+  of the dedicated-coordinator Must-fix above; the canonical path also carries the inherited-closure
+  check these bypass. **Requirement:** `INV §2`, TS-09.R37, TS-09.R49. **Suggested fix/test:** route
+  pipeline task creation through one shared `insertTaskTx` helper; assert a coordinator task records
+  its standing owner as creator.
+
+- **Worth fixing** — manager internals carry dead and leaking control flow. **Where:**
+  `Manager.runLock` (`internal/pipeline/manager.go`) inserts a mutex per run id into `m.locks` and
+  never removes it, unlike the server's refcounted `lockTaskStart`; `Reconcile`'s
+  `for step := 0; step < maxReconcileSteps; step++` loop (`internal/pipeline/reconcile.go`) returns
+  on all seven branches, so it never iterates and `maxReconcileSteps` is dead; `Manager.Detail`
+  assigns `ListPipelineValues`'s error without checking it, then keeps building and returns a
+  populated `RunDetail` alongside a non-nil error, and overwrites durable `CurrentAgentID` and
+  `AttentionReason` fields in memory so callers cannot tell the view from the record.
+  **Trigger:** long-lived servers accumulate one mutex per run ever touched; a `Detail` caller that
+  ignores the error gets a half-built struct. **Why it matters:** the loop is exactly the mechanism
+  that would drive a run to quiescence, so its presence hides the single-shot reconcile behind the
+  stalled-cursor Must-fix. **Requirement:** `INV §7`, `INV §16`. **Suggested fix/test:** refcount and
+  drop run locks, either make `Reconcile` loop or delete the loop, and return early on `Detail`'s
+  read errors.
+
+- **Worth fixing** — `internal/messaging` reaches past its own control-plane seam into pipeline
+  tables. **Where:** `create`/`cancel`/`list`/`get`/`retry`/`rearm` in
+  `internal/messaging/task_tools.go` go through the injected `TaskControl` interface, while
+  `report_task_result`, `wait_for_tasks` and `get_assigned_task` call `*state.Store` directly, and
+  the report handler routes itself on `ReadPipelineStageTaskByTask`/`ReadPipelineRun`. **Trigger:**
+  none directly; it is why the report path has no publisher and no run lock. **Why it matters:** the
+  MCP transport package now owns the pipeline-versus-ordinary domain decision and the run-revision
+  read that guards the stage transaction, which TS-09.R35 assigns to the controller. **Requirement:**
+  TS-09.R35, TS-09.R40, `INV §2`. **Suggested fix/test:** move the stage/ordinary routing behind the
+  same `TaskControl` seam the sibling tools use.
 
 - **Worth fixing** — retained cleanup state never reaches the stage view. **Where:**
   `ui/src/schemas/pipeline.ts` declares `stage_tasks[].cleanup` and `RunBrowser.tsx` renders it, but
