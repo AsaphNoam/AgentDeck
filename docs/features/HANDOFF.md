@@ -16,8 +16,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Current position
 
 - **Active change:** None.
-- **Release:** `v0.4.3` is tagged and published; **Release state** and the release record carry its
-  contents. `v0.4.2` and earlier are in the state archive.
+- **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
+  earlier are in the state archive.
 - **Review units:** none available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
   closed the same day when its fixes landed; BR-1's three findings were fixed the same day. Both
   sets of fix commits are closure of their originating units and are not new review units.
@@ -45,58 +45,39 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
 - **Bug reports:** BR-1, BR-2, and BR-3 are investigated, fixed and closed. Pinned Claude model
   delivery through `_meta` works; an ACP model `currentValue` is adapter configuration evidence and
-  no execution-model oracle (TS-04.R54). OpenCode/OpenHands model and prompt delivery is unverified
-  and now sits under **Acceptance gates**.
-- **State:** The file viewer's credentialed rendered forms are owed: journey J3 now carries the
-  file-link steps (docked and transcript-width forms, the refusal branch, the dashboard-pane
-  navigation), and none of them has been exercised against a real browser.
-  Automated MCP contract verification is green. The full post-fix Claude/Codex acceptance
-  matrix remains open and must not be called verified; the 2026-09-08/09 probes were limited contract
-  and model-delivery checks, not that matrix. Real Claude and Codex steering is unexercised.
+  no execution-model oracle (TS-04.R54).
+- **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
 ## Active change
 
-**Change:** None. BR-1 is closed: all three findings fixed on 2026-09-13. Settled 2026-09-13
-changelog entries moved to
+**Change:** None. `v0.5.0` closed the epoch: every settled 2026-09-13 changelog entry, the `v0.4.3`
+release record, and the retired acceptance-gate checklist moved to
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Changelog — 2026-09-13 (fix: BR-1 OpenCode/OpenHands delivery):** The undetermined finding
-becomes recorded gated evidence instead of an open finding. FS-09.A6 and its deviation note name the
-two out-of-schema members (top-level `systemPrompt` on both, top-level `model` on OpenCode), state
-that OpenHands' model arrives through `LLM_MODEL` so its copy is redundant, and require delivery to
-be checked at the effective provider rather than at the emitted request. TS-04.R47 now says
-"unchanged" is not "working". Neither member is removed: R47's reason holds while the CLIs are
-uninstalled. The **Acceptance gates** entry carries the check (INV §12). No code change; the
-machine-readable record is the R54 out-of-schema table added with finding 2.
+**Changelog — 2026-09-14 (release: `v0.5.0`):** Refreshed the shipped `operating-agentdeck` package
+for the range's agent-facing changes (FS-18.R4–R5, TS-11.R1/R8).
+`references/build-and-run-pipelines.md` was rewritten onto the standing-orchestrator model: stages
+are bounded durable assignments to one standing run orchestrator that alone reports each stage
+outcome, run setup picks one backend/model for it while only dedicated stages select a
+sub-orchestrator runtime, templates carry no conditional routing, accepted stage completion cancels
+unfinished descendants before cleanup fences the next stage, Stop cancels nested delegated work, and
+Continue/Retry/Replace are distinguished (FS-14.R61–R78). `references/coordinate-work.md` gained
+durable waiting — `wait_for_tasks` holds an assignment open, yields its capacity slot, and resumes on
+a watched revision change instead of polling — plus creator authority to inspect, retry, re-arm,
+cancel, and replace work it created (FS-16.R30–R38). `SKILL.md` names both in its routing bullets.
+No product code changed. README, `install.sh`, and `scripts/release/assemble.sh` were re-checked
+against the range and none of their release-matched claims is falsified: the CLI install/update/auth
+surface, the config schema version, and the Node and adapter pins are unchanged, and the in-range
+`assemble.sh` edit already carries its own `+agentdeck.1` component suffix.
 
-**Changelog — 2026-09-13 (fix: BR-1 provider-contract oracles):** TS-04.R54 states the three rules
-that separate a contract claim from a restatement of AgentDeck's own intent. The pinned ACP
-session-request member set is now transcribed from the protocol schema and compared against
-`sessionNewParams`/`sessionLoadParams`, with each backend's surviving out-of-schema members declared
-and backend types enumerated from the adapter registry (new `backend.Types`, one `registry` slice
-replacing `For`'s parallel union). `fakeacp` decodes both session requests through that member set,
-so it drops what the pinned peer drops. R46 now labels `configOptions.currentValue` adapter
-configuration evidence, not provider execution evidence, and FS-09.A15 cites the schema check while
-leaving live honoring to gated A16. INV §12/§17 gained the BR-1 entries (INV §12/§17/§2).
-`internal/runtime/acp_session_schema_test.go` holds both checks; the fake-peer one fails against the
-pre-fix fake with `[model systemPrompt]`.
-
-**Changelog — 2026-09-13 (fix: BR-1 live-gate durability):** Workflow §4 makes a failed acceptance
-gate or live-provider check live state: recorded under `## Review findings` in the §7 format before
-the role that ran it closes, with the archived run record as supporting evidence rather than the
-only trace. A blocked state-file write leaves the role explicitly blocked under §3 instead of
-archiving the finding, and a commit or review carrying an acceptance run record first reconciles
-every Must-fix in it against the live findings. §16.6 repeats the rule where release acceptance
-reports are produced. Documentation-only (INV §1/§10), so no code test applies; `make check-specs`
-and `git diff --check` pass.
-
-**Release state:** `v0.4.3` is published and verified on tag `8ad5261`. Release and CI runs passed,
-the local distributable reports `0.4.3` with `sqlite_fts5`, and the GitHub Release carries the
-darwin/arm64 archive, `install.sh`, and a manifest declaring `0.4.3` with its SHA-256.
-The release shipped with five open Must-fix findings on the operator's explicit decision; all five
-are now closed. The credentialed Claude and Codex journeys under
-**Acceptance gates** are owed; real steering has never been exercised against a provider.
+**Release state:** `v0.5.0` is tagged and published. `make test` (both tag variants, including
+`make check-specs`), the UI suite (54 files, 437 tests), and `make dist VERSION=0.5.0` pass; the
+local distributable reports `0.5.0` with `sqlite_fts5`. No credentialed or real-browser journey was
+run for this release, and none may be described as verified. The standing acceptance-gate checklist
+was retired from this file on the operator's explicit decision during this release; the underlying
+verification debt is unchanged and is recorded in
+[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
 **Available by role:** `/review` has no unreviewed unit. `/work` may take
 `rename-product-to-deckhand`; `/fix` has no open findings;
@@ -110,25 +91,6 @@ are now closed. The credentialed Claude and Codex journeys under
   keep withholding **Open agent**, matching restart recovery (FS-14.R48), or whether chat should
   remain reachable with a wider continuation contract.
 
-## Acceptance gates
-
-**Not blocking as of 2026-09-05.** These gates have not been run, and no agent may describe them as
-verified, passed, or closed. The operator chose to let roles proceed with them open.
-
-- [ ] Pinned real-provider stage-result/file-edit approval journey (FS-03.A26/J14).
-- [ ] Post-fix credentialed Claude and Codex chat, MCP, resume, task, effective-model/effort, and
-      reported-result checks. The historical 2026-07-26 run failed model precedence and is evidence,
-      not closure for the current implementation.
-- [ ] Pinned Claude terminal flags/hooks and live xterm journeys.
-- [ ] Pinned OpenCode/OpenHands launch and credential checks, including model and system-prompt
-      delivery at the effective provider: both send an out-of-schema top-level `systemPrompt` and
-      OpenCode's model depends on an out-of-schema top-level `model` (FS-09.A6, TS-04.R54).
-- [ ] Real macOS native folder-panel checks (FS-04.A22/J2/J9/J16).
-- [ ] Real-browser permission-pane and drag-refusal journeys (FS-02.A35/A43).
-- [ ] Phase 7 federation matrix against real Claude and Codex installations.
-- [ ] Real-browser worktree creation/launch and archive-with-uncommitted-work journeys (FS-19).
-- [ ] Six-tab same-origin dashboard check against a `make dist` build (FS-02.A27).
-
 ## Blocked on human
 
 - None.
@@ -138,7 +100,7 @@ verified, passed, or closed. The operator chose to let roles proceed with them o
 `persistent-pipeline-orchestration` closed on 2026-09-13: all fourteen findings are fixed with
 regression tests, and the unit is no longer open for review or fixes. BR-1 closed on 2026-09-13:
 all three findings are fixed, and the OpenCode/OpenHands delivery it left undetermined is now
-gated evidence under **Acceptance gates** rather than an open finding.
+documented as compatibility evidence rather than an open finding.
 
 No review or bug-report unit has open findings.
 
