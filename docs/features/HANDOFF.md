@@ -71,10 +71,13 @@ against the range and none of their release-matched claims is falsified: the CLI
 surface, the config schema version, and the Node and adapter pins are unchanged, and the in-range
 `assemble.sh` edit already carries its own `+agentdeck.1` component suffix.
 
-**Release state:** `v0.5.0` is tagged and published. `make test` (both tag variants, including
-`make check-specs`), the UI suite (54 files, 437 tests), and `make dist VERSION=0.5.0` pass; the
-local distributable reports `0.5.0` with `sqlite_fts5`. No credentialed or real-browser journey was
-run for this release, and none may be described as verified. The standing acceptance-gate checklist
+**Release state:** `v0.5.0` is published and verified on tag `8ab84d3`. `make test` (both tag
+variants, including `make check-specs`), the UI suite (54 files, 437 tests), and
+`make dist VERSION=0.5.0` pass; the local distributable reports `0.5.0` with `sqlite_fts5`. The CI
+and Release macOS installer runs both succeeded, and the GitHub Release carries the darwin/arm64
+archive, `install.sh`, and a manifest declaring `0.5.0` whose SHA-256 and size match the uploaded
+archive. No credentialed or real-browser journey was run for this release, and none may be described
+as verified. The standing acceptance-gate checklist
 was retired from this file on the operator's explicit decision during this release; the underlying
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
