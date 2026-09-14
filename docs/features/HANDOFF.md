@@ -55,6 +55,17 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 release record, and the retired acceptance-gate checklist moved to
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
+**Changelog — 2026-09-14 (CI flake):** Fixed the intermittent `LaunchStep` onboarding test that
+reddened CI on `7162f59`. `LaunchStep` disables Launch until both the roles and the projects query
+resolve, but both tests awaited only the project option before clicking; when the roles response
+landed second, the click hit a disabled button, no `POST /api/sessions` was sent, and the
+`launchBody` wait timed out. A shared `clickLaunch()` helper now waits for the button to be enabled.
+Delaying the roles handler by 300ms reproduced the CI failure verbatim and both tests pass under
+that delay with the fix. Test-only: no product code changed, so the shipped `v0.5.0` artifact is
+unaffected and no re-release is required. CI also warns that `actions/checkout@v4`,
+`setup-go@v5` and `setup-node@v4` are being forced off deprecated Node 20; not yet breaking, not
+addressed here.
+
 **Changelog — 2026-09-14 (release: `v0.5.0`):** Refreshed the shipped `operating-agentdeck` package
 for the range's agent-facing changes (FS-18.R4–R5, TS-11.R1/R8).
 `references/build-and-run-pipelines.md` was rewritten onto the standing-orchestrator model: stages

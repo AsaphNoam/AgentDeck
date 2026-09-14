@@ -44,6 +44,15 @@ function renderWithQuery(ui: React.ReactElement) {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
+// Launch stays disabled until both the roles and the projects query have
+// populated their selects. Clicking earlier is a silent no-op, so wait for the
+// button itself rather than for either list alone.
+async function clickLaunch() {
+  const button = await screen.findByRole("button", { name: "Launch" });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+}
+
 describe("LaunchStep", () => {
   it("launches the just-created project, not the seeded my-app (J2 onboarding-completion blocker)", async () => {
     renderWithQuery(<LaunchStep onDone={() => {}} initialProject="user-proj" />);
@@ -51,7 +60,7 @@ describe("LaunchStep", () => {
     // Wait for role/project data to populate the selects.
     expect(await screen.findByText("User Proj (user-proj)")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Launch"));
+    await clickLaunch();
 
     await waitFor(() => expect(launchBody).not.toBeNull());
     expect(launchBody?.project).toBe("user-proj");
@@ -73,7 +82,7 @@ describe("LaunchStep", () => {
     renderWithQuery(<LaunchStep onDone={onDone} initialProject="user-proj" />);
 
     expect(await screen.findByText("User Proj (user-proj)")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Launch"));
+    await clickLaunch();
 
     // Wait for launch to succeed; config write will fail and show an error toast.
     // The key assertion: onDone should NOT be called (wizard stays visible).
