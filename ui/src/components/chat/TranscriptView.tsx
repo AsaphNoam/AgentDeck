@@ -9,6 +9,8 @@ import { ToolCall } from "./renderers/ToolCall";
 import { shouldRenderToolResult, ToolResult } from "./renderers/ToolResult";
 import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
+import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
+import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { FileViewer } from "./FileViewer";
@@ -31,6 +33,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   // The queued follow-up renders beside the event list, never inside it: the
   // server sends no event for a message it has not delivered (TS-08.R56).
   const held = useHeldStore((state) => state.byAgent[agentId]);
+  const reasoning = useReasoningStore((state) => state.byAgent[agentId]?.spans);
 
   // Annotating is a right-click action on the event under the pointer: it captures the
   // highlighted text when there is a selection inside that event, otherwise the whole event.
@@ -58,7 +61,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   useEffect(() => {
     const el = scrollRef.current;
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
-  }, [events, busy]);
+  }, [events, busy, reasoning]);
 
   const jumpToLatest = () => {
     const el = scrollRef.current;
@@ -71,7 +74,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         <FileViewer agentId={agentId} link={openFile} onClose={() => onOpenFile(null)} onOpenFile={onOpenFile} />
       )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
-        {groupTranscriptRows(events).map((row, index) => row.kind === "tool-run" ? (
+        {groupTranscriptRows(withReasoning(events, reasoning)).map((row, index) => row.kind === "tool-run" ? (
           <ToolRun
             key={`run-${keyOf(row.events[0], index)}`}
             events={row.events}
@@ -183,7 +186,7 @@ function ToolRun({ events, renderEvent }: { events: TranscriptEvent[]; renderEve
   );
 }
 
-type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "annotation" | "unknown";
+type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "annotation" | "thinking" | "unknown";
 
 type TranscriptRow = { kind: "event"; event: TranscriptEvent } | { kind: "tool-run"; events: TranscriptEvent[] };
 
@@ -202,6 +205,25 @@ export function groupTranscriptRows(events: TranscriptEvent[]): TranscriptRow[] 
     else run.filter(shouldRenderTranscriptEvent).forEach((item) => rows.push({ kind: "event", event: item }));
   }
   return rows;
+}
+
+// withReasoning places each live reasoning span at its chronological slot as a
+// render-only row. It has no seq, so it is never annotated, and it never enters
+// the transcript store (FS-03.R57).
+export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] | undefined): TranscriptEvent[] {
+  if (!spans?.length) return events;
+  const row = (span: ReasoningSpan): TranscriptEvent => ({
+    kind: "reasoning",
+    message_id: `reasoning-${span.activityId ?? ""}-${span.spanId}`,
+    text: span.text,
+  });
+  const out: TranscriptEvent[] = [];
+  events.forEach((event, index) => {
+    for (const span of spans) if (span.anchor === index) out.push(row(span));
+    out.push(event);
+  });
+  for (const span of spans) if (span.anchor >= events.length) out.push(row(span));
+  return out;
 }
 
 function isToolEvent(event: TranscriptEvent) {
@@ -233,6 +255,7 @@ function variantOf(event: TranscriptEvent): TranscriptVariant {
   if (kind === "turn_end") return "turn";
   if (kind === "backend_switch") return "backend-switch";
   if (kind === "annotation") return "annotation";
+  if (kind === "reasoning") return "thinking";
   return "unknown";
 }
 
@@ -254,6 +277,7 @@ function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: s
   if (kind === "tool_result") return <ToolResult event={event} />;
   if (kind === "error") return <TurnError event={event} />;
   if (kind === "annotation") return <AnnotationCard event={event} />;
+  if (kind === "reasoning") return <ThinkingDisclosure text={String(event.text ?? "")} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
   if (kind === "backend_switch") {
     const from = String(event.from ?? "");

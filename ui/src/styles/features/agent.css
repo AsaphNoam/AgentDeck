@@ -1049,4 +1049,15 @@
 .tab-placeholder {
   color: var(--ad-text-muted);
 }
+
+/* Live-only reasoning: a subdued, collapsed disclosure beside the turn (TS-08.R59). */
+.thinking {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+}
+
+.thinking-text {
+  margin: var(--ad-space-2) 0 0;
+  white-space: pre-wrap;
+}
 }

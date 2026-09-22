@@ -1,5 +1,15 @@
 export type AgentStatus = "busy" | "idle" | "waiting_input" | "done" | "error" | "unknown";
 
+/** Ephemeral `runtime_activity` SSE payload (TS-03.R44): no transcript seq. */
+export interface RuntimeActivity {
+  agent_id: string;
+  generation: string;
+  activity_id?: string;
+  span_id: string;
+  kind: "reasoning_delta";
+  delta: string;
+}
+
 export interface RuntimeCapabilities {
   fork: boolean;
   subagents: boolean;

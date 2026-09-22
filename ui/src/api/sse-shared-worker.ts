@@ -19,6 +19,7 @@ let hydratedRow: string | null = null;
 const eventTypes = [
   "state_update",
   "new_message",
+  "runtime_activity",
   "notification",
   "pipeline_update",
   "pipeline_proposal_update",

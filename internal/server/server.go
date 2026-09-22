@@ -315,6 +315,10 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	// committing the record stay here, with the plane that owns them (TS-10.R13).
 	msg.SetTaskControl(s)
 	if registry != nil {
+		registry.SetActivitySink(func(notice runtime.ActivityNotice) {
+			agentID := notice.AgentID
+			eventBus.Publish("runtime_activity", &agentID, notice)
+		})
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)
 			if ev.Type == runtime.EvPermissionRequest || ev.Type == runtime.EvPermissionResolved {

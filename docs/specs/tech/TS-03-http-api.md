@@ -74,7 +74,7 @@ origin's connection pool again.
 
 **R8 — SSE event types are versioned by payload contract.** Current types include `state_update`,
 `new_message`, `notification`, `config_source_update`, `pipeline_update`, `task_update`, `hydrated`,
-and `ping`. Unknown event types
+`ping`, and the live-only `runtime_activity` (R44). Unknown event types
 are ignored by clients. Producers publish only after authoritative state is committed.
 
 **R9 — Slow subscribers cannot block the server.** Bus/subscription buffers are bounded; overflow

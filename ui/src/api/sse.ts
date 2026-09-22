@@ -3,10 +3,11 @@ import { QUERY_KEYS, queryClient } from "./config";
 import { PIPELINE_QUERY_KEYS } from "./pipelines";
 import { TASK_QUERY_KEYS } from "./tasks";
 import type { Config } from "../schemas/config";
-import type { AgentState, BusEvent, NotificationPayload, TranscriptEvent } from "./types";
+import type { AgentState, BusEvent, NotificationPayload, RuntimeActivity, TranscriptEvent } from "./types";
 import { pipelineUpdateSchema, type PipelineRunDetail } from "../schemas/pipeline";
 import { useAgentStore } from "../store/agentStore";
 import { useAnnotationStore } from "../store/annotationStore";
+import { useReasoningStore } from "../store/reasoningStore";
 import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
 import { discardChatDraft } from "../components/chat/drafts";
@@ -47,6 +48,8 @@ class SseClient {
       useAgentStore.getState().hydrateBegin();
       this.hydrationIds = [];
       this.lastAgentSeq = {};
+      // Live-only reasoning has no seq to recover; a reconnect discards it (TS-03.R44).
+      useReasoningStore.getState().clearAll();
       // The open route can outlive its agent. Missing transcripts are represented
       // by ChatPanel's recovery view, not an unhandled reconnect rejection.
       for (const agentId of this.openAgents.keys()) {
@@ -59,6 +62,7 @@ class SseClient {
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
     this.es.addEventListener("new_message", (event) => this.onNewMessage(event as MessageEvent<string>));
+    this.es.addEventListener("runtime_activity", (event) => this.onRuntimeActivity(event as MessageEvent<string>));
     this.es.addEventListener("notification", (event) => this.onNotification(event as MessageEvent<string>));
     this.es.addEventListener("pipeline_update", (event) => this.onPipelineUpdate(event as MessageEvent<string>));
     this.es.addEventListener("pipeline_proposal_update", () => queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals }));
@@ -133,6 +137,16 @@ class SseClient {
     if (this.openAgents.has(agentId)) {
       useTranscriptStore.getState().appendMessage(agentId, envelope.data);
     }
+  }
+
+  // Live-only reasoning streams into its own memory-only store, anchored at the
+  // open transcript's current rendered length (FS-03.R57).
+  private onRuntimeActivity(event: MessageEvent<string>) {
+    const envelope = JSON.parse(event.data) as BusEvent<RuntimeActivity>;
+    const activity = envelope.data;
+    if (!activity?.agent_id || !this.openAgents.has(activity.agent_id)) return;
+    const anchor = useTranscriptStore.getState().byAgent[activity.agent_id]?.length ?? 0;
+    useReasoningStore.getState().append(activity, anchor);
   }
 
   // A federation source changed on disk (or was refreshed/bound): invalidate the

@@ -440,6 +440,20 @@ func runScenario(name string) string {
 		emitChunk("```mermaid\ngraph TD;\n  A[\"<script>window.__injected = true;</script>\"]-->B[\"<img src=x onerror='window.__injected = true'>\"];\n```\n")
 		return "end_turn"
 
+	case "thought_stream":
+		// codex-acp 1.12 reasoning: text blocks under agent_thought_chunk, then an
+		// answer, then a second reasoning span (FS-03.A39).
+		thought := func(text string) {
+			emitUpdate(map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": text}})
+		}
+		thought("Consider ")
+		thought("the plan.")
+		emitUpdate(map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": ""}})
+		emitChunk("Answer.")
+		thought("Second thought.")
+		emitChunk("Done.")
+		return "end_turn"
+
 	case "tool_flow":
 		emitUpdate(map[string]any{
 			"sessionUpdate": "tool_call", "toolCallId": "tc_1",

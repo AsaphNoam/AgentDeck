@@ -56,7 +56,9 @@ type ChatRuntime struct {
 	mu     sync.Mutex
 	agents map[string]*agentState
 	sink   func(Event)
-	touch  func(string)
+	// activitySink receives live-only reasoning (TS-03.R44).
+	activitySink func(ActivityNotice)
+	touch        func(string)
 
 	transcriptHome string
 	openTranscript TranscriptOpener
@@ -243,6 +245,10 @@ type agentState struct {
 	steering bool
 	// caps is the negotiated native-session capability value (TS-04.R62).
 	caps SessionCapabilities
+	// spanOpen is the live reasoning span a thought chunk joins; spans numbers
+	// them within this generation (FS-03.R57).
+	spanOpen string
+	spans    int
 	// held is the person's queued follow-up: at most one message per agent, live
 	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
@@ -1489,6 +1495,13 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	if replay {
 		return
 	}
+	// Reasoning streams live and is never persisted; any other update closes
+	// the open reasoning span (FS-03.R57, TS-04.R63).
+	if delta, ok := decodeThoughtChunk(params); ok {
+		c.publishReasoning(as, delta)
+		return
+	}
+	as.closeReasoningSpan()
 
 	for _, m := range mapSessionUpdate(params) {
 		c.emit(as, m.Type, m.Data)

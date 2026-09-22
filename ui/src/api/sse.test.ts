@@ -130,6 +130,27 @@ describe("SseClient watchdog reconnect", () => {
     expect(client.getTranscript).toHaveBeenCalledTimes(1);
   });
 
+  // FS-03.A39 — reasoning has no seq: it never triggers gap recovery, reaches
+  // only an open agent's memory-only store, and a reconnect discards it.
+  it("routes live reasoning without a seq and discards it on reconnect", async () => {
+    const { sseClient } = await import("./sse");
+    const client = await import("./client");
+    const { useReasoningStore } = await import("../store/reasoningStore");
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    const activity = (agent: string) =>
+      JSON.stringify({ type: "runtime_activity", seq: 40, ts: 1, agent_id: agent, data: { agent_id: agent, generation: "g", span_id: "r1", kind: "reasoning_delta", delta: "hm" } });
+    sseClient.registerOpenAgent("a_think");
+    (client.getTranscript as ReturnType<typeof vi.fn>).mockClear();
+    es.emit("runtime_activity", activity("a_think"));
+    es.emit("runtime_activity", activity("a_closed"));
+    expect(useReasoningStore.getState().byAgent.a_think?.spans.map((span) => span.text)).toEqual(["hm"]);
+    expect(useReasoningStore.getState().byAgent.a_closed).toBeUndefined();
+    expect(client.getTranscript).not.toHaveBeenCalled();
+    es.onopen?.();
+    expect(useReasoningStore.getState().byAgent).toEqual({});
+  });
+
   it("contains a missing open transcript during reconnect hydration", async () => {
     const { sseClient } = await import("./sse");
     const client = await import("./client");

@@ -263,6 +263,7 @@
         "backend-switch",
         "annotation",
         "held",
+        "thinking",
         "unknown"
       ]
     },
@@ -320,6 +321,13 @@
         "collapsed",
         "expanded"
       ],
+      "variants": []
+    },
+    "runtime-activity": {
+      "slots": [
+        "thinking"
+      ],
+      "states": [],
       "variants": []
     },
     "permission-prompt": {

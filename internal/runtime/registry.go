@@ -134,6 +134,14 @@ func (r *Registry) SetEventSink(sink func(Event)) {
 	r.chat.SetEventSink(sink)
 }
 
+// SetActivitySink mirrors live-only runtime activity into an external bus.
+func (r *Registry) SetActivitySink(sink func(ActivityNotice)) {
+	if r == nil || r.chat == nil {
+		return
+	}
+	r.chat.SetActivitySink(sink)
+}
+
 // SetStateTouch wires runtime state writes to the dashboard state manager.
 func (r *Registry) SetStateTouch(touch func(string)) {
 	if r == nil || r.chat == nil {
