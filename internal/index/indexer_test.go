@@ -708,3 +708,21 @@ func TestSessionMetaFreezesRuntimeCapabilities(t *testing.T) {
 		t.Fatalf("projection omits non-null runtime_capabilities: %s", encoded)
 	}
 }
+
+// Codex 1.12's canonical command name classifies a command the ACP kind alone
+// ("execute") never did (FS-05.R38).
+func TestCanonicalExecCommandIsTracked(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_exec", meta()); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	data, _ := json.Marshal(runtime.ToolCallData{ToolCallID: "c1", Name: "exec_command", Title: "ls", Args: json.RawMessage(`{"command":"ls -la","cwd":"/w"}`)})
+	if err := ix.OnEvent("a_exec", runtime.Event{AgentID: "a_exec", Seq: 1, Type: runtime.EvToolCall, Data: data, Ts: "2026-09-22T10:00:00Z"}); err != nil {
+		t.Fatalf("OnEvent: %v", err)
+	}
+	var command string
+	if err := st.DB().QueryRow(`SELECT command FROM tracked_commands WHERE agent_id = 'a_exec'`).Scan(&command); err != nil || command != "ls -la" {
+		t.Fatalf("tracked command = %q, %v", command, err)
+	}
+}

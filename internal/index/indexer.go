@@ -455,7 +455,7 @@ func isFileTool(name string) bool {
 
 func isCommandTool(name string) bool {
 	switch strings.ToLower(name) {
-	case "bash", "shell", "run", "terminal":
+	case "bash", "shell", "run", "terminal", "exec_command":
 		return true
 	default:
 		return false

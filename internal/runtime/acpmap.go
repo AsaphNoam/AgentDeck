@@ -214,8 +214,10 @@ type acpUpdate struct {
 	// agent_message_chunk / agent_thought_chunk: a single content block.
 	Content json.RawMessage `json:"content"`
 
-	// tool_call / tool_call_update.
+	// tool_call / tool_call_update. Name is the adapter's canonical tool name
+	// (ACP 1.12, TS-04.R66); older adapters omit it.
 	ToolCallID string          `json:"toolCallId"`
+	Name       string          `json:"name"`
 	Title      string          `json:"title"`
 	Kind       string          `json:"kind"`
 	Status     string          `json:"status"`
@@ -265,6 +267,7 @@ type acpPermissionRequest struct {
 
 type acpPermToolCall struct {
 	ToolCallID string          `json:"toolCallId"`
+	Name       string          `json:"name"`
 	Title      string          `json:"title"`
 	Kind       string          `json:"kind"`
 	RawInput   json.RawMessage `json:"rawInput"`
@@ -291,7 +294,10 @@ func mapPermissionRequest(params json.RawMessage, expiresAt string, autoApproved
 	var pr acpPermissionRequest
 	_ = json.Unmarshal(params, &pr)
 
-	name := strutil.FirstNonEmpty(pr.ToolCall.Title, pr.ToolCall.Kind, "tool")
+	// The canonical name wins; the title-first fallback is unchanged. The
+	// auto-approve identity stays the title (permissionToolIdentity) because the
+	// adapters' MCP calls carry no canonical name.
+	name := strutil.FirstNonEmpty(pr.ToolCall.Name, pr.ToolCall.Title, pr.ToolCall.Kind, "tool")
 	opts := make([]PermOption, 0, len(pr.Options))
 	byKind := make(map[string]string, len(pr.Options))
 	for _, o := range pr.Options {
@@ -413,11 +419,10 @@ func mapPromptResult(result json.RawMessage) (TurnEndData, bool) {
 	return td, false
 }
 
-// toolName picks a normalized tool name: prefer the ACP kind, else the title.
-// (The §4.3 mapping table does not pin which ACP field becomes Name; kind is the
-// closest stable discriminator. See HANDOFF autonomous decisions.)
+// toolName picks a normalized tool name: the adapter's canonical name when it
+// supplies one (TS-04.R66), else the ACP kind, else the title.
 func toolName(u acpUpdate) string {
-	return strutil.FirstNonEmpty(u.Kind, u.Title, "tool")
+	return strutil.FirstNonEmpty(u.Name, u.Kind, u.Title, "tool")
 }
 
 func decodeContentArray(raw json.RawMessage) []acpContentBlock {

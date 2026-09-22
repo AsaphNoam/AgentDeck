@@ -210,3 +210,24 @@ func TestAvailableCommandsSnapshotReplaceOnly(t *testing.T) {
 		t.Fatalf("Commands(unknown) err = nil, want ErrNoHandle")
 	}
 }
+
+// A canonical name wins over a misleading title while an unnamed event keeps
+// the kind/title fallback; the permission's display name follows the same rule
+// but its auto-approve identity stays the title (TS-04.R66, FS-03.A42).
+func TestCanonicalToolNameWinsOverFallback(t *testing.T) {
+	named := mapSessionUpdate(json.RawMessage(`{"sessionId":"s","update":{"sessionUpdate":"tool_call","toolCallId":"t1","name":"exec_command","kind":"execute","title":"Editing files"}}`))
+	unnamed := mapSessionUpdate(json.RawMessage(`{"sessionId":"s","update":{"sessionUpdate":"tool_call","toolCallId":"t2","kind":"edit","title":"Editing files"}}`))
+	if got := named[0].Data.(ToolCallData); got.Name != "exec_command" || got.Title != "Editing files" {
+		t.Fatalf("named = %+v", got)
+	}
+	if got := unnamed[0].Data.(ToolCallData); got.Name != "edit" {
+		t.Fatalf("unnamed = %+v", got)
+	}
+	perm := json.RawMessage(`{"sessionId":"s","toolCall":{"toolCallId":"t1","name":"exec_command","title":"mcp__agentdeck__send"},"options":[]}`)
+	if data, _ := mapPermissionRequest(perm, "", false); data.Name != "exec_command" {
+		t.Fatalf("permission name = %q", data.Name)
+	}
+	if id := permissionToolIdentity(perm); id != "mcp__agentdeck__send" {
+		t.Fatalf("permission identity = %q", id)
+	}
+}

@@ -55,7 +55,7 @@ one Codex 0.154.0). Slice 2 done: `internal/runtime/capabilities.go` negotiates;
 client set stays empty until each slice lands its event handling (subagents → 5, asyncTasks → 6,
 agentFileChangeReport → 8), so the adapter never switches away from forms AgentDeck renders.
 Snapshot: migration 33, `SessionMetaData.RuntimeCapabilities`, `AgentState.runtime_capabilities`.
-**Next:** slice 3. 1.12.0 wire notes: re-derive from `npm pack @agentclientprotocol/codex-acp@1.12.0`
+Slice 3a done: canonical `name` wins (tool call + permission display), `exec_command` is a tracked command. **Next:** slice 3b — elicitation completion (1.11 fix) check against wire notes; load replay is already dropped whole on resume, so pagination de-dupe only matters for fork (slice 7). 1.12.0 wire notes: re-derive from `npm pack @agentclientprotocol/codex-acp@1.12.0`
 (`dist/index.js`: initialize ~32307, AIR keys ~22839). MCP tool calls carry no `name`, so
 auto-approve identity stays title-based. Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
