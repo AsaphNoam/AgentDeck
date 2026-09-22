@@ -1,6 +1,6 @@
 # FS-01 — Agent Lifecycle
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/server/{launch,resume,switch,sessions,groups}.go`, `internal/runtime/`, `internal/index/`, `internal/cli/launch.go` · **Journeys:** J3, J7, J11
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -89,7 +89,21 @@ orphaned processes.
   R4. The UI drives rename through the core application dialog described by R32.
 - **R9** — **Clone** launches a **new** agent (new `agent_id`) carrying the source agent's role,
   project, backend, model, interface, and group. Clone launches **immediately, with no confirmation
-  dialog**; the source agent is untouched.
+  dialog**; the source agent is untouched. R36 supersedes this settings-only meaning when it ships.
+- **R36** `(planned)` — **Clone** is a conversation fork, not a settings duplicate. It creates a
+  new AgentDeck agent with a new `agent_id`, the source agent's role, project, backend, model,
+  interface, effort, fast mode and group, and a provider-native conversation fork at the source's
+  latest completed turn. The new agent receives the provider context and a durable copy of the
+  source's visible transcript through that boundary plus a fork marker linking back to the source;
+  later source events never enter the clone. The source is untouched and the clone launches
+  immediately without a confirmation dialog. Clone is available only for a chat runtime that
+  advertises native session fork and has a native session to fork; AgentDeck never silently falls
+  back to the superseded settings-only meaning. While the source has an active turn or unresolved
+  permission, Clone is unavailable with an explanation that cloning requires a completed
+  conversation point. A stopped, non-archived source remains cloneable from its last native
+  session. Background commands remain owned by the source and do not continue in the clone; any
+  copied running task row is closed at the fork boundary as not carried. A failed fork creates no
+  new agent, transcript, running process, or messaging identity.
 
 ### Resume
 
@@ -303,6 +317,15 @@ transitions:
   resume/clone tests, switch-runtime tests, `NewAgentModal.test.tsx`, and the chat/archive header UI
   tests.
 
+- **A20** `(planned)` (R36) — Clone against a fork-capable fake ACP session at idle creates one
+  running agent with a distinct `agent_id`, identical configured identity, a distinct native
+  session, copied visible history through the last completed turn, and a source-link marker; a
+  later source turn appears only on the source. The same action succeeds from a stopped source by
+  reopening its native session for the fork. A busy or waiting source, a terminal or non-advertising
+  runtime, and a source without a native session expose no weaker clone path, while a rejected fork
+  leaves no partial AgentDeck state. *Verify by* lifecycle/runtime/API tests and card-menu tests for
+  capability, state, success and rollback, plus journey J7.
+
 ## 6. Deviations & open decisions
 
 - **Pipeline replacement:** FS-14.R74 replaces R33's historical pipeline-association wake veto
@@ -321,8 +344,9 @@ transitions:
   hardcoded ~5 seconds before stopping; the live identity updates before the archived snapshot; and a
   switch on a stopped identity returns `409 agent_not_running`. These are user/API-visible
   interoperability choices.
-- **Immediate/dialog-based UI.** Clone launches immediately
-  with no confirmation (R9); rename and switch runtime use the application dialogs specified by
+- **Immediate/dialog-based UI.** Clone launches immediately with no confirmation under current R9;
+  planned R36 preserves that interaction once its stable fork boundary is available. Rename and
+  switch runtime use the application dialogs specified by
   R32/FS-12.R26; a disappeared
   terminal process becomes `done` not `error` (R18); and an invalid seeded project is explained after
   launch fails (R22, mitigated by the up-front cwd check).

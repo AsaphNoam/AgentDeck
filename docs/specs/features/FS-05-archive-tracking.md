@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -98,6 +98,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   file link (FS-03.R55), so a tracked path recorded outside the session working directory, or a file
   since deleted, states that reason rather than opening. Tracking capture, path form, ordering,
   rollup counts, and the R15–R19 endpoints are unchanged.
+
+- **R38** `(planned)` — Runtime-native child activity and background commands contribute to the
+  parent agent's existing Files and Commands projections, never separate tracking identities. A
+  canonical tool name and validated runtime diff/file metadata may strengthen classification and
+  change statistics, but provider summary metadata never fabricates a transcript diff whose patch
+  was not supplied. Replayed load/fork pages and reconstructed background-task lifecycle are
+  de-duplicated by their stable session/tool/task identity so one provider event produces at most
+  one tracked edit or command. Reasoning and ignored plan updates contribute nothing to tracking,
+  rollups or search.
 
 
 ## 3. States & transitions
@@ -293,6 +302,12 @@ R22's `active` validation remain binding.
   working directory or since deleted renders its stated refusal:
   `ui/src/components/chat/FilesTab.test.tsx` and
   `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
+
+- **A21** `(planned)` (R38) — Root and nested child file/command events roll up once under the
+  parent agent across live delivery, paginated load and resume; canonical names improve
+  classification, summary-only file metadata cannot create an inspectable patch, and reasoning or
+  plan updates create no tracking/search entry. *Verify by* indexer/reindex fixtures containing
+  duplicated pages, child session ids, background-task reconstruction and summary-only reports.
 
 
 ## 6. Deviations & open decisions

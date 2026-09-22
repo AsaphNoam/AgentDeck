@@ -436,6 +436,36 @@ authorized turn may already have consumed its mail. Deferred backlog can never k
 alive. A new waking send may coalesce a fresh opportunity under existing rules. Retain lifecycle,
 project, ownership and budget gates; waiting assignees route waking requests through TS-10.R29.
 
+**R35 `(planned)` — Native session capabilities extend `Runtime`, never bypass it.** The runtime
+package owns one provider-independent `SessionCapabilities` value and normalized operations for
+`Fork` and `StopBackgroundTask`. Capabilities are populated only from the live ACP initialize
+response, frozen onto the session snapshot for stopped-session affordances, and revalidated by the
+new peer before an operation proceeds; no server, persistence or UI branch infers them from
+`backend == "codex-acp"` or an adapter version. Chat implements the advertised operations and the
+terminal runtime returns the ordinary unsupported result. The registry remains the sole dispatcher,
+so launch, resume, switch, clone, wake and rollback never reach a Codex app-server client directly.
+
+Normalized durable events gain optional `activity_id` and `parent_activity_id` scope plus bounded
+activity/background-task lifecycle payloads. Root events omit both fields. Child assistant, tool,
+diff and permission events reuse their existing payloads with scope attached rather than creating a
+parallel transcript vocabulary. Every child tool call receives an AgentDeck-normalized composite
+`tool_call_id` scoped by activity; only Runtime retains the provider's raw id and maps the normalized
+id back when answering permission or task control. Root ids remain unchanged for API compatibility,
+so the one pending-permission map cannot cross-resolve equal raw ids from sibling sessions
+(INV §5/§11). Reasoning uses a separate live-only runtime notification that has a
+generation, activity scope and span id but no durable transcript sequence; it therefore cannot make
+SSE gap recovery request a sequence that will never exist. One mapper owns live and replayed ACP
+child/task conversion (INV §1/§2/§11).
+
+Clone is one exclusive lifecycle operation over the source and target. The server claims the source
+at its last completed durable turn, prepares the target's rewritten transcript prefix, asks the
+runtime to fork the native session, and publishes the target identity/running registration only
+after the fork and local session commit both succeed. Failure removes the prepared prefix and tears
+down the target generation; a forked provider session that exists when local commit fails is deleted
+best-effort through the same ACP session owner before the error returns (INV §4/§5/§15). Native
+background processes never transfer; copied open task state is terminally fenced at the clone
+boundary.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):

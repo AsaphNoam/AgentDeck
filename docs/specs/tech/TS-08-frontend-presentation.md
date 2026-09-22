@@ -614,6 +614,27 @@ primitive seam; the rejected alternatives are recorded in §5.
   written so that running it twice is a no-op, since it runs on every mount rather than behind a
   persisted flag.
 
+**R59 `(planned)` — Runtime-native activity stays subordinate to the conversation.** The experienced
+operator's primary job remains reading the root exchange and intervening only when work needs
+attention. `TranscriptView` and `appendRenderedEvent` own one `runtime-activity` projection used by
+the full agent screen, dashboard chat pane and read-only archive (INV §2). Its reading order is root
+conversation, nested child activity at the causal position, and a compact background-task summary
+at the transcript tail while any task is active; completed child/task detail remains available by
+disclosure without competing with assistant text.
+
+The projection exposes one curated `runtime-activity` hook with `thinking`, `child`, `task-list` and
+`task` slots plus active/completed/failed/stopped/disconnected states. Thinking is a subdued collapsed disclosure
+and never reserves empty space after reload. Child sessions use restrained hierarchy and the
+existing assistant/tool/diff/permission components rather than equal cards or a second transcript;
+visual indentation is capped after two levels while labels retain ancestry. Background rows put
+state before metadata, show **Stop** only for a live controllable task, keep the related tool call as
+the output owner, and preserve the last state plus inline retryable error when Stop fails. A
+disconnected child is read-only and states that its historical outcome is unknown rather than using
+failure styling. Archived rows are read-only. The same composition works at the transcript container's narrow dashboard-pane
+width and supported desktop floor in Core and Sky & Grove without a new tab, side panel, provider
+label, raw color, token family or motion dependency. High-frequency updates use no entrance motion;
+only existing state-color/typographic feedback changes, and reduced motion loses no information.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

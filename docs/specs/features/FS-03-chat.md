@@ -1,6 +1,6 @@
 # FS-03 — Live chat & permission flow
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/runtime/` (`chat.go`, `permission.go`, `event.go`), `internal/server/sessions.go`, `internal/transcript/`, `ui/src/components/chat/`, `ui/src/store/transcriptStore.ts`, `ui/src/api/sse.ts` · **Journeys:** J3, J4, J7
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -443,6 +443,46 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the message. Steer remains available wherever the runtime advertises it; an advertised adapter
   must provide this host-owned fallback before the planned behavior ships.
 
+### 2.10 Runtime-native activity
+
+- **R57** `(planned)` — A runtime-advertised reasoning stream appears live in chronological order
+  beside the assistant turn under one compact **Thinking** disclosure, collapsed by default. Opening
+  it reveals the text received so far and continues streaming without moving or duplicating the
+  surrounding transcript. Reasoning is ephemeral: AgentDeck does not append it to the transcript,
+  database, archive, search index, annotations, context references or clone history, and it is gone
+  after reload or reopening. The same rule applies to reasoning emitted by a native child session.
+- **R58** `(planned)` — When both sides negotiate native subagent sessions, each provider child is
+  shown as a nested, expandable activity stream within its immediate parent conversation. It names
+  the child when the runtime supplies a name and shows its lifecycle, assistant output, tool calls,
+  tool results, diffs, permissions and terminal outcome using the ordinary normalized renderers.
+  Durable child events are retained in the parent transcript and replay with the same nesting; they
+  do not create AgentDeck agents, dashboard cards, durable tasks, pipeline stages, independent
+  archive rows or separate search identities. Child permissions remain actionable from the parent
+  conversation and identify the child that requested them. Root Cancel and Stop keep their existing
+  whole-turn/session authority; AgentDeck offers no targeted child stop or close that the negotiated
+  capability does not provide. A loaded child whose provider history cannot prove an outcome is
+  shown as `disconnected`, not failed; it remains inspectable but has no live control.
+- **R59** `(planned)` — When a runtime advertises background-task control, a command that continues
+  after its initiating tool call appears in a compact **Background tasks** activity list associated
+  with that conversation and, for a native child command, that child. Each row names the command
+  when available, identifies its related tool call, and shows `running`, `completed`, `failed` or
+  `stopped`; command output remains in the related tool call and is not duplicated. A running row
+  offers targeted **Stop**. Accepted stop waits for the runtime's terminal lifecycle update before
+  claiming the task stopped; a refusal or transport failure preserves the last state and gives a
+  retryable error. Lifecycle events are durable and replay in live and archived transcripts. A
+  provider restart may terminally stop or fail old tasks, exactly as reported by the runtime.
+  Background tasks never become AgentDeck durable tasks, pipeline work or terminal-interface tabs.
+- **R60** `(planned)` — Tool calls prefer the runtime's canonical tool name and retain the existing
+  bounded title/kind fallback when no name is supplied. The canonical name flows through permission
+  identity, transcript rendering, command/file tracking and diagnostic logs without changing the
+  provider's arguments or result. A runtime that improves load/fork pagination, MCP elicitation
+  completion or ordinary diff emission requires no provider-specific UI path: AgentDeck consumes
+  the same normalized history, permission and diff contracts and must not duplicate replayed events
+  or leave a completed elicitation pending.
+- **R61** — Plan updates remain deliberately ignored. Supporting them
+  requires a distinct normalized state, retention and presentation contract; their availability in
+  ACP is recorded as a future product option rather than treated as a protocol limitation.
+
 
 ## 3. States & transitions
 
@@ -746,6 +786,28 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   that returns `startedNewTurn` is covered as an incompatible legacy contract, not as a passing
   fallback. *Verify by* focused runtime and route tests over a fake ACP scenario plus the Composer
   outcome test.
+
+- **A39** `(planned)` (R57) — Root and child reasoning chunks stream into one collapsed disclosure
+  per reasoning span, remain readable while opened, and never enter transcript reads, archive,
+  search, annotation, context-pull or clone data; reload removes them. *Verify by* runtime mapping,
+  transcript-store and rendered chat tests over interleaved root/child reasoning.
+- **A40** `(planned)` (R58) — A negotiated fake ACP child announces before its output, renders and
+  durably replays nested text/tools/diffs/permission/outcome under its parent, and associates a
+  child permission with the ordinary parent approval flow. Without bilateral negotiation the
+  provider's legacy tool-call form remains ordinary tool activity. A loaded orphan renders
+  `disconnected` without being reported failed. No child produces an agent row, task, pipeline stage
+  or archive result. *Verify by* runtime persistence/API tests and transcript rendering tests
+  covering live, reload, archive and orphan reconstruction.
+- **A41** `(planned)` (R59) — A root task and child task each render exactly one lifecycle row tied
+  to their tool call; targeted Stop addresses only the chosen task, success waits for its terminal
+  update, failure stays retryable, and reload/resume reconstructs active and terminal rows without
+  duplicated output. A non-advertising runtime exposes no Stop control. *Verify by* capability,
+  normalization, stop-routing, replay and component tests plus a focused real-browser task journey.
+- **A42** `(planned)` (R60–R61) — A canonical tool name wins over a misleading title while an old
+  unnamed event keeps the fallback; paginated load/fork history has no missing or duplicate durable
+  event; completed MCP elicitation leaves no pending permission; and existing diff events preserve
+  their path/content correlation. Plan updates produce no product event. *Verify by* fake-ACP wire
+  tests and a credentialed Codex 1.12.0 compatibility receipt.
 
 
 ## 6. Deviations & open decisions

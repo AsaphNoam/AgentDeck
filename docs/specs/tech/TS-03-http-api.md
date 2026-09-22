@@ -564,6 +564,33 @@ already have consumed the text and started work outside AgentDeck's turn gate. A
 provide the no-consumption idle fallback is not compatible with the steering lifecycle;
 Steer availability remains capability-advertised rather than inferred from the adapter version.
 
+**R43 `(planned)` — Clone has one explicit capability-gated lifecycle endpoint.** `POST
+/api/sessions/{agent_id}/clone` accepts no provider/session id and returns `201` with the ordinary
+new-session envelope plus `history_handoff:"native_fork"`, `forked_from_agent_id`, and
+`forked_from_seq`. The server derives every setting and the native source id from the frozen source
+session. It returns `409 agent_busy` for a busy/waiting source, `409 transition_in_progress` for a
+competing lifecycle claim, `422 clone_unavailable` with a bounded reason for terminal, missing-native
+session or non-advertised fork, and the sanitized upstream error for fork refusal; none creates a
+partial target. Agent projections add non-null
+`clone:{available:<bool>,reason:<string>}` computed from interface, live state, stored capability and
+native-session presence. The server re-negotiates and revalidates before acting, so the projection
+is an affordance, not authority (INV §8/§11/§14).
+
+**R44 `(planned)` — Runtime activity uses existing durable delivery plus one ephemeral channel.**
+Durable child/task/file-report events remain ordinary sequenced `new_message` SSE events and appear
+in transcript reads. Live-only reasoning is a distinct `runtime_activity` SSE payload
+`{agent_id,generation,activity_id?,span_id,kind:"reasoning_delta",delta}` with bounded strings and no
+transcript `seq`; reconnect discards it instead of manufacturing a gap. `POST
+/api/sessions/{agent_id}/background-task-stop` accepts
+`{activity_id?:<string>,task_id:<string>}` and returns `202 {accepted:true}` only after the runtime
+accepts the targeted stop request; the eventual durable task-state event is the terminal truth.
+Unknown/stale tasks return `404`, unsupported runtimes `422 background_task_control_unavailable`,
+and peer refusal/transport errors use the standard sanitized envelope. Agent/session collection
+payloads expose non-null normalized `runtime_capabilities`; provider extension metadata does not
+cross the API. Child tool, result, diff and permission payloads carry Runtime's normalized composite
+`tool_call_id`; the existing permission endpoint accepts that opaque value unchanged, so no provider
+child-session id or second decision route reaches HTTP.
+
 ## 3. Interfaces & data shapes
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline

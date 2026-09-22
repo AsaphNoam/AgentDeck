@@ -52,20 +52,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Show the agent's thinking, not only its tool use.** Requested 2026-09-07: the Codex app shows
-  the steps and reasoning an agent takes; AgentDeck's transcript shows tool calls and final text
-  only. Verified 2026-09-07: this is a deliberate drop, not a provider gap —
-  `internal/runtime/acpmap.go:297` discards `agent_thought_chunk` **and** `plan` updates as
-  "dropped this phase", and both pinned adapters emit them (`codex-acp` maps
-  `item/reasoning/summaryTextDelta`, `item/reasoning/textDelta`, and
-  `item/reasoning/summaryPartAdded` to `agent_thought_chunk`, and `item/plan/delta` /
-  `turn/plan/updated` to plan updates; `claude-agent-acp` emits `agent_thought_chunk` too). So the
-  work is a new normalized event plus its persistence and rendering, not a protocol problem.
-  **Decided 2026-09-07:** thinking is **live-only** — streamed to the open chat and not persisted.
-  It therefore never reaches the durable transcript, the archive, the FTS index, FS-13 annotation
-  targets, or FS-15 context pulls, and reopening a conversation shows no reasoning. Still open:
-  default collapsed or expanded rendering, and whether `plan` ships in the same slice.
-
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
   Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and
@@ -126,9 +112,10 @@ These are capabilities AgentDeck implements above ACP, or has deliberately defer
 pinned adapter contract is missing or unverified. An adapter release is a reason to recheck the
 capability; it is not by itself authority to remove the fallback or ship the deferred feature.
 
-- **Steering.** The pinned adapters predate `_session/steering`; the target Claude 0.75.1 and Codex
-  1.10.0 adapters advertise it. The adapter bump makes steering reachable, while the separate
-  `queue-a-follow-up-while-busy.md` unit owns the product behavior and UI.
+- **Steering.** The pinned Claude 0.75.1 and Codex 1.10.0 adapters advertise
+  `_session/steering`, and AgentDeck uses it. Codex 1.12.0 still starts a detached turn when a steer
+  arrives idle and ignores AgentDeck's `promptRequired` metadata, so the packaged steering patch
+  remains necessary until upstream advertises the same no-consumption contract.
 - **Host-held queued Send.** AgentDeck holds a busy agent's next prompt because the pinned Claude
   adapter queues while the pinned Codex adapter supersedes and interrupts the active turn. Keep the
   host-side hold even after steering exists: Send must remain portable, withdrawable, and distinct
@@ -156,14 +143,16 @@ capability; it is not by itself authority to remove the fallback or ship the def
   `systemPrompt`. Keep and reverify the overlay on every adapter bump until the adapter exposes a
   proven portable replacement.
 - **Codex executable authority.** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
-  pinned private Codex executable because codex-acp 1.1.2 otherwise resolves an older nested CLI.
-  The 1.10.0 bump should make this default non-load-bearing through dependency deduplication, but
-  explicit `CODEX_PATH` overrides remain supported and the assembled tree must prove there is one
-  Codex at the pinned version.
-- **New adapter-native surfaces.** The target adapters also expose combinations of session fork,
-  provider management, native subagent sessions, background-task control, and session goals.
-  AgentDeck's durable tasks and pipelines are separate product control planes, not compatibility
-  shims to delete. Each native surface needs its own capability-gated product decision before use.
+  pinned private Codex executable and the assembled tree proves there is exactly one Codex at the
+  pinned compatible version. `adopt-modern-codex-acp-capabilities.md` moves the adapter/CLI pair to
+  1.12.0/0.154.0 without weakening that rule; explicit `CODEX_PATH` overrides remain supported.
+- **Reasoning, plans, fork, subagents and background tasks are not ACP-blocked.** Current Codex ACP
+  emits reasoning and plans, negotiates native child sessions, exposes background-task lifecycle and
+  targeted stop, and implements `session/fork`. `adopt-modern-codex-acp-capabilities.md` adopts
+  reasoning, child sessions, background tasks and fork through the normalized runtime. Plan updates
+  are intentionally deferred because they require non-free normalized state, retention and UI work,
+  not because ACP lacks them. AgentDeck's durable tasks and pipelines remain separate control planes.
+  Provider management, provider recommendations and session goals are outside that change.
 
 ## Known things to improve
 

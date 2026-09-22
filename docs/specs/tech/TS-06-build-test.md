@@ -166,6 +166,24 @@ GitHub documents redirects only for web links and git clone/fetch/push. Verifica
 repository-wide assertion that no build, release, or packaging artifact still spells the old name,
 run in CI alongside the existing archive-content checks (INV §10).
 
+**R26 `(planned)` — The Codex ACP capability bump is reproducible and provider-verified.** Release
+inputs pin `@agentclientprotocol/codex-acp` exactly at `1.12.0` and direct `@openai/codex` exactly at
+`0.154.0`; lockfile, assembly constants, manifest expectations, wrapper/archive fixtures and release
+documentation move together. Assembly still proves one installed Codex package, hashes the reviewed
+unpatched adapter bundle, applies the version-named no-consumption steering patch with zero fuzz,
+hashes the complete patched output, and reports the component as `1.12.0+agentdeck.1`. A source
+comparison test proves the patch is still semantically required instead of assuming its old offset.
+
+Automated contract fixtures exercise canonical and absent capability advertisements; root/nested
+reasoning; native child lifecycle and legacy fallback; background task reconstruction, targeted stop
+and provider restart; fork success, pagination, cyclic/oversized cursor refusal and compensating
+delete; canonical tool names; matching/stale/truncated file reports; and MCP elicitation completion.
+The fake derives closed request/update shapes from the reviewed 1.12.0 protocol, not AgentDeck's
+mapper. Before release, one credentialed Codex receipt covers chat, model/effort/fast application,
+MCP, steer idle fallback, thought delivery, one native subagent, one background command and targeted
+stop, clone/fork with multi-page history, canonical tool name, file report, stop/resume and load. It
+records the exact adapter/CLI versions and cannot be replaced by fake-ACP success (INV §12/§17).
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

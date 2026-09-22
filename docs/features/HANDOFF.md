@@ -23,7 +23,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start: the AgentDeck → Deckhand rename with its
+- **Work units:** `adopt-modern-codex-acp-capabilities.md` is Waiting to start: the capability-gated
+  Codex ACP 1.12.0/CLI 0.154.0 bump, conversation Clone, live reasoning, nested subagent sessions,
+  background-task control and metadata/fidelity updates through normalized Runtime.
+  `rename-product-to-deckhand.md` is also Waiting to start: the AgentDeck → Deckhand rename with its
   one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport
   blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
@@ -36,8 +39,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   transactional budget/read settlement, uncertain-delivery recovery and deferred retention.
   The design decisions for clean legacy reset, descendant cancellation, project boundaries,
   subordinate coordination and ordinary stop/resume remain confirmed; implementation gaps are
-  recorded below. Streaming agent thinking stays part-decided (live-only decided; rendering default and whether
-  `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
+  recorded below. Modern Codex ACP adoption is specified in
+  `adopt-modern-codex-acp-capabilities.md`: thinking is live-only/collapsed, plans are excluded as
+  non-free product work, and fork/subagent/background-task capabilities are no longer protocol
+  blockers. The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
 - **Open findings:** none. `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
@@ -55,6 +60,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 **Change:** None. `v0.5.0` closed the epoch: every settled 2026-09-13 changelog entry, the `v0.4.3`
 release record, and the retired acceptance-gate checklist moved to
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+
+**Changelog — 2026-09-22 (design: modern Codex ACP capabilities):** Re-evaluated the ACP wishlist
+against `codex-acp` 1.12.0 and promoted `adopt-modern-codex-acp-capabilities.md` to Waiting to start.
+FS-01.R36, FS-03.R57–R61, FS-05.R38 and their acceptance items make Clone a native conversation
+fork, stream reasoning live-only, nest negotiated child sessions, expose background-task lifecycle
+and targeted stop, and consume canonical tool/file metadata without merging them into AgentDeck's
+durable task plane. TS-01.R35, TS-02.R35, TS-03.R43–R44, TS-04.R61–R66, TS-06.R26 and TS-08.R59
+keep the work inside normalized Runtime, pin the 1.12.0/0.154.0 pair, and retain the steering patch
+because upstream still lacks its idle no-consumption behavior. Plans, provider recommendations and
+session goals are excluded. No product code changed.
 
 **Changelog — 2026-09-14 (CI flake):** Fixed the intermittent `LaunchStep` onboarding test that
 reddened CI on `7162f59`. `LaunchStep` disables Launch until both the roles and the projects query
@@ -95,7 +110,7 @@ verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
 **Available by role:** `/review` has no unreviewed unit. `/work` may take
-`rename-product-to-deckhand`; `/fix` has no open findings;
+`adopt-modern-codex-acp-capabilities` or `rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input

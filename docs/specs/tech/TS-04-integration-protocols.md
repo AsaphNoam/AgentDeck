@@ -743,6 +743,72 @@ of AgentDeck's own intent.
   init, assistant, and usage signals, so treating it as an execution oracle produced a false
   finding that would have added a redundant delivery path (INV §12, INV §17).
 
+**R61 `(planned)` — The packaged Codex baseline is ACP 1.12.0 with its compatible Codex 0.154.0.**
+The bump consumes 1.11's paginated load/fork history and finalized standalone MCP-elicitation
+permission completion plus 1.12's canonical tool names, elicitation-form fix and turn-diff-derived
+file reports. AgentDeck neither consumes the adapter's recommended model/reasoning values nor
+session-goal extension. Static inspection of 1.12.0 confirms that idle steering still starts a
+detached turn and its request parser still drops `_meta.steering.idleBehavior`; the
+`promptRequired` patch required by R51 is therefore rebased, source-hash locked and retained. It may
+be removed only when an upstream advertised/request-level contract provides the same no-consumption
+outcome and R51's compatibility receipt passes.
+
+**R62 `(planned)` — Capability negotiation is bilateral and extension-scoped.** Initialize sends
+the canonical ACP `clientCapabilities.subagents:{}` plus AIR v1 capability keys only for
+`asyncTasks` and `agentFileChangeReport`; it does not advertise plan updates, goals, recommended
+configuration, provider management or an elicitation UI AgentDeck does not implement. The decoder
+accepts only known boolean/object shapes from `agentCapabilities.sessionCapabilities` and bounded
+AIR metadata and maps them into TS-01.R35's value. Native subagents, fork, background updates,
+targeted stop and file reports remain disabled independently when their matching advertisement is
+absent. Capability/version/backend inference is forbidden (INV §11/§12).
+
+**R63 `(planned)` — Thoughts and native child sessions share normalized event mapping.**
+`agent_thought_chunk` maps to TS-01.R35's live-only reasoning notification; malformed, empty or
+oversized chunks are dropped/bounded before fan-out. `plan` remains deliberately dropped. With
+negotiated subagents, `subagent_spawned` creates a bounded activity scope before child output, every
+later update is routed by its ACP child session id, and `subagent_state_update` closes that scope
+under its immediate parent. Child text/tools/diffs/permissions reuse root mapping with activity
+scope. The mapper replaces each child provider tool-call id with TS-01.R35's stable activity-scoped
+id across call/update/result/diff/permission events and retains the reverse map only for the active
+runtime generation. Child permission and elicitation requests still resolve through the root
+transport and single-winner permission gate using that normalized id. Without bilateral
+negotiation, the adapter's legacy ordinary tool call passes through unchanged. History orphans map
+to the explicit durable `disconnected` state; unknown live child ids produce a bounded protocol
+diagnostic and no invented AgentDeck identity.
+
+**R64 `(planned)` — Background terminals are normalized async tasks, not AgentDeck tasks.** After
+AIR async negotiation the runtime maps `async_task_spawned` and `async_task_state_update` into one
+stable background-task lifecycle keyed by the root agent, optional child activity and adapter task
+id; related tool-call id is retained and output is never copied. `_session/async_task/stop` receives
+the exact runtime-owned ACP session id and task id after a generation-scoped lookup; task/process ids
+never come from the browser unchecked. Acceptance of the request emits no optimistic terminal state.
+Task maps are bounded to announced unfinished tasks plus a bounded terminal tail and are cleared on
+generation teardown; load reconstruction de-duplicates the durable lifecycle before republishing
+(INV §1/§5/§16).
+
+**R65 `(planned)` — Native fork has one provider-independent wire operation.** The runtime sends
+standard `session/fork` only after initialize advertises `sessionCapabilities.fork`, with the source
+native session id and the same shared cwd/additional-directory/MCP builders used for session open.
+It trusts only a non-empty returned target session id, applies the ordinary post-session config
+verification, and exposes neither provider ids nor fork request members above `internal/runtime`.
+Fork sends no new system-prompt overlay or primer because the provider conversation already contains
+the source context. Load/fork replay accepts every paginated chronological page, rejects cyclic or
+unbounded cursor traversal, and de-duplicates updates before they reach the clone transcript. A
+post-fork local failure invokes standard `session/delete` best-effort on the target before process
+teardown; no native app-server method is called directly (INV §2/§12/§15).
+
+**R66 `(planned)` — New metadata strengthens existing events without replacing them.** ACP 1.12's
+top-level tool-call/update `name` is decoded into the existing normalized name and wins over the
+title/kind fallback; conflicting later names cannot change the permission identity of an already
+pending call. For each root prompt, AgentDeck requests at most one AIR v1 file-change report using a
+generation/turn-derived request id, accepts one matching bounded `session_info_update`, validates
+every absolute path against cwd/additional directories, and records its declared-incomplete and
+uncertainty fields. The report supplements Files tracking only: it never fabricates file contents,
+patches, line counts or completeness and never replaces ordinary ACP diffs. Duplicate, stale,
+malformed, unavailable or unmatched reports are ignored with bounded diagnostics. The 1.11
+standalone MCP elicitation fix is consumed through the existing permission lifecycle; AgentDeck adds
+no provider-specific elicitation form.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

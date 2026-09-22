@@ -43,6 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`adopt-modern-codex-acp-capabilities.md`](adopt-modern-codex-acp-capabilities.md) — upgrade the
+  packaged Codex ACP runtime and adopt capability-gated reasoning, native child sessions,
+  background tasks, conversation Clone, canonical tool names and fidelity fixes through Runtime.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 

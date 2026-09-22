@@ -484,6 +484,36 @@ selection, not an in-memory inbox scan; durable unread mail may accumulate but p
 FS-06.A20–A25 verification includes restart before/after preparation and confirmation, stale callback
 after a new turn, concurrent manual reads, no double charge, and a clock advanced past seven days.
 
+**R35 `(planned)` — Activity scope and fork lineage stay inside existing session authority.** A
+schema migration adds nullable `sessions.forked_from_agent_id`, `forked_from_seq`, and a bounded
+`runtime_capabilities_json` snapshot. The source foreign identity is informational rather than a
+cascading foreign key: deleting or archiving either agent never deletes the other agent's session,
+transcript, index or provider history. Capability JSON accepts only AgentDeck's boolean vocabulary,
+defaults to all false for old rows, is replaced after each successful handshake, and is never an
+oracle for a new peer that fails to advertise the capability.
+
+Durable normalized events add optional `activity_id` and `parent_activity_id` fields and the event
+kinds `activity_started`, `activity_state`, `background_task_state`, `file_report`, and
+`fork_boundary`. Identifiers and names are length-bounded at decode; child activity state is the
+declared enum `active|completed|failed|stopped|disconnected`, and task state is the declared enum
+`running|completed|failed|stopped`;
+`file_report` retains only validated in-scope paths, completeness/truncation facts, uncertainty and
+the request id, never file content. The transcript/index projection treats child conversation events
+as the parent agent's ordinary turn material, hides lifecycle/file-report records from prose search,
+and uses stable `(agent_id, activity_id, tool_call_id/task_id/request_id)` identities to make live,
+paginated-load and resume replay idempotent. Reasoning and plan updates never reach the writer,
+SQLite, FTS, tracking or reindex.
+
+`transcript.CloneCompletedPrefix` is the sole clone builder. Under a source lifecycle claim it reads
+through the last durable `turn_end`, rewrites `agent_id`, resequences into a temporary target file,
+omits source `session_meta` and annotation records, carries visible conversation/backend-switch and
+completed child/task events, closes copied running background tasks with `fork_boundary`, and appends
+one source-link boundary event. The target's own session metadata is emitted by the normal launch
+path. Only after native fork success does the server atomically install the file and commit the new
+agent/session rows; index documents are built from that installed transcript through normal reindex,
+so copied user/assistant text is intentionally searchable under both independent agents. Failure
+removes the temporary file and no partial target row becomes visible (INV §3/§9/§15).
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:
