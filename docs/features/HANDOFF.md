@@ -44,33 +44,19 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** [`adopt-modern-codex-acp-capabilities`](../ready-changes/adopt-modern-codex-acp-capabilities.md)
-— In progress since 2026-09-22. Slices, each committed when verified: (1) packaging bump to
-1.12.0/0.154.0 with rebased steering patch; (2) capability negotiation + snapshot column and
-`runtime_capabilities` projection; (3) canonical tool names, paginated load de-dupe, elicitation
-completion; (4) live-only reasoning over `runtime_activity` SSE + Thinking disclosure; (5) native
-child activity scope, nested rendering, tracking roll-up; (6) background tasks + targeted stop;
-(7) Clone as native fork; (8) file reports; closure: credentialed Codex receipt (TS-06.R26) and
-real-browser pass. Slice 1 done (clean `npm ci` of the lockfile verified hashes, zero-fuzz patch,
-one Codex 0.154.0). Slice 2 done: `internal/runtime/capabilities.go` negotiates; the `offered`
-client set stays empty until each slice lands its event handling (subagents → 5, asyncTasks → 6,
-agentFileChangeReport → 8), so the adapter never switches away from forms AgentDeck renders.
-Snapshot: migration 33, `SessionMetaData.RuntimeCapabilities`, `AgentState.runtime_capabilities`.
-Slice 3 done: canonical `name` wins (tool call + permission display), `exec_command` is a tracked
-command; 1.12 itself closes elicitation fallback tool calls, which the existing mapping consumes;
-resume drops load replay whole, so pagination de-dupe matters only for fork (slice 7). Slice 4
-done for root reasoning: `runtime/activity.go` → `runtime_activity` SSE → `ui/src/store/
-reasoningStore.ts` → `ThinkingDisclosure`; child reasoning joins in slice 5 via `activity_id`.
-Slice 5 done: `offered.Subagents` on; `runtime/subagent.go` scopes child frames (by their own ACP
-session id) into `activity_id`/`parent_activity_id` on the envelope with `act_<hash>/<raw>` tool ids;
-unknown child ids drop only once subagents are negotiated (the fake's resume echoes a different id).
-UI: `components/chat/runtimeActivity.ts` nests; `renderers/ChildActivity.tsx`. Card preview, primer
-and context-pull folding ignore/separate child text. Slice 6 done: `runtime/tasks.go`, route
-`background-task-stop`, `renderers/BackgroundTaskList.tsx`. Review note (reversible choice): a task
-still running when a later `session_meta` resume marker appears is shown "Ended with the previous
-session" without Stop, because resume drops the adapter's own replayed reconciliation.
-**Next:** slice 7 (Clone as native fork). Wire notes: `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`
-(temporary; delete at closure). MCP tool calls carry no `name`, so auto-approve identity stays
-title-based. Settled 2026-09-14 entries are in
+— In progress since 2026-09-22. Slices 1–7 are committed (packaging, negotiation, canonical names,
+reasoning, child sessions, background tasks, Clone); commit messages carry their detail. **Next:**
+slice 8 — file-change reports: add `agentFileChangeReport` to `offered` (`runtime/capabilities.go`)
+with its per-prompt request and `file_report` event (TS-04.R66, TS-02.R35); then closure — the
+credentialed Codex 1.12.0 receipt (TS-06.R26; Codex is signed in locally) and a real-browser pass
+of the transcript composition, then delete the temporary wire notes
+`docs/plans/adopt-modern-codex-acp-capabilities-wire.md`. A20/A41 stay `(planned)` until those
+journeys run. Review notes (reversible choices): MCP calls carry no `name`, so auto-approve
+identity stays title-based; unknown child session ids drop only once subagents are negotiated; a
+task still running at a later resume or clone boundary shows as ended there without Stop, since
+resume/fork replay is dropped; the clone process forks the source thread because all Codex agents
+share one AgentDeck Codex profile, and a source turn begun after the busy check is not excluded
+from the provider fork. Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
 
 **Changelog — 2026-09-22 (design: modern Codex ACP capabilities):** Re-evaluated the ACP wishlist
