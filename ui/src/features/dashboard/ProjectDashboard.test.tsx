@@ -454,3 +454,32 @@ describe("ProjectDashboard", () => {
     expect(screen.queryByLabelText(/delete this project's worktree checkout/i)).toBeNull();
   });
 });
+
+// BR-4 (investigate-bug, 2026-09-22): the projects home grid stretches its cards
+// to fill the viewport and shoves the visible content toward the bottom. jsdom
+// does not run a real layout/grid engine, so this cannot be reproduced by
+// rendering and reading computed style; it was reproduced instead by loading
+// the real stylesheet chain (`.app-shell` -> `.app-main` -> `.project-dashboard`)
+// in a browser, confirming both the header and the card row absorb the extra
+// `min-block-size: 100%` height and every `.project-card` stretches to fill its
+// inflated row. `.card-grid` (the agent grid, dashboard.css) was fixed with
+// `align-items: start` for the same class of bug; `.project-card-grid` never
+// received the matching declaration. This asserts the two rules stay in sync
+// so the CSS source itself proves the defect until the fix lands.
+describe.skip("project card grid layout (BR-4)", () => {
+  const css = readFileSync(join(__dirname, "../../styles/features/dashboard.css"), "utf8");
+  const ruleBody = (selector: string) => {
+    const start = css.indexOf(`${selector} {`);
+    if (start === -1) throw new Error(`selector not found: ${selector}`);
+    return css.slice(start, css.indexOf("}", start));
+  };
+
+  it("caps card-grid items to their content height like the agent card-grid does", () => {
+    expect(ruleBody(".card-grid")).toContain("align-items: start");
+    expect(ruleBody(".project-card-grid")).toContain("align-items: start");
+  });
+
+  it("does not stretch the header/grid rows to fill the viewport", () => {
+    expect(ruleBody(".project-dashboard")).toContain("align-content: start");
+  });
+});
