@@ -48,7 +48,7 @@ function TaskRow({ agentId, task, controllable }: { agentId: string; task: Backg
       setError("Could not stop this task. Try again.");
     });
   };
-  const label = task.fenced ? "Ended with the previous session" : STATE_LABEL[task.state];
+  const label = task.fenced === "fork" ? "Stayed with the source agent" : task.fenced === "resume" ? "Ended with the previous session" : STATE_LABEL[task.state];
   return (
     <li className="background-task" data-slot="task" data-state={task.state}>
       <span className="background-task-state">{stopping ? "Stopping…" : label}</span>

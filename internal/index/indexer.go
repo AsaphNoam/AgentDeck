@@ -81,8 +81,8 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec(`
-INSERT INTO sessions(agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, runtime_capabilities_json, last_session_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO sessions(agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, runtime_capabilities_json, forked_from_agent_id, forked_from_seq, last_session_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, 0), ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
   name=excluded.name,
   role=excluded.role,
@@ -100,10 +100,12 @@ ON CONFLICT(agent_id) DO UPDATE SET
   add_dirs=excluded.add_dirs,
   launch_config_json=excluded.launch_config_json,
   runtime_capabilities_json=excluded.runtime_capabilities_json,
+  forked_from_agent_id=COALESCE(excluded.forked_from_agent_id, sessions.forked_from_agent_id),
+  forked_from_seq=COALESCE(excluded.forked_from_seq, sessions.forked_from_seq),
   last_session_id=excluded.last_session_id,
   updated_at=MAX(excluded.updated_at, sessions.updated_at)`,
 		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Effort, meta.Fast, meta.Interface,
-		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), launchConfig, capabilities, meta.SessionID, now, now)
+		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), launchConfig, capabilities, meta.ForkedFromAgentID, meta.ForkedFromSeq, meta.SessionID, now, now)
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}

@@ -35,6 +35,9 @@ type SessionSnapshot struct {
 	LastSeq        int64
 	LastContextPct float64
 	CreatedAt      string
+	// RuntimeCapabilities is the last handshake's frozen advertisement
+	// (TS-02.R35): a stopped-session affordance, never authority for a new peer.
+	RuntimeCapabilities RuntimeCapabilities
 }
 
 // normalizeLaunchConfig returns the stored launch-config JSON as a RawMessage,
@@ -53,15 +56,17 @@ func (s *Store) ReadSession(agentID string) (SessionSnapshot, error) {
 	var snap SessionSnapshot
 	var envKeysJSON string
 	var addDirsJSON string
-	var launchConfigJSON string
+	var launchConfigJSON, capabilitiesJSON string
 	err := s.db.QueryRow(`
 SELECT agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt,
-       env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, last_seq, last_context_pct, created_at
+       env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, last_seq, last_context_pct, created_at,
+       runtime_capabilities_json
 FROM sessions WHERE agent_id = ?`, agentID).Scan(
 		&snap.AgentID, &snap.Name, &snap.Role, &snap.Project,
 		&snap.Backend, &snap.Model, &snap.Effort, &snap.Fast, &snap.Interface, &snap.Group,
 		&snap.Cwd, &snap.SystemPrompt, &envKeysJSON, &snap.SkipPermissions, &addDirsJSON, &launchConfigJSON,
 		&snap.LastSessionID, &snap.LastSeq, &snap.LastContextPct, &snap.CreatedAt,
+		&capabilitiesJSON,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return SessionSnapshot{}, ErrNotFound
@@ -76,6 +81,7 @@ FROM sessions WHERE agent_id = ?`, agentID).Scan(
 		snap.AddDirs = nil
 	}
 	snap.LaunchConfig = normalizeLaunchConfig(launchConfigJSON)
+	snap.RuntimeCapabilities = DecodeRuntimeCapabilities(capabilitiesJSON)
 	return snap, nil
 }
 

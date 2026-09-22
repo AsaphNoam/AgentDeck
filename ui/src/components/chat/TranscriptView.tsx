@@ -19,6 +19,7 @@ import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationCon
 import { FileViewer } from "./FileViewer";
 import type { FileLink } from "./renderers/filePath";
 import { useAnnotationStore } from "../../store/annotationStore";
+import { useAgentStore } from "../../store/agentStore";
 import { useHeldStore } from "../../store/heldStore";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
 
@@ -204,7 +205,7 @@ function ToolRun({ events, renderEvent }: { events: TranscriptEvent[]; renderEve
   );
 }
 
-type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "annotation" | "thinking" | "unknown";
+type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "fork-boundary" | "annotation" | "thinking" | "unknown";
 
 type TranscriptRow = { kind: "event"; event: TranscriptEvent } | { kind: "tool-run"; events: TranscriptEvent[] };
 
@@ -273,6 +274,7 @@ function variantOf(event: TranscriptEvent): TranscriptVariant {
   if (kind === "error") return "error";
   if (kind === "turn_end") return "turn";
   if (kind === "backend_switch") return "backend-switch";
+  if (kind === "fork_boundary") return "fork-boundary";
   if (kind === "annotation") return "annotation";
   if (kind === "reasoning") return "thinking";
   return "unknown";
@@ -303,9 +305,16 @@ function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: s
     const to = String(event.to ?? "");
     return <div className="backend-switch-divider">{from} {"->"} {to}</div>;
   }
+  if (kind === "fork_boundary") return <ForkBoundary sourceId={String(event.forked_from_agent_id ?? "")} />;
   // permission_resolved is folded into its prompt by the store; nothing to render.
   if (kind === "permission_resolved" || kind === "session_meta") return null;
   return <pre className="tool-block">{JSON.stringify(event, null, 2)}</pre>;
+}
+
+// ForkBoundary marks where a clone's copied history ends (FS-01.R36).
+function ForkBoundary({ sourceId }: { sourceId: string }) {
+  const source = useAgentStore((state) => state.agents[sourceId]?.name);
+  return <div className="backend-switch-divider">Cloned from {source || "another agent"}</div>;
 }
 
 function canAnnotate(event: TranscriptEvent) {

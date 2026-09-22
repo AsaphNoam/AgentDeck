@@ -72,6 +72,16 @@ describe("background tasks (FS-03.A41)", () => {
     expect(within(row).getByRole("button", { name: "Stop" })).toBeEnabled();
   });
 
+  // FS-01.R36: copied history ends at a visible clone marker, and a copied
+  // running task stays with the source rather than continuing in the clone.
+  it("marks the clone boundary and leaves copied tasks with the source", () => {
+    renderTranscript([...running, wire(6, "fork_boundary", { forked_from_agent_id: "a_src", forked_from_seq: 5 })]);
+    expect(screen.getByText("Cloned from another agent")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Background tasks/ }));
+    expect(rows()[0]).toBe("stopped:Stayed with the source agentnpm run dev");
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  });
+
   it("offers no Stop without control, and a resume fences old running tasks", () => {
     renderTranscript(running, false);
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();

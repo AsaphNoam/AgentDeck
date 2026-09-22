@@ -127,6 +127,11 @@ const (
 
 	// CodeBackgroundTaskControlUnavailable: no negotiated targeted stop (TS-03.R44).
 	CodeBackgroundTaskControlUnavailable = "background_task_control_unavailable" // 422
+
+	// Clone codes (TS-03.R43).
+	CodeAgentBusy            = "agent_busy"             // 409
+	CodeTransitionInProgress = "transition_in_progress" // 409
+	CodeCloneUnavailable     = "clone_unavailable"      // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -153,7 +158,7 @@ func statusForCode(code string) int {
 	switch code {
 	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
 		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable,
-		CodeBackgroundTaskControlUnavailable:
+		CodeBackgroundTaskControlUnavailable, CodeCloneUnavailable:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400
@@ -162,7 +167,8 @@ func statusForCode(code string) int {
 	case CodeConflict, CodeAgentNotRunning, CodeSwitchInProgress,
 		CodeSourceChanged, CodeSourceConflict, CodeApprovalRequired,
 		CodeAgentArchived, CodeAgentArchiving, CodeProjectArchived, CodeProjectArchiving,
-		CodeBackendExists, CodeBackendCatalogChanged, CodeDirectoryPickerBusy:
+		CodeBackendExists, CodeBackendCatalogChanged, CodeDirectoryPickerBusy,
+		CodeAgentBusy, CodeTransitionInProgress:
 		return http.StatusConflict // 409
 	case CodeNotImplemented:
 		return http.StatusNotImplemented // 501

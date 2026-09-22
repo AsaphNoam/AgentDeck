@@ -79,6 +79,9 @@ type launchOptions struct {
 	// composition tests, and every path whose response has no place for it —
 	// leave it nil.
 	Notice *worktreeStartNotice
+	// Fork makes the start a native fork of another agent's conversation
+	// (Clone, FS-01.R36). One-shot launch input; never persisted.
+	Fork *runtime.ForkPlan
 }
 
 const maxAgentNameRunes = 256
@@ -367,6 +370,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
 		ExtraArgs:    extraArgs,
 		LaunchConfig: launchConfig,
+		Fork:         options.Fork,
 	}
 	return s.applyKnowledgeOverlay(spec), agent, nil
 }
@@ -739,6 +743,8 @@ func launchStartError(err error) *runtime.APIError {
 		return apiError(runtime.CodeNotImplemented, err.Error())
 	case errors.Is(err, runtime.ErrAlreadyStarted):
 		return apiError(runtime.CodeConflict, err.Error())
+	case errors.Is(err, runtime.ErrForkUnavailable):
+		return cloneUnavailable(state.CloneReasonNoFork)
 	default:
 		return apiError(runtime.CodeRuntimeStartFailed, err.Error())
 	}

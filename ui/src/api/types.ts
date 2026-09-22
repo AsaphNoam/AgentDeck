@@ -37,6 +37,8 @@ export interface AgentState {
   /** The session snapshot's normalized native capabilities (TS-03.R44); all
    * false when unknown. An affordance only — the server revalidates. */
   runtime_capabilities?: RuntimeCapabilities;
+  /** Whether Clone is offered and, if not, why (FS-01.R36, TS-03.R43). */
+  clone?: { available: boolean; reason: string };
   interface: string;
   group?: string;
   created_at: string;

@@ -138,6 +138,15 @@ export function steerPrompt(agentId: string, text: string) {
   });
 }
 
+/** Clones an agent as a native fork of its conversation at the latest completed
+ * turn (FS-01.R36). The server derives every setting from the source. */
+export function cloneAgent(agentId: string) {
+  return json<{ agent: { agent_id: string }; history_handoff: "native_fork"; forked_from_agent_id: string; forked_from_seq: number }>(
+    `/api/sessions/${agentId}/clone`,
+    { method: "POST" },
+  );
+}
+
 /** Asks the runtime to stop one background task. 202 means accepted; the
  * durable task-state event that follows is the terminal truth (TS-03.R44). */
 export function stopBackgroundTask(agentId: string, taskId: string, activityId?: string) {

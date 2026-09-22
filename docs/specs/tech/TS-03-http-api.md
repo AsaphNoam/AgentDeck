@@ -35,7 +35,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Family | Routes |
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
-| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `background-task-stop`, `resume`, `switch-runtime`, `annotations`; transcript read |
+| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `background-task-stop`, `clone`, `resume`, `switch-runtime`, `annotations`; transcript read |
 | Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout`; `POST /api/directory-picker` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Composer autocomplete | session-scoped file search and available-command snapshot reads |
@@ -564,7 +564,7 @@ already have consumed the text and started work outside AgentDeck's turn gate. A
 provide the no-consumption idle fallback is not compatible with the steering lifecycle;
 Steer availability remains capability-advertised rather than inferred from the adapter version.
 
-**R43 `(planned)` — Clone has one explicit capability-gated lifecycle endpoint.** `POST
+**R43 — Clone has one explicit capability-gated lifecycle endpoint.** `POST
 /api/sessions/{agent_id}/clone` accepts no provider/session id and returns `201` with the ordinary
 new-session envelope plus `history_handoff:"native_fork"`, `forked_from_agent_id`, and
 `forked_from_seq`. The server derives every setting and the native source id from the frozen source

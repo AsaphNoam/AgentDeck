@@ -788,7 +788,7 @@ Task maps are bounded to announced unfinished tasks plus a bounded terminal tail
 generation teardown; load reconstruction de-duplicates the durable lifecycle before republishing
 (INV §1/§5/§16).
 
-**R65 `(planned)` — Native fork has one provider-independent wire operation.** The runtime sends
+**R65 — Native fork has one provider-independent wire operation.** The runtime sends
 standard `session/fork` only after initialize advertises `sessionCapabilities.fork`, with the source
 native session id and the same shared cwd/additional-directory/MCP builders used for session open.
 It trusts only a non-empty returned target session id, applies the ordinary post-session config

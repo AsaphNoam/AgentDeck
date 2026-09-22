@@ -82,6 +82,45 @@ func DecodeRuntimeCapabilities(raw string) RuntimeCapabilities {
 	return caps
 }
 
+// CloneAffordance says whether Clone is offered and, when not, why. It is an
+// affordance only: the clone route revalidates against a fresh peer (TS-03.R43).
+type CloneAffordance struct {
+	Available bool   `json:"available"`
+	Reason    string `json:"reason"`
+}
+
+// Clone unavailability reasons: bounded, in-vocabulary text (INV §8).
+const (
+	CloneReasonNotChat   = "Clone is available for chat agents only."
+	CloneReasonArchived  = "Restore this agent before cloning it."
+	CloneReasonNoFork    = "This agent's runtime cannot fork its conversation."
+	CloneReasonNoSession = "This agent has no conversation to fork yet."
+	CloneReasonBusy      = "Cloning needs a completed conversation point. Wait for the current turn or permission to finish."
+)
+
+// CloneAvailability is the one rule the projection and the clone route share
+// (FS-01.R36, INV §2). busy covers an active turn and an unresolved permission.
+func CloneAvailability(iface string, archived bool, caps RuntimeCapabilities, nativeSessionID string, busy bool) CloneAffordance {
+	switch {
+	case iface != "chat":
+		return CloneAffordance{Reason: CloneReasonNotChat}
+	case archived:
+		return CloneAffordance{Reason: CloneReasonArchived}
+	case !caps.Fork:
+		return CloneAffordance{Reason: CloneReasonNoFork}
+	case nativeSessionID == "":
+		return CloneAffordance{Reason: CloneReasonNoSession}
+	case busy:
+		return CloneAffordance{Reason: CloneReasonBusy}
+	}
+	return CloneAffordance{Available: true}
+}
+
+// CloneBusyState reports whether a status state blocks Clone.
+func CloneBusyState(state string) bool {
+	return state == "busy" || state == "waiting_input"
+}
+
 // AgentState is the dashboard-ready merge of agent identity, running state, and
 // latest status. Timestamps are strings because this shape is sent directly to
 // the browser over SSE.
@@ -118,6 +157,8 @@ type AgentState struct {
 	// RuntimeCapabilities is the session snapshot's frozen advertisement; always
 	// present, all false when unknown (TS-03.R44). An affordance, never authority.
 	RuntimeCapabilities RuntimeCapabilities `json:"runtime_capabilities"`
+	// Clone is the Clone affordance (FS-01.R36, TS-03.R43); always present.
+	Clone CloneAffordance `json:"clone"`
 
 	State      string  `json:"state"`
 	Detail     string  `json:"detail"`

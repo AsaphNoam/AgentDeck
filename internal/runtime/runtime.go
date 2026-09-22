@@ -65,6 +65,19 @@ type LaunchSpec struct {
 	// session_meta so resume reproduces the frozen high-level snapshot. Empty when
 	// the backend has no active source binding.
 	LaunchConfig json.RawMessage
+	// Fork, when set, makes Start open a native fork of another agent's
+	// provider session instead of a fresh one (FS-01.R36, TS-04.R65). It is
+	// one-shot launch input and never persisted as configuration (INV §3).
+	Fork *ForkPlan
+}
+
+// ForkPlan is Clone's launch input: the source's native session to fork, and
+// the durable copy of its visible transcript through the fork boundary.
+type ForkPlan struct {
+	SourceAgentID   string
+	SourceSessionID string
+	SourceSeq       int64
+	Prefix          []Event
 }
 
 // StartSystemPrompt is the system prompt handed to the backend process for this

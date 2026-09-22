@@ -59,6 +59,7 @@ func TestManagerRecomputesEffectiveAgentState(t *testing.T) {
 		StartedAt: formatTime(started), State: "busy", Detail: "Editing src/auth.ts",
 		LastTrace: "PostToolUse: Edit", BusySince: formatTime(busy), ContextPct: 0.42,
 		UpdatedAt: mustTime(t, "2026-06-22T10:01:00Z").UnixMilli(),
+		Clone:     CloneAffordance{Reason: CloneReasonNoFork},
 	}}
 	if !reflect.DeepEqual(update, want) {
 		t.Fatalf("update = %+v, want %+v", update, want)

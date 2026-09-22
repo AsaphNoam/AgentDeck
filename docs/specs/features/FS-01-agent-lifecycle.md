@@ -89,8 +89,9 @@ orphaned processes.
   R4. The UI drives rename through the core application dialog described by R32.
 - **R9** — **Clone** launches a **new** agent (new `agent_id`) carrying the source agent's role,
   project, backend, model, interface, and group. Clone launches **immediately, with no confirmation
-  dialog**; the source agent is untouched. R36 supersedes this settings-only meaning when it ships.
-- **R36** `(planned)` — **Clone** is a conversation fork, not a settings duplicate. It creates a
+  dialog**; the source agent is untouched. Superseded by R36: Clone is now a conversation fork, and
+  the settings-only meaning no longer ships.
+- **R36** — **Clone** is a conversation fork, not a settings duplicate. It creates a
   new AgentDeck agent with a new `agent_id`, the source agent's role, project, backend, model,
   interface, effort, fast mode and group, and a provider-native conversation fork at the source's
   latest completed turn. The new agent receives the provider context and a durable copy of the

@@ -28,6 +28,17 @@ import (
 
 const sessionID = "fake-sess-1"
 
+// activeSession is the session later updates address: session/fork switches it
+// to the forked id, as the real adapter's updates follow the new session.
+var activeSession atomic.Value
+
+func currentSession() string {
+	if v, ok := activeSession.Load().(string); ok && v != "" {
+		return v
+	}
+	return sessionID
+}
+
 // The pinned ACP session-request schemas declare a closed member set, and the
 // adapters decode with a schema parser that strips every member outside it
 // (TS-04.R47). A double that echoed the raw parameters back would let a test
@@ -38,6 +49,7 @@ const sessionID = "fake-sess-1"
 var (
 	newSessionMembers  = []string{"cwd", "additionalDirectories", "mcpServers", "_meta"}
 	loadSessionMembers = []string{"sessionId", "cwd", "additionalDirectories", "mcpServers", "_meta"}
+	forkSessionMembers = []string{"sessionId", "cwd", "additionalDirectories", "mcpServers", "_meta"}
 )
 
 func decodeSessionRequest(raw json.RawMessage, members []string) []byte {
@@ -211,6 +223,30 @@ func handle(msg *rpcMessage) {
 		applyConfigOption(setParams.ConfigID, setParams.Value)
 		// SetSessionConfigOptionResponse requires the full rebuilt option list.
 		respond(*msg.ID, map[string]any{"configOptions": fakeConfigOptions()})
+	case "session/fork":
+		// codex-acp 1.12 forkSession: history replays as session/update frames
+		// before the response, which carries the new session id (FS-01.A20).
+		if dump := os.Getenv("FAKEACP_FORK_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, decodeSessionRequest(msg.Params, forkSessionMembers), 0o600)
+		}
+		if os.Getenv("FAKEACP_FORK_FAIL") != "" {
+			respondErr(*msg.ID, -32603, "fork refused")
+			return
+		}
+		initConfigOptions()
+		emitLoadHistory()
+		emitChunk("replayed source history")
+		forked := "fake-fork-1"
+		if os.Getenv("FAKEACP_FORK_EMPTY") != "" {
+			forked = ""
+		}
+		activeSession.Store(forked)
+		respond(*msg.ID, map[string]any{"sessionId": forked, "configOptions": fakeConfigOptions()})
+	case "session/delete":
+		if logPath := os.Getenv("FAKEACP_DELETE_LOG"); logPath != "" {
+			_ = os.WriteFile(logPath, msg.Params, 0o600)
+		}
+		respond(*msg.ID, map[string]any{})
 	case "_session/async_task/stop":
 		// Upstream finishes the task (publishing its terminal update under the
 		// owning session) before answering {stopped:true}; unknown tasks and a
@@ -762,7 +798,7 @@ func emitChunk(text string) {
 }
 
 func emitUpdate(update map[string]any) {
-	emitUpdateIn(sessionID, update)
+	emitUpdateIn(currentSession(), update)
 }
 
 func emitUpdateIn(session string, update map[string]any) {

@@ -223,6 +223,10 @@ type SessionMetaData struct {
 	// RuntimeCapabilities is this handshake's normalized advertisement, replaced
 	// on every successful launch/resume (TS-02.R35). Nil in older records.
 	RuntimeCapabilities *SessionCapabilities `json:"runtime_capabilities,omitempty"`
+	// ForkedFrom* record a clone's informational source link (TS-02.R35); empty
+	// on every other record, which leaves the stored link untouched.
+	ForkedFromAgentID string `json:"forked_from_agent_id,omitempty"`
+	ForkedFromSeq     int64  `json:"forked_from_seq,omitempty"`
 }
 
 // SessionCapabilities is the runtime's provider-independent capability value
@@ -251,4 +255,5 @@ var AllEventTypes = []string{
 	EvActivityStarted,
 	EvActivityState,
 	EvBackgroundTaskState,
+	EvForkBoundary,
 }

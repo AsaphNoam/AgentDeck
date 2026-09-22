@@ -261,6 +261,7 @@
         "error",
         "turn",
         "backend-switch",
+        "fork-boundary",
         "annotation",
         "held",
         "thinking",

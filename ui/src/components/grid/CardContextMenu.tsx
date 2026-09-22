@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { archiveAgent, getCapabilities, launchAgent, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
+import { archiveAgent, cloneAgent, getCapabilities, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useBackends } from "../../api/config";
 import type { AgentState } from "../../api/types";
 import { terminalSupported } from "../../lib/backendTypes";
@@ -126,10 +126,18 @@ export function CardContextMenu() {
       <button type="button" data-slot="item" disabled={!agent.running} title={agent.running ? "Switch interface/backend/model" : "Agent must be running"} onClick={() => openDialog("switch")}>
         Switch runtime
       </button>
-      <button type="button" data-slot="item" title="Launch a new agent with this one's role, project, backend, and model" onClick={() => {
-        launchAgent({ role: agent.role, project: agent.project, backend: agent.backend, model: agent.model, effort: agent.effort, fast: agent.fast, interface: agent.interface, group: agent.group }).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
-        close();
-      }}>
+      {/* Clone forks this conversation into a new agent; there is no weaker
+          settings-only fallback when it is unavailable (FS-01.R36). */}
+      <button
+        type="button"
+        data-slot="item"
+        disabled={!agent.clone?.available}
+        title={agent.clone?.available ? "Start a new agent that continues this conversation from its last completed turn" : agent.clone?.reason || "Clone is not available for this agent"}
+        onClick={() => {
+          cloneAgent(agent.agent_id).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
+          close();
+        }}
+      >
         Clone
       </button>
       <button type="button" data-slot="item" onClick={() => openDialog("group")}>Move to group</button>

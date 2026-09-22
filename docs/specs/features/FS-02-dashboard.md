@@ -90,8 +90,8 @@ overflow cannot clip it.
 - Rename → `POST /api/sessions/{id}/rename` (FS-01).
 - Stop → `POST /api/sessions/{id}/stop` after a confirm (FS-01).
 - Switch runtime → `POST /api/sessions/{id}/switch-runtime {interface?, backend?, model?}` (FS-01).
-- Clone → `POST /api/sessions` with this agent's role/project/backend/model/interface/group (FS-01
-  launch); it launches immediately with no confirmation.
+- Clone → `POST /api/sessions/{id}/clone`, a native conversation fork (FS-01.R36); it launches
+  immediately with no confirmation and is disabled with the server's reason when unavailable.
 - Move to group → identity update of the `group` field via `POST /api/sessions/{id}/identity`.
 
 **R17.** A failed menu action surfaces an error toast carrying the server message; it does not fail
@@ -514,8 +514,9 @@ it.
 **A6.** A context-menu action failure surfaces an error toast with the server message. —
 `CardContextMenu.test.tsx` "shows an error toast … when switch-runtime/rename/stop/clone/move fails".
 
-**A7.** Clone launches a new session with the source agent's config. — `CardContextMenu.test.tsx`
-"clones an agent by launching a new session with the same config".
+**A7.** Clone forks the source through the clone route and offers no settings-only fallback
+(superseded meaning: FS-01.R36). — `CardContextMenu.test.tsx` "clones through the fork route with no
+client-supplied settings" and "explains an unavailable Clone and offers no weaker path".
 
 **A8.** Releasing a group stops all of its member agents. — `TestReleaseGroupStopsMembers`; J5.
 

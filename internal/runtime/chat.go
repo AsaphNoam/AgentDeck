@@ -365,16 +365,38 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	}
 	as.setSteering(decodeSteeringSupport(initRes))
 	as.setCapabilities(negotiateCapabilities(initRes, offered))
-	newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
-	if err != nil {
-		return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
-	}
 	var sess struct {
 		SessionID string `json:"sessionId"`
 	}
-	if err := json.Unmarshal(newRes, &sess); err != nil || sess.SessionID == "" {
+	var newRes json.RawMessage
+	if spec.Fork != nil {
+		// Clone: the new peer revalidates fork before anything is created, and a
+		// forked session whose local commit fails is deleted before teardown.
+		sid, res, err := c.openFork(ctx, as, spec)
+		if errors.Is(err, ErrForkUnavailable) {
+			as.shutdown()
+			return nil, err
+		}
+		if err != nil {
+			return nil, c.startupFailure(as, spec.BackendType, "session/fork", err)
+		}
+		sess.SessionID, newRes = sid, res
+	} else {
+		res, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
+		if err != nil {
+			return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
+		}
+		if err := json.Unmarshal(res, &sess); err != nil || sess.SessionID == "" {
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: session/new returned no sessionId")
+		}
+		newRes = res
+	}
+	failForked := func() {
+		if spec.Fork != nil {
+			c.deleteForkedSession(as, sess.SessionID)
+		}
 		as.shutdown()
-		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
 	as.mu.Lock()
 	as.sessionID = sess.SessionID
@@ -382,13 +404,16 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	as.configOptions = decodeSessionConfigOptions(newRes)
 	applied, err := applySessionConfig(ctx, as.transport, ad, spec, sess.SessionID, as.configOptions)
 	if err != nil {
-		as.shutdown()
+		failForked()
 		return nil, err
 	}
 	spec.Agent.Fast = applied.Fast
 	if err := c.openPersistence(as, spec, sess.SessionID); err != nil {
-		as.shutdown()
+		failForked()
 		return nil, err
+	}
+	if spec.Fork != nil {
+		c.writeForkPrefix(as, spec.Fork)
 	}
 
 	// Persist running + initial status rows (state.db is the sole writer).
@@ -398,14 +423,14 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
 		FastAvailable: applied.FastAvailable, SteeringAvailable: as.steeringSupported(),
 	}); err != nil {
-		as.shutdown()
+		failForked()
 		return nil, fmt.Errorf("runtime: write running: %w", err)
 	}
 	if err := c.writeStatus(as, state.Status{
 		AgentID: as.agentID, State: "idle", Detail: "ready",
 		LastTrace: "SessionStart", ContextPct: 0,
 	}); err != nil {
-		as.shutdown()
+		failForked()
 		_ = c.store.DeleteRunning(as.agentID)
 		return nil, fmt.Errorf("runtime: write status: %w", err)
 	}
@@ -1753,6 +1778,9 @@ func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID
 	meta := runtimeMeta(spec, sessionID)
 	caps := as.capabilities()
 	meta.RuntimeCapabilities = &caps
+	if spec.Fork != nil {
+		meta.ForkedFromAgentID, meta.ForkedFromSeq = spec.Fork.SourceAgentID, spec.Fork.SourceSeq
+	}
 	w, err := open(home, spec.Agent.AgentID, &meta)
 	if err != nil {
 		return fmt.Errorf("runtime: open transcript: %w", err)

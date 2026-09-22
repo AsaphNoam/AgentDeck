@@ -143,34 +143,42 @@ describe("CardContextMenu error surfacing", () => {
     );
   });
 
-  it("clones an agent by launching a new session with the same config", async () => {
-    let received: Record<string, unknown> | null = null;
+  // FS-01.A20: Clone is the explicit fork route, never a settings-only launch.
+  it("clones through the fork route with no client-supplied settings", async () => {
+    useAgentStore.setState({ agents: { a_1: { ...agent, clone: { available: true, reason: "" } } } });
+    let cloned: string | null = null;
+    let launched = false;
     server.use(
-      http.post("/api/sessions", async ({ request }) => {
-        received = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ agent: { agent_id: "a_2", name: "beta" } }, { status: 201 });
+      http.post("/api/sessions/:id/clone", ({ params }) => {
+        cloned = String(params.id);
+        return HttpResponse.json({ agent: { agent_id: "a_2" }, history_handoff: "native_fork", forked_from_agent_id: "a_1", forked_from_seq: 7 }, { status: 201 });
+      }),
+      http.post("/api/sessions", () => {
+        launched = true;
+        return HttpResponse.json({}, { status: 201 });
       }),
     );
 
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /^Clone$/i }));
 
-    await waitFor(() => expect(received).not.toBeNull());
-    expect(received).toMatchObject({
-      role: "implementer",
-      project: "my-app",
-      backend: "claude",
-      model: "sonnet",
-      interface: "chat",
-    });
-    // No name is sent so the server auto-suggests a fresh one.
-    expect(received).not.toHaveProperty("name");
+    await waitFor(() => expect(cloned).toBe("a_1"));
+    expect(launched).toBe(false);
+  });
+
+  it("explains an unavailable Clone and offers no weaker path", () => {
+    useAgentStore.setState({ agents: { a_1: { ...agent, clone: { available: false, reason: "Cloning needs a completed conversation point. Wait for the current turn or permission to finish." } } } });
+    renderMenu();
+    const clone = screen.getByRole("button", { name: /^Clone$/i });
+    expect(clone).toBeDisabled();
+    expect(clone).toHaveAttribute("title", expect.stringContaining("completed conversation point"));
   });
 
   it("shows an error toast when clone fails", async () => {
+    useAgentStore.setState({ agents: { a_1: { ...agent, clone: { available: true, reason: "" } } } });
     server.use(
-      http.post("/api/sessions", () =>
-        HttpResponse.json({ error: { code: "internal", message: "project cwd does not exist" } }, { status: 502 }),
+      http.post("/api/sessions/:id/clone", () =>
+        HttpResponse.json({ error: { code: "clone_unavailable", message: "This agent's runtime cannot fork its conversation." } }, { status: 422 }),
       ),
     );
 

@@ -436,7 +436,7 @@ authorized turn may already have consumed its mail. Deferred backlog can never k
 alive. A new waking send may coalesce a fresh opportunity under existing rules. Retain lifecycle,
 project, ownership and budget gates; waiting assignees route waking requests through TS-10.R29.
 
-**R35 `(planned)` — Native session capabilities extend `Runtime`, never bypass it.** The runtime
+**R35 — Native session capabilities extend `Runtime`, never bypass it.** The runtime
 package owns one provider-independent `SessionCapabilities` value and normalized operations for
 `Fork` and `StopBackgroundTask`. Capabilities are populated only from the live ACP initialize
 response, frozen onto the session snapshot for stopped-session affordances, and revalidated by the

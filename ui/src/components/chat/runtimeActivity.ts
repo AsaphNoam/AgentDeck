@@ -66,8 +66,9 @@ export interface BackgroundTask {
   name: string;
   state: TaskState;
   canStop: boolean;
-  /** A later resume started a new runtime generation that cannot control it. */
-  fenced: boolean;
+  /** A later resume or clone boundary left it with a runtime that cannot
+   * control it: the previous session, or the source a clone was forked from. */
+  fenced?: "resume" | "fork";
 }
 
 const TASK_STATES = new Set(["running", "completed", "failed", "stopped"]);
@@ -75,8 +76,9 @@ const TASK_STATES = new Set(["running", "completed", "failed", "stopped"]);
 // collectTasks folds durable task lifecycle into one row per task, in
 // announcement order, naming its related tool call. Output stays with that tool
 // call. A task still running when a later session resume began belonged to the
-// previous runtime generation, whose process is gone: it reads as stopped and
-// offers no control (INV §1).
+// previous runtime generation, whose process is gone; one copied into a clone
+// stays owned by its source (FS-01.R36). Either reads as stopped and offers no
+// control here (INV §1).
 export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
   const tasks = new Map<string, BackgroundTask>();
   const titles = new Map<string, string>();
@@ -85,8 +87,9 @@ export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
     const kind = kindOf(event);
     if (kind === "activity_started" && event.activity_id) owners.set(event.activity_id, String(event.name || "Subagent"));
     if (kind === "tool_call" && event.tool_call_id) titles.set(String(event.tool_call_id), String(event.title ?? event.name ?? ""));
-    if (kind === "session_meta" && event.resumed_at) {
-      for (const task of tasks.values()) if (task.state === "running") Object.assign(task, { state: "stopped", fenced: true });
+    const fence = kind === "session_meta" && event.resumed_at ? "resume" : kind === "fork_boundary" ? "fork" : undefined;
+    if (fence) {
+      for (const task of tasks.values()) if (task.state === "running") Object.assign(task, { state: "stopped", fenced: fence });
     }
     if (kind !== "background_task_state" || !event.task_id || !TASK_STATES.has(String(event.state))) continue;
     const id = String(event.task_id);
@@ -99,7 +102,6 @@ export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
       name: String(event.name || prior?.name || ""),
       state: event.state as TaskState,
       canStop: Boolean(event.can_stop ?? prior?.canStop),
-      fenced: false,
     });
   }
   return [...tasks.values()];
