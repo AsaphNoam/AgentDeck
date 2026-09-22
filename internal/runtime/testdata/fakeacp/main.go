@@ -135,6 +135,20 @@ func handle(msg *rpcMessage) {
 		if os.Getenv("FAKEACP_STEERING") != "" {
 			res["_meta"] = map[string]any{"steering": map[string]any{"supported": true}}
 		}
+		if dump := os.Getenv("FAKEACP_INIT_DUMP"); dump != "" {
+			_ = os.WriteFile(dump, msg.Params, 0o600)
+		}
+		// The reviewed codex-acp 1.12.0 advertisement (CodexAcpServer.initialize):
+		// canonical session capabilities plus the AIR extension list.
+		if os.Getenv("FAKEACP_CAPS") != "" {
+			res["agentCapabilities"] = map[string]any{"loadSession": true, "sessionCapabilities": map[string]any{
+				"resume": map[string]any{}, "list": map[string]any{}, "close": map[string]any{}, "delete": map[string]any{},
+				"fork": map[string]any{}, "additionalDirectories": map[string]any{}, "subagents": map[string]any{},
+			}}
+			res["_meta"] = map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{
+				"sessionFailure", "agentFileChangeReport", "nativeSubagentSessions", "asyncTasks", "recommendedValue",
+			}}}}
+		}
 		respond(*msg.ID, res)
 	case "session/new":
 		// If asked, record that session/new was invoked so a resume test can

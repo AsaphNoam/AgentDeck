@@ -1,5 +1,13 @@
 export type AgentStatus = "busy" | "idle" | "waiting_input" | "done" | "error" | "unknown";
 
+export interface RuntimeCapabilities {
+  fork: boolean;
+  subagents: boolean;
+  background_tasks: boolean;
+  background_task_stop: boolean;
+  file_change_reports: boolean;
+}
+
 export interface AgentState {
   agent_id: string;
   name: string;
@@ -16,6 +24,9 @@ export interface AgentState {
    * for a stopped agent and for any adapter without the extension, both of which
    * render no Steer control rather than a disabled one. */
   steering_available: boolean;
+  /** The session snapshot's normalized native capabilities (TS-03.R44); all
+   * false when unknown. An affordance only — the server revalidates. */
+  runtime_capabilities?: RuntimeCapabilities;
   interface: string;
   group?: string;
   created_at: string;

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/agentdeck/agentdeck/internal/state"
 )
 
 // EventType constants name the normalized transcript event kinds (techspec §4.2).
@@ -209,7 +211,15 @@ type SessionMetaData struct {
 	CreatedAt    string          `json:"created_at"`
 	ResumedAt    *string         `json:"resumed_at"`
 	SessionID    string          `json:"session_id,omitempty"`
+	// RuntimeCapabilities is this handshake's normalized advertisement, replaced
+	// on every successful launch/resume (TS-02.R35). Nil in older records.
+	RuntimeCapabilities *SessionCapabilities `json:"runtime_capabilities,omitempty"`
 }
+
+// SessionCapabilities is the runtime's provider-independent capability value
+// (TS-01.R35). It shares the state package's vocabulary so the snapshot and the
+// agent projection cannot drift from what the runtime negotiated.
+type SessionCapabilities = state.RuntimeCapabilities
 
 // AllEventTypes is the closed registry of normalized transcript event kinds. It
 // exists so every Go consumer that projects events into text can be tested

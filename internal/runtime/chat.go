@@ -241,6 +241,8 @@ type agentState struct {
 	// extension at handshake (TS-04.R49). Decided once per process from that
 	// advertisement alone, never from the adapter version or the backend type.
 	steering bool
+	// caps is the negotiated native-session capability value (TS-04.R62).
+	caps SessionCapabilities
 	// held is the person's queued follow-up: at most one message per agent, live
 	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
@@ -337,7 +339,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	// ACP handshake: initialize then session/new (techspec §4.1).
 	initRes, err := c.startupCall(ctx, as.transport, "initialize", map[string]any{
 		"protocolVersion":    1,
-		"clientCapabilities": map[string]any{},
+		"clientCapabilities": clientCapabilitiesFor(offered),
 	})
 	if err != nil {
 		return nil, c.startupFailure(as, spec.BackendType, "initialize", err)
@@ -347,6 +349,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, err
 	}
 	as.setSteering(decodeSteeringSupport(initRes))
+	as.setCapabilities(negotiateCapabilities(initRes, offered))
 	newRes, err := c.startupCall(ctx, as.transport, "session/new", sessionNewParams(spec))
 	if err != nil {
 		return nil, c.startupFailure(as, spec.BackendType, "session/new", err)
@@ -1120,7 +1123,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// ACP handshake: initialize.
 	initRes, err := c.startupCall(ctx, as.transport, "initialize", map[string]any{
 		"protocolVersion":    1,
-		"clientCapabilities": map[string]any{},
+		"clientCapabilities": clientCapabilitiesFor(offered),
 	})
 	if err != nil {
 		return nil, c.startupFailure(as, spec.BackendType, "initialize", err)
@@ -1132,6 +1135,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	// Re-decoded here, not carried across the boundary: resume spawns a new
 	// adapter process whose advertisement is its own (INV §1).
 	as.setSteering(decodeSteeringSupport(initRes))
+	as.setCapabilities(negotiateCapabilities(initRes, offered))
 
 	// Try session/load to restore native context; fall back to session/new.
 	// The load params must carry the current cwd + freshly-minted MCP servers
@@ -1217,6 +1221,8 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	resumeNow := time.Now().UTC().Format(time.RFC3339)
 	resumedMeta := runtimeMeta(spec, resolvedSessionID)
 	resumedMeta.ResumedAt = &resumeNow
+	resumedCaps := as.capabilities()
+	resumedMeta.RuntimeCapabilities = &resumedCaps
 	c.emit(as, EvSessionMeta, resumedMeta)
 
 	// Write fresh running row + status row with restored context_pct.
@@ -1668,6 +1674,8 @@ func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID
 		return nil
 	}
 	meta := runtimeMeta(spec, sessionID)
+	caps := as.capabilities()
+	meta.RuntimeCapabilities = &caps
 	w, err := open(home, spec.Agent.AgentID, &meta)
 	if err != nil {
 		return fmt.Errorf("runtime: open transcript: %w", err)
@@ -1963,6 +1971,20 @@ func (as *agentState) steeringSupported() bool {
 func (as *agentState) setSteering(supported bool) {
 	as.mu.Lock()
 	as.steering = supported
+	as.mu.Unlock()
+}
+
+// capabilities is this process's negotiated native-session capability value,
+// re-decoded on every handshake like steering (TS-01.R35, INV §1).
+func (as *agentState) capabilities() SessionCapabilities {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	return as.caps
+}
+
+func (as *agentState) setCapabilities(caps SessionCapabilities) {
+	as.mu.Lock()
+	as.caps = caps
 	as.mu.Unlock()
 }
 

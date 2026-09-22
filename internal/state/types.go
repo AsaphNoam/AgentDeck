@@ -58,6 +58,30 @@ type Status struct {
 	UpdatedAt  int64      `json:"updated_at"`
 }
 
+// RuntimeCapabilities is AgentDeck's normalized, provider-independent vocabulary
+// of native session capabilities (TS-01.R35, TS-02.R35). It is populated only
+// from a live ACP initialize response, frozen onto the session snapshot for
+// stopped-session affordances, and never inferred from backend type or adapter
+// version. The zero value (all false) is the answer for old rows, terminals and
+// any adapter that does not advertise.
+type RuntimeCapabilities struct {
+	Fork               bool `json:"fork"`
+	Subagents          bool `json:"subagents"`
+	BackgroundTasks    bool `json:"background_tasks"`
+	BackgroundTaskStop bool `json:"background_task_stop"`
+	FileChangeReports  bool `json:"file_change_reports"`
+}
+
+// DecodeRuntimeCapabilities reads a stored snapshot. Anything outside the
+// boolean vocabulary, or a malformed value, reads as all false (TS-02.R35).
+func DecodeRuntimeCapabilities(raw string) RuntimeCapabilities {
+	var caps RuntimeCapabilities
+	if raw == "" || json.Unmarshal([]byte(raw), &caps) != nil {
+		return RuntimeCapabilities{}
+	}
+	return caps
+}
+
 // AgentState is the dashboard-ready merge of agent identity, running state, and
 // latest status. Timestamps are strings because this shape is sent directly to
 // the browser over SSE.
@@ -91,6 +115,9 @@ type AgentState struct {
 	// adapter that does not advertise the extension, which render no Steer control
 	// rather than a disabled one.
 	SteeringAvailable bool `json:"steering_available"`
+	// RuntimeCapabilities is the session snapshot's frozen advertisement; always
+	// present, all false when unknown (TS-03.R44). An affordance, never authority.
+	RuntimeCapabilities RuntimeCapabilities `json:"runtime_capabilities"`
 
 	State      string  `json:"state"`
 	Detail     string  `json:"detail"`

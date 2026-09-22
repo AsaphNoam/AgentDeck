@@ -664,3 +664,47 @@ func TestIndexerDegradesWhenFTS5WritesAreUnavailable(t *testing.T) {
 		t.Fatalf("derived documents = %d, want 0", documents)
 	}
 }
+
+// Each handshake replaces the frozen capability snapshot; a record without one
+// (a terminal, an old transcript) stores all false, and the agent projection
+// always carries the decoded value (TS-02.R35, TS-03.R44).
+func TestSessionMetaFreezesRuntimeCapabilities(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := st.WriteAgent(state.Agent{AgentID: "a_caps", Name: "Atlas", Role: "r", Project: "p", Backend: "codex", Interface: "chat", CreatedAt: time.Now()}); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	readCaps := func() (string, state.RuntimeCapabilities) {
+		t.Helper()
+		var raw string
+		if err := st.DB().QueryRow(`SELECT runtime_capabilities_json FROM sessions WHERE agent_id = ?`, "a_caps").Scan(&raw); err != nil {
+			t.Fatalf("read capabilities: %v", err)
+		}
+		update, err := state.NewManager(st, nil).Touch("a_caps")
+		if err != nil {
+			t.Fatalf("Touch: %v", err)
+		}
+		return raw, update.RuntimeCapabilities
+	}
+
+	m := meta()
+	m.RuntimeCapabilities = &runtime.SessionCapabilities{Fork: true, BackgroundTasks: true}
+	if err := ix.UpsertSessionMeta("a_caps", m); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	if _, got := readCaps(); got != (state.RuntimeCapabilities{Fork: true, BackgroundTasks: true}) {
+		t.Fatalf("projected capabilities = %+v", got)
+	}
+
+	m.RuntimeCapabilities = nil
+	if err := ix.UpsertSessionMeta("a_caps", m); err != nil {
+		t.Fatalf("UpsertSessionMeta without capabilities: %v", err)
+	}
+	if raw, got := readCaps(); raw != "{}" || got != (state.RuntimeCapabilities{}) {
+		t.Fatalf("reset capabilities = %s / %+v", raw, got)
+	}
+	encoded, _ := json.Marshal(state.AgentState{})
+	if !strings.Contains(string(encoded), `"runtime_capabilities":{"fork":false`) {
+		t.Fatalf("projection omits non-null runtime_capabilities: %s", encoded)
+	}
+}

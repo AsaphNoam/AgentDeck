@@ -562,4 +562,15 @@ ALTER TABLE tasks ADD COLUMN execution_turn TEXT NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN cleanup_unsafe INTEGER NOT NULL DEFAULT 0;
 `,
 	},
+	{
+		// Native session capabilities and fork lineage stay on the session
+		// snapshot. The source link is informational, not a cascading key
+		// (TS-02.R35).
+		version: 33,
+		sql: `
+ALTER TABLE sessions ADD COLUMN runtime_capabilities_json TEXT NOT NULL DEFAULT '{}';
+ALTER TABLE sessions ADD COLUMN forked_from_agent_id TEXT;
+ALTER TABLE sessions ADD COLUMN forked_from_seq INTEGER;
+`,
+	},
 }

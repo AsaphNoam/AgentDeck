@@ -65,6 +65,14 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	if len(meta.LaunchConfig) > 0 {
 		launchConfig = string(meta.LaunchConfig)
 	}
+	capabilities := "{}"
+	if meta.RuntimeCapabilities != nil {
+		raw, err := json.Marshal(meta.RuntimeCapabilities)
+		if err != nil {
+			return fmt.Errorf("index: marshal runtime capabilities: %w", err)
+		}
+		capabilities = string(raw)
+	}
 	// Put the session upsert and metadata document replacement in one
 	// transaction so both succeed or both roll back (TS-02.R16, INV §15).
 	tx, err := ix.db.Begin()
@@ -73,8 +81,8 @@ func (ix *Indexer) UpsertSessionMeta(agentID string, meta runtime.SessionMetaDat
 	}
 	defer tx.Rollback()
 	_, err = tx.Exec(`
-INSERT INTO sessions(agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, last_session_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO sessions(agent_id, name, role, project, backend, model, effort, fast, interface, grp, cwd, system_prompt, env_keys, skip_permissions, add_dirs, launch_config_json, runtime_capabilities_json, last_session_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
   name=excluded.name,
   role=excluded.role,
@@ -91,10 +99,11 @@ ON CONFLICT(agent_id) DO UPDATE SET
   skip_permissions=excluded.skip_permissions,
   add_dirs=excluded.add_dirs,
   launch_config_json=excluded.launch_config_json,
+  runtime_capabilities_json=excluded.runtime_capabilities_json,
   last_session_id=excluded.last_session_id,
   updated_at=MAX(excluded.updated_at, sessions.updated_at)`,
 		agentID, meta.Name, meta.Role, meta.Project, meta.Backend, meta.Model, meta.Effort, meta.Fast, meta.Interface,
-		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), launchConfig, meta.SessionID, now, now)
+		meta.Group, meta.Cwd, meta.SystemPrompt, string(envKeys), meta.SkipPermissions, string(addDirs), launchConfig, capabilities, meta.SessionID, now, now)
 	if err != nil {
 		return fmt.Errorf("index: upsert session meta: %w", err)
 	}
