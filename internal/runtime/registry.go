@@ -313,6 +313,20 @@ func (r *Registry) Steer(ctx context.Context, agentID, text string) (SteerOutcom
 	return chat.Steer(ctx, agentID, text)
 }
 
+// StopBackgroundTask routes a targeted background-task stop to the owning chat
+// runtime. A terminal owner has no such control (TS-01.R35).
+func (r *Registry) StopBackgroundTask(ctx context.Context, agentID, taskID string) error {
+	rt, err := r.ownerFor(agentID)
+	if err != nil {
+		return err
+	}
+	chat, ok := rt.(*ChatRuntime)
+	if !ok {
+		return ErrBackgroundTaskControlUnavailable
+	}
+	return chat.StopBackgroundTask(ctx, agentID, taskID)
+}
+
 // SetSessionConfig routes a live session-setting change to the owning chat
 // runtime. The change it returns is meaningful even alongside an error, because a
 // combined request applies its settings one at a time (see SessionConfigChange).

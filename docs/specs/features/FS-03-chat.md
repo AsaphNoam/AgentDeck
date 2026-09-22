@@ -462,7 +462,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   whole-turn/session authority; AgentDeck offers no targeted child stop or close that the negotiated
   capability does not provide. A loaded child whose provider history cannot prove an outcome is
   shown as `disconnected`, not failed; it remains inspectable but has no live control.
-- **R59** `(planned)` — When a runtime advertises background-task control, a command that continues
+- **R59** — When a runtime advertises background-task control, a command that continues
   after its initiating tool call appears in a compact **Background tasks** activity list associated
   with that conversation and, for a native child command, that child. Each row names the command
   when available, identifies its related tool call, and shows `running`, `completed`, `failed` or

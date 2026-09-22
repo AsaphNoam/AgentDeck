@@ -326,7 +326,9 @@
     "runtime-activity": {
       "slots": [
         "thinking",
-        "child"
+        "child",
+        "task-list",
+        "task"
       ],
       "states": [
         "active",

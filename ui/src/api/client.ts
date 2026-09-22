@@ -138,6 +138,16 @@ export function steerPrompt(agentId: string, text: string) {
   });
 }
 
+/** Asks the runtime to stop one background task. 202 means accepted; the
+ * durable task-state event that follows is the terminal truth (TS-03.R44). */
+export function stopBackgroundTask(agentId: string, taskId: string, activityId?: string) {
+  return json<{ accepted: true }>(`/api/sessions/${agentId}/background-task-stop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ task_id: taskId, ...(activityId ? { activity_id: activityId } : {}) }),
+  });
+}
+
 export function cancelTurn(agentId: string) {
   return json<unknown>(`/api/sessions/${agentId}/cancel`, { method: "POST" });
 }

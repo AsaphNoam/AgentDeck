@@ -778,7 +778,7 @@ negotiation, the adapter's legacy ordinary tool call passes through unchanged. H
 to the explicit durable `disconnected` state; unknown live child ids produce a bounded protocol
 diagnostic and no invented AgentDeck identity.
 
-**R64 `(planned)` — Background terminals are normalized async tasks, not AgentDeck tasks.** After
+**R64 — Background terminals are normalized async tasks, not AgentDeck tasks.** After
 AIR async negotiation the runtime maps `async_task_spawned` and `async_task_state_update` into one
 stable background-task lifecycle keyed by the root agent, optional child activity and adapter task
 id; related tool-call id is retained and output is never copied. `_session/async_task/stop` receives

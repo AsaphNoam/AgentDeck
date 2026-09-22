@@ -31,6 +31,7 @@ export function DashboardChatPane({ agent }: { agent: AgentState }) {
         sourceActive={agent.running && agent.state === "idle"}
         busy={agent.state === "busy"}
         onOpenFile={openOnAgentScreen}
+        taskControl={agent.running && Boolean(agent.runtime_capabilities?.background_task_stop)}
       />
       <div className="dashboard-chat-composer">
         <Composer agentId={agent.agent_id} busy={agent.state === "busy" || agent.state === "waiting_input"} />

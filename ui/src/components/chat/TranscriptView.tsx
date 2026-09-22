@@ -11,7 +11,8 @@ import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
 import { ChildActivity } from "./renderers/ChildActivity";
-import { nestActivities, type ChildNode } from "./runtimeActivity";
+import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
+import { collectTasks, nestActivities, type ChildNode } from "./runtimeActivity";
 import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
@@ -26,7 +27,9 @@ import { withdrawHeldMessage } from "../../lib/heldMessage";
 // carries and a handler that writes it back to the route; the dashboard chat pane
 // passes no open file and a handler that navigates to the agent screen instead,
 // which is that pane's existing route to the full surface (FS-03.R53).
-export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null) => void }) {
+// taskControl offers targeted background-task Stop; only a live session whose
+// runtime negotiated it passes true, and the archive never does (FS-03.R59).
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile, taskControl = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null) => void; taskControl?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -114,6 +117,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
         {renderEvents(nestActivities(withReasoning(events, reasoning)), [], 1)}
+        <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
         {busy && (
           <div className="transcript-pending" aria-live="polite">
             <span className="spinner" aria-hidden="true" />

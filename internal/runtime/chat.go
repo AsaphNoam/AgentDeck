@@ -253,6 +253,11 @@ type agentState struct {
 	// scope for this generation only (TS-04.R63); bounded by maxChildren.
 	children           map[string]activityScope
 	unknownChildFrames int
+	// tasks tracks announced background tasks by normalized id: unfinished ones
+	// plus a bounded terminal tail (TS-04.R64, INV §16).
+	tasks         map[string]*taskRef
+	openTasks     int
+	finishedTasks []string
 	// held is the person's queued follow-up: at most one message per agent, live
 	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
@@ -1548,6 +1553,9 @@ func (c *ChatRuntime) mapScoped(as *agentState, scope activityScope, params json
 		return
 	}
 	as.closeReasoningSpan(scope.ActivityID)
+	if as.capabilities().BackgroundTasks && c.onAsyncTaskUpdate(as, scope, params) {
+		return
+	}
 	if scope.ActivityID == "" && as.capabilities().Subagents && c.onSubagentUpdate(as, params) {
 		return
 	}

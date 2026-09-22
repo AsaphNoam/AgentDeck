@@ -124,6 +124,9 @@ const (
 	CodeNotText              = "not_text"              // 422
 	CodeFileUnreadable       = "file_unreadable"       // 422
 	CodeWorkspaceUnavailable = "workspace_unavailable" // 422
+
+	// CodeBackgroundTaskControlUnavailable: no negotiated targeted stop (TS-03.R44).
+	CodeBackgroundTaskControlUnavailable = "background_task_control_unavailable" // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -149,7 +152,8 @@ func (e *APIError) HTTPStatus() int {
 func statusForCode(code string) int {
 	switch code {
 	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
-		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable:
+		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable,
+		CodeBackgroundTaskControlUnavailable:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400

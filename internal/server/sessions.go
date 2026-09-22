@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -562,6 +563,35 @@ func (s *Server) handlePermission(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"resolved": true, "tool_call_id": body.ToolCallID, "decision": body.Decision,
 	})
+}
+
+// handleBackgroundTaskStop implements POST /api/sessions/{id}/background-task-stop
+// (TS-03.R44). 202 means the runtime accepted the targeted stop; the durable
+// task-state event that follows is the terminal truth. The task id is Runtime's
+// normalized value; no provider id is accepted from the browser.
+func (s *Server) handleBackgroundTaskStop(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var body struct {
+		ActivityID string `json:"activity_id"`
+		TaskID     string `json:"task_id"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil || body.TaskID == "" || len(body.TaskID) > 512 {
+		writeAPIError(w, apiError(runtime.CodeValidation, "task_id is required"))
+		return
+	}
+	err := s.registry.StopBackgroundTask(r.Context(), id, body.TaskID)
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusAccepted, map[string]any{"accepted": true})
+	case errors.Is(err, runtime.ErrNoHandle):
+		writeAPIError(w, apiError(runtime.CodeNotFound, "agent not started"))
+	case errors.Is(err, runtime.ErrUnknownBackgroundTask):
+		writeAPIError(w, apiError(runtime.CodeNotFound, "that background task is not running"))
+	case errors.Is(err, runtime.ErrBackgroundTaskControlUnavailable):
+		writeAPIError(w, apiError(runtime.CodeBackgroundTaskControlUnavailable, "this agent cannot stop background tasks"))
+	default:
+		writeAPIError(w, apiError(runtime.CodeConflict, "the agent could not stop that background task; try again"))
+	}
 }
 
 func (s *Server) handleRename(w http.ResponseWriter, r *http.Request) {

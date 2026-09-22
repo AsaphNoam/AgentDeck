@@ -90,6 +90,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/sessions/{id}/rename", s.handleRename)
 	api("POST /api/sessions/{id}/identity", s.handleIdentity)
 	api("POST /api/sessions/{id}/permission", s.handlePermission)
+	api("POST /api/sessions/{id}/background-task-stop", s.handleBackgroundTaskStop)
 	api("POST /api/sessions/{id}/resume", s.handleResume)
 	api("POST /api/sessions/{id}/archive", s.handleArchiveAgentAction)
 	api("POST /api/sessions/{id}/restore", s.handleRestoreAgentAction)

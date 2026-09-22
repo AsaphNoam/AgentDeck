@@ -250,4 +250,5 @@ var AllEventTypes = []string{
 	EvAnnotation,
 	EvActivityStarted,
 	EvActivityState,
+	EvBackgroundTaskState,
 }

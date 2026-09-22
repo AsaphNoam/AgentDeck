@@ -1086,4 +1086,53 @@
 .runtime-child[data-state="failed"] > .tool-toggle {
   color: var(--ad-state-error);
 }
+
+/* Background tasks: a compact tail list, state before metadata (TS-08.R59). */
+.background-tasks {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+}
+
+.background-task-rows {
+  display: grid;
+  gap: var(--ad-space-1);
+  list-style: none;
+  margin: var(--ad-space-2) 0 0;
+  padding: 0;
+}
+
+.background-task {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+.background-task-state {
+  color: var(--ad-text-secondary);
+  font-weight: 600;
+}
+
+.background-task[data-state="failed"] > .background-task-state {
+  color: var(--ad-state-error);
+}
+
+.background-task-name {
+  font-family: var(--ad-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.background-task-meta {
+  color: var(--ad-text-muted);
+}
+
+.background-task-stop {
+  min-height: auto;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.background-task-error {
+  flex-basis: 100%;
+  margin: 0;
+}
 }

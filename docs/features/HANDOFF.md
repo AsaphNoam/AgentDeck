@@ -64,7 +64,11 @@ Slice 5 done: `offered.Subagents` on; `runtime/subagent.go` scopes child frames 
 session id) into `activity_id`/`parent_activity_id` on the envelope with `act_<hash>/<raw>` tool ids;
 unknown child ids drop only once subagents are negotiated (the fake's resume echoes a different id).
 UI: `components/chat/runtimeActivity.ts` nests; `renderers/ChildActivity.tsx`. Card preview, primer
-and context-pull folding ignore/separate child text. **Next:** slice 6 (background tasks). Wire notes: `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`
+and context-pull folding ignore/separate child text. Slice 6 done: `runtime/tasks.go`, route
+`background-task-stop`, `renderers/BackgroundTaskList.tsx`. Review note (reversible choice): a task
+still running when a later `session_meta` resume marker appears is shown "Ended with the previous
+session" without Stop, because resume drops the adapter's own replayed reconciliation.
+**Next:** slice 7 (Clone as native fork). Wire notes: `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`
 (temporary; delete at closure). MCP tool calls carry no `name`, so auto-approve identity stays
 title-based. Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).

@@ -211,6 +211,21 @@ func handle(msg *rpcMessage) {
 		applyConfigOption(setParams.ConfigID, setParams.Value)
 		// SetSessionConfigOptionResponse requires the full rebuilt option list.
 		respond(*msg.ID, map[string]any{"configOptions": fakeConfigOptions()})
+	case "_session/async_task/stop":
+		// Upstream finishes the task (publishing its terminal update under the
+		// owning session) before answering {stopped:true}; unknown tasks and a
+		// refused terminate answer {stopped:false}.
+		var p struct {
+			SessionID   string `json:"sessionId"`
+			AsyncTaskID string `json:"asyncTaskId"`
+		}
+		_ = json.Unmarshal(msg.Params, &p)
+		if os.Getenv("FAKEACP_TASK_STOP") == "refuse" || p.AsyncTaskID != "task_1" {
+			respond(*msg.ID, map[string]any{"stopped": false})
+			return
+		}
+		emitUpdateIn(p.SessionID, map[string]any{"sessionUpdate": "async_task_state_update", "asyncTaskId": p.AsyncTaskID, "state": "stopped", "toolCallId": "tc_bg"})
+		respond(*msg.ID, map[string]any{"stopped": true})
 	case "_session/steering":
 		// The adapter owns the injected-vs-new-turn choice and reports it; the
 		// scenario picks which one this run exercises. FAKEACP_STEER_LOG records
@@ -490,6 +505,23 @@ func runScenario(name string) string {
 		}
 		emitUpdate(map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": child, "state": "completed"})
 		emitChunk("root done")
+		return "end_turn"
+
+	case "task_flow":
+		// codex-acp 1.12 background terminals (CodexBackgroundTerminalTasks):
+		// the tool call is marked backgrounded, then the task is announced under
+		// its owning session. A child reuses the root's raw task id, and the
+		// root announcement repeats as a replayed duplicate (FS-03.A41).
+		const child = "th_child_1"
+		emitUpdate(map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_bg", "name": "exec_command", "title": "npm run dev", "kind": "execute", "rawInput": map[string]any{"command": "npm run dev"}})
+		emitUpdate(map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "tc_bg", "_meta": map[string]any{"jetbrains": map[string]any{"air": map[string]any{"asyncTasks": map[string]any{"backgrounded": true}}}}})
+		spawn := map[string]any{"sessionUpdate": "async_task_spawned", "asyncTaskId": "task_1", "name": "npm run dev", "taskType": "shell", "showInTranscript": false, "canStop": true, "toolCallId": "tc_bg"}
+		emitUpdate(spawn)
+		emitUpdate(spawn)
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_spawned", "subagentSessionId": child, "name": "researcher", "capabilities": map[string]any{}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "async_task_spawned", "asyncTaskId": "task_1", "name": "go test", "taskType": "shell", "canStop": true, "toolCallId": "tc_c"})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "async_task_state_update", "asyncTaskId": "task_1", "state": "completed", "toolCallId": "tc_c"})
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": child, "state": "completed"})
 		return "end_turn"
 
 	case "tool_flow":

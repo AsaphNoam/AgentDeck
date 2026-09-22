@@ -35,7 +35,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Family | Routes |
 |---|---|
 | Health/live state | `GET /api/health`, `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/events`, `GET /api/capabilities` |
-| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `resume`, `switch-runtime`, `annotations`; transcript read |
+| Lifecycle/chat | `POST /api/sessions`, `prompt`, `cancel`, `stop`, `archive`, `restore`, `rename`, `identity`, `permission`, `background-task-stop`, `resume`, `switch-runtime`, `annotations`; transcript read |
 | Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout`; `POST /api/directory-picker` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Composer autocomplete | session-scoped file search and available-command snapshot reads |
@@ -576,7 +576,7 @@ partial target. Agent projections add non-null
 native-session presence. The server re-negotiates and revalidates before acting, so the projection
 is an affordance, not authority (INV §8/§11/§14).
 
-**R44 `(planned)` — Runtime activity uses existing durable delivery plus one ephemeral channel.**
+**R44 — Runtime activity uses existing durable delivery plus one ephemeral channel.**
 Durable child/task/file-report events remain ordinary sequenced `new_message` SSE events and appear
 in transcript reads. Live-only reasoning is a distinct `runtime_activity` SSE payload
 `{agent_id,generation,activity_id?,span_id,kind:"reasoning_delta",delta}` with bounded strings and no
