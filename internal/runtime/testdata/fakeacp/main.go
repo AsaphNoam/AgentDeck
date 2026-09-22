@@ -549,6 +549,32 @@ func runScenario(name string) string {
 		emitChunk("root done")
 		return "end_turn"
 
+	case "activity_showcase":
+		// Real-browser fixture for the runtime-activity composition (TS-08.R59):
+		// live reasoning, a nested child with a grandchild, and a root
+		// background task left running so Stop can be exercised.
+		pause := func() { time.Sleep(300 * time.Millisecond) }
+		for _, text := range []string{"Weighing whether to split the work… ", "a researcher can read the logs while I fix the parser."} {
+			emitUpdate(map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": text}})
+			pause()
+		}
+		emitChunk("I'll delegate the log reading and start the dev server.\n")
+		const child, grandchild = "th_showcase_child", "th_showcase_grand"
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_spawned", "subagentSessionId": child, "name": "researcher", "task": "Find where the parser drops the last line", "capabilities": map[string]any{}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": "Start with the tokenizer tests."}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_1", "name": "exec_command", "title": "rg lastLine", "kind": "execute", "rawInput": map[string]any{"command": "rg lastLine"}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "tc_1", "status": "completed", "content": []any{map[string]any{"type": "content", "content": map[string]any{"type": "text", "text": "parser.go:88"}}}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "subagent_spawned", "subagentSessionId": grandchild, "name": "checker", "capabilities": map[string]any{}})
+		emitUpdateIn(grandchild, map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": "Confirmed: the loop exits before flushing."}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": grandchild, "state": "completed"})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": "The parser returns before flushing its buffer at parser.go:88."}})
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": child, "state": "completed"})
+		pause()
+		emitUpdate(map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_bg", "name": "exec_command", "title": "npm run dev", "kind": "execute", "rawInput": map[string]any{"command": "npm run dev"}})
+		emitUpdate(map[string]any{"sessionUpdate": "async_task_spawned", "asyncTaskId": "task_1", "name": "npm run dev", "taskType": "shell", "canStop": true, "toolCallId": "tc_bg"})
+		emitChunk("The dev server keeps running in the background; the parser fix is next.")
+		return "end_turn"
+
 	case "task_flow":
 		// codex-acp 1.12 background terminals (CodexBackgroundTerminalTasks):
 		// the tool call is marked backgrounded, then the task is announced under

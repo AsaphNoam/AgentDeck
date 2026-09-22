@@ -41,12 +41,6 @@ A change is either:
 Keep this file short. It points to the specifications; it does not repeat them or become a detailed
 implementation plan. A large change may have a temporary plan in `docs/plans/` for sequencing.
 
-## Changes in progress
-
-- [`adopt-modern-codex-acp-capabilities.md`](adopt-modern-codex-acp-capabilities.md) — upgrade the
-  packaged Codex ACP runtime and adopt capability-gated reasoning, native child sessions,
-  background tasks, conversation Clone, canonical tool names and fidelity fixes through Runtime.
-
 ## Changes waiting to start
 
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand

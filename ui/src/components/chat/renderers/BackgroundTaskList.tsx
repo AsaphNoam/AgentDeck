@@ -25,7 +25,8 @@ export function BackgroundTaskList({ agentId, tasks, controllable }: { agentId: 
       {open && (
         <ul className="background-task-rows">
           {tasks.map((task) => (
-            <TaskRow key={task.taskId} agentId={agentId} task={task} controllable={controllable} />
+            // Using Stop keeps the list open so its outcome stays in view.
+            <TaskRow key={task.taskId} agentId={agentId} task={task} controllable={controllable} onStop={() => setChosen(true)} />
           ))}
         </ul>
       )}
@@ -33,7 +34,7 @@ export function BackgroundTaskList({ agentId, tasks, controllable }: { agentId: 
   );
 }
 
-function TaskRow({ agentId, task, controllable }: { agentId: string; task: BackgroundTask; controllable: boolean }) {
+function TaskRow({ agentId, task, controllable, onStop }: { agentId: string; task: BackgroundTask; controllable: boolean; onStop: () => void }) {
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Accepted stop waits for the runtime's own terminal update (FS-03.R59).
@@ -41,6 +42,7 @@ function TaskRow({ agentId, task, controllable }: { agentId: string; task: Backg
     if (task.state !== "running") setStopping(false);
   }, [task.state]);
   const stop = () => {
+    onStop();
     setError(null);
     setStopping(true);
     stopBackgroundTask(agentId, task.taskId, task.activityId).catch(() => {

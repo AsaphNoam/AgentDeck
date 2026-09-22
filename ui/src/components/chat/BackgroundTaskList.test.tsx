@@ -55,9 +55,8 @@ describe("background tasks (FS-03.A41)", () => {
         <TranscriptView agentId="a1" taskControl events={foldTranscript([...running, wire(6, "background_task_state", { task_id: "task_1", tool_call_id: "tc_bg", state: "stopped" })])} />
       </QueryClientProvider>,
     );
-    const toggle = screen.getByRole("button", { name: /Background tasks/ });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
+    // The list stays open after Stop so its outcome is visible.
+    expect(screen.getByRole("button", { name: /Background tasks/ })).toHaveAttribute("aria-expanded", "true");
     expect(rows()[0]).toBe("stopped:Stoppednpm run dev");
     expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
   });

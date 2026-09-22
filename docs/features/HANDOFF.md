@@ -16,16 +16,15 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `adopt-modern-codex-acp-capabilities` — In progress; plan below.
+- **Active change:** None.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** none available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
+- **Review units:** `adopt-modern-codex-acp-capabilities` (finished 2026-09-23) is available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
   closed the same day when its fixes landed; BR-1's three findings were fixed the same day. Both
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `adopt-modern-codex-acp-capabilities` is In progress (below).
-  `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
@@ -43,18 +42,25 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** [`adopt-modern-codex-acp-capabilities`](../ready-changes/adopt-modern-codex-acp-capabilities.md)
-— In progress since 2026-09-22. Slices 1–8 are committed (packaging, negotiation, canonical names,
-reasoning, child sessions, background tasks, Clone, file-change reports); commit messages carry
-their detail. **Next:** closure — the closure matrix, the credentialed Codex 1.12.0 receipt (TS-06.R26; Codex is signed in locally) and a real-browser pass
-of the transcript composition, then delete the temporary wire notes
-`docs/plans/adopt-modern-codex-acp-capabilities-wire.md`. A20/A41 stay `(planned)` until those
-journeys run. Review notes (reversible choices): MCP calls carry no `name`, so auto-approve
-identity stays title-based; unknown child session ids drop only once subagents are negotiated; a
-task still running at a later resume or clone boundary shows as ended there without Stop, since
-resume/fork replay is dropped; the clone process forks the source thread because all Codex agents
-share one AgentDeck Codex profile, and a source turn begun after the busy check is not excluded
-from the provider fork. Settled 2026-09-14 entries are in
+**Change:** None. `adopt-modern-codex-acp-capabilities` finished 2026-09-23 and awaits `/review`.
+
+**Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
+1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
+session; canonical tool names; live-only reasoning; nested native child sessions; background tasks
+with targeted Stop; Clone as a native `session/fork`; file-change reports as tracking supplements.
+Closure matrix passed (`make test` both variants, focused `-race`, `make build`, UI 453 tests + build).
+A fake-ACP real-browser pass (Core, desktop and the one-column dashboard pane) confirmed Thinking,
+child nesting, the task list with Stop, and Clone's copied history and marker; it led to keeping the
+task list open after Stop. **Still owed before release:** the credentialed Codex 1.12.0 receipt
+(TS-06.R26, stays `(planned)`), which also gates FS-03.A41/A42 and FS-01.A20 (J7); Sky & Grove was
+not viewed. The in-app browser pane cannot run the shared-worker SSE stream (its worker reports an
+error and the app never falls back to a direct stream) — not reproduced elsewhere, not recorded as a
+finding. Review notes (reversible choices): MCP calls carry no `name`, so auto-approve identity
+stays title-based; unknown child session ids drop only once subagents are negotiated; a task still
+running at a later resume or clone boundary shows as ended there without Stop, because resume/fork
+replay is dropped; the clone process forks the source thread because all Codex agents share one
+AgentDeck Codex profile, and a source turn begun after the busy check is not excluded from the fork.
+Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
 
 **Changelog — 2026-09-22 (design: modern Codex ACP capabilities):** Re-evaluated the ACP wishlist
@@ -78,8 +84,8 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` has no unreviewed unit. `/work` may take
-`adopt-modern-codex-acp-capabilities` or `rename-product-to-deckhand`; `/fix` has no open findings;
+**Available by role:** `/review` may take `adopt-modern-codex-acp-capabilities`. `/work` may take
+`rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
