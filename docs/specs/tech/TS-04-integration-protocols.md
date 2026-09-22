@@ -351,8 +351,10 @@ in AgentDeck's own records.
 content; AgentDeck resubmits that exact content through `session/prompt`. `startedNewTurn` is a
 legacy detached-turn outcome and is not a safe retry signal or a completion owner for AgentDeck.
 Claude 0.75.1 provides the request opt-in directly. The private release applies the version-locked
-`codex-acp-1.10.0-steering-prompt-required.patch` after its clean install and records that patched
-component as `1.10.0+agentdeck.1`; patch drift fails release assembly. The steering advertisement
+`codex-acp-1.12.0-steering-prompt-required.patch` after its clean install and records that patched
+component as `1.12.0+agentdeck.1`; patch drift fails release assembly, and assembly also refuses an
+upstream source that already reads `idleBehavior`, so a no-longer-required patch is re-reviewed
+rather than stacked (R61). The steering advertisement
 still controls whether Steer is shown.
 
 **R23 `(planned)` — Optional-integration version tolerance is probed.** An adapter flag or metadata

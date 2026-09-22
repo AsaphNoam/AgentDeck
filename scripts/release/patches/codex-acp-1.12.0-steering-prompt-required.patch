@@ -1,6 +1,6 @@
 --- a/node_modules/@agentclientprotocol/codex-acp/dist/index.js
 +++ b/node_modules/@agentclientprotocol/codex-acp/dist/index.js
-@@ -33287,6 +33287,9 @@
+@@ -33387,6 +33387,9 @@
          return { outcome: "injected" };
        }
      }
@@ -10,7 +10,7 @@
      return await this.startNewTurnFromSteering(params);
    }
    /**
-@@ -33421,12 +33424,22 @@
+@@ -33520,12 +33523,22 @@
    parseSessionSteerParams(params) {
      const sessionId = params["sessionId"];
      const prompt = params["prompt"];

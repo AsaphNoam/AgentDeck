@@ -1,6 +1,6 @@
 # Adopt modern Codex ACP capabilities
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct 2026-09-22 request to re-evaluate the ACP wishlist against `codex-acp` 1.12.0.
 **Relevant requirements:** FS-01.R36, FS-03.R57–R61, FS-05.R38, TS-01.R35, TS-02.R35,
 TS-03.R43–R44, TS-04.R61–R66, TS-06.R26, TS-08.R59, INV §1–§6, §8, §10–§13, §15–§17

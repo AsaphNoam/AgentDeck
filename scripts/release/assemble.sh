@@ -15,16 +15,16 @@ NODE_VERSION="${NODE_VERSION:-22.22.0}"
 # dependency update and requires refreshing the matching Node archive.
 NODE_SHA256="5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640"
 CLAUDE_ACP_VERSION="0.75.1"
-CODEX_ACP_VERSION="1.10.0"
+CODEX_ACP_VERSION="1.12.0"
 CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+agentdeck.1"
-CODEX_ACP_SOURCE_SHA256="4602784c5896fbf05a7d89b09655bacc768d0bf281e0d03a10333ff81da45268"
-CODEX_ACP_PATCHED_SHA256="003e57494e9cfdc0f688b329d75f159ac03a74a0299ce60ff807fd62443e965e"
+CODEX_ACP_SOURCE_SHA256="f45a64dc3a994556ebdb688dc8d59b86945a9b2f940a3e3e545739dd265a7cc5"
+CODEX_ACP_PATCHED_SHA256="a4d3ee81aacfca79e048341423467738991d9b384cdc75eacac4521aee71ae03"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
 # one: it is the executable that performs `codex login` and answers
 # `codex login status`, so onboarding readiness must not depend on where the
 # adapter happens to hoist it (TS-06.R22). Keep in step with
 # scripts/release/package.json.
-CODEX_CLI_VERSION="0.153.4"
+CODEX_CLI_VERSION="0.154.0"
 TARGET="darwin-arm64"
 OUT_DIR="${OUT_DIR:-$ROOT/dist/release}"
 
@@ -61,14 +61,19 @@ cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtim
 [ -x "$stage/runtime/node_modules/.bin/codex-acp" ] || die "Codex ACP adapter was not installed"
 [ -x "$stage/runtime/node_modules/.bin/codex" ] || die "Codex CLI was not installed"
 
-# Codex ACP 1.10.0 advertises steering but its idle branch starts a detached
-# turn. Keep AgentDeck's no-consumption fallback explicit and version-locked
-# until an upstream release provides the same request-level contract.
+# Codex ACP advertises steering but its idle branch starts a detached turn.
+# Keep AgentDeck's no-consumption fallback explicit and version-locked until an
+# upstream release provides the same request-level contract (TS-04.R51/R61).
 codex_acp_source="$stage/runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js"
 codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
 [ "$codex_acp_sum" = "$CODEX_ACP_SOURCE_SHA256" ] \
   || die "Codex ACP ${CODEX_ACP_VERSION} source does not match the reviewed patch input"
-patch --fuzz=0 -p1 -d "$stage/runtime" < scripts/release/patches/codex-acp-1.10.0-steering-prompt-required.patch
+# The patch is still semantically required only while upstream neither reads
+# nor answers the idle-behavior request member (TS-06.R26).
+if grep -q 'idleBehavior' "$codex_acp_source"; then
+  die "Codex ACP ${CODEX_ACP_VERSION} already handles idle steering; re-review the steering patch"
+fi
+patch --fuzz=0 -p1 -d "$stage/runtime" < "scripts/release/patches/codex-acp-${CODEX_ACP_VERSION}-steering-prompt-required.patch"
 codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
 [ "$codex_acp_sum" = "$CODEX_ACP_PATCHED_SHA256" ] \
   || die "Codex ACP steering patch did not produce the complete reviewed output"

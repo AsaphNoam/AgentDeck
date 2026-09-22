@@ -32,7 +32,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	for _, a := range []string{"claude-agent-acp", "codex-acp", "codex"} {
 		body := "#!/bin/sh\n"
 		if a == "codex" {
-			body += "echo 'codex-cli 0.153.4'\n"
+			body += "echo 'codex-cli 0.154.0'\n"
 		}
 		if err := os.WriteFile(filepath.Join(adapters, a), []byte(body), 0o755); err != nil {
 			t.Fatal(err)
@@ -108,7 +108,7 @@ func TestShimRunsPrivateRuntime(t *testing.T) {
 				t.Fatalf("CODEX_PATH = %q, want the private %q", got, filepath.Join(wantAdapterDir, "codex"))
 			}
 		}
-		if strings.HasPrefix(line, "CODEX_VERSION=") && strings.TrimPrefix(line, "CODEX_VERSION=") != "0.153.4" {
+		if strings.HasPrefix(line, "CODEX_VERSION=") && strings.TrimPrefix(line, "CODEX_VERSION=") != "0.154.0" {
 			t.Fatalf("packaged Codex version not exported: %s", line)
 		}
 		if strings.HasPrefix(line, "ARGS=") {

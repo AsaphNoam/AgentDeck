@@ -2,7 +2,8 @@
 
 **Live agent state.** Read the **Current position** and **Active change** below, then open the
 requirements they name. Settled state is archived in `../archive/state/`: the dated
-[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md),
+[`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md),
+[`-13`](../archive/state/HANDOFF-through-2026-09-13.md),
 [`-12`](../archive/state/HANDOFF-through-2026-09-12.md),
 [`-11`](../archive/state/HANDOFF-through-2026-09-11.md),
 [`-10`](../archive/state/HANDOFF-through-2026-09-10.md),
@@ -15,7 +16,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None.
+- **Active change:** `adopt-modern-codex-acp-capabilities` — In progress; plan below.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** none available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
@@ -23,28 +24,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `adopt-modern-codex-acp-capabilities.md` is Waiting to start: the capability-gated
-  Codex ACP 1.12.0/CLI 0.154.0 bump, conversation Clone, live reasoning, nested subagent sessions,
-  background-task control and metadata/fidelity updates through normalized Runtime.
-  `rename-product-to-deckhand.md` is also Waiting to start: the AgentDeck → Deckhand rename with its
-  one-time state migration, role rename to FirstMate, and two named read-compatibility paths.
-  `migrate-internal-actions-from-mcp.md` stays paused on its transport
-  blocker; the ACP wait-list in `docs/ideas.md` holds the rest behind an adapter contract.
-  Queue hygiene: `bump-pinned-acp-adapters.md` reads `State: Finished` but is still in
-  `docs/ready-changes/` and absent from that directory's index; per its README a finished change's
-  file is removed. Left in place rather than deleted unasked.
-- **Design units:** `Ideas being defined` entries may resume; `New ideas` entries are available.
-  Persistent pipeline orchestration and its mail extension are implemented, reviewed and fixed.
-  TS-01.R31–R33, TS-02.R34 and TS-04.R53 complete shared prompt preparation, bounded batches,
-  transactional budget/read settlement, uncertain-delivery recovery and deferred retention.
-  The design decisions for clean legacy reset, descendant cancellation, project boundaries,
-  subordinate coordination and ordinary stop/resume remain confirmed; implementation gaps are
-  recorded below. Modern Codex ACP adoption is specified in
-  `adopt-modern-codex-acp-capabilities.md`: thinking is live-only/collapsed, plans are excluded as
-  non-free product work, and fork/subagent/background-task capabilities are no longer protocol
-  blockers. The permanently unaddressable pipeline agent is the newest `New ideas`
-  entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
-  to the work queue; no design decision remains open for it.
+- **Work units:** `adopt-modern-codex-acp-capabilities` is In progress (below).
+  `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+  paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
+  `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
+- **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
+  uncommitted spec edits in the tree from another session — not this change's); `New ideas`
+  entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
 - **Open findings:** none. `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
@@ -57,9 +43,20 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `v0.5.0` closed the epoch: every settled 2026-09-13 changelog entry, the `v0.4.3`
-release record, and the retired acceptance-gate checklist moved to
-[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+**Change:** [`adopt-modern-codex-acp-capabilities`](../ready-changes/adopt-modern-codex-acp-capabilities.md)
+— In progress since 2026-09-22. Slices, each committed when verified: (1) packaging bump to
+1.12.0/0.154.0 with rebased steering patch; (2) capability negotiation + snapshot column and
+`runtime_capabilities` projection; (3) canonical tool names, paginated load de-dupe, elicitation
+completion; (4) live-only reasoning over `runtime_activity` SSE + Thinking disclosure; (5) native
+child activity scope, nested rendering, tracking roll-up; (6) background tasks + targeted stop;
+(7) Clone as native fork; (8) file reports; closure: credentialed Codex receipt (TS-06.R26) and
+real-browser pass. Slice 1 done (clean `npm ci` of the lockfile verified hashes, zero-fuzz patch,
+one Codex 0.154.0). **Next:** slice 2 — storage/projection edits are in the tree uncommitted
+(`state.RuntimeCapabilities`, migration 33, `SessionMetaData.RuntimeCapabilities`); decode from
+initialize and send `clientCapabilities` remain. 1.12.0 wire notes: scratchpad-derived, re-verify
+from `npm pack @agentclientprotocol/codex-acp@1.12.0` if lost. MCP tool calls carry no `name`, so
+auto-approve identity stays title-based. Settled 2026-09-14 entries are in
+[`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
 
 **Changelog — 2026-09-22 (design: modern Codex ACP capabilities):** Re-evaluated the ACP wishlist
 against `codex-acp` 1.12.0 and promoted `adopt-modern-codex-acp-capabilities.md` to Waiting to start.
@@ -70,33 +67,6 @@ durable task plane. TS-01.R35, TS-02.R35, TS-03.R43–R44, TS-04.R61–R66, TS-0
 keep the work inside normalized Runtime, pin the 1.12.0/0.154.0 pair, and retain the steering patch
 because upstream still lacks its idle no-consumption behavior. Plans, provider recommendations and
 session goals are excluded. No product code changed.
-
-**Changelog — 2026-09-14 (CI flake):** Fixed the intermittent `LaunchStep` onboarding test that
-reddened CI on `7162f59`. `LaunchStep` disables Launch until both the roles and the projects query
-resolve, but both tests awaited only the project option before clicking; when the roles response
-landed second, the click hit a disabled button, no `POST /api/sessions` was sent, and the
-`launchBody` wait timed out. A shared `clickLaunch()` helper now waits for the button to be enabled.
-Delaying the roles handler by 300ms reproduced the CI failure verbatim and both tests pass under
-that delay with the fix. Test-only: no product code changed, so the shipped `v0.5.0` artifact is
-unaffected and no re-release is required. CI also warns that `actions/checkout@v4`,
-`setup-go@v5` and `setup-node@v4` are being forced off deprecated Node 20; not yet breaking, not
-addressed here.
-
-**Changelog — 2026-09-14 (release: `v0.5.0`):** Refreshed the shipped `operating-agentdeck` package
-for the range's agent-facing changes (FS-18.R4–R5, TS-11.R1/R8).
-`references/build-and-run-pipelines.md` was rewritten onto the standing-orchestrator model: stages
-are bounded durable assignments to one standing run orchestrator that alone reports each stage
-outcome, run setup picks one backend/model for it while only dedicated stages select a
-sub-orchestrator runtime, templates carry no conditional routing, accepted stage completion cancels
-unfinished descendants before cleanup fences the next stage, Stop cancels nested delegated work, and
-Continue/Retry/Replace are distinguished (FS-14.R61–R78). `references/coordinate-work.md` gained
-durable waiting — `wait_for_tasks` holds an assignment open, yields its capacity slot, and resumes on
-a watched revision change instead of polling — plus creator authority to inspect, retry, re-arm,
-cancel, and replace work it created (FS-16.R30–R38). `SKILL.md` names both in its routing bullets.
-No product code changed. README, `install.sh`, and `scripts/release/assemble.sh` were re-checked
-against the range and none of their release-matched claims is falsified: the CLI install/update/auth
-surface, the config schema version, and the Node and adapter pins are unchanged, and the in-range
-`assemble.sh` edit already carries its own `+agentdeck.1` component suffix.
 
 **Release state:** `v0.5.0` is published and verified on tag `8ab84d3`. `make test` (both tag
 variants, including `make check-specs`), the UI suite (54 files, 437 tests), and
