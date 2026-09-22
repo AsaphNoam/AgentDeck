@@ -42,6 +42,7 @@ func sampleEvents(t *testing.T) map[string]runtime.Event {
 		runtime.EvActivityState:       projectionEvent(t, runtime.EvActivityState, runtime.ActivityStateData{State: "completed"}),
 		runtime.EvBackgroundTaskState: projectionEvent(t, runtime.EvBackgroundTaskState, runtime.BackgroundTaskData{TaskID: "t1", Name: "npm run dev", State: "running"}),
 		runtime.EvForkBoundary:        projectionEvent(t, runtime.EvForkBoundary, runtime.ForkBoundaryData{ForkedFromAgentID: "a_src", ForkedFromSeq: 7}),
+		runtime.EvFileReport:          projectionEvent(t, runtime.EvFileReport, runtime.FileReportData{RequestID: "fcr-1", Status: "reported", Paths: []string{"/w/a.go"}}),
 		runtime.EvAnnotation: projectionEvent(t, runtime.EvAnnotation, runtime.AnnotationData{
 			Annotations:        []runtime.Annotation{{Seq: 3, Excerpt: "line", Instruction: "fix"}},
 			OverallInstruction: "tidy up"}),
@@ -60,6 +61,7 @@ func TestProjectEventCoversEveryType(t *testing.T) {
 		runtime.EvActivityState:       true,
 		runtime.EvBackgroundTaskState: true,
 		runtime.EvForkBoundary:        true,
+		runtime.EvFileReport:          true,
 	}
 	for _, typ := range runtime.AllEventTypes {
 		ev, ok := samples[typ]

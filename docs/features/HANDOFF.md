@@ -44,11 +44,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** [`adopt-modern-codex-acp-capabilities`](../ready-changes/adopt-modern-codex-acp-capabilities.md)
-— In progress since 2026-09-22. Slices 1–7 are committed (packaging, negotiation, canonical names,
-reasoning, child sessions, background tasks, Clone); commit messages carry their detail. **Next:**
-slice 8 — file-change reports: add `agentFileChangeReport` to `offered` (`runtime/capabilities.go`)
-with its per-prompt request and `file_report` event (TS-04.R66, TS-02.R35); then closure — the
-credentialed Codex 1.12.0 receipt (TS-06.R26; Codex is signed in locally) and a real-browser pass
+— In progress since 2026-09-22. Slices 1–8 are committed (packaging, negotiation, canonical names,
+reasoning, child sessions, background tasks, Clone, file-change reports); commit messages carry
+their detail. **Next:** closure — the closure matrix, the credentialed Codex 1.12.0 receipt (TS-06.R26; Codex is signed in locally) and a real-browser pass
 of the transcript composition, then delete the temporary wire notes
 `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`. A20/A41 stay `(planned)` until those
 journeys run. Review notes (reversible choices): MCP calls carry no `name`, so auto-approve

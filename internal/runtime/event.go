@@ -256,4 +256,5 @@ var AllEventTypes = []string{
 	EvActivityState,
 	EvBackgroundTaskState,
 	EvForkBoundary,
+	EvFileReport,
 }

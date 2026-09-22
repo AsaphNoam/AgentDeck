@@ -31,7 +31,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact per-role seed-prompt migration |
-| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Partial | Session archive, full-text search, resume from archive, file/command tracking |
+| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent mail with waking/deferred delivery and bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |

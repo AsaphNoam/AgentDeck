@@ -484,7 +484,7 @@ selection, not an in-memory inbox scan; durable unread mail may accumulate but p
 FS-06.A20–A25 verification includes restart before/after preparation and confirmation, stale callback
 after a new turn, concurrent manual reads, no double charge, and a clock advanced past seven days.
 
-**R35 `(planned)` — Activity scope and fork lineage stay inside existing session authority.** A
+**R35 — Activity scope and fork lineage stay inside existing session authority.** A
 schema migration adds nullable `sessions.forked_from_agent_id`, `forked_from_seq`, and a bounded
 `runtime_capabilities_json` snapshot. The source foreign identity is informational rather than a
 cascading foreign key: deleting or archiving either agent never deletes the other agent's session,

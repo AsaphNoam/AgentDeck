@@ -358,6 +358,23 @@ SET exit_status = ?, exit_error = ?
 WHERE agent_id = ? AND tool_call_id = ?`, strutil.FirstNonEmpty(d.Status, "completed"), d.Error, agentID, d.ToolCallID); err != nil {
 			return fmt.Errorf("index: update command result: %w", err)
 		}
+	case runtime.EvFileReport:
+		// A file-change report only adds paths no tool call or diff already
+		// tracked; it never counts an edit twice or claims an inspectable patch
+		// (FS-05.R38, TS-04.R66).
+		var d runtime.FileReportData
+		if err := json.Unmarshal(ev.Data, &d); err != nil {
+			return fmt.Errorf("index: track file report: %w", err)
+		}
+		for _, p := range d.Paths {
+			display, abs := ix.normalizePath(agentID, p)
+			if _, err := ix.db.Exec(`
+INSERT INTO tracked_files(agent_id, path, abs_path, edit_count, first_seq, last_seq, first_ts, last_ts, has_diff, diff_refs)
+VALUES (?, ?, ?, 1, ?, ?, ?, ?, 0, '[]')
+ON CONFLICT(agent_id, path) DO NOTHING`, agentID, display, abs, ev.Seq, ev.Seq, ev.Ts, ev.Ts); err != nil {
+				return fmt.Errorf("index: track reported file: %w", err)
+			}
+		}
 	case runtime.EvDiff:
 		var d runtime.DiffData
 		if err := json.Unmarshal(ev.Data, &d); err != nil {

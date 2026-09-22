@@ -472,7 +472,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   retryable error. Lifecycle events are durable and replay in live and archived transcripts. A
   provider restart may terminally stop or fail old tasks, exactly as reported by the runtime.
   Background tasks never become AgentDeck durable tasks, pipeline work or terminal-interface tabs.
-- **R60** `(planned)` — Tool calls prefer the runtime's canonical tool name and retain the existing
+- **R60** — Tool calls prefer the runtime's canonical tool name and retain the existing
   bounded title/kind fallback when no name is supplied. The canonical name flows through permission
   identity, transcript rendering, command/file tracking and diagnostic logs without changing the
   provider's arguments or result. A runtime that improves load/fork pagination, MCP elicitation

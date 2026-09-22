@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -759,5 +760,95 @@ func TestChildActivityRollsUpUnderTheParent(t *testing.T) {
 	text, err := searchableText(event(1, runtime.EvActivityStarted, runtime.ActivityStartedData{Name: "zebraresearcher"}))
 	if err != nil || text != "" {
 		t.Fatalf("lifecycle search text = %q, %v", text, err)
+	}
+}
+
+// A report adds only paths nothing else tracked, never bumps an edit a diff
+// already counted, and never claims an inspectable patch (FS-05.A21).
+func TestFileReportSupplementsTrackingOnly(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	m := meta()
+	if err := ix.UpsertSessionMeta("a_rep", m); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	event := func(seq int64, typ string, data any) runtime.Event {
+		raw, _ := json.Marshal(data)
+		return runtime.Event{AgentID: "a_rep", Seq: seq, Type: typ, Data: raw, Ts: "2026-09-22T10:00:00Z"}
+	}
+	for _, ev := range []runtime.Event{
+		event(1, runtime.EvDiff, runtime.DiffData{ToolCallID: "tc_1", Path: m.Cwd + "/a.go", NewText: "x"}),
+		event(2, runtime.EvFileReport, runtime.FileReportData{RequestID: "fcr-1", Status: "reported", Paths: []string{m.Cwd + "/a.go", m.Cwd + "/b.go"}}),
+		event(3, runtime.EvFileReport, runtime.FileReportData{RequestID: "fcr-2", Status: "reported", Paths: []string{m.Cwd + "/b.go"}}),
+	} {
+		if err := ix.OnEvent("a_rep", ev); err != nil {
+			t.Fatalf("OnEvent: %v", err)
+		}
+	}
+	rows, err := st.DB().Query(`SELECT path, edit_count, has_diff FROM tracked_files WHERE agent_id = 'a_rep' ORDER BY path`)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var path string
+		var edits, diff int
+		_ = rows.Scan(&path, &edits, &diff)
+		got = append(got, path+":"+strconv.Itoa(edits)+":"+strconv.Itoa(diff))
+	}
+	if strings.Join(got, ",") != "a.go:1:1,b.go:1:0" {
+		t.Fatalf("tracked = %q", got)
+	}
+}
+
+// FS-05.A21: rebuilding from the raw log rolls child and background-task
+// activity up once under the parent, and lifecycle, task and report records
+// add nothing to prose search; a summary-only report creates no patch.
+func TestReindexRollsUpNativeActivityOnce(t *testing.T) {
+	st, home := openTestDB(t)
+	m := meta()
+	raw := func(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
+	w, err := transcript.Open(home, "a_native", &m)
+	if err != nil {
+		t.Fatalf("transcript.Open: %v", err)
+	}
+	for _, e := range []runtime.Event{
+		{Seq: 1, Type: runtime.EvUserPrompt, Data: raw(runtime.UserPromptData{Text: "delegate"})},
+		{Seq: 2, Type: runtime.EvActivityStarted, ActivityID: "act_c", Data: raw(runtime.ActivityStartedData{Name: "zebraresearcher"})},
+		{Seq: 3, Type: runtime.EvToolCall, ActivityID: "act_c", Data: raw(runtime.ToolCallData{ToolCallID: "act_c/tc_1", Name: "exec_command", Args: json.RawMessage(`{"command":"npm run dev"}`)})},
+		{Seq: 4, Type: runtime.EvBackgroundTaskState, ActivityID: "act_c", Data: raw(runtime.BackgroundTaskData{TaskID: "act_c/task_1", ToolCallID: "act_c/tc_1", Name: "quokkaserver", State: "running"})},
+		{Seq: 5, Type: runtime.EvBackgroundTaskState, ActivityID: "act_c", Data: raw(runtime.BackgroundTaskData{TaskID: "act_c/task_1", State: "stopped"})},
+		{Seq: 6, Type: runtime.EvDiff, ActivityID: "act_c", Data: raw(runtime.DiffData{ToolCallID: "act_c/tc_2", Path: m.Cwd + "/a.go", NewText: "x"})},
+		{Seq: 7, Type: runtime.EvActivityState, ActivityID: "act_c", Data: raw(runtime.ActivityStateData{State: "completed"})},
+		{Seq: 8, Type: runtime.EvFileReport, Data: raw(runtime.FileReportData{RequestID: "fcr-1", Status: "reported", Paths: []string{m.Cwd + "/a.go", m.Cwd + "/summary.go"}})},
+		{Seq: 9, Type: runtime.EvTurnEnd, Data: raw(runtime.TurnEndData{StopReason: "end_turn"})},
+	} {
+		if err := w.Append(e); err != nil {
+			t.Fatalf("Append seq %d: %v", e.Seq, err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := Reindex(home, st.DB()); err != nil {
+			t.Fatalf("Reindex %d: %v", i, err)
+		}
+	}
+	var files, commands int
+	if err := st.DB().QueryRow(`SELECT files_touched, commands_run FROM sessions WHERE agent_id = 'a_native'`).Scan(&files, &commands); err != nil || files != 2 || commands != 1 {
+		t.Fatalf("rollup files=%d commands=%d err=%v", files, commands, err)
+	}
+	var patchless int
+	if err := st.DB().QueryRow(`SELECT has_diff FROM tracked_files WHERE agent_id = 'a_native' AND path = 'summary.go'`).Scan(&patchless); err != nil || patchless != 0 {
+		t.Fatalf("summary-only file has_diff=%d err=%v", patchless, err)
+	}
+	for _, term := range []string{"zebraresearcher", "quokkaserver"} {
+		var n int
+		_ = st.DB().QueryRow(`SELECT COUNT(*) FROM sessions_fts WHERE content LIKE ?`, "%"+term+"%").Scan(&n)
+		if n != 0 {
+			t.Fatalf("%s reached prose search", term)
+		}
 	}
 }

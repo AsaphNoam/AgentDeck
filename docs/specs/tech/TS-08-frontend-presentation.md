@@ -614,7 +614,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   written so that running it twice is a no-op, since it runs on every mount rather than behind a
   persisted flag.
 
-**R59 `(planned)` — Runtime-native activity stays subordinate to the conversation.** The experienced
+**R59 — Runtime-native activity stays subordinate to the conversation.** The experienced
 operator's primary job remains reading the root exchange and intervening only when work needs
 attention. `TranscriptView` and `appendRenderedEvent` own one `runtime-activity` projection used by
 the full agent screen, dashboard chat pane and read-only archive (INV §2). Its reading order is root

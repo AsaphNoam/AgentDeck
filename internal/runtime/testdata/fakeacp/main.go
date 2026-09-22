@@ -336,6 +336,12 @@ func handle(msg *rpcMessage) {
 		// client's permission reply / cancel while the scenario blocks.
 		go func() {
 			stop := runScenario(os.Getenv("FAKEACP_SCENARIO"))
+			// codex-acp 1.12 publishes the requested file-change report as a
+			// session_info_update before answering the prompt (TS-04.R66). A stale
+			// report precedes it; its paths include out-of-scope entries.
+			if os.Getenv("FAKEACP_FILE_REPORT") != "" {
+				emitFileReports(msg.Params)
+			}
 			// Match the pinned Claude adapter: current context percentage comes
 			// from a usage_update notification, while the prompt result carries
 			// token accounting only.
@@ -826,4 +832,34 @@ func writeRaw(s string) {
 	_, _ = out.WriteString(s)
 	_ = out.WriteByte('\n')
 	_ = out.Flush()
+}
+
+func emitFileReports(promptParams json.RawMessage) {
+	var p struct {
+		Meta struct {
+			JetBrains struct {
+				Air struct {
+					Request struct {
+						RequestID string `json:"requestId"`
+					} `json:"agentFileChangeReportRequest"`
+				} `json:"air"`
+			} `json:"jetbrains"`
+		} `json:"_meta"`
+	}
+	_ = json.Unmarshal(promptParams, &p)
+	report := func(requestID string, paths []string) {
+		emitUpdate(map[string]any{"sessionUpdate": "session_info_update", "_meta": map[string]any{"jetbrains": map[string]any{"air": map[string]any{
+			"version": 1,
+			"agentFileChangeReport": map[string]any{
+				"version": 1, "requestId": requestID, "status": "reported", "paths": paths,
+				"declaredComplete": false, "truncated": false,
+				"uncertainty": "Codex turn diffs may omit same-content renames and changes made outside apply_patch.",
+			},
+		}}}})
+	}
+	report("fcr-stale", []string{"stale.go"})
+	if id := p.Meta.JetBrains.Air.Request.RequestID; id != "" {
+		report(id, []string{"main.go", "/etc/passwd", "../outside.go", "main.go"})
+		report(id, []string{"duplicate.go"})
+	}
 }

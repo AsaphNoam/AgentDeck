@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -99,7 +99,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   since deleted, states that reason rather than opening. Tracking capture, path form, ordering,
   rollup counts, and the R15–R19 endpoints are unchanged.
 
-- **R38** `(planned)` — Runtime-native child activity and background commands contribute to the
+- **R38** — Runtime-native child activity and background commands contribute to the
   parent agent's existing Files and Commands projections, never separate tracking identities. A
   canonical tool name and validated runtime diff/file metadata may strengthen classification and
   change statistics, but provider summary metadata never fabricates a transcript diff whose patch
@@ -303,7 +303,7 @@ R22's `active` validation remain binding.
   `ui/src/components/chat/FilesTab.test.tsx` and
   `ui/src/components/chat/renderers/DiffBlock.test.tsx`.
 
-- **A21** `(planned)` (R38) — Root and nested child file/command events roll up once under the
+- **A21** (R38) — Root and nested child file/command events roll up once under the
   parent agent across live delivery, paginated load and resume; canonical names improve
   classification, summary-only file metadata cannot create an inspectable patch, and reasoning or
   plan updates create no tracking/search entry. *Verify by* indexer/reindex fixtures containing

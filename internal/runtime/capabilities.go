@@ -26,7 +26,7 @@ type clientOffer struct {
 }
 
 // offered is what this build implements.
-var offered = clientOffer{Subagents: true, AsyncTasks: true}
+var offered = clientOffer{Subagents: true, AsyncTasks: true, FileChangeReports: true}
 
 // clientCapabilitiesFor builds the initialize `clientCapabilities` object.
 func clientCapabilitiesFor(o clientOffer) map[string]any {

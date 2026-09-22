@@ -45,7 +45,7 @@ export function nestActivities(events: TranscriptEvent[]): TranscriptEvent[] {
       continue;
     }
     // Task lifecycle renders in the tail list, never inline (FS-03.R59).
-    if (kind === "background_task_state") continue;
+    if (kind === "background_task_state" || kind === "file_report") continue;
     if (kind === "turn_end" && !id) {
       for (const node of nodes.values()) if (node.state === "active") node.state = "disconnected";
     }

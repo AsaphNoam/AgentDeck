@@ -253,6 +253,11 @@ type agentState struct {
 	// scope for this generation only (TS-04.R63); bounded by maxChildren.
 	children           map[string]activityScope
 	unknownChildFrames int
+	// roots are the working directory then additional directories: the scope a
+	// file-change report path must fall inside (TS-04.R66).
+	roots []string
+	// fileReportRequest is the one report request id this turn accepts.
+	fileReportRequest string
 	// tasks tracks announced background tasks by normalized id: unfinished ones
 	// plus a bounded terminal tail (TS-04.R64, INV §16).
 	tasks         map[string]*taskRef
@@ -322,6 +327,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	as := &agentState{
 		agentID:          spec.Agent.AgentID,
 		generation:       spec.Generation,
+		roots:            append([]string{spec.Cwd}, spec.StartAddDirs()...),
 		cmd:              cmd,
 		pgid:             pgid,
 		hub:              NewHub(),
@@ -752,6 +758,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 			"sessionId": as.sessionID,
 			"prompt":    []map[string]any{{"type": "text", "text": promptText}},
 		}
+		as.fileReportMeta(params)
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
 			// Transport closed (crash/stop) is owned by onTransportClosed / Stop.
@@ -1128,6 +1135,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		// registry's generation, so an empty value is rejected as stale and the
 		// unsolicited exit would skip ownership and registration teardown.
 		generation:       spec.Generation,
+		roots:            append([]string{spec.Cwd}, spec.StartAddDirs()...),
 		cmd:              cmd,
 		pgid:             pgid,
 		hub:              NewHub(),
@@ -1379,6 +1387,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			"sessionId": as.sessionID,
 			"prompt":    []map[string]any{{"type": "text", "text": promptText}},
 		}
+		as.fileReportMeta(params)
 		res, err := as.transport.Call(as.ctx, "session/prompt", params)
 		if err != nil {
 			if errors.Is(err, errTransportClosed) || as.isStopped() {
@@ -1578,6 +1587,9 @@ func (c *ChatRuntime) mapScoped(as *agentState, scope activityScope, params json
 		return
 	}
 	as.closeReasoningSpan(scope.ActivityID)
+	if scope.ActivityID == "" && as.capabilities().FileChangeReports && c.onFileReport(as, params) {
+		return
+	}
 	if as.capabilities().BackgroundTasks && c.onAsyncTaskUpdate(as, scope, params) {
 		return
 	}
