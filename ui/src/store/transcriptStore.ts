@@ -26,7 +26,8 @@ export function normalizeEvent(event: TranscriptEvent): TranscriptEvent {
   const type = (event.type ?? event.kind) as string | undefined;
   const data = event.data;
   if (data && typeof data === "object") {
-    return { kind: type, seq: event.seq, ts: event.ts, ...(data as Record<string, unknown>) };
+    const scope = event.activity_id ? { activity_id: event.activity_id, parent_activity_id: event.parent_activity_id } : {};
+    return { kind: type, seq: event.seq, ts: event.ts, ...scope, ...(data as Record<string, unknown>) };
   }
   const { type: _drop, ...rest } = event;
   return { ...rest, kind: type };
@@ -119,7 +120,8 @@ function appendRenderedEvent(events: TranscriptEvent[], event: TranscriptEvent) 
   // transcripts recorded before this shipped are quieted the same way.
   if (suppressedAnnotationPrompt(events, event)) return;
   const last = events[events.length - 1];
-  if (kindOf(event) === "assistant_text" && last && kindOf(last) === "assistant_text") {
+  // A native child's text is its own passage, never merged into the root's.
+  if (kindOf(event) === "assistant_text" && last && kindOf(last) === "assistant_text" && last.activity_id === event.activity_id) {
     events[events.length - 1] = {
       ...last,
       kind: "assistant_text",
@@ -200,6 +202,9 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   updatePreview: (agentId, raw) =>
     set((state) => {
       const event = normalizeEvent(raw);
+      // A native child's activity is not the agent's reply (FS-03.R58), matching
+      // the server's lastAssistantPreview.
+      if (event.activity_id) return state;
       const kind = kindOf(event);
       const nextKinds = { ...state.previewKindByAgent, [agentId]: kind };
       if (kind !== "assistant_text") return { previewKindByAgent: nextKinds };

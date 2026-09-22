@@ -764,7 +764,7 @@ AIR metadata and maps them into TS-01.R35's value. Native subagents, fork, backg
 targeted stop and file reports remain disabled independently when their matching advertisement is
 absent. Capability/version/backend inference is forbidden (INV §11/§12).
 
-**R63 `(planned)` — Thoughts and native child sessions share normalized event mapping.**
+**R63 — Thoughts and native child sessions share normalized event mapping.**
 `agent_thought_chunk` maps to TS-01.R35's live-only reasoning notification; malformed, empty or
 oversized chunks are dropped/bounded before fan-out. `plan` remains deliberately dropped. With
 negotiated subagents, `subagent_spawned` creates a bounded activity scope before child output, every

@@ -445,13 +445,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.10 Runtime-native activity
 
-- **R57** `(planned)` — A runtime-advertised reasoning stream appears live in chronological order
+- **R57** — A runtime-advertised reasoning stream appears live in chronological order
   beside the assistant turn under one compact **Thinking** disclosure, collapsed by default. Opening
   it reveals the text received so far and continues streaming without moving or duplicating the
   surrounding transcript. Reasoning is ephemeral: AgentDeck does not append it to the transcript,
   database, archive, search index, annotations, context references or clone history, and it is gone
   after reload or reopening. The same rule applies to reasoning emitted by a native child session.
-- **R58** `(planned)` — When both sides negotiate native subagent sessions, each provider child is
+- **R58** — When both sides negotiate native subagent sessions, each provider child is
   shown as a nested, expandable activity stream within its immediate parent conversation. It names
   the child when the runtime supplies a name and shows its lifecycle, assistant output, tool calls,
   tool results, diffs, permissions and terminal outcome using the ordinary normalized renderers.
@@ -787,11 +787,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   fallback. *Verify by* focused runtime and route tests over a fake ACP scenario plus the Composer
   outcome test.
 
-- **A39** `(planned)` (R57) — Root and child reasoning chunks stream into one collapsed disclosure
+- **A39** (R57) — Root and child reasoning chunks stream into one collapsed disclosure
   per reasoning span, remain readable while opened, and never enter transcript reads, archive,
   search, annotation, context-pull or clone data; reload removes them. *Verify by* runtime mapping,
   transcript-store and rendered chat tests over interleaved root/child reasoning.
-- **A40** `(planned)` (R58) — A negotiated fake ACP child announces before its output, renders and
+- **A40** (R58) — A negotiated fake ACP child announces before its output, renders and
   durably replays nested text/tools/diffs/permission/outcome under its parent, and associates a
   child permission with the ordinary parent approval flow. Without bilateral negotiation the
   provider's legacy tool-call form remains ordinary tool activity. A loaded orphan renders

@@ -34,10 +34,12 @@ func sampleEvents(t *testing.T) map[string]runtime.Event {
 			ToolCallID: "tc1", Name: "Bash", Reason: "runs a command"}),
 		runtime.EvPermissionResolved: projectionEvent(t, runtime.EvPermissionResolved, runtime.PermissionResolvedData{
 			ToolCallID: "tc1", Decision: "approve"}),
-		runtime.EvSessionMeta:   projectionEvent(t, runtime.EvSessionMeta, runtime.SessionMetaData{Name: "alpha", Backend: "claude-acp"}),
-		runtime.EvTurnEnd:       projectionEvent(t, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.4}),
-		runtime.EvError:         projectionEvent(t, runtime.EvError, runtime.ErrorData{Scope: "protocol", Message: "handshake failed"}),
-		runtime.EvBackendSwitch: projectionEvent(t, runtime.EvBackendSwitch, runtime.BackendSwitchData{From: "a", To: "b"}),
+		runtime.EvSessionMeta:     projectionEvent(t, runtime.EvSessionMeta, runtime.SessionMetaData{Name: "alpha", Backend: "claude-acp"}),
+		runtime.EvTurnEnd:         projectionEvent(t, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.4}),
+		runtime.EvError:           projectionEvent(t, runtime.EvError, runtime.ErrorData{Scope: "protocol", Message: "handshake failed"}),
+		runtime.EvBackendSwitch:   projectionEvent(t, runtime.EvBackendSwitch, runtime.BackendSwitchData{From: "a", To: "b"}),
+		runtime.EvActivityStarted: projectionEvent(t, runtime.EvActivityStarted, runtime.ActivityStartedData{Name: "researcher", Task: "find"}),
+		runtime.EvActivityState:   projectionEvent(t, runtime.EvActivityState, runtime.ActivityStateData{State: "completed"}),
 		runtime.EvAnnotation: projectionEvent(t, runtime.EvAnnotation, runtime.AnnotationData{
 			Annotations:        []runtime.Annotation{{Seq: 3, Excerpt: "line", Instruction: "fix"}},
 			OverallInstruction: "tidy up"}),
@@ -50,8 +52,10 @@ func sampleEvents(t *testing.T) map[string]runtime.Event {
 func TestProjectEventCoversEveryType(t *testing.T) {
 	samples := sampleEvents(t)
 	metadataOnly := map[string]bool{
-		runtime.EvSessionMeta:   true,
-		runtime.EvBackendSwitch: true,
+		runtime.EvSessionMeta:     true,
+		runtime.EvBackendSwitch:   true,
+		runtime.EvActivityStarted: true,
+		runtime.EvActivityState:   true,
 	}
 	for _, typ := range runtime.AllEventTypes {
 		ev, ok := samples[typ]

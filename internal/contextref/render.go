@@ -18,7 +18,10 @@ type transcriptRenderer struct {
 	out     *pageWriter
 	pending strings.Builder // folded assistant deltas awaiting a boundary
 	folding bool
-	empty   bool
+	// foldScope is the activity whose deltas are folding: a native child's
+	// text is its own passage, never merged into the root's (TS-02.R35).
+	foldScope string
+	empty     bool
 	// Edge bookkeeping for skipped oversized records. An oversized record has no
 	// sequence of its own, so its position is only knowable from the readable
 	// records around it: adjacent means nothing readable has intervened since it
@@ -71,6 +74,10 @@ func (r *transcriptRenderer) event(ev runtime.Event) error {
 		return nil
 	}
 	if p.Type == runtime.EvAssistantText {
+		if r.folding && r.foldScope != ev.ActivityID {
+			r.flush()
+		}
+		r.foldScope = ev.ActivityID
 		r.pending.WriteString(partText(p, transcript.PartAssistantDelta))
 		r.folding = true
 		return nil

@@ -27,14 +27,24 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 		return
 	}
 
+	// A child's request arrives under its own session id and resolves through
+	// this same single-winner gate under its composite tool-call id (TS-04.R63).
+	scope, known := as.scopeFor(sessionIDOf(req.Params))
+	if !known {
+		as.noteUnknownChild(sessionIDOf(req.Params))
+		_ = req.Respond(cancelledOutcome())
+		return
+	}
+
 	identity := permissionToolIdentity(req.Params)
 	_, agentDeckTool := as.autoApproveTools[identity]
 	autoData, autoKinds := mapPermissionRequest(req.Params, "", true)
+	autoData.ToolCallID = scope.toolCallID(autoData.ToolCallID)
 	_, hasAllowOnce := autoKinds["allow_once"]
 	// skip_permissions auto-approves any tool. AgentDeck-owned actions use the
 	// same recorded shape, but only when an allow-once option is available.
 	if as.skipPerms || (agentDeckTool && hasAllowOnce) {
-		c.emit(as, EvPermissionRequest, autoData)
+		c.emitIn(as, scope, EvPermissionRequest, autoData)
 		optID, ok := selectOption(autoKinds, "approve")
 		if agentDeckTool && !as.skipPerms {
 			optID, ok = autoKinds["allow_once"]
@@ -55,6 +65,7 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 		expiresAt = time.Now().UTC().Add(timeout).Format(time.RFC3339)
 	}
 	data, byKind := mapPermissionRequest(req.Params, expiresAt, false)
+	data.ToolCallID = scope.toolCallID(data.ToolCallID)
 
 	p := &pendingPerm{req: req, name: data.Name, optByKind: byKind}
 	toolCallID := data.ToolCallID
@@ -68,7 +79,7 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 
 	// waiting_input while withheld (techspec §4.4).
 	c.updateStatus(as, "waiting_input", "Permission: "+data.Name, "PermissionRequest: "+data.Name, keepBusySince)
-	c.emit(as, EvPermissionRequest, data)
+	c.emitIn(as, scope, EvPermissionRequest, data)
 	// NB: no req.Respond here — withholding the response IS the pause.
 }
 

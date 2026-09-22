@@ -325,9 +325,16 @@
     },
     "runtime-activity": {
       "slots": [
-        "thinking"
+        "thinking",
+        "child"
       ],
-      "states": [],
+      "states": [
+        "active",
+        "completed",
+        "failed",
+        "stopped",
+        "disconnected"
+      ],
       "variants": []
     },
     "permission-prompt": {

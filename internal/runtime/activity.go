@@ -49,26 +49,32 @@ func decodeThoughtChunk(params json.RawMessage) (string, bool) {
 	return strutil.ClipRunes(block.Text, maxReasoningDelta), true
 }
 
-// reasoningSpan returns the current span id, opening a new one when the
-// previous update was not reasoning.
-func (as *agentState) reasoningSpan() string {
+// reasoningSpan returns the activity's current span id, opening a new one when
+// that activity's previous update was not reasoning.
+func (as *agentState) reasoningSpan(activityID string) string {
 	as.mu.Lock()
 	defer as.mu.Unlock()
-	if as.spanOpen == "" {
-		as.spans++
-		as.spanOpen = "r" + strconv.Itoa(as.spans)
+	if as.spanOpen == nil {
+		as.spanOpen = map[string]string{}
 	}
-	return as.spanOpen
+	span := as.spanOpen[activityID]
+	if span == "" {
+		as.spans++
+		span = "r" + strconv.Itoa(as.spans)
+		as.spanOpen[activityID] = span
+	}
+	return span
 }
 
-// closeReasoningSpan ends the open span; the next thought starts a new one.
-func (as *agentState) closeReasoningSpan() {
+// closeReasoningSpan ends the activity's open span; its next thought starts a
+// new one.
+func (as *agentState) closeReasoningSpan(activityID string) {
 	as.mu.Lock()
-	as.spanOpen = ""
+	delete(as.spanOpen, activityID)
 	as.mu.Unlock()
 }
 
-func (c *ChatRuntime) publishReasoning(as *agentState, delta string) {
+func (c *ChatRuntime) publishReasoning(as *agentState, activityID, delta string) {
 	c.mu.Lock()
 	sink := c.activitySink
 	c.mu.Unlock()
@@ -76,7 +82,7 @@ func (c *ChatRuntime) publishReasoning(as *agentState, delta string) {
 		return
 	}
 	sink(ActivityNotice{
-		AgentID: as.agentID, Generation: as.generation, SpanID: as.reasoningSpan(),
-		Kind: ActivityReasoningDelta, Delta: delta,
+		AgentID: as.agentID, Generation: as.generation, ActivityID: activityID,
+		SpanID: as.reasoningSpan(activityID), Kind: ActivityReasoningDelta, Delta: delta,
 	})
 }

@@ -187,9 +187,10 @@ func ProjectEvent(ev runtime.Event) (Projection, error) {
 			)
 		}
 		p.Parts = append(p.Parts, Part{Kind: PartAnnotationOverall, Text: d.OverallInstruction, Indexed: true})
-	case runtime.EvSessionMeta, runtime.EvBackendSwitch:
-		// Deliberately content-free: a launch/resume snapshot and a cross-backend
-		// hand-off marker describe the conversation rather than belonging to it.
+	case runtime.EvSessionMeta, runtime.EvBackendSwitch, runtime.EvActivityStarted, runtime.EvActivityState:
+		// Deliberately content-free: a launch/resume snapshot, a cross-backend
+		// hand-off marker and child lifecycle records describe the conversation
+		// rather than belonging to it (TS-02.R35).
 		p.Disposition = DispositionMetadata
 	default:
 		p.Disposition = DispositionUnknown

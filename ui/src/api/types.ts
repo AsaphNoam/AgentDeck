@@ -98,6 +98,9 @@ export interface RuntimeEvent {
   type: string;
   ts: string;
   data: Record<string, unknown>;
+  /** Native child scope (TS-01.R35); root events omit both. */
+  activity_id?: string;
+  parent_activity_id?: string;
 }
 
 // TranscriptEvent is the flat, render-ready shape the store and renderers consume:
@@ -113,6 +116,8 @@ export interface TranscriptEvent {
   text?: string;
   delta?: string;
   resolved?: PermissionResolution;
+  activity_id?: string;
+  parent_activity_id?: string;
   data?: unknown;
   [key: string]: unknown;
 }

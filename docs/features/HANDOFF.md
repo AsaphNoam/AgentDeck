@@ -60,7 +60,11 @@ command; 1.12 itself closes elicitation fallback tool calls, which the existing 
 resume drops load replay whole, so pagination de-dupe matters only for fork (slice 7). Slice 4
 done for root reasoning: `runtime/activity.go` → `runtime_activity` SSE → `ui/src/store/
 reasoningStore.ts` → `ThinkingDisclosure`; child reasoning joins in slice 5 via `activity_id`.
-**Next:** slice 5 (child sessions). Wire notes: `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`
+Slice 5 done: `offered.Subagents` on; `runtime/subagent.go` scopes child frames (by their own ACP
+session id) into `activity_id`/`parent_activity_id` on the envelope with `act_<hash>/<raw>` tool ids;
+unknown child ids drop only once subagents are negotiated (the fake's resume echoes a different id).
+UI: `components/chat/runtimeActivity.ts` nests; `renderers/ChildActivity.tsx`. Card preview, primer
+and context-pull folding ignore/separate child text. **Next:** slice 6 (background tasks). Wire notes: `docs/plans/adopt-modern-codex-acp-capabilities-wire.md`
 (temporary; delete at closure). MCP tool calls carry no `name`, so auto-approve identity stays
 title-based. Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).

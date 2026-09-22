@@ -113,6 +113,11 @@ func transcriptTurns(events []runtime.Event) []string {
 		cur = nil
 	}
 	for _, ev := range events {
+		// A native child's work stays with the provider that ran it; the primer
+		// carries the root conversation only (FS-03.R58).
+		if ev.ActivityID != "" {
+			continue
+		}
 		switch ev.Type {
 		case runtime.EvAssistantText:
 			var d runtime.AssistantTextData

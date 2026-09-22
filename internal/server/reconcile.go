@@ -167,7 +167,8 @@ func lastAssistantPreview(path string) string {
 			continue
 		}
 		var ev runtime.Event
-		if json.Unmarshal([]byte(raw), &ev) != nil {
+		// A native child's text is not the agent's reply (FS-03.R58).
+		if json.Unmarshal([]byte(raw), &ev) != nil || ev.ActivityID != "" {
 			continue
 		}
 		switch ev.Type {

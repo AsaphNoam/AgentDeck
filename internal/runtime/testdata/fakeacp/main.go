@@ -454,6 +454,44 @@ func runScenario(name string) string {
 		emitChunk("Done.")
 		return "end_turn"
 
+	case "subagent_flow":
+		// codex-acp 1.12 native children (CodexSubagentEventRouter): the
+		// announcement goes out under the immediate parent's session, the
+		// child's ordinary updates and permission request under its own. The
+		// child reuses the root's raw tool-call id to prove scoping (FS-03.A40).
+		const child, grandchild = "th_child_1", "th_grand_1"
+		emitUpdate(map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_1", "title": "Root ls", "kind": "execute", "rawInput": map[string]any{"command": "ls"}})
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_spawned", "subagentSessionId": child, "name": "researcher", "task": "Find the bug", "capabilities": map[string]any{}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": "child thinks"}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": "child says"}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_1", "name": "exec_command", "title": "Child grep", "kind": "execute", "rawInput": map[string]any{"command": "grep x"}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": "tc_1", "status": "completed",
+			"content": []any{map[string]any{"type": "diff", "path": "child.go", "oldText": "a", "newText": "b"}}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "subagent_spawned", "subagentSessionId": grandchild, "name": "helper", "capabilities": map[string]any{}})
+		emitUpdateIn(grandchild, map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": "grandchild says"}})
+		emitUpdateIn("th_never_announced", map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]any{"type": "text", "text": "orphan"}})
+		emitUpdateIn(child, map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": grandchild, "state": "cancelled"})
+		if os.Getenv("FAKEACP_CHILD_PERMISSION") != "" {
+			id := reqSeq.Add(1)
+			ch := registerPending(id)
+			sendRequest(id, "session/request_permission", map[string]any{
+				"sessionId": child, "reason": "child command",
+				"toolCall": map[string]any{"toolCallId": "tc_1", "title": "Child rm", "kind": "execute"},
+				"options": []any{
+					map[string]any{"optionId": "opt_allow", "name": "Allow", "kind": "allow_once"},
+					map[string]any{"optionId": "opt_reject", "name": "Reject", "kind": "reject_once"},
+				},
+			})
+			select {
+			case <-ch:
+			case <-cancelCh:
+				return "cancelled"
+			}
+		}
+		emitUpdate(map[string]any{"sessionUpdate": "subagent_state_update", "subagentSessionId": child, "state": "completed"})
+		emitChunk("root done")
+		return "end_turn"
+
 	case "tool_flow":
 		emitUpdate(map[string]any{
 			"sessionUpdate": "tool_call", "toolCallId": "tc_1",
@@ -692,7 +730,11 @@ func emitChunk(text string) {
 }
 
 func emitUpdate(update map[string]any) {
-	raw, _ := json.Marshal(map[string]any{"sessionId": sessionID, "update": update})
+	emitUpdateIn(sessionID, update)
+}
+
+func emitUpdateIn(session string, update map[string]any) {
+	raw, _ := json.Marshal(map[string]any{"sessionId": session, "update": update})
 	writeMessage(rpcMessage{JSONRPC: "2.0", Method: "session/update", Params: raw})
 }
 

@@ -25,6 +25,10 @@ const (
 	EvError              = "error"
 	EvBackendSwitch      = "backend_switch"
 	EvAnnotation         = "annotation"
+	// Native child-session lifecycle (TS-02.R35). The scope rides on the
+	// envelope; the payload names the child and its state.
+	EvActivityStarted = "activity_started"
+	EvActivityState   = "activity_state"
 )
 
 // Event is the normalized transcript event emitted to subscribers (techspec §3.1).
@@ -38,6 +42,11 @@ type Event struct {
 	Type       string          `json:"type"` // one of the EventType constants
 	Data       json.RawMessage `json:"data"` // type-specific payload (below)
 	Ts         string          `json:"ts"`   // RFC3339 UTC
+	// ActivityID scopes an event to a native child session and
+	// ParentActivityID names its immediate parent; root events omit both
+	// (TS-01.R35). Child events otherwise reuse the root payloads.
+	ActivityID       string `json:"activity_id,omitempty"`
+	ParentActivityID string `json:"parent_activity_id,omitempty"`
 }
 
 // AssistantTextData — a streamed markdown delta. NOT cumulative; the client
@@ -239,4 +248,6 @@ var AllEventTypes = []string{
 	EvError,
 	EvBackendSwitch,
 	EvAnnotation,
+	EvActivityStarted,
+	EvActivityState,
 }

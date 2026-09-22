@@ -726,3 +726,38 @@ func TestCanonicalExecCommandIsTracked(t *testing.T) {
 		t.Fatalf("tracked command = %q, %v", command, err)
 	}
 }
+
+// A native child's file and command events roll up under the parent agent,
+// and its lifecycle records stay out of prose search (FS-05.A21, TS-02.R35).
+func TestChildActivityRollsUpUnderTheParent(t *testing.T) {
+	st, _ := openTestDB(t)
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_kids", meta()); err != nil {
+		t.Fatalf("UpsertSessionMeta: %v", err)
+	}
+	event := func(seq int64, typ string, data any) runtime.Event {
+		raw, _ := json.Marshal(data)
+		return runtime.Event{AgentID: "a_kids", Seq: seq, Type: typ, Data: raw, Ts: "2026-09-22T10:00:00Z", ActivityID: "act_c"}
+	}
+	for _, ev := range []runtime.Event{
+		event(1, runtime.EvActivityStarted, runtime.ActivityStartedData{Name: "zebraresearcher"}),
+		event(2, runtime.EvToolCall, runtime.ToolCallData{ToolCallID: "act_c/tc_1", Name: "exec_command", Args: json.RawMessage(`{"command":"go vet"}`)}),
+		event(3, runtime.EvDiff, runtime.DiffData{ToolCallID: "act_c/tc_2", Path: "child.go", NewText: "b"}),
+		event(4, runtime.EvActivityState, runtime.ActivityStateData{State: "completed"}),
+	} {
+		if err := ix.OnEvent("a_kids", ev); err != nil {
+			t.Fatalf("OnEvent %s: %v", ev.Type, err)
+		}
+	}
+	if err := ix.OnTurnEnd("a_kids", runtime.TurnRollup{LastSeq: 4, UpdatedAt: "2026-09-22T10:00:00Z"}); err != nil {
+		t.Fatalf("OnTurnEnd: %v", err)
+	}
+	var files, commands int
+	if err := st.DB().QueryRow(`SELECT files_touched, commands_run FROM sessions WHERE agent_id = 'a_kids'`).Scan(&files, &commands); err != nil || files != 1 || commands != 1 {
+		t.Fatalf("rollup files=%d commands=%d err=%v", files, commands, err)
+	}
+	text, err := searchableText(event(1, runtime.EvActivityStarted, runtime.ActivityStartedData{Name: "zebraresearcher"}))
+	if err != nil || text != "" {
+		t.Fatalf("lifecycle search text = %q, %v", text, err)
+	}
+}

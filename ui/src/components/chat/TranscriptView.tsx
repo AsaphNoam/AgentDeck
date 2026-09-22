@@ -10,6 +10,8 @@ import { shouldRenderToolResult, ToolResult } from "./renderers/ToolResult";
 import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
+import { ChildActivity } from "./renderers/ChildActivity";
+import { nestActivities, type ChildNode } from "./runtimeActivity";
 import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
@@ -63,18 +65,11 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [events, busy, reasoning]);
 
-  const jumpToLatest = () => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
-  return (
-    <div className="transcript-wrap" data-ui="transcript">
-      {openFile && onOpenFile && (
-        <FileViewer agentId={agentId} link={openFile} onClose={() => onOpenFile(null)} onOpenFile={onOpenFile} />
-      )}
-      <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
-        {groupTranscriptRows(withReasoning(events, reasoning)).map((row, index) => row.kind === "tool-run" ? (
+  // One row renderer for the root list and every nested child (TS-08.R59).
+  const renderEvents = (list: TranscriptEvent[], ancestry: string[], depth: number): ReactNode =>
+    groupTranscriptRows(list).map((row, index) => {
+      if (row.kind === "tool-run") {
+        return (
           <ToolRun
             key={`run-${keyOf(row.events[0], index)}`}
             events={row.events}
@@ -90,16 +85,35 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
               />
             )}
           />
-        ) : (
-          <TranscriptEventFrame
-            agentId={agentId}
-            event={row.event}
-            key={keyOf(row.event, index)}
-            onAnnotate={(draft) => addAnnotation(agentId, draft)}
-            onContextMenu={openMenu}
-            onOpenFile={onOpenFile}
-          />
-        ))}
+        );
+      }
+      if (kindOf(row.event) === "activity") {
+        return <ChildActivity key={keyOf(row.event, index)} node={row.event.node as ChildNode} ancestry={ancestry} depth={depth} renderEvents={renderEvents} />;
+      }
+      return (
+        <TranscriptEventFrame
+          agentId={agentId}
+          event={row.event}
+          key={keyOf(row.event, index)}
+          onAnnotate={(draft) => addAnnotation(agentId, draft)}
+          onContextMenu={openMenu}
+          onOpenFile={onOpenFile}
+        />
+      );
+    });
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
+  return (
+    <div className="transcript-wrap" data-ui="transcript">
+      {openFile && onOpenFile && (
+        <FileViewer agentId={agentId} link={openFile} onClose={() => onOpenFile(null)} onOpenFile={onOpenFile} />
+      )}
+      <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
+        {renderEvents(nestActivities(withReasoning(events, reasoning)), [], 1)}
         {busy && (
           <div className="transcript-pending" aria-live="polite">
             <span className="spinner" aria-hidden="true" />
@@ -214,6 +228,7 @@ export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] 
   if (!spans?.length) return events;
   const row = (span: ReasoningSpan): TranscriptEvent => ({
     kind: "reasoning",
+    activity_id: span.activityId,
     message_id: `reasoning-${span.activityId ?? ""}-${span.spanId}`,
     text: span.text,
   });

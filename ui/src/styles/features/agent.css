@@ -1060,4 +1060,30 @@
   margin: var(--ad-space-2) 0 0;
   white-space: pre-wrap;
 }
+
+/* Native child activity: restrained hierarchy at its causal position (TS-08.R59).
+   Indentation stops after two levels; the label keeps the ancestry. */
+.runtime-child {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+}
+
+.runtime-child-indent > .runtime-child-content {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  padding-left: var(--ad-space-3);
+}
+
+.runtime-child-content {
+  display: grid;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-2);
+}
+
+.runtime-child-task {
+  margin: 0;
+}
+
+.runtime-child[data-state="failed"] > .tool-toggle {
+  color: var(--ad-state-error);
+}
 }

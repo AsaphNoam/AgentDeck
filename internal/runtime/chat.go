@@ -245,10 +245,14 @@ type agentState struct {
 	steering bool
 	// caps is the negotiated native-session capability value (TS-04.R62).
 	caps SessionCapabilities
-	// spanOpen is the live reasoning span a thought chunk joins; spans numbers
-	// them within this generation (FS-03.R57).
-	spanOpen string
+	// spanOpen is, per activity (root = ""), the live reasoning span a thought
+	// chunk joins; spans numbers them within this generation (FS-03.R57).
+	spanOpen map[string]string
 	spans    int
+	// children maps announced provider child session ids to their activity
+	// scope for this generation only (TS-04.R63); bounded by maxChildren.
+	children           map[string]activityScope
+	unknownChildFrames int
 	// held is the person's queued follow-up: at most one message per agent, live
 	// state only (FS-03.R48, TS-01.R29, TS-02.R31). Submitting another replaces
 	// it, turn end delivers it, and it dies with this agentState on stop or crash
@@ -367,7 +371,9 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		as.shutdown()
 		return nil, fmt.Errorf("runtime: session/new returned no sessionId")
 	}
+	as.mu.Lock()
 	as.sessionID = sess.SessionID
+	as.mu.Unlock()
 	as.configOptions = decodeSessionConfigOptions(newRes)
 	applied, err := applySessionConfig(ctx, as.transport, ad, spec, sess.SessionID, as.configOptions)
 	if err != nil {
@@ -1207,7 +1213,9 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		resolvedSessionID = sess.SessionID
 		configOptions.replace(decodeSessionConfigOptions(newRes))
 	}
+	as.mu.Lock()
 	as.sessionID = resolvedSessionID
+	as.mu.Unlock()
 	as.configOptions = configOptions
 	applied, err := applySessionConfig(ctx, as.transport, ad, spec, resolvedSessionID, configOptions)
 	if err != nil {
@@ -1457,6 +1465,13 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	if method != "session/update" {
 		return
 	}
+	// A native child's frames arrive under its own session id; they are never
+	// the root's commands or context meter (TS-04.R63).
+	scope, known := as.scopeFor(sessionIDOf(params))
+	if !known || scope.ActivityID != "" {
+		c.onChildNotification(as, scope, known, params)
+		return
+	}
 	// available_commands_update is replace-only live state, not a normalized
 	// transcript event: it gets no seq, durable append, index entry, or SSE
 	// publication (TS-04.R24). Handle it before event mapping and return.
@@ -1495,16 +1510,50 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	if replay {
 		return
 	}
-	// Reasoning streams live and is never persisted; any other update closes
-	// the open reasoning span (FS-03.R57, TS-04.R63).
-	if delta, ok := decodeThoughtChunk(params); ok {
-		c.publishReasoning(as, delta)
+	c.mapScoped(as, activityScope{}, params)
+}
+
+// onChildNotification maps a frame addressed to a child session. Announcements
+// under a child parent a grandchild; replayed history is dropped like the
+// root's; an unannounced child produces only a bounded diagnostic.
+func (c *ChatRuntime) onChildNotification(as *agentState, scope activityScope, known bool, params json.RawMessage) {
+	as.mu.Lock()
+	replay := as.loadReplay
+	as.mu.Unlock()
+	if replay {
 		return
 	}
-	as.closeReasoningSpan()
+	if c.onSubagentUpdate(as, params) {
+		return
+	}
+	if !known {
+		as.noteUnknownChild(sessionIDOf(params))
+		return
+	}
+	if _, ok := decodeAvailableCommands(params); ok {
+		return
+	}
+	if _, ok := decodeContextUsage(params); ok {
+		return
+	}
+	c.mapScoped(as, scope, params)
+}
 
+// mapScoped is the one live mapper for root and child updates (INV §2).
+// Reasoning streams live and is never persisted; any other update closes that
+// activity's open reasoning span (FS-03.R57, TS-04.R63).
+func (c *ChatRuntime) mapScoped(as *agentState, scope activityScope, params json.RawMessage) {
+	if delta, ok := decodeThoughtChunk(params); ok {
+		c.publishReasoning(as, scope.ActivityID, delta)
+		return
+	}
+	as.closeReasoningSpan(scope.ActivityID)
+	if scope.ActivityID == "" && as.capabilities().Subagents && c.onSubagentUpdate(as, params) {
+		return
+	}
 	for _, m := range mapSessionUpdate(params) {
-		c.emit(as, m.Type, m.Data)
+		m = scopeMapped(scope, m)
+		c.emitIn(as, scope, m.Type, m.Data)
 		c.applyEventStatus(as, m)
 	}
 }
@@ -1598,6 +1647,11 @@ func (c *ChatRuntime) removeAgent(agentID string) {
 // seq increment and transcript append are done under a single as.mu acquisition
 // so concurrent emitters cannot interleave their events in the in-memory log.
 func (c *ChatRuntime) emit(as *agentState, typ string, data any) Event {
+	return c.emitIn(as, activityScope{}, typ, data)
+}
+
+// emitIn is emit for an event scoped to a native child activity.
+func (c *ChatRuntime) emitIn(as *agentState, scope activityScope, typ string, data any) Event {
 	raw, err := json.Marshal(data)
 	if err != nil {
 		slog.Error("runtime: marshal event payload", "type", typ, "err", err)
@@ -1611,6 +1665,8 @@ func (c *ChatRuntime) emit(as *agentState, typ string, data any) Event {
 		Type: typ,
 		Data: raw,
 		Ts:   time.Now().UTC().Format(time.RFC3339),
+
+		ActivityID: scope.ActivityID, ParentActivityID: scope.ParentActivityID,
 	}
 	as.transcript = append(as.transcript, ev)
 	as.mu.Unlock()
