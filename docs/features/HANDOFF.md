@@ -40,15 +40,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `plan` ships still open). The permanently unaddressable pipeline agent is the newest `New ideas`
   entry and needs `/design-feature` before code. The Deckhand rename is fully specified and promoted
   to the work queue; no design decision remains open for it.
-- **Open findings:** BR-4 (one Must-fix, `docs/features/dashboard.css` project-card grid stretch).
-  `persistent-pipeline-orchestration` and BR-1 are both closed as of
-  2026-09-13. The injected-steer lifetime edge case is still named in prose but was never recorded
+- **Open findings:** none. `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
+  The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
-- **Bug reports:** BR-1, BR-2, and BR-3 are investigated, fixed and closed. Pinned Claude model
+- **Bug reports:** BR-1, BR-2, BR-3, and BR-4 are investigated, fixed and closed. Pinned Claude model
   delivery through `_meta` works; an ACP model `currentValue` is adapter configuration evidence and
   no execution-model oracle (TS-04.R54). BR-4 (2026-09-22, "the main project page looks off, the
-  cards are stretched and stuck to the bottom") is investigated with one open Must-fix finding; see
-  **Review findings**.
+  cards are stretched and stuck to the bottom") is fixed the same day; see **Review findings**.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -97,7 +95,7 @@ verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
 **Available by role:** `/review` has no unreviewed unit. `/work` may take
-`rename-product-to-deckhand`; `/fix` may take BR-4's Must-fix finding;
+`rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -119,38 +117,12 @@ regression tests, and the unit is no longer open for review or fixes. BR-1 close
 all three findings are fixed, and the OpenCode/OpenHands delivery it left undetermined is now
 documented as compatibility evidence rather than an open finding.
 
-**BR-4** (2026-09-22, "the main project page looks off, the cards are stretched and stuck to the
-bottom" — **confirmed**, reproduced by loading `ui/src/styles/index.css`'s real stylesheet chain in
-a browser against the actual `.app-shell` → `.app-main` → `.project-dashboard` markup):
+BR-4 closed on 2026-09-22: its one Must-fix finding (`.project-dashboard`/`.project-card-grid`
+missing the `align-content`/`align-items: start` that `.card-grid` already carried, `INV §2`,
+`ui/src/styles/features/dashboard.css`) is fixed with the committed regression test un-skipped, and
+the unit is no longer open for review or fixes.
 
-- **Must fix** — `ui/src/styles/features/dashboard.css:480-483`. `.project-dashboard` is
-  `display: grid` with `min-block-size: 100%` (added 2026-08-17 for FS-02.R41) and no
-  `align-content`; `.app-main` is the `1fr` row of `.app-shell` (`shell.css:2-6`), which gives it a
-  definite height, so `.project-dashboard`'s two implicit rows (header, `.project-card-grid`) get
-  the default `align-content: normal` → `stretch` behavior and absorb all leftover viewport height,
-  shoving the header and card row toward the bottom on any project count that doesn't fill the
-  screen. `.project-card-grid` also has no `align-items: start` (unlike `.card-grid` at
-  `dashboard.css:92-95`, fixed for the same class of bug on `82d1717`, 2026-08-29, for the agent
-  grid), so with its row inflated, every `.project-card` stretches to fill it, and `.project-card`'s
-  own internal `display: grid` rows (color dot, title, branch, count, summary) then spread apart
-  inside the oversized card because it also has no `align-content` override and no `.agent-card`-
-  style `min-height` bound. Net effect: on the projects home route (FS-02.R29), cards render far
-  taller than their content and the whole grid sits low in the viewport instead of hugging the
-  header. Fix by giving `.project-dashboard` `align-content: start`, `.project-card-grid`
-  `align-items: start` (matching `.card-grid`), and considering a `.project-card` `min-height` bound
-  matching `.agent-card`'s 196px. A skipped reproduction test is committed at
-  `ui/src/features/dashboard/ProjectDashboard.test.tsx` (`describe.skip("project card grid layout
-  (BR-4)"`): it parses the raw CSS and fails today because `.project-card-grid` lacks
-  `align-items: start` and `.project-dashboard` lacks `align-content: start`; un-skip it as the
-  regression test. jsdom has no CSS layout engine, so a computed-style/layout assertion is not
-  practical in this test environment — the parsed-declaration test is the closest available
-  automated proxy for the browser reproduction.
-
-**Fix model:** trivial/easy — Claude Sonnet or Codex Luna. Localized CSS change at an existing,
-already-proven seam (`.card-grid`/`.agent-card`'s pattern), single file, no state or concurrency
-risk, regression test already committed skipped.
-
-No other review or bug-report unit has open findings.
+No review or bug-report unit has open findings.
 
 ## Design consistency notes
 

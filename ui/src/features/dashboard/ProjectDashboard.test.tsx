@@ -455,18 +455,20 @@ describe("ProjectDashboard", () => {
   });
 });
 
-// BR-4 (investigate-bug, 2026-09-22): the projects home grid stretches its cards
-// to fill the viewport and shoves the visible content toward the bottom. jsdom
-// does not run a real layout/grid engine, so this cannot be reproduced by
-// rendering and reading computed style; it was reproduced instead by loading
-// the real stylesheet chain (`.app-shell` -> `.app-main` -> `.project-dashboard`)
-// in a browser, confirming both the header and the card row absorb the extra
-// `min-block-size: 100%` height and every `.project-card` stretches to fill its
-// inflated row. `.card-grid` (the agent grid, dashboard.css) was fixed with
-// `align-items: start` for the same class of bug; `.project-card-grid` never
-// received the matching declaration. This asserts the two rules stay in sync
-// so the CSS source itself proves the defect until the fix lands.
-describe.skip("project card grid layout (BR-4)", () => {
+// BR-4 (investigate-bug, 2026-09-22; fixed 2026-09-22, INV §2): the projects
+// home grid stretched its cards to fill the viewport and shoved the visible
+// content toward the bottom. jsdom does not run a real layout/grid engine, so
+// this could not be reproduced by rendering and reading computed style; it was
+// reproduced instead by loading the real stylesheet chain
+// (`.app-shell` -> `.app-main` -> `.project-dashboard`) in a browser, which
+// showed both the header and the card row absorbing the extra
+// `min-block-size: 100%` height and every `.project-card` stretching to fill
+// its inflated row. `.card-grid` (the agent grid, dashboard.css) was fixed with
+// `align-items: start` for the same class of bug on 2026-08-29; `.project-card-
+// grid` never received the matching declaration, and `.project-dashboard`
+// never got `align-content: start` to stop absorbing the leftover height. This
+// asserts the declarations stay in sync as the regression test for the fix.
+describe("project card grid layout (BR-4)", () => {
   const css = readFileSync(join(__dirname, "../../styles/features/dashboard.css"), "utf8");
   const ruleBody = (selector: string) => {
     const start = css.indexOf(`${selector} {`);
