@@ -104,6 +104,35 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 	return nil
 }
 
+// RemoveAgent drops one agent's index rows and buffered text. It is the index
+// half of a failed clone's rollback (TS-02.R35, INV §15); the rows are rebuilt
+// from the transcript by reindex, so nothing else depends on them.
+func (ix *Indexer) RemoveAgent(agentID string) error {
+	ix.mu.Lock()
+	defer ix.mu.Unlock()
+	delete(ix.content, agentID)
+	tx, err := ix.db.Begin()
+	if err != nil {
+		return fmt.Errorf("index: begin remove: %w", err)
+	}
+	defer tx.Rollback()
+	tables := []string{"tracked_commands", "tracked_files", "sessions"}
+	if ok, err := ix.ftsWritable(tx); err != nil {
+		return fmt.Errorf("index: remove: %w", err)
+	} else if ok {
+		tables = append(tables, "sessions_fts")
+	}
+	for _, table := range tables {
+		if _, err := tx.Exec(`DELETE FROM `+table+` WHERE agent_id = ?`, agentID); err != nil {
+			return fmt.Errorf("index: remove %s: %w", table, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("index: commit remove: %w", err)
+	}
+	return nil
+}
+
 func resetTables(db *sql.DB) error {
 	tx, err := db.Begin()
 	if err != nil {

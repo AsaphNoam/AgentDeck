@@ -61,24 +61,12 @@ func (s *Server) cloneAgent(ctx context.Context, sourceID string) (cloneResponse
 
 	// The fork boundary is the source's latest completed turn; the clone gets a
 	// durable copy of the visible transcript through it.
-	events, err := transcript.ReadFile(s.configStore.Home(), sourceID, transcript.ReadOptions{})
+	prefix, boundary, err := transcript.CloneCompletedPrefix(s.configStore.Home(), sourceID)
 	if err != nil {
 		return cloneResponse{}, apiError(runtime.CodeInternal, "read source transcript")
 	}
-	var boundary int64
-	for _, ev := range events {
-		if ev.Type == runtime.EvTurnEnd && ev.ActivityID == "" {
-			boundary = ev.Seq
-		}
-	}
 	if boundary == 0 {
 		return cloneResponse{}, cloneUnavailable(state.CloneReasonNoSession)
-	}
-	prefix := make([]runtime.Event, 0, len(events))
-	for _, ev := range events {
-		if ev.Seq > 0 && ev.Seq <= boundary {
-			prefix = append(prefix, ev)
-		}
 	}
 
 	resp, ae := s.launchAgent(ctx, launchRequest{

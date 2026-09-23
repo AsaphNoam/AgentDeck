@@ -288,6 +288,10 @@ type pendingPerm struct {
 	name      string
 	optByKind map[string]string // kind -> optionId
 	timer     *time.Timer
+	// scope is the activity scope the permission_request was emitted in. Every
+	// permission_resolved for this request must reuse it, so a native child's
+	// request/resolution pair stays together under durable replay (TS-04.R63).
+	scope activityScope
 }
 
 func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, error) {
@@ -401,6 +405,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	failForked := func() {
 		if spec.Fork != nil {
 			c.deleteForkedSession(as, sess.SessionID)
+			c.discardForkPersistence(as)
 		}
 		as.shutdown()
 	}
@@ -419,7 +424,10 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 		return nil, err
 	}
 	if spec.Fork != nil {
-		c.writeForkPrefix(as, spec.Fork)
+		if err := c.writeForkPrefix(as, spec.Fork); err != nil {
+			failForked()
+			return nil, err
+		}
 	}
 
 	// Persist running + initial status rows (state.db is the sole writer).
@@ -1798,7 +1806,11 @@ func (c *ChatRuntime) openPersistence(as *agentState, spec LaunchSpec, sessionID
 		return fmt.Errorf("runtime: open transcript: %w", err)
 	}
 	if err := ix.UpsertSessionMeta(spec.Agent.AgentID, meta); err != nil {
-		_ = w.Close()
+		if spec.Fork != nil {
+			_ = w.Discard() // a failed clone leaves no transcript (INV §15)
+		} else {
+			_ = w.Close()
+		}
 		return fmt.Errorf("runtime: index session meta: %w", err)
 	}
 	as.writer = w

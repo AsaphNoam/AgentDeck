@@ -87,14 +87,19 @@ func (c *ChatRuntime) onFileReport(as *agentState, params json.RawMessage) bool 
 	if r == nil {
 		return false
 	}
+	valid := r.Version == fileReportVersion && (r.Status == "reported" || r.Status == "unavailable")
 	as.mu.Lock()
 	matched := r.RequestID != "" && r.RequestID == as.fileReportRequest
-	if matched {
+	// Only a validated report consumes the outstanding request. A malformed
+	// frame that happens to carry the matching request id must not burn the
+	// slot — otherwise a genuine report arriving right after it is dropped as
+	// unmatched (TS-04.R66).
+	if matched && valid {
 		as.fileReportRequest = ""
 	}
 	roots := as.roots
 	as.mu.Unlock()
-	if !matched || r.Version != fileReportVersion || (r.Status != "reported" && r.Status != "unavailable") {
+	if !matched || !valid {
 		return true
 	}
 	paths, dropped := scopedReportPaths(roots, r.Paths)

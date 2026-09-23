@@ -159,6 +159,8 @@ type PersistenceIndexer interface {
 	OnTurnEnd(agentID string, rollup TurnRollup) error
 	OnEventAndTurnEnd(agentID string, ev Event, rollup TurnRollup) error
 	OnEventAndFlushContent(agentID string, ev Event, lastSeq int64, updatedAt string) error
+	// RemoveAgent drops every index row for an agent whose clone launch failed.
+	RemoveAgent(agentID string) error
 }
 
 type TranscriptWriter interface {
@@ -166,6 +168,8 @@ type TranscriptWriter interface {
 	Sync() error
 	Close() error
 	NextSeq() int64
+	// Discard closes and removes the log; only a failed clone launch uses it.
+	Discard() error
 }
 
 type TranscriptOpener func(home, agentID string, meta *SessionMetaData) (TranscriptWriter, error)

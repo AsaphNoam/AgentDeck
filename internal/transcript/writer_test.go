@@ -325,3 +325,23 @@ func TestTranscriptIsOwnerOnly(t *testing.T) {
 		}
 	}
 }
+
+// A failed clone's rollback removes its transcript so no partial history
+// survives (TS-02.R35, INV §15).
+func TestDiscardRemovesTheLog(t *testing.T) {
+	home := t.TempDir()
+	w, err := Open(home, "a_clone", meta())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	if err := w.Append(runtime.Event{Type: runtime.EvUserPrompt, Data: json.RawMessage(`{"text":"hi"}`)}); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	path := w.Path()
+	if err := w.Discard(); err != nil {
+		t.Fatalf("Discard: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("log survived discard: %v", err)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
@@ -64,11 +65,11 @@ func TestCloneForksTheConversationIntoANewAgent(t *testing.T) {
 		t.Fatalf("clone = %d %s", resp.StatusCode, body)
 	}
 	var out struct {
-		Agent             state.Agent        `json:"agent"`
+		Agent             state.Agent         `json:"agent"`
 		Running           *state.RunningEntry `json:"running"`
-		HistoryHandoff    string             `json:"history_handoff"`
-		ForkedFromAgentID string             `json:"forked_from_agent_id"`
-		ForkedFromSeq     int64              `json:"forked_from_seq"`
+		HistoryHandoff    string              `json:"history_handoff"`
+		ForkedFromAgentID string              `json:"forked_from_agent_id"`
+		ForkedFromSeq     int64               `json:"forked_from_seq"`
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -120,6 +121,67 @@ func TestCloneFromAStoppedSource(t *testing.T) {
 		t.Fatalf("clone of stopped source = %d %s", resp.StatusCode, body)
 	}
 	_ = srv
+}
+
+// TS-02.R35: a resumed, annotated source's session metadata and annotations
+// stay with the source, so the clone keeps its own native session identity and
+// lineage after the clone and after a reindex from its transcript.
+func TestCloneLeavesSourceMetadataAndAnnotationsBehind(t *testing.T) {
+	srv, ts, src := cloneServer(t, map[string]string{"FAKEACP_CAPS": "1"})
+	if resp, body := post(t, ts.URL+"/api/sessions/"+src+"/stop", map[string]string{}); resp.StatusCode >= 300 {
+		t.Fatalf("stop = %d %s", resp.StatusCode, body)
+	}
+	// What a resume and an annotation append, followed by a completed turn.
+	w, err := transcript.Open(srv.configStore.Home(), src, nil)
+	if err != nil {
+		t.Fatalf("open source transcript: %v", err)
+	}
+	raw := func(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
+	for _, ev := range []runtime.Event{
+		{Type: runtime.EvSessionMeta, Seq: w.NextSeq(), Data: raw(runtime.SessionMetaData{SessionID: "source-resumed-native"})},
+		{Type: runtime.EvAnnotation, Data: raw(runtime.AnnotationData{OverallInstruction: "source only"})},
+		{Type: runtime.EvTurnEnd, Data: raw(runtime.TurnEndData{StopReason: "end_turn"})},
+	} {
+		if err := w.Append(ev); err != nil {
+			t.Fatalf("append %s: %v", ev.Type, err)
+		}
+	}
+	_ = w.Close()
+
+	resp, body := post(t, ts.URL+"/api/sessions/"+src+"/clone", map[string]string{})
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("clone = %d %s", resp.StatusCode, body)
+	}
+	var out struct {
+		Agent state.Agent `json:"agent"`
+	}
+	_ = json.Unmarshal(body, &out)
+	clone := out.Agent.AgentID
+	all, err := transcript.ReadFile(srv.configStore.Home(), clone, transcript.ReadOptions{IncludeMeta: true})
+	if err != nil {
+		t.Fatalf("read clone: %v", err)
+	}
+	for _, ev := range all {
+		if ev.Type == runtime.EvAnnotation || (ev.Type == runtime.EvSessionMeta && ev.Seq != 0) {
+			t.Fatalf("clone copied a source-only record: %+v", ev)
+		}
+	}
+	check := func(when string) {
+		t.Helper()
+		var sid, linked string
+		if err := srv.stateStore.DB().QueryRow(`SELECT last_session_id, COALESCE(forked_from_agent_id, '') FROM sessions WHERE agent_id = ?`, clone).Scan(&sid, &linked); err != nil {
+			t.Fatalf("%s: read clone session row: %v", when, err)
+		}
+		if sid != "fake-fork-1" || linked != src {
+			t.Fatalf("%s: clone session = %q linked %q", when, sid, linked)
+		}
+	}
+	check("after clone")
+	srv.registry.Shutdown(context.Background())
+	if err := index.Reindex(srv.configStore.Home(), srv.stateStore.DB()); err != nil {
+		t.Fatalf("reindex: %v", err)
+	}
+	check("after reindex")
 }
 
 // A non-advertising runtime exposes no weaker clone path and leaves nothing.

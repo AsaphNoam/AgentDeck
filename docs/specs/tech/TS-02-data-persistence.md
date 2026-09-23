@@ -512,14 +512,16 @@ paginated-load and resume replay idempotent. Reasoning and plan updates never re
 SQLite, FTS, tracking or reindex.
 
 `transcript.CloneCompletedPrefix` is the sole clone builder. Under a source lifecycle claim it reads
-through the last durable `turn_end`, rewrites `agent_id`, resequences into a temporary target file,
-omits source `session_meta` and annotation records, carries visible conversation/backend-switch and
-completed child/task events, closes copied running background tasks with `fork_boundary`, and appends
-one source-link boundary event. The target's own session metadata is emitted by the normal launch
-path. Only after native fork success does the server atomically install the file and commit the new
-agent/session rows; index documents are built from that installed transcript through normal reindex,
-so copied user/assistant text is intentionally searchable under both independent agents. Failure
-removes the temporary file and no partial target row becomes visible (INV §3/§9/§15).
+through the last durable root `turn_end` and omits source `session_meta` and annotation records,
+carrying visible conversation/backend-switch and completed child/task events. The target's own
+session metadata is written by the normal launch path. Only after native fork success does the
+runtime write the prefix into the target transcript, rewriting `agent_id` and resequencing under the
+target, index it through the ordinary per-event path, and append one source-link `fork_boundary`
+event, which also closes copied running background tasks. Copied user/assistant text is
+intentionally searchable under both independent agents, and reindex rebuilds the same rows from the
+target transcript. Any failure after the fork is created deletes the forked provider session,
+discards the target transcript, removes its index rows and rolls back the partial agent rows, so
+no half-copied clone survives (INV §3/§9/§15).
 
 ## 3. Interfaces & data shapes
 

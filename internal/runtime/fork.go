@@ -81,14 +81,40 @@ func (c *ChatRuntime) deleteForkedSession(as *agentState, sessionID string) {
 // writeForkPrefix commits the durable copy of the source's visible transcript
 // under the clone's identity and sequence, then marks the boundary. The copy
 // is persisted and indexed but not published: it is history, not live work.
-func (c *ChatRuntime) writeForkPrefix(as *agentState, plan *ForkPlan) {
+// A failed append stops the copy so the launch can roll the clone back.
+func (c *ChatRuntime) writeForkPrefix(as *agentState, plan *ForkPlan) error {
 	for _, ev := range plan.Prefix {
 		as.mu.Lock()
 		as.seq++
 		ev.AgentID, ev.Generation, ev.Seq = as.agentID, as.generation, as.seq
 		as.transcript = append(as.transcript, ev)
 		as.mu.Unlock()
-		c.persistEvent(as, ev)
+		if !c.persistEvent(as, ev) {
+			return fmt.Errorf("runtime: write clone history at seq %d", ev.Seq)
+		}
 	}
 	c.emit(as, EvForkBoundary, ForkBoundaryData{ForkedFromAgentID: plan.SourceAgentID, ForkedFromSeq: plan.SourceSeq})
+	return nil
+}
+
+// discardForkPersistence removes the clone's partial transcript and index rows
+// after a failed launch, so no half-copied clone history survives (INV §15).
+func (c *ChatRuntime) discardForkPersistence(as *agentState) {
+	c.mu.Lock()
+	ix := c.indexer
+	c.mu.Unlock()
+	as.mu.Lock()
+	w := as.writer
+	as.writer = nil
+	as.mu.Unlock()
+	if w != nil {
+		if err := w.Discard(); err != nil {
+			slog.Warn("runtime: discard clone transcript", "agent", as.agentID, "err", err)
+		}
+	}
+	if ix != nil {
+		if err := ix.RemoveAgent(as.agentID); err != nil {
+			slog.Warn("runtime: remove clone index rows", "agent", as.agentID, "err", err)
+		}
+	}
 }

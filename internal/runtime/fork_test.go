@@ -106,6 +106,61 @@ func TestForkLaunchRefusalsCreateNothing(t *testing.T) {
 	}
 }
 
+type failingForkWriter struct {
+	appended  int
+	failAfter int
+	discarded bool
+}
+
+func (w *failingForkWriter) Append(Event) error {
+	if w.appended == w.failAfter {
+		return errors.New("disk full")
+	}
+	w.appended++
+	return nil
+}
+func (w *failingForkWriter) Sync() error    { return nil }
+func (w *failingForkWriter) Close() error   { return nil }
+func (w *failingForkWriter) NextSeq() int64 { return 1 }
+func (w *failingForkWriter) Discard() error { w.discarded = true; return nil }
+
+type removalIndexer struct{ removed []string }
+
+func (ix *removalIndexer) UpsertSessionMeta(string, SessionMetaData) error           { return nil }
+func (ix *removalIndexer) OnEvent(string, Event) error                               { return nil }
+func (ix *removalIndexer) OnTurnEnd(string, TurnRollup) error                        { return nil }
+func (ix *removalIndexer) OnEventAndTurnEnd(string, Event, TurnRollup) error         { return nil }
+func (ix *removalIndexer) OnEventAndFlushContent(string, Event, int64, string) error { return nil }
+func (ix *removalIndexer) RemoveAgent(id string) error {
+	ix.removed = append(ix.removed, id)
+	return nil
+}
+
+// A clone whose history copy fails part-way discards its partial transcript and
+// index rows and deletes the forked provider session: no half-copied clone
+// survives (TS-02.R35, INV §15).
+func TestForkLaunchRollsBackAPartialHistoryCopy(t *testing.T) {
+	c, spec, dir := forkSpec(t, "FAKEACP_CAPS=1")
+	w := &failingForkWriter{failAfter: 1}
+	ix := &removalIndexer{}
+	c.SetPersistence(t.TempDir(), func(string, string, *SessionMetaData) (TranscriptWriter, error) { return w, nil }, ix)
+	if _, err := c.Start(context.Background(), spec); err == nil {
+		t.Fatal("a failed history copy started the clone")
+	}
+	if w.appended != 1 || !w.discarded {
+		t.Fatalf("writer appended %d, discarded %v", w.appended, w.discarded)
+	}
+	if len(ix.removed) != 1 || ix.removed[0] != spec.Agent.AgentID {
+		t.Fatalf("index removals = %v", ix.removed)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "delete.json")); err != nil {
+		t.Fatalf("forked session not deleted: %v", err)
+	}
+	if _, err := c.store.ReadRunning(spec.Agent.AgentID); err == nil {
+		t.Fatal("failed clone left a running row")
+	}
+}
+
 // A fork whose local commit fails deletes the forked provider session before
 // teardown (TS-04.R65, INV §15).
 func TestForkLaunchDeletesTheForkWhenLocalCommitFails(t *testing.T) {

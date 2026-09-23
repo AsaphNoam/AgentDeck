@@ -54,7 +54,7 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 			c.emit(as, EvError, ErrorData{Scope: "tool", Message: "no allow option offered"})
 			return
 		}
-		c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: autoData.ToolCallID, Decision: "auto_approve"})
+		c.emitIn(as, scope, EvPermissionResolved, PermissionResolvedData{ToolCallID: autoData.ToolCallID, Decision: "auto_approve"})
 		_ = req.Respond(selectedOutcome(optID))
 		return
 	}
@@ -67,7 +67,7 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 	data, byKind := mapPermissionRequest(req.Params, expiresAt, false)
 	data.ToolCallID = scope.toolCallID(data.ToolCallID)
 
-	p := &pendingPerm{req: req, name: data.Name, optByKind: byKind}
+	p := &pendingPerm{req: req, name: data.Name, optByKind: byKind, scope: scope}
 	toolCallID := data.ToolCallID
 	if timeout > 0 {
 		p.timer = time.AfterFunc(timeout, func() { c.onPermissionTimeout(as, toolCallID) })
@@ -113,7 +113,7 @@ func (c *ChatRuntime) Permission(ctx context.Context, agentID, toolCallID, decis
 	// may finish session/prompt as soon as it receives this response; writing busy
 	// afterwards could then overwrite the prompt goroutine's final idle status.
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
-	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
+	c.emitIn(as, p.scope, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: decision})
 	p.resolve("selected", optID)
 	return nil
 }
@@ -129,7 +129,7 @@ func (c *ChatRuntime) onPermissionTimeout(as *agentState, toolCallID string) {
 	// As with a user decision, write busy before answering the peer so a fast
 	// prompt completion is the final owner of the idle transition.
 	c.updateStatus(as, "busy", "thinking", "PermissionResolved", keepBusySince)
-	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
+	c.emitIn(as, p.scope, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "timeout"})
 	c.emit(as, EvError, ErrorData{Scope: "tool", Message: "permission timed out"})
 	if found {
 		p.resolve("selected", optID)
@@ -243,7 +243,7 @@ func (c *ChatRuntime) resolvePending(as *agentState, toolCallID, outcome, option
 		return false
 	}
 	c.markResolved(as, toolCallID)
-	c.emit(as, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "cancelled"})
+	c.emitIn(as, p.scope, EvPermissionResolved, PermissionResolvedData{ToolCallID: toolCallID, Decision: "cancelled"})
 	p.resolve(outcome, optionID)
 	return true
 }

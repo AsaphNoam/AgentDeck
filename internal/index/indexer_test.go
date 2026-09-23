@@ -127,6 +127,33 @@ FROM sessions WHERE agent_id = 'a_index'`).Scan(&turnCount, &eventCount, &lastSe
 	}
 }
 
+// A failed clone's rollback removes every index row the agent had, leaving other
+// agents' rows alone (TS-02.R35, INV §15).
+func TestRemoveAgentDropsOnlyThatAgentsRows(t *testing.T) {
+	st, _ := openTestDB(t)
+	indexFixture(t, st.DB())
+	ix := New(st.DB())
+	if err := ix.UpsertSessionMeta("a_other", meta()); err != nil {
+		t.Fatalf("upsert other: %v", err)
+	}
+	if err := ix.RemoveAgent("a_index"); err != nil {
+		t.Fatalf("RemoveAgent: %v", err)
+	}
+	for _, table := range []string{"sessions", "tracked_files", "tracked_commands", "sessions_fts"} {
+		var n int
+		if err := st.DB().QueryRow(`SELECT COUNT(*) FROM ` + table + ` WHERE agent_id = 'a_index'`).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+		if n != 0 {
+			t.Fatalf("%s kept %d rows for the removed agent", table, n)
+		}
+	}
+	var n int
+	if err := st.DB().QueryRow(`SELECT COUNT(*) FROM sessions WHERE agent_id = 'a_other'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("other agent's session row = %d, %v", n, err)
+	}
+}
+
 // FS-13.A5: annotation excerpts and instructions join archive search even
 // though a dashboard annotation does not finish an ACP turn.
 func TestAnnotationFlushesSearchableContent(t *testing.T) {
