@@ -805,11 +805,11 @@ or silently launch an agent unable to participate in coordination (TS-05.R4, INV
 adds `cursor`: interactive login is `agent login`, readiness is `agent status --format json`, and
 the adapter launch is `agent --model <selected> acp`. Only the terminal-attached `agentdeck auth
 cursor` path may run login. Readiness has no stdin, uses the shared six-second deadline and parses a
-small typed JSON projection; model discovery is TS-01.R34's separately bounded `agent models`
+small typed JSON projection; model discovery is a separately bounded `agent models`
 command. Both cap output while it is produced, sanitize every diagnostic, and classify a missing
 binary, authentication requirement, incompatible shape or timeout without exposing raw output.
 Neither command accepts request-derived argv, starts a runtime/session row, or is retried with a
-different model/account. The real authenticated gate in FS-09.A34 must prove argv model honoring,
+different model/account. A real authenticated Cursor gate must prove argv model honoring,
 native load, permission identifiers, extension replies and non-empty MCP delivery against the exact
 supported CLI before release compatibility is claimed.
 

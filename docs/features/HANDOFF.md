@@ -64,8 +64,8 @@ INV §2/§3/§15: `transcript.CloneCompletedPrefix` is now the one clone builder
 annotations (session_meta was already dropped by the reader); a failed clone discards its
 transcript and index rows (TS-02.R35 text updated). INV §11: child permission resolutions stay in
 the request's scope. INV §11/§17: a malformed file report no longer consumes the pending request.
-Go tests pass; `make check-specs` fails only on TS-04 citing Cursor-draft FS-09.A34/TS-01.R34
-(committed in `42e2ba5`; the operator deleted that draft).
+Go tests pass. TS-04's two citations of the deleted Cursor draft were then reworded, so
+`make check-specs` passes; its planned Cursor R55–R60 (committed in `42e2ba5`) remain.
 
 **Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
 1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
