@@ -26,8 +26,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Work units:** `add-studio-skin.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
-- **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
-  uncommitted spec edits in the tree from another session — not this change's); `New ideas`
+- **Design units:** `Ideas being defined` entries may resume (the operator deleted the
+  uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
 - **Open findings:** None. `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
@@ -65,7 +65,7 @@ annotations (session_meta was already dropped by the reader); a failed clone dis
 transcript and index rows (TS-02.R35 text updated). INV §11: child permission resolutions stay in
 the request's scope. INV §11/§17: a malformed file report no longer consumes the pending request.
 Go tests pass; `make check-specs` fails only on TS-04 citing Cursor-draft FS-09.A34/TS-01.R34
-(committed in `42e2ba5`; the draft left the tree mid-run).
+(committed in `42e2ba5`; the operator deleted that draft).
 
 **Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
 1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
