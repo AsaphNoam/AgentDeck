@@ -40,7 +40,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Partial | Product-native core interface design, Sky & Grove, and planned third built-in skin |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
-| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail redesign planned |
+| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail browser acceptance pending |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks, armed starts, task waiting, lineage, and scoped repair |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
@@ -85,7 +85,7 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 | Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
 | Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped, including waking/deferred bounded inline mail |
-| Configurable pipelines | FS-14 templates, task-backed ordered runs, recovery, and supervision | Shipped with planned run detail redesign |
+| Configurable pipelines | FS-14 templates, task-backed ordered runs, recovery, and supervision | Shipped; run detail browser acceptance pending |
 | Dependent work | FS-16 durable tasks, prerequisite arms, host-started work, task context | Shipped |
 | Extension boundaries | FS-07 terminal; FS-08 federation | Shipped core with explicitly tagged planned work; Partial |
 | Agent-facing contracts and knowledge | FS-17 tool result contract; FS-18 operator knowledge | Tool results and shared operator knowledge shipped |

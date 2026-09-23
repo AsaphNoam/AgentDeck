@@ -549,9 +549,7 @@
         "actions",
         "timeline",
         "attempt",
-        "agents",
-        "setup",
-        "values"
+        "agents"
       ],
       "states": [],
       "variants": []

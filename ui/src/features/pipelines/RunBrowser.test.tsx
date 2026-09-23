@@ -29,8 +29,36 @@ function renderRun() {
 it("renders only durable stage-task provenance", async () => {
   renderRun();
   expect(await screen.findByText("Standing")).toBeInTheDocument();
-  expect(screen.getByText("Task task_1")).toBeInTheDocument();
   expect(screen.getByText("1 task")).toBeInTheDocument();
+});
+
+// FS-14.R79/A46: position, next stage and attempt titles come from the frozen
+// template; no setup or value panel competes with the timeline.
+const threeStages = { ...template, stages: [
+  { id: "spec", title: "Write spec", objective: "", coordination: "standing", inputs: [], outputs: [] },
+  { id: "work", title: "Implement", objective: "", coordination: "standing", inputs: [], outputs: [] },
+  { id: "review", title: "Correctness review", objective: "", coordination: "standing", inputs: [], outputs: [] },
+] };
+
+it("names stage position, the next stage, and human attempt titles without setup or value panels", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({ ...detail, template: threeStages, values: [{ run_id: "run_1", name: "plan", value: "long value", source_kind: "stage_output", source_attempt_id: "att_1", updated_at: "2026-07-26T00:00:00Z" }] })));
+  const { container } = renderRun();
+  expect(await screen.findByText("Stage 2 of 3")).toBeInTheDocument();
+  expect(screen.getByText("Next: Correctness review")).toBeInTheDocument();
+  expect(screen.getByText("app · Delivery")).toBeInTheDocument();
+  expect(screen.getAllByText("Implement")).toHaveLength(2);
+  expect(container.querySelector('[data-slot="setup"], [data-slot="values"]')).toBeNull();
+  expect(screen.queryByText("Named values")).toBeNull();
+  expect(screen.queryByText("long value")).toBeNull();
+});
+
+it("shows no next stage once the run is finished and falls back to an unmatched stage id", async () => {
+  server.use(http.get("/api/pipeline-runs/run_1", () => HttpResponse.json({ ...detail, template: threeStages, run: { ...run, state: "completed", current_stage_id: "gone" }, stage_tasks: [{ ...stageTask, stage_id: "gone", state: "finished" }] })));
+  renderRun();
+  expect(await screen.findByText("Final position")).toBeInTheDocument();
+  expect(screen.getAllByText("gone")).toHaveLength(2);
+  expect(screen.queryByText(/^Stage \d+ of/)).toBeNull();
+  expect(screen.queryByText(/^Next:/)).toBeNull();
 });
 
 it("requires recovery input when blocked continuation is eligible", async () => {

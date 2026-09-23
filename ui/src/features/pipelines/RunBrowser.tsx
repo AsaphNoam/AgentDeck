@@ -75,7 +75,12 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const data = detail.data;
   const run = data.run;
   const orchestratorRuntime = data.orchestrator ?? run.orchestrator;
-  const stage = data.template.stages.find((item) => item.id === run.current_stage_id);
+  // FS-14.R79: position and next stage come from the frozen template; an
+  // unmatched stage id shows as-is with no invented progress.
+  const stages = data.template.stages;
+  const stageTitles = new Map(stages.map((item) => [item.id, item.title]));
+  const stageIndex = stages.findIndex((item) => item.id === run.current_stage_id);
+  const stage = stageIndex >= 0 ? stages[stageIndex] : undefined;
   const currentTask = data.stage_tasks.find((item) => item.task_id === run.current_task_id) ?? data.stage_tasks.find((item) => item.stage_id === run.current_stage_id && item.state !== "completed");
   const paused = run.state === "paused";
   const canContinue = data.controls.continue.eligible;
@@ -89,6 +94,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   const restarted = run.attention_reason.startsWith("restart_");
   const recovered = paused && (restarted || run.attention_reason === "launch_failed" || run.attention_reason === "resume_failed");
   const terminal = run.state === "completed" || run.state === "stopped";
+  const nextStage = !terminal && stage ? stages[stageIndex + 1] : undefined;
   const busy = continueRun.isPending || retryRun.isPending || replaceOwner.isPending || repairCleanup.isPending || stopRun.isPending || deleteRun.isPending;
 
   const control = (action: "continue" | "retry" | "stop") => {
@@ -105,7 +111,8 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
       <Link className="pipeline-back-link" to="/pipelines/runs">← All runs</Link>
       <section className="pipeline-run-hero" data-slot="live">
         <div className="pipeline-run-kicker"><code>{run.run_id}</code><span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span></div>
-        <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{currentTask && <span>Task {currentTask.task_id}</span>}</div></div>
+        <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{stage && <span>Stage {stageIndex + 1} of {stages.length}</span>}{nextStage && <span>Next: {nextStage.title}</span>}</div></div>
+        <p className="pipeline-run-context">{run.project} · {data.template.title}</p>
         {currentTask && <div className="pipeline-owner-strip"><div><small>Standing owner</small><strong>{currentTask.standing_owner.name || currentTask.standing_owner.agent_id || "Starting"}</strong><span>{humanize(currentTask.standing_owner.state || currentTask.state)}</span></div>{currentTask.coordinator && <div><small>Stage coordinator</small><strong>{currentTask.coordinator.name || currentTask.coordinator.agent_id || "Starting"}</strong><span>{currentTask.coordinator.report_summary ? "Reports to standing owner" : humanize(currentTask.coordinator.state || "assigned")}</span></div>}</div>}
         {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>{restarted ? "The stage agent was stopped when AgentDeck restarted" : "The stage agent is not running after this failure"}, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
         <div className="pipeline-run-actions" data-slot="actions">
@@ -121,31 +128,22 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
         {error && <p className="form-error">{error}</p>}
       </section>
 
-      <div className="pipeline-run-workspace">
-        <section className="pipeline-timeline" data-slot="timeline">
-          <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Durable stage work</p><h3>{data.stage_tasks.length} task{data.stage_tasks.length === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
-          <ol>
-            {data.stage_tasks.map((item) => <StageTask key={item.task_id} task={item} current={item.task_id === run.current_task_id} />)}
-          </ol>
-        </section>
-        <aside className="pipeline-run-rail">
-          <details className="pipeline-disclosure" open data-slot="setup"><summary>Frozen setup <span>{data.template.stages.length} stages</span></summary><div className="pipeline-disclosure-body">
-            <dl className="pipeline-rail-facts"><div><dt>Project</dt><dd>{run.project}</dd></div><div><dt>Template</dt><dd>{data.template.title}</dd></div><div><dt>Started</dt><dd>{formatDate(run.created_at)}</dd></div><div><dt>Revision</dt><dd>{run.revision}</dd></div></dl>
-            <ol className="pipeline-setup-list"><li><span>1</span><div><strong>Standing owner · {data.template.orchestrator_role}</strong><small>{[orchestratorRuntime.backend, orchestratorRuntime.model, orchestratorRuntime.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>{data.template.stages.filter((item) => item.coordination === "dedicated").map((item, index) => { const runtime = data.dedicated_assignments[item.id]; return <li key={item.id}><span>{index + 2}</span><div><strong>{item.title} coordinator · {item.dedicated_role}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ") || "No runtime"}</small></div></li>; })}</ol>
-          </div></details>
-          <details className="pipeline-disclosure" open={terminal} data-slot="values"><summary>Named values <span>{data.values.length}</span></summary><div className="pipeline-disclosure-body">{data.values.length === 0 ? <p className="pipeline-empty">No values recorded.</p> : <dl className="pipeline-value-list">{data.values.map((value) => <div key={value.name}><dt>{value.name}<small>{value.source_kind}{value.source_attempt_id ? ` · ${value.source_attempt_id}` : ""}</small></dt><dd>{value.value}</dd></div>)}</dl>}</div></details>
-        </aside>
-      </div>
+      <section className="pipeline-timeline" data-slot="timeline">
+        <div className="pipeline-timeline-heading"><div><p className="pipeline-eyebrow">Durable stage work</p><h3>{data.stage_tasks.length} task{data.stage_tasks.length === 1 ? "" : "s"}</h3></div><span>Oldest → newest</span></div>
+        <ol>
+          {data.stage_tasks.map((item) => <StageTask key={item.task_id} task={item} title={stageTitles.get(item.stage_id) ?? item.stage_id} current={item.task_id === run.current_task_id} />)}
+        </ol>
+      </section>
     </article>
   );
 }
 
-function StageTask({ task, current }: { task: PipelineRunDetail["stage_tasks"][number]; current: boolean }) {
+function StageTask({ task, title, current }: { task: PipelineRunDetail["stage_tasks"][number]; title: string; current: boolean }) {
   const outcome = task.result?.outcome || task.state;
   return <li className={current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"} data-slot="attempt">
     <span className="pipeline-timeline-line" aria-hidden="true" />
     <details open={current}>
-      <summary><span className="pipeline-stage-number">{task.stage_index + 1}</span><span className="pipeline-attempt-identity"><strong>{task.stage_id}</strong><small>{task.standing_owner.name || task.standing_owner.agent_id || "Standing owner"} · attempt {task.attempt_number}</small></span><span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span><span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span></summary>
+      <summary><span className="pipeline-stage-number">{task.stage_index + 1}</span><span className="pipeline-attempt-identity"><strong>{title}</strong><small>{task.standing_owner.name || task.standing_owner.agent_id || "Standing owner"} · attempt {task.attempt_number}</small></span><span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span><span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span></summary>
       <div className="pipeline-attempt-body">
         {task.result?.summary ? <p className="pipeline-result-summary">{task.result.summary}</p> : <p className="pipeline-unreported">{current ? "The standing owner has not accepted a stage outcome yet." : "No stage outcome was recorded."}</p>}
         {task.coordinator && <section><h4>Coordinator report to standing owner</h4><p>{task.coordinator.report_summary || "No coordinator report recorded."}</p></section>}
@@ -166,7 +164,6 @@ function RunsSkeleton() { return <div className="pipeline-ledger pipeline-skelet
 function RunDetailSkeleton() { return <div className="pipeline-run-page pipeline-skeleton" aria-label="Loading run"><span /><span /><span /><span /></div>; }
 function messageOf(reason: unknown) { return reason instanceof Error ? reason.message : String(reason); }
 function humanize(value: string) { return value.replace(/_/g, " "); }
-function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date); }
 export function formatRelative(value: string) { const date = new Date(value); if (Number.isNaN(date.getTime())) return value; const delta = Date.now() - date.getTime(); if (delta < 60_000) return "just now"; if (delta < 3_600_000) return `${Math.floor(delta / 60_000)}m ago`; if (delta < 86_400_000) return `${Math.floor(delta / 3_600_000)}h ago`; return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); }
 
 // Compatibility wrapper for older focused tests and embedders.

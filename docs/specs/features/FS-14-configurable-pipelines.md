@@ -636,7 +636,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 4.7 Run detail hierarchy
 
-- **R79 (planned)** — The run page keeps live state, actions, and the execution timeline as its
+- **R79** (shipped 2026-09-23) — The run page keeps live state, actions, and the execution timeline as its
   primary reading path. It has no persistent side rail beside stage entries. The live summary names
   the current or final stage's position in the frozen stage sequence and, while active, the next
   stage's human title when one exists. The run's project and template are compact context in that summary; revision and
@@ -920,11 +920,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
-**Confirmed run-page direction, 2026-09-23.** R79/A46 remove the setup and latest-value panels
-from the human run page when implemented. The frozen template, assignments, input values, and
+**Confirmed run-page direction, 2026-09-23.** R79 removed the setup and latest-value panels
+from the human run page on 2026-09-23. The frozen template, assignments, input values, and
 current named-value projection remain durable and available through the existing API; run and agent
-behavior, retention, and lifecycle are unchanged. Until R79 ships, the existing R23/R37/R44/R56
-run-page presentation remains current.
+behavior, retention, and lifecycle are unchanged. A46 stays planned until its real-browser J14 pass
+in Core and Sky & Grove.
 
 **Persistent-orchestrator replacement, 2026-09-11.** The operator approved the feature direction,
 discarding old pipelines without migration, cancelling all delegated work on Stop, and existing

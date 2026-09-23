@@ -635,7 +635,7 @@ width and supported desktop floor in Core and Sky & Grove without a new tab, sid
 label, raw color, token family or motion dependency. High-frequency updates use no entrance motion;
 only existing state-color/typographic feedback changes, and reduced motion loses no information.
 
-- **R60 (planned) — Run supervision uses the existing detail projection without a rail.**
+- **R60 (shipped 2026-09-23) — Run supervision uses the existing detail projection without a rail.**
   `RunBrowser` derives current/final stage position, the next human stage title, and each attempt's
   human title from the run detail's frozen template and stage-task fields. An absent or unmatched
   stage id falls back to the available id without inventing progress or a next stage. The existing

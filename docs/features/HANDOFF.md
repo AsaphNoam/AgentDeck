@@ -19,12 +19,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `adopt-modern-codex-acp-capabilities` was reviewed 2026-09-23 and remains open for its findings below. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
+- **Review units:** `simplify-pipeline-run-detail` finished 2026-09-23 and awaits `/review`. `adopt-modern-codex-acp-capabilities` was reviewed 2026-09-23 and remains open for its findings below. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
   closed the same day when its fixes landed; BR-1's three findings were fixed the same day. Both
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `add-studio-skin.md`, `simplify-pipeline-run-detail.md`, and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `add-studio-skin.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
@@ -42,7 +42,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `adopt-modern-codex-acp-capabilities` finished 2026-09-23 and awaits `/review`.
+**Change:** None. `simplify-pipeline-run-detail` finished 2026-09-23 and awaits `/review`.
 
 **Changelog — 2026-09-23 (design: Studio skin):** The operator approved Studio as a third optional
 built-in appearance, leaving Core default/fallback and Sky & Grove intact. Planned FS-12.R42–R45/A18–A20,
@@ -50,11 +50,15 @@ TS-02.R36, TS-03.R45, and TS-08.R61–R64 extend the existing finite skin seam. 
 guides visual treatment only; the real expanded dashboard chat and all product behavior remain
 authoritative. `add-studio-skin.md` is Waiting to start. No product code changed.
 
-**Changelog — 2026-09-23 (design: pipeline run detail):** The operator confirmed removing Frozen
-setup and Named values from the human run page after a UX review of useful supervision data. Planned
-FS-14.R79/A46 and TS-08.R60 put live stage position/next stage and attempt-local results ahead of
-stored setup/value projections. `simplify-pipeline-run-detail.md` is Waiting to start; implementation
-must keep the existing run/API data and verify long expanded attempts in Core and Sky & Grove.
+**Changelog — 2026-09-23 (work: simplify pipeline run detail):** Shipped FS-14.R79 and TS-08.R60 in
+one slice. `RunBrowser.tsx` drops the setup/value rail for a full-width timeline; the live summary
+shows "Stage N of M", "Next: <title>" while active, and a compact project · template line; attempts
+use the frozen template's stage title with the stage id as fallback. The `setup`/`values` slots left
+`presentation/contract.json` (schema stays version 2); rail-only CSS was removed (`.pipeline-disclosure` stays for
+the template editor). API and stored data are unchanged. Closure matrix passed. **Still owed:** A46's
+real-browser J14 pass (Core and Sky & Grove, desktop floor and wider, long expanded attempt) — A46
+stays `(planned)`. Review note (reversible): the run id kicker stays in the hero as run identity;
+the per-task id line was removed as an opaque id.
 
 **Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
 1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
@@ -96,7 +100,7 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` has no other available unit. `/work` may take
+**Available by role:** `/review` may take `simplify-pipeline-run-detail`. `/work` may take `add-studio-skin` or
 `rename-product-to-deckhand`; `/fix` may take `adopt-modern-codex-acp-capabilities`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
