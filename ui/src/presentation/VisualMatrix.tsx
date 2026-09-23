@@ -9,7 +9,7 @@ import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import type { AgentStatus } from "../api/types";
-import { applyAppearance } from "../features/appearance/appearance";
+import { applyAppearance, effectiveAppearance, type EffectiveAppearance } from "../features/appearance/appearance";
 import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
 import { ProjectNav } from "../components/shell/ActiveProjectNav";
 import "./contract-fixture.css";
@@ -18,11 +18,11 @@ const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "er
 
 export function VisualMatrix() {
   const [highVariance, setHighVariance] = useState(false);
-  const [appearance, setAppearance] = useState<"core" | "sky-grove">("core");
+  const [appearance, setAppearance] = useState<EffectiveAppearance>("core");
   const initialSkin = useRef(document.documentElement.getAttribute("data-skin"));
 
   useEffect(() => {
-    applyAppearance(appearance === "sky-grove" ? "sky-grove" : "");
+    applyAppearance(appearance === "core" ? "" : appearance);
   }, [appearance]);
 
   useEffect(() => () => {
@@ -44,10 +44,11 @@ export function VisualMatrix() {
               <select
                 aria-label="Fixture appearance"
                 value={appearance}
-                onChange={(event) => setAppearance(event.target.value as "core" | "sky-grove")}
+                onChange={(event) => setAppearance(effectiveAppearance(event.target.value))}
               >
                 <option value="core">AgentDeck Core</option>
                 <option value="sky-grove">Sky & Grove</option>
+                <option value="studio">Studio</option>
               </select>
             </label>
             <label className="visual-matrix-toggle">

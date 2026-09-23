@@ -252,10 +252,10 @@ unknown value from a hand edit remains readable so the UI can fall back and expl
 classifying the whole version-1 document as corrupt. Older files decode to Core without rewrite;
 Core is never inserted into the manifest as if it were a skin id.
 
-**R36 (planned) — Studio reuses the appearance field without a migration.**
+**R36 (shipped 2026-09-23) — Studio reuses the appearance field without a migration.**
 `studio` joins the finite write-valid `appearance_skin` values in the existing version-1
 `config.json`. Its selection survives the same owner-only atomic rewrite and later reads as
-`sky-grove`; older, empty, and unknown hand-edited values keep R21's Core fallback behavior. No
+`studio`; older, empty, and unknown hand-edited values keep R21's Core fallback behavior. No
 second preference, schema version, SQLite row, launch snapshot, project/session field, or retained
 visual data is introduced (FS-12.R42, TS-08.R61).
 

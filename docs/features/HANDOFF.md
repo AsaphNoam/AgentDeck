@@ -19,11 +19,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `simplify-pipeline-run-detail` finished 2026-09-23 and awaits `/review`. `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23) and
+- **Review units:** `simplify-pipeline-run-detail` and `add-studio-skin` finished 2026-09-23 and await `/review`. `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23) and
   `persistent-pipeline-orchestration` (2026-09-13) are closed; their fix commits are not new units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `add-studio-skin.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -41,13 +41,18 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `simplify-pipeline-run-detail` finished 2026-09-23 and awaits `/review`.
+**Change:** None. `simplify-pipeline-run-detail` and `add-studio-skin` await `/review`.
 
-**Changelog — 2026-09-23 (design: Studio skin):** The operator approved Studio as a third optional
-built-in appearance, leaving Core default/fallback and Sky & Grove intact. Planned FS-12.R42–R45/A18–A20,
-TS-02.R36, TS-03.R45, and TS-08.R61–R64 extend the existing finite skin seam. The Figma Make file
-guides visual treatment only; the real expanded dashboard chat and all product behavior remain
-authoritative. `add-studio-skin.md` is Waiting to start. No product code changed.
+**Changelog — 2026-09-23 (work: Studio skin):** Shipped FS-12.R42–R45/A18, TS-02.R36, TS-03.R45,
+TS-08.R61–R64 in one slice: `studio` in `config.BuiltInAppearanceSkins`, `BUILT_IN_SKINS` and
+`contract.json` v3 (new Go test ties Go to the manifest); `styles/skins/studio.css`; Settings and
+matrix options. Reversible review notes: `--ad-action-secondary` is teal-blue, since forest made Info
+badges match Success; forest is `--ad-border-strong`; the user-bubble rule is compound so only the
+message tints. Browser pass (fake ACP, 1024/1440): dashboard, expanded pane send, agent screen,
+Settings switch + reload, Archive, Pipelines, matrix; no external requests. **Still owed:** A19/A20
+stay `(planned)` — live stream, permissions and real terminal unobserved (in-app SSE limit).
+Pre-existing, not Studio: Sky & Grove tints the whole user event row; `--ad-shadow-project-edge`
+resolves at `:root`, so card edges show fallback grey, not the project accent, in every skin.
 
 **Changelog — 2026-09-23 (work: simplify pipeline run detail):** Shipped FS-14.R79 and TS-08.R60 in
 one slice. `RunBrowser.tsx` drops the setup/value rail for a full-width timeline; the live summary
@@ -81,16 +86,6 @@ error and the app never falls back to a direct stream) — not reproduced elsewh
 finding. Settled 2026-09-14 entries are in
 [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
 
-**Changelog — 2026-09-22 (design: modern Codex ACP capabilities):** Re-evaluated the ACP wishlist
-against `codex-acp` 1.12.0 and promoted `adopt-modern-codex-acp-capabilities.md` to Waiting to start.
-FS-01.R36, FS-03.R57–R61, FS-05.R38 and their acceptance items make Clone a native conversation
-fork, stream reasoning live-only, nest negotiated child sessions, expose background-task lifecycle
-and targeted stop, and consume canonical tool/file metadata without merging them into AgentDeck's
-durable task plane. TS-01.R35, TS-02.R35, TS-03.R43–R44, TS-04.R61–R66, TS-06.R26 and TS-08.R59
-keep the work inside normalized Runtime, pin the 1.12.0/0.154.0 pair, and retain the steering patch
-because upstream still lacks its idle no-consumption behavior. Plans, provider recommendations and
-session goals are excluded. No product code changed.
-
 **Release state:** `v0.5.0` is published and verified on tag `8ab84d3`. `make test` (both tag
 variants, including `make check-specs`), the UI suite (54 files, 437 tests), and
 `make dist VERSION=0.5.0` pass; the local distributable reports `0.5.0` with `sqlite_fts5`. The CI
@@ -102,7 +97,7 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` may take `simplify-pipeline-run-detail`. `/work` may take `add-studio-skin` or
+**Available by role:** `/review` may take `simplify-pipeline-run-detail` or `add-studio-skin`. `/work` may take
 `rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 

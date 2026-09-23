@@ -70,6 +70,47 @@ describe("AppearanceEditor", () => {
     expect(lastPut).toEqual({ appearance_skin: "sky-grove" });
   });
 
+  it("offers three named appearances and switches between Studio and Sky & Grove without reload", async () => {
+    server.use(
+      http.put("/api/config", async ({ request }) => {
+        lastPut = await request.json();
+        currentConfig = { ...currentConfig, ...(lastPut as object) };
+        return HttpResponse.json(currentConfig);
+      }),
+    );
+    renderAppearance();
+
+    const options = await screen.findAllByRole("radio");
+    expect(options.map((option) => (option as HTMLInputElement).value)).toEqual(["", "sky-grove", "studio"]);
+
+    fireEvent.click(screen.getByLabelText(/Studio/));
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("studio"));
+    expect(lastPut).toEqual({ appearance_skin: "studio" });
+    await waitFor(() => expect(screen.getByLabelText(/Studio/)).toBeChecked());
+
+    fireEvent.click(screen.getByLabelText(/Sky & Grove/));
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
+    expect(lastPut).toEqual({ appearance_skin: "sky-grove" });
+  });
+
+  it("rolls a Studio selection back to the saved appearance when persistence fails", async () => {
+    currentConfig = { ...configDoc, appearance_skin: "sky-grove" };
+    server.use(
+      http.put("/api/config", async () => {
+        await delay(40);
+        return HttpResponse.json({ error: { code: "internal", message: "write failed" } }, { status: 500 });
+      }),
+    );
+    renderAppearance();
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
+
+    fireEvent.click(screen.getByLabelText(/Studio/));
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("studio"));
+
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
+    expect(useUiStore.getState().toasts.at(-1)?.title).toBe("Saving appearance failed");
+  });
+
   it("rolls an immediate Core selection back when persistence fails", async () => {
     currentConfig = { ...configDoc, appearance_skin: "sky-grove" };
     server.use(

@@ -1,0 +1,118 @@
+@layer ad-skins {
+:root {
+  --ad-studio-canvas: #f4f8f7;
+  --ad-studio-panel: #fcfefd;
+  --ad-studio-raised: #fbfefd;
+  --ad-studio-ink: #263432;
+  --ad-studio-text: #3c4b48;
+  --ad-studio-muted: #667571;
+  --ad-studio-line: #dce6e5;
+  --ad-studio-forest: #4e8068;
+  --ad-studio-soft-blue: #e2f0f6;
+  --ad-studio-coral: #e76d5b;
+  --ad-studio-dot: #577d7a;
+  --ad-studio-busy: #b57418;
+  --ad-studio-idle: #6d7d79;
+  --ad-studio-waiting: #2b7aa0;
+  --ad-studio-done: #2f8559;
+  --ad-studio-error: #b73a4d;
+  --ad-studio-unknown: #8c9b97;
+  --ad-studio-tech-background: #1c2927;
+  --ad-studio-tech-surface: #253532;
+  --ad-studio-tech-text: #eef6f4;
+  --ad-studio-tech-muted: #a6bab5;
+  --ad-studio-radius-small: 5px;
+  --ad-studio-radius-medium: 10px;
+  --ad-studio-radius-large: 16px;
+}
+
+:root[data-skin="studio"] {
+  --ad-surface-canvas: var(--ad-studio-canvas);
+  --ad-surface-panel: var(--ad-studio-panel);
+  --ad-surface-raised: var(--ad-studio-raised);
+  --ad-surface-subtle: color-mix(in srgb, var(--ad-studio-soft-blue) 45%, var(--ad-studio-panel));
+  --ad-surface-emphasis: var(--ad-studio-soft-blue);
+  --ad-text-primary: var(--ad-studio-ink);
+  --ad-text-secondary: var(--ad-studio-text);
+  --ad-text-muted: var(--ad-studio-muted);
+  --ad-text-inverse: var(--ad-studio-raised);
+  --ad-border-default: var(--ad-studio-line);
+  --ad-border-strong: var(--ad-studio-forest);
+  --ad-action-primary: var(--ad-studio-coral);
+  --ad-action-primary-ink: var(--ad-studio-ink);
+  --ad-action-secondary: var(--ad-studio-waiting);
+  --ad-highlight: var(--ad-studio-soft-blue);
+  --ad-state-busy: var(--ad-studio-busy);
+  --ad-state-idle: var(--ad-studio-idle);
+  --ad-state-waiting: var(--ad-studio-waiting);
+  --ad-state-done: var(--ad-studio-done);
+  --ad-state-error: var(--ad-studio-error);
+  --ad-state-unknown: var(--ad-studio-unknown);
+  --ad-technical-background: var(--ad-studio-tech-background);
+  --ad-technical-surface: var(--ad-studio-tech-surface);
+  --ad-technical-text: var(--ad-studio-tech-text);
+  --ad-technical-muted: var(--ad-studio-tech-muted);
+  --ad-radius-small: var(--ad-studio-radius-small);
+  --ad-radius-medium: var(--ad-studio-radius-medium);
+  --ad-radius-large: var(--ad-studio-radius-large);
+  --ad-shadow-keyline: 0 1px 2px color-mix(in srgb, var(--ad-studio-ink) 7%, transparent);
+  --ad-shadow-offset: 0 12px 30px color-mix(in srgb, var(--ad-studio-forest) 11%, transparent);
+}
+
+/* Open-canvas ornament: a uniform low-contrast dot grid. Opaque reading
+   surfaces sit above it, so it never enters text, forms, or technical blocks. */
+:root[data-skin="studio"] body::before {
+  background-image: radial-gradient(circle, var(--ad-studio-dot) 1.2px, transparent 1.6px);
+  background-size: 26px 26px;
+  opacity: 0.18;
+}
+
+:root[data-skin="studio"] [data-ui="agent-card"] {
+  border-radius: var(--ad-radius-large);
+  overflow: hidden;
+}
+
+:root[data-skin="studio"] [data-ui="surface"],
+:root[data-skin="studio"] [data-ui="dialog"][data-slot="content"],
+:root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] {
+  border-radius: var(--ad-radius-large);
+}
+
+:root[data-skin="studio"] [data-ui="button"] {
+  border-radius: var(--ad-radius-medium);
+}
+
+/* The message itself carries the transcript hook; a descendant selector would
+   also tint the full-width event row around it. */
+:root[data-skin="studio"] [data-ui="transcript"][data-variant="user"] {
+  background: color-mix(in srgb, var(--ad-studio-soft-blue) 60%, var(--ad-surface-raised));
+}
+
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] {
+  background-color: var(--ad-studio-canvas);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ad-studio-dot) 30%, transparent) 1px, transparent 1.4px);
+  background-size: 8px 8px;
+  border-color: var(--ad-studio-line);
+  border-radius: var(--ad-studio-radius-medium);
+}
+
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-sky {
+  background: var(--ad-studio-soft-blue);
+  border-radius: var(--ad-studio-radius-small);
+}
+
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-surface {
+  background: var(--ad-studio-panel);
+  border-color: var(--ad-studio-line);
+  border-radius: var(--ad-studio-radius-medium);
+}
+
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-action {
+  background: var(--ad-studio-coral);
+  border-radius: var(--ad-studio-radius-medium);
+}
+
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-signal {
+  background: var(--ad-studio-forest);
+}
+}

@@ -271,7 +271,7 @@ SSE event, cache-control rule, or skin-content response is added. The TypeScript
 unknown read strings long enough to fall back safely, recognizes only the two warning codes, and the
 Go/frontend/manifest supported-id sets have a lockstep regression (R11).
 
-**R45 (planned) — Studio is one additional value on the existing config route.**
+**R45 (shipped 2026-09-23) — Studio is one additional value on the existing config route.**
 `PUT /api/config` accepts `appearance_skin: "studio"` with R21's partial-merge and validation
 behavior; `GET /api/config` returns that id without an `appearance_skin_warning`. This supersedes
 R21's two-value supported set, not its omission, empty-Core, unsupported-write, unknown-read,

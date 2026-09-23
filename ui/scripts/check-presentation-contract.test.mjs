@@ -28,7 +28,7 @@ function fixture({
   fs.writeFileSync(path.join(root, "src", "Component.tsx"), `${allowlist}${component}${skinMarkup}`);
   fs.writeFileSync(path.join(root, "src", "presentation", "VisualMatrix.tsx"), "export function VisualMatrix() { return null; }");
   fs.writeFileSync(path.join(root, "src", "presentation", "contract.json"), JSON.stringify({
-    version: 2,
+    version: 3,
     skins,
     tokens: ["--ad-public"],
     components: skinComponents,
@@ -69,6 +69,13 @@ test("accepts a complete minimal contract", () => {
 
 test("accepts a declared, statically imported, scoped built-in skin", () => {
   assert.deepEqual(auditPresentation(fixture({ skins: ["sky-grove"] })), []);
+});
+
+test("accepts several built-in skins, each with its own private palette", () => {
+  assert.deepEqual(auditPresentation(fixture({ skins: ["sky-grove", "studio"] })), []);
+  const crossed = fixture({ skins: ["sky-grove", "studio"] });
+  fs.appendFileSync(path.join(crossed, "src", "styles", "skins", "studio.css"), '\n@layer ad-skins { :root[data-skin="studio"] { --ad-public: var(--ad-sky-grove-canvas); } }');
+  expectFailure(crossed, "may be used only in sky-grove.css");
 });
 
 test("rejects literal classes without selectors", () => {

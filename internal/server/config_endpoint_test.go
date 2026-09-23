@@ -393,6 +393,20 @@ func TestConfigAppearanceSkinRoundTripAndCoreOmission(t *testing.T) {
 		t.Fatalf("appearance after omitted partial update = %q, want %q", preserved.AppearanceSkin, config.AppearanceSkinSkyGrove)
 	}
 
+	// Studio is one more value on the same route (TS-03.R45).
+	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"appearance_skin": config.AppearanceSkinStudio})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT Studio status = %d body=%s, want 200", rec.Code, rec.Body)
+	}
+	rec = doGET(t, h, "/api/config")
+	got = configResponse{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.AppearanceSkin != config.AppearanceSkinStudio || got.AppearanceSkinWarning != "" {
+		t.Fatalf("GET Studio = skin %q warning %q", got.AppearanceSkin, got.AppearanceSkinWarning)
+	}
+
 	rec = doRequest(t, h, http.MethodPut, "/api/config", map[string]any{"appearance_skin": ""})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT Core status = %d body=%s, want 200", rec.Code, rec.Body)

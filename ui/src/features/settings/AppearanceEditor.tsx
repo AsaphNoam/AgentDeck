@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { configErrorMessage, QUERY_KEYS, useConfig, usePutConfig } from "../../api/config";
 import type { Config } from "../../schemas/config";
-import { SKY_GROVE_SKIN, effectiveAppearance } from "../appearance/appearance";
+import { SKY_GROVE_SKIN, STUDIO_SKIN, effectiveAppearance } from "../appearance/appearance";
 import { useUiStore } from "../../store/uiStore";
 
 const appearances = [
@@ -16,6 +16,12 @@ const appearances = [
     value: SKY_GROVE_SKIN,
     name: "Sky & Grove",
     description: "Calm sky-blue layers, evergreen structure, and quiet contour linework.",
+  },
+  {
+    id: STUDIO_SKIN,
+    value: STUDIO_SKIN,
+    name: "Studio",
+    description: "Pale blue-green studio light, forest accents, and a quiet dotted canvas.",
   },
 ];
 

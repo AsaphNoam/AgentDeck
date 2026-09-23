@@ -43,4 +43,15 @@ describe("AppearanceRoot", () => {
 
     await waitFor(() => expect(document.documentElement).not.toHaveAttribute("data-skin"));
   });
+
+  it("follows the config projection between built-in skins and back to Core", async () => {
+    const client = renderRoot({ ...config, appearance_skin: "studio" });
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("studio"));
+
+    client.setQueryData<Config>(QUERY_KEYS.config, { ...config, appearance_skin: "sky-grove" });
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
+
+    client.setQueryData<Config>(QUERY_KEYS.config, { ...config, appearance_skin: "" });
+    await waitFor(() => expect(document.documentElement).not.toHaveAttribute("data-skin"));
+  });
 });

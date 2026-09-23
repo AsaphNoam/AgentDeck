@@ -233,27 +233,27 @@ Requirements are user-observable.
 
 ### 2.10 Third optional skin
 
-- **R42 (planned)** — AgentDeck offers a third, optional built-in skin named **Studio** alongside AgentDeck Core
+- **R42 (shipped 2026-09-23)** — AgentDeck offers a third, optional built-in skin named **Studio** alongside AgentDeck Core
   and Sky & Grove. Core remains the default for an absent preference and the safe fallback for an
   unavailable one; both existing appearances remain selectable and visually unchanged. This
   supersedes only R27's count of optional skins and R29's two-choice limit. The new skin uses the
   existing AgentDeck-wide Appearance preference, applies immediately throughout the mounted app,
   and survives reload and later sessions under R30 and FS-04.R38.
-- **R43 (planned)** — Studio presents a light, spacious, polished creative workspace: soft
+- **R43 (shipped 2026-09-23)** — Studio presents a light, spacious, polished creative workspace: soft
   off-whites and pale blue-green surfaces, forest-green supporting color, and restrained saturated
   emphasis. Its open workspace canvas uses a simple, consistent, low-contrast dot grid; readable
   cards, transcript, forms, overlays, and technical content keep opaque surfaces. Generous spacing,
   friendly legible type, rounded but non-pill geometry, quiet chrome, and selective depth make the
   work dominant without generic card grids, neon, AI gradients, glass, or an IDE-like shell. It is
   visibly distinct from Sky & Grove's stronger blue canvas and botanical/topographic decoration.
-- **R44 (planned)** — The Figma Make exploration guides Studio's visual direction, not its
+- **R44 (shipped 2026-09-23)** — The Figma Make exploration guides Studio's visual direction, not its
   product anatomy. Existing AgentDeck routes, copy, actions, card density and grouping, live
   states, permissions, chat chronology, composer, Files, Commands, conditional Terminal, and
   archive behavior remain authoritative. In particular, an expanded dashboard card retains its
   real interactive chat transcript and controls; the cramped transcript-like area in the Make
   mockup is not copied. The skin does not introduce a new dashboard pane, synthetic transcript,
   decorative replacement for content, or a behavior change.
-- **R45 (planned)** — Studio treats running, waiting-input, error, stopped, success, warning,
+- **R45 (shipped 2026-09-23)** — Studio treats running, waiting-input, error, stopped, success, warning,
   destructive, connection, permission, context pressure, and project accents as distinct semantic
   information. Color never becomes the only cue; long names, dense technical output, empty states,
   and narrow supported desktop layouts remain legible without clipped controls or escaped content.
@@ -271,7 +271,7 @@ Requirements are user-observable.
   owning feature's behavior.
 - **Overlay:** existing modals, menus, permission prompts, and toasts appear above the
   shell with a consistent depth and surface treatment; their open/close behavior is unchanged.
-- **Appearance selection:** choosing Core or Sky & Grove (or planned Studio) applies the complete
+- **Appearance selection:** choosing Core, Sky & Grove, or Studio applies the complete
   selected presentation to the mounted application and saves the global preference; a later session
   restores it after configuration loads.
 
@@ -372,7 +372,7 @@ Requirements are user-observable.
   and bottom/right pointer positions. — `ui/src/lib/menuPlacement.test.ts` for the geometry,
   `CardContextMenu.test.tsx` for the measured wiring, and a real-browser J5 lower-row pass.
 
-- **A18 (planned)** (R42) — Settings presents all three named appearances with distinguishable
+- **A18 (shipped 2026-09-23)** (R42) — Settings presents all three named appearances with distinguishable
   previews and a text-identified active choice. Choosing the new skin changes the mounted app
   without reload; navigation, reload, and a later browser session preserve it. Choosing either
   existing appearance restores that appearance, and clearing the preference restores Core.

@@ -78,7 +78,7 @@ describe("VisualMatrix", () => {
     expect(run.querySelector('[data-slot="agents"]')).toBeTruthy();
   });
 
-  it("switches between Core and Sky & Grove without changing product structure", () => {
+  it("switches between Core, Sky & Grove, and Studio without changing product structure", () => {
     const { container, unmount } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;
     const copyBefore = root.textContent;
@@ -86,13 +86,15 @@ describe("VisualMatrix", () => {
     const actionsBefore = [...root.querySelectorAll("button")].map((button) => button.textContent);
     const statesBefore = [...root.querySelectorAll("[data-state]")].map((node) => node.getAttribute("data-state"));
 
-    fireEvent.change(screen.getByLabelText("Fixture appearance"), { target: { value: "sky-grove" } });
+    for (const skin of ["sky-grove", "studio"]) {
+      fireEvent.change(screen.getByLabelText("Fixture appearance"), { target: { value: skin } });
 
-    expect(document.documentElement.dataset.skin).toBe("sky-grove");
-    expect(root.textContent).toBe(copyBefore);
-    expect([...root.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual(routesBefore);
-    expect([...root.querySelectorAll("button")].map((button) => button.textContent)).toEqual(actionsBefore);
-    expect([...root.querySelectorAll("[data-state]")].map((node) => node.getAttribute("data-state"))).toEqual(statesBefore);
+      expect(document.documentElement.dataset.skin).toBe(skin);
+      expect(root.textContent).toBe(copyBefore);
+      expect([...root.querySelectorAll("a")].map((link) => link.getAttribute("href"))).toEqual(routesBefore);
+      expect([...root.querySelectorAll("button")].map((button) => button.textContent)).toEqual(actionsBefore);
+      expect([...root.querySelectorAll("[data-state]")].map((node) => node.getAttribute("data-state"))).toEqual(statesBefore);
+    }
 
     unmount();
     expect(document.documentElement).not.toHaveAttribute("data-skin");

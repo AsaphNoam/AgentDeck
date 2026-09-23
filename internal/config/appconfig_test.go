@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -66,10 +67,31 @@ func TestAppearanceSkinValidationAllowsOnlyBundledChoices(t *testing.T) {
 	for skin, want := range map[string]bool{
 		"":                     true,
 		AppearanceSkinSkyGrove: true,
+		AppearanceSkinStudio:   true,
+		"core":                 false,
 		"forest-night":         false,
 	} {
 		if got := ValidAppearanceSkin(skin); got != want {
 			t.Errorf("ValidAppearanceSkin(%q) = %t, want %t", skin, got, want)
 		}
+	}
+}
+
+// The Go write set, the frontend allowlist, and the presentation manifest move
+// in lockstep (TS-03.R45); the manifest checker ties the frontend to the
+// manifest, and this ties Go to the same manifest.
+func TestAppearanceSkinsMatchPresentationContract(t *testing.T) {
+	raw, err := os.ReadFile("../../ui/src/presentation/contract.json")
+	if err != nil {
+		t.Fatalf("read presentation contract: %v", err)
+	}
+	var contract struct {
+		Skins []string `json:"skins"`
+	}
+	if err := json.Unmarshal(raw, &contract); err != nil {
+		t.Fatalf("decode presentation contract: %v", err)
+	}
+	if !slices.Equal(contract.Skins, BuiltInAppearanceSkins) {
+		t.Fatalf("contract skins = %v, Go built-in skins = %v", contract.Skins, BuiltInAppearanceSkins)
 	}
 }

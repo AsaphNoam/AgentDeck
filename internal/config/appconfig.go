@@ -1,19 +1,28 @@
 package config
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"slices"
+)
 
 // Config single-file object: config.json.
 
-// AppearanceSkinSkyGrove is the only version-1 built-in appearance skin id.
-// Core is represented by an absent or empty appearance_skin field, not an id.
-const AppearanceSkinSkyGrove = "sky-grove"
+// Built-in appearance skin ids. Core is represented by an absent or empty
+// appearance_skin field, not an id. BuiltInAppearanceSkins must match the
+// frontend BUILT_IN_SKINS allowlist and ui/src/presentation/contract.json.
+const (
+	AppearanceSkinSkyGrove = "sky-grove"
+	AppearanceSkinStudio   = "studio"
+)
+
+var BuiltInAppearanceSkins = []string{AppearanceSkinSkyGrove, AppearanceSkinStudio}
 
 // ValidAppearanceSkin reports whether an appearance_skin value may be written
 // through the configuration API. ReadConfig intentionally does not use this
 // check: an unknown hand-edited id remains readable so callers can fall back to
 // Core and explain the unsupported value.
 func ValidAppearanceSkin(skin string) bool {
-	return skin == "" || skin == AppearanceSkinSkyGrove
+	return skin == "" || slices.Contains(BuiltInAppearanceSkins, skin)
 }
 
 // ReadConfig reads config.json. Returns ErrNotFound if absent, ErrCorrupt if

@@ -652,7 +652,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
 
 ### 2.8 Studio built-in skin
 
-- **R61 (planned) — Studio extends the finite built-in appearance set.** Add the id `studio` to
+- **R61 (shipped 2026-09-23) — Studio extends the finite built-in appearance set.** Add the id `studio` to
   the Go write validator, frontend effective-id allowlist, Settings option list, and versioned
   `presentation/contract.json` skin list in lockstep; advance the contract version from 2 to 3.
   The existing `AppearanceRoot`, React Query config projection, optimistic save/rollback, Core
@@ -663,7 +663,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   currently singular production-skin description to match the finite three-appearance contract
   (FS-12.R42, TS-02.R36,
   TS-03.R45; INV §8/§10/§11).
-- **R62 (planned) — Studio is one locally bundled skin stylesheet.**
+- **R62 (shipped 2026-09-23) — Studio is one locally bundled skin stylesheet.**
   `styles/skins/studio.css` is statically imported by `styles/index.css`, keeps every rule inside
   `ad-skins`, defines its private raw palette only in the `--ad-studio-*` namespace, and maps only
   approved public semantic tokens under `:root[data-skin="studio"]`. The directional palette is
@@ -679,7 +679,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   inactive Settings preview uses the same private palette and a miniature dot treatment, not a
   duplicated literal palette. All geometry, depth, and typography changes remain token or
   approved-hook overrides, not feature CSS values or new layout ownership (FS-12.R43/R45).
-- **R63 (planned) — Product anatomy stays feature-owned.** Studio may override curated
+- **R63 (shipped 2026-09-23) — Product anatomy stays feature-owned.** Studio may override curated
   presentation hooks for existing cards, states, shell, transcript, controls, and overlays, but
   it does not replace their TSX, DOM order, content, route, event handlers, or sizing decisions
   that protect dashboard grid order and pane behavior. In particular, the expanded card continues
@@ -688,7 +688,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   needs a public hook not already present, register and version that narrow product-native hook
   before using it, with the matching checker and fixture; implementation-class selectors are not
   a substitute (FS-12.R44; INV §2/§13).
-- **R64 (planned) — Verification covers the third skin without weakening the first two.** The
+- **R64 (shipped 2026-09-23) — Verification covers the third skin without weakening the first two.** The
   contract checker proves `studio` has one declared bundled stylesheet, active and preview
   selectors, only permitted tokens/hooks and private values, and no network import. The
   deterministic matrix uses the same feature data for Core, Sky & Grove, and Studio, including
