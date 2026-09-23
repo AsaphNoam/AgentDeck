@@ -19,7 +19,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `adopt-modern-codex-acp-capabilities` (finished 2026-09-23) is available. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
+- **Review units:** `adopt-modern-codex-acp-capabilities` was reviewed 2026-09-23 and remains open for its findings below. `persistent-pipeline-orchestration` was reviewed 2026-09-13 and
   closed the same day when its fixes landed; BR-1's three findings were fixed the same day. Both
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
@@ -30,7 +30,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
   uncommitted spec edits in the tree from another session — not this change's); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** none. `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
+- **Open findings:** `adopt-modern-codex-acp-capabilities` has three review findings below. `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
 - **Bug reports:** BR-1, BR-2, BR-3, and BR-4 are investigated, fixed and closed. Pinned Claude model
@@ -84,8 +84,8 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` may take `adopt-modern-codex-acp-capabilities`. `/work` may take
-`rename-product-to-deckhand`; `/fix` has no open findings;
+**Available by role:** `/review` has no other available unit. `/work` may take
+`rename-product-to-deckhand`; `/fix` may take `adopt-modern-codex-acp-capabilities`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -101,6 +101,39 @@ verification debt is unchanged and is recorded in
 - None.
 
 ## Review findings
+
+`adopt-modern-codex-acp-capabilities` reviewed 2026-09-23 (implementation range
+`ff095bf..5177024`; the design commit `e12baba` supplied its requirements). Invariant trigger
+sweep: all 17 classes had an applicable surface in this broad runtime, persistence, API, UI, build,
+and test change; the findings below are tagged with their matching classes.
+
+- **Must fix — INV §2/§3/§11/§15:** Clone copies every positive-sequence source event through the
+  last `turn_end` (`internal/server/clone.go:77–81`, `internal/runtime/fork.go:84–93`) instead of the
+  filtered `transcript.CloneCompletedPrefix` required by TS-02.R35. After a source has resumed,
+  its `session_meta` is copied and `Indexer.OnEvent` upserts the *source's* native session id and
+  metadata into the clone's session row; copied annotation records also carry source-only
+  annotations into the clone. Build the filtered prefix once, exclude source metadata and
+  annotations, and verify a resumed/annotated source leaves the clone's own session identity and
+  lineage intact after clone and reindex. Cover local write failure so a failed fork leaves no
+  partial transcript/index state.
+- **Must fix — INV §11/§15:** A native child's `permission_request` is emitted in the child scope,
+  but auto approval, human resolution, timeout and cancellation emit `permission_resolved` at the
+  root (`internal/runtime/permission.go:47–57,70–82,116,132,246`). This violates FS-03.R58 and
+  TS-04.R63's scoped child conversation contract; durable replay has mismatched request/resolution
+  scope, even where the UI's tool-id fold hides it. Carry the activity scope with the pending
+  request and emit every resolution in that scope; assert scope and ordering for child approve,
+  deny, timeout and cancel in a runtime transcript test.
+- **Worth fixing — INV §11/§17:** A matching `session_info_update` consumes the outstanding file
+  report request before its version and status are validated (`internal/runtime/filereport.go:90–99`).
+  If a peer sends a malformed matching frame before a valid report, the valid report is dropped,
+  contrary to TS-04.R66's malformed-report rule; Files silently misses the edit. Validate first,
+  then consume the matching request, with a malformed-then-valid fixture and duplicate check.
+
+**Fix model:** difficult — Codex Sol. Clone's durable prefix/index and rollback boundary is the
+most difficult open fix. Focused `go test ./internal/runtime ./internal/state ./internal/index`
+passed; `go test ./internal/server` could not reach the tests in this sandbox because its test
+server's IPv6 loopback bind was denied. The credentialed Codex 1.12.0 receipt remains an explicit
+pre-release gate, not evidence from this review.
 
 `persistent-pipeline-orchestration` closed on 2026-09-13: all fourteen findings are fixed with
 regression tests, and the unit is no longer open for review or fixes. BR-1 closed on 2026-09-13:
