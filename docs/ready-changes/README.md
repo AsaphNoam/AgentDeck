@@ -43,6 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`simplify-pipeline-run-detail.md`](simplify-pipeline-run-detail.md) — replace the run-page side rail
+  with a full-width supervision timeline and contextual stage information.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 

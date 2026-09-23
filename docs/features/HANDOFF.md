@@ -24,7 +24,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `simplify-pipeline-run-detail.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
@@ -43,6 +43,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** None. `adopt-modern-codex-acp-capabilities` finished 2026-09-23 and awaits `/review`.
+
+**Changelog — 2026-09-23 (design: pipeline run detail):** The operator confirmed removing Frozen
+setup and Named values from the human run page after a UX review of useful supervision data. Planned
+FS-14.R79/A46 and TS-08.R60 put live stage position/next stage and attempt-local results ahead of
+stored setup/value projections. `simplify-pipeline-run-detail.md` is Waiting to start; implementation
+must keep the existing run/API data and verify long expanded attempts in Core and Sky & Grove.
 
 **Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
 1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
@@ -102,12 +108,20 @@ verification debt is unchanged and is recorded in
 
 ## Review findings
 
+### adopt-modern-codex-acp-capabilities — **Fix model:** difficult — Codex Sol.
+
 `adopt-modern-codex-acp-capabilities` reviewed 2026-09-23 (implementation range
 `ff095bf..5177024`; the design commit `e12baba` supplied its requirements). Invariant trigger
 sweep: all 17 classes had an applicable surface in this broad runtime, persistence, API, UI, build,
 and test change; the findings below are tagged with their matching classes.
 
-- **Must fix — INV §2/§3/§11/§15:** Clone copies every positive-sequence source event through the
+Clone's durable prefix/index and rollback boundary is the most difficult open fix. Focused
+`go test ./internal/runtime ./internal/state ./internal/index`
+passed; `go test ./internal/server` could not reach the tests in this sandbox because its test
+server's IPv6 loopback bind was denied. The credentialed Codex 1.12.0 receipt remains an explicit
+pre-release gate, not evidence from this review.
+
+- **Must fix** — INV §2/§3/§11/§15: Clone copies every positive-sequence source event through the
   last `turn_end` (`internal/server/clone.go:77–81`, `internal/runtime/fork.go:84–93`) instead of the
   filtered `transcript.CloneCompletedPrefix` required by TS-02.R35. After a source has resumed,
   its `session_meta` is copied and `Indexer.OnEvent` upserts the *source's* native session id and
@@ -116,36 +130,18 @@ and test change; the findings below are tagged with their matching classes.
   annotations, and verify a resumed/annotated source leaves the clone's own session identity and
   lineage intact after clone and reindex. Cover local write failure so a failed fork leaves no
   partial transcript/index state.
-- **Must fix — INV §11/§15:** A native child's `permission_request` is emitted in the child scope,
+- **Must fix** — INV §11/§15: A native child's `permission_request` is emitted in the child scope,
   but auto approval, human resolution, timeout and cancellation emit `permission_resolved` at the
   root (`internal/runtime/permission.go:47–57,70–82,116,132,246`). This violates FS-03.R58 and
   TS-04.R63's scoped child conversation contract; durable replay has mismatched request/resolution
   scope, even where the UI's tool-id fold hides it. Carry the activity scope with the pending
   request and emit every resolution in that scope; assert scope and ordering for child approve,
   deny, timeout and cancel in a runtime transcript test.
-- **Worth fixing — INV §11/§17:** A matching `session_info_update` consumes the outstanding file
+- **Worth fixing** — INV §11/§17: A matching `session_info_update` consumes the outstanding file
   report request before its version and status are validated (`internal/runtime/filereport.go:90–99`).
   If a peer sends a malformed matching frame before a valid report, the valid report is dropped,
   contrary to TS-04.R66's malformed-report rule; Files silently misses the edit. Validate first,
   then consume the matching request, with a malformed-then-valid fixture and duplicate check.
-
-**Fix model:** difficult — Codex Sol. Clone's durable prefix/index and rollback boundary is the
-most difficult open fix. Focused `go test ./internal/runtime ./internal/state ./internal/index`
-passed; `go test ./internal/server` could not reach the tests in this sandbox because its test
-server's IPv6 loopback bind was denied. The credentialed Codex 1.12.0 receipt remains an explicit
-pre-release gate, not evidence from this review.
-
-`persistent-pipeline-orchestration` closed on 2026-09-13: all fourteen findings are fixed with
-regression tests, and the unit is no longer open for review or fixes. BR-1 closed on 2026-09-13:
-all three findings are fixed, and the OpenCode/OpenHands delivery it left undetermined is now
-documented as compatibility evidence rather than an open finding.
-
-BR-4 closed on 2026-09-22: its one Must-fix finding (`.project-dashboard`/`.project-card-grid`
-missing the `align-content`/`align-items: start` that `.card-grid` already carried, `INV §2`,
-`ui/src/styles/features/dashboard.css`) is fixed with the committed regression test un-skipped, and
-the unit is no longer open for review or fixes.
-
-No review or bug-report unit has open findings.
 
 ## Design consistency notes
 

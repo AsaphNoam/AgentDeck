@@ -1,6 +1,6 @@
 # FS-14 — Configurable pipeline runs
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/pipeline`, `internal/config`, `internal/state`, `internal/server`, `internal/messaging`, `internal/cli`, `ui/src/features/pipelines` · **Journeys:** J14
 **Absorbed:** —
 
@@ -634,6 +634,21 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   the same identity and inbox. Successfully queued FYIs arrive on a natural turn without implicitly
   restarting a completed task.
 
+### 4.7 Run detail hierarchy
+
+- **R79 (planned)** — The run page keeps live state, actions, and the execution timeline as its
+  primary reading path. It has no persistent side rail beside stage entries. The live summary names
+  the current or final stage's position in the frozen stage sequence and, while active, the next
+  stage's human title when one exists. The run's project and template are compact context in that summary; revision and
+  opaque source ids do not occupy the normal reading path. Each attempt uses its stage's human title
+  and keeps its outcome, useful result, runtime, and produced outputs with that attempt. Required
+  run inputs appear in the start flow; recovery identifies the specific input it needs. The frozen
+  setup and global current-value projection remain in the durable run/API record but do not appear
+  as separate run-page panels. Expanding an attempt never places another panel over its content.
+  This presentation supersedes R23 and R37's requirement to display the complete
+  named-value projection and setup on the run page, R44's secondary-rail placement, and R56's
+  finished-run default expansion. Stage-local outputs remain available under R56.
+
 ## 5. Acceptance criteria
 
 - **A35** (shipped 2026-09-13; R61–R64, R75) — Run spec → implementation → correctness review → additional
@@ -687,6 +702,13 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   results or a user assignment and verify inline intervention messages, normal scoped coordination
   and unchanged stage-report authority. An explicit action request uses waking mail; exercise the
   overflow/restart/successor cases in FS-06.A22–A25.
+- **A46 (planned)** (R79) — On an active and a finished run with long stage names, multiple visits,
+  run inputs, overwritten stage outputs, and long values, start from the run page and identify its
+  state, current position, next stage, and required action without reading setup metadata or the
+  value projection. Open an attempt at the supported desktop floor and a wider viewport; its result,
+  runtime, and full output text remain readable and unobscured. Confirm the relevant input is
+  identified at a recovery point and that neither run presents a duplicate setup or value panel.
+  *Verify:* J14 in a real browser and focused run-page interaction tests.
 
 - **A1** — A person creates and edits one model-neutral four-stage template, starts it
   once with Codex Work and Claude Review and again with those runtime assignments reversed, and
@@ -897,6 +919,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   `RunBrowser` tests.
 
 ## 6. Deviations & open decisions
+
+**Confirmed run-page direction, 2026-09-23.** R79/A46 remove the setup and latest-value panels
+from the human run page when implemented. The frozen template, assignments, input values, and
+current named-value projection remain durable and available through the existing API; run and agent
+behavior, retention, and lifecycle are unchanged. Until R79 ships, the existing R23/R37/R44/R56
+run-page presentation remains current.
 
 **Persistent-orchestrator replacement, 2026-09-11.** The operator approved the feature direction,
 discarding old pipelines without migration, cancelling all delegated work on Stop, and existing

@@ -635,6 +635,21 @@ width and supported desktop floor in Core and Sky & Grove without a new tab, sid
 label, raw color, token family or motion dependency. High-frequency updates use no entrance motion;
 only existing state-color/typographic feedback changes, and reduced motion loses no information.
 
+- **R60 (planned) — Run supervision uses the existing detail projection without a rail.**
+  `RunBrowser` derives current/final stage position, the next human stage title, and each attempt's
+  human title from the run detail's frozen template and stage-task fields. An absent or unmatched
+  stage id falls back to the available id without inventing progress or a next stage. The existing
+  result and runtime fields supply each attempt; no endpoint, schema, store, persistence, or second
+  projection is added (FS-14.R79, INV §2/§10). The run page renders one timeline track and removes
+  the setup/value rail and its sticky positioning. It reuses core tokens and the existing run,
+  timeline, attempt, and action hooks; removing the obsolete `setup` and `values` slots updates and
+  versions the curated presentation contract under R8. The bundled Sky & Grove skin has no rules
+  targeting those slots. The start form and template editor retain their own disclosures and styles.
+  R52's stage-local output presentation remains; its finished-run default-open value disclosure is
+  superseded when this change ships. Focused interaction checks and Core/Sky & Grove browser views
+  at the desktop floor and a wider viewport verify long output text, expanded attempts, attention
+  actions, and unobscured stage content (INV §8/§13/§17).
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract
