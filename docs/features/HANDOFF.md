@@ -24,7 +24,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   sets of fix commits are closure of their originating units and are not new review units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `simplify-pipeline-run-detail.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `add-studio-skin.md`, `simplify-pipeline-run-detail.md`, and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the Cursor backend draft has
@@ -43,6 +43,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** None. `adopt-modern-codex-acp-capabilities` finished 2026-09-23 and awaits `/review`.
+
+**Changelog — 2026-09-23 (design: Studio skin):** The operator approved Studio as a third optional
+built-in appearance, leaving Core default/fallback and Sky & Grove intact. Planned FS-12.R42–R45/A18–A20,
+TS-02.R36, TS-03.R45, and TS-08.R61–R64 extend the existing finite skin seam. The Figma Make file
+guides visual treatment only; the real expanded dashboard chat and all product behavior remain
+authoritative. `add-studio-skin.md` is Waiting to start. No product code changed.
 
 **Changelog — 2026-09-23 (design: pipeline run detail):** The operator confirmed removing Frozen
 setup and Named values from the human run page after a UX review of useful supervision data. Planned

@@ -650,6 +650,56 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   at the desktop floor and a wider viewport verify long output text, expanded attempts, attention
   actions, and unobscured stage content (INV §8/§13/§17).
 
+### 2.8 Studio built-in skin
+
+- **R61 (planned) — Studio extends the finite built-in appearance set.** Add the id `studio` to
+  the Go write validator, frontend effective-id allowlist, Settings option list, and versioned
+  `presentation/contract.json` skin list in lockstep; advance the contract version from 2 to 3.
+  The existing `AppearanceRoot`, React Query config projection, optimistic save/rollback, Core
+  first-paint fallback, and unknown-id warning remain the only activation path (R30–R32).
+  `appearance_skin: "studio"` is the sole new stored/wire value; Core stays empty/absent, and
+  `sky-grove` retains its meaning. There is no new provider, route, browser storage, migration,
+  per-project preference, dynamic loader, or external skin source. Update `ui/AGENTS.md`'s
+  currently singular production-skin description to match the finite three-appearance contract
+  (FS-12.R42, TS-02.R36,
+  TS-03.R45; INV §8/§10/§11).
+- **R62 (planned) — Studio is one locally bundled skin stylesheet.**
+  `styles/skins/studio.css` is statically imported by `styles/index.css`, keeps every rule inside
+  `ad-skins`, defines its private raw palette only in the `--ad-studio-*` namespace, and maps only
+  approved public semantic tokens under `:root[data-skin="studio"]`. The directional palette is
+  canvas `#f4f8f7`, panel `#fcfefd`, raised `#fbfefd`, primary text `#263432`, muted text
+  `#667571`, default border `#dce6e5`, forest support `#4e8068`, soft blue `#e2f0f6`, and
+  restrained coral action `#e76d5b`; semantic state, destructive, permission, project-accent,
+  and technical colors retain separate roles rather than deriving their meanings from the coral
+  action. Existing bundled fonts supply Studio's friendly display/text and crisp mono roles;
+  no runtime font or image request is introduced. Studio's open-canvas ornament replaces the Core
+  `body::before` grid with a uniform radial dot repeat of approximately 1.2px dots on a 26px
+  pitch in `#577d7a` at approximately 10% opacity. Opaque reading surfaces cover the ornament;
+  the dot pattern never enters a transcript, form, dialog, technical block, or control. Studio's
+  inactive Settings preview uses the same private palette and a miniature dot treatment, not a
+  duplicated literal palette. All geometry, depth, and typography changes remain token or
+  approved-hook overrides, not feature CSS values or new layout ownership (FS-12.R43/R45).
+- **R63 (planned) — Product anatomy stays feature-owned.** Studio may override curated
+  presentation hooks for existing cards, states, shell, transcript, controls, and overlays, but
+  it does not replace their TSX, DOM order, content, route, event handlers, or sizing decisions
+  that protect dashboard grid order and pane behavior. In particular, the expanded card continues
+  to compose the shipped `TranscriptView` and `Composer` under R41–R49; no second transcript,
+  mockup markup, transcript event projection, or chat state is added. If a visual treatment truly
+  needs a public hook not already present, register and version that narrow product-native hook
+  before using it, with the matching checker and fixture; implementation-class selectors are not
+  a substitute (FS-12.R44; INV §2/§13).
+- **R64 (planned) — Verification covers the third skin without weakening the first two.** The
+  contract checker proves `studio` has one declared bundled stylesheet, active and preview
+  selectors, only permitted tokens/hooks and private values, and no network import. The
+  deterministic matrix uses the same feature data for Core, Sky & Grove, and Studio, including
+  collapsed/expanded dashboard chat, status extremes, dense configuration, overlays, syntax,
+  diffs, terminal, and the supported desktop floor. Component/config/API tests prove new-id
+  persistence, immediate selection, rollback, unknown-id fallback, and Core/Sky & Grove
+  non-regression; a real-browser pass checks the actual transcript pane, dot placement, contrast,
+  focus, overflow, and technical renderer updates after switching. No pixel-baseline framework
+  or behavior-only mockup assertion substitutes for rendered evidence (FS-12.A18–A20;
+  INV §10/§13/§17).
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

@@ -43,6 +43,7 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`add-studio-skin.md`](add-studio-skin.md) — add a third, Figma Make-inspired built-in appearance without replacing Core, Sky & Grove, or AgentDeck's real chat surfaces.
 - [`simplify-pipeline-run-detail.md`](simplify-pipeline-run-detail.md) — replace the run-page side rail
   with a full-width supervision timeline and contextual stage information.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
