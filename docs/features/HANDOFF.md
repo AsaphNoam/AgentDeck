@@ -65,7 +65,7 @@ annotations (session_meta was already dropped by the reader); a failed clone dis
 transcript and index rows (TS-02.R35 text updated). INV §11: child permission resolutions stay in
 the request's scope. INV §11/§17: a malformed file report no longer consumes the pending request.
 Go tests pass. TS-04's two citations of the deleted Cursor draft were then reworded, so
-`make check-specs` passes; its planned Cursor R55–R60 (committed in `42e2ba5`) remain.
+`make check-specs` passes; its planned Cursor R55–R60 (committed in `42e2ba5`) were retired.
 
 **Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
 1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the

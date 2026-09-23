@@ -745,73 +745,8 @@ of AgentDeck's own intent.
   init, assistant, and usage signals, so treating it as an execution oracle produced a false
   finding that would have added a redundant delivery path (INV §12, INV §17).
 
-**R55 `(planned)` — Cursor is an adapter, not a runtime.** `cursor-acp` registers one
-`BackendAdapter` with binary `agent`; its launch argv is `--model <resolved-provider-model> acp`,
-placing Cursor's documented global model option before the ACP subcommand. The adapter strips no
-ambient environment, exposes no lifecycle hooks, effort option, fast option or terminal path, and
-derives status from the common ACP stream. Same-backend/same-model resume returns the prior native
-session id for `session/load`; a model change sets `CanSwitchModelOnResume=false`, so the existing
-primer path starts a new Cursor session at the selected argv model rather than claiming an
-unverified in-session model switch. `BackendAdapter.LaunchArgs` receives the resolved provider model
-as an argument; the four existing adapters ignore it and retain byte-identical argv. The adapter
-registry remains the only backend-type authority (INV §2/§6/§10).
-
-**R56 `(planned)` — Cursor receives the full LaunchSpec through verified portable channels.**
-`cwd`, additional directories and scoped HTTP MCP registration stay in the shared
-`session/new`/`session/load` builders. Cursor has no documented ACP system-prompt member or
-provider-specific metadata channel, so its adapter declares **first-prompt overlay** delivery for
-the composed role/project prompt instead of emitting R54's forbidden top-level `systemPrompt`.
-For each newly created native session the runtime prepends one clearly delimited, injection-safe
-AgentDeck instruction block to the provider-bound first `session/prompt` while persisting and
-rendering only the person's original prompt. A native load sends no overlay because the loaded
-provider conversation already received it; a Cursor session with no previously delivered user turn
-starts a new native session instead of loading an empty one, so its first real prompt cannot miss
-the overlay. Cross-backend primer handoff is a new session and receives the overlay once before the
-primer/user content. The one shared turn-preparation path owns this composition beside inline mail;
-launch, wake and ordinary prompt code do not re-spell it (INV §2/§3).
-
-**R57 `(planned)` — Cursor permission and extension requests terminate exactly once.** Standard
-`session/request_permission` enters the existing atomic pending gate. The Cursor adapter maps
-approve to `allow-once`, deny to `reject-once`, and effective skip-permissions to immediate
-`allow-once`; AgentDeck never selects `allow-always`. The ACP inbound-request dispatcher also
-recognizes Cursor's documented extensions without leaking provider structs past `acpmap.go`:
-`cursor/ask_question` receives `{outcome:"skipped"}` and `cursor/create_plan` receives
-`{outcome:"rejected",reason:<bounded AgentDeck copy>}`. Each emits at most one bounded normalized
-`error` notice with code `cursor_extension_unsupported` for the live/replayed transcript path and
-does not itself end the provider turn. `cursor/update_todos`, `cursor/task`, and
-`cursor/generate_image` are bounded-and-dropped notifications: their payloads are neither retained
-nor logged. Unknown requests receive JSON-RPC method-not-found rather than hanging; malformed
-extension payloads receive invalid-params and never reach product state (INV §8/§11/§16).
-
-**R58 `(planned)` — Cursor uses the normal profile and AgentDeck mutates none of it.** Cursor child,
-readiness and model-discovery processes inherit the ordinary environment and default profile; no
-`CURSOR_CONFIG_DIR` override, profile copy, symlink, managed `.cursor` file or provider-history
-cleanup is created. This is intentionally unlike R20/R21: Cursor documents its config-directory
-override but not an auth/session-history isolation contract, so copying the Codex mechanism would
-be an unverified new authority rather than a simpler equivalent. Cursor's own global/project rules,
-permissions and MCP configuration remain provider-owned inputs under TS-05.R10. AgentDeck persists
-only its normalized transcript and native session id, and never treats provider history as its
-archive source.
-
-**R59 `(planned)` — Inline messaging MCP is fail-closed and release-gated for Cursor.** The shared
-session builders send the same non-empty token-scoped `mcpServers` entry on new and load. Cursor's
-official sample proves that the member is accepted syntactically but documents only file-configured
-MCP behavior, so fake ACP proves serialization only. If Cursor rejects session creation/load or the
-credentialed gate cannot call one AgentDeck MCP action, launch/resume fails with bounded Cursor
-compatibility guidance; AgentDeck does not write the registration into the person's `.cursor/mcp.json`
-or silently launch an agent unable to participate in coordination (TS-05.R4, INV §4/§12/§17).
-
-**R60 `(planned)` — Cursor process probes share fixed commands and hard bounds.** Provider metadata
-adds `cursor`: interactive login is `agent login`, readiness is `agent status --format json`, and
-the adapter launch is `agent --model <selected> acp`. Only the terminal-attached `agentdeck auth
-cursor` path may run login. Readiness has no stdin, uses the shared six-second deadline and parses a
-small typed JSON projection; model discovery is a separately bounded `agent models`
-command. Both cap output while it is produced, sanitize every diagnostic, and classify a missing
-binary, authentication requirement, incompatible shape or timeout without exposing raw output.
-Neither command accepts request-derived argv, starts a runtime/session row, or is retried with a
-different model/account. A real authenticated Cursor gate must prove argv model honoring,
-native load, permission identifiers, extension replies and non-empty MCP delivery against the exact
-supported CLI before release compatibility is claimed.
+R55–R60 were unshipped Cursor backend requirements, retired with that design on 2026-09-23; the
+IDs are not reused.
 
 **R61 — The packaged Codex baseline is ACP 1.12.0 with its compatible Codex 0.154.0.**
 The bump consumes 1.11's paginated load/fork history and finalized standalone MCP-elicitation
