@@ -59,35 +59,25 @@
   --ad-shadow-offset: 0 12px 30px color-mix(in srgb, var(--ad-studio-forest) 11%, transparent);
 }
 
-/* Open-canvas ornament: a uniform low-contrast dot grid. Opaque reading
-   surfaces sit above it, so it never enters text, forms, or technical blocks. */
 :root[data-skin="studio"] body::before {
   background-image: radial-gradient(circle, var(--ad-studio-dot) 1.2px, transparent 1.6px);
   background-size: 26px 26px;
   opacity: 0.18;
 }
 
-:root[data-skin="studio"] [data-ui="agent-card"] {
-  border-radius: var(--ad-radius-large);
-  overflow: hidden;
-}
-
-/* R46 — a quieter, more compact single-row header with less boxed
-   navigation, replacing Core's tall boxed-cell treatment. */
-:root[data-skin="studio"] .app-header {
+/* The compact shell reduces chrome so route work, not navigation framing, leads. */
+:root[data-skin="studio"] [data-ui="app-shell"][data-slot="header"] {
   border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   min-height: 60px;
 }
 
-:root[data-skin="studio"] .app-logo {
+:root[data-skin="studio"] [data-ui="app-shell"][data-slot="brand"] {
   border-right: none;
 }
 
-:root[data-skin="studio"] .app-mark strong {
-  font-size: 1.35rem;
-}
+:root[data-skin="studio"] [data-ui="app-shell"] [data-slot="wordmark"] { font-size: 1.35rem; }
 
-:root[data-skin="studio"] .app-nav a {
+:root[data-skin="studio"] [data-ui="app-shell"] [data-slot="navigation"] a {
   border-right: none;
   font-family: var(--ad-font-text);
   font-size: 0.875rem;
@@ -96,28 +86,30 @@
   text-transform: none;
 }
 
-:root[data-skin="studio"] .app-nav a::after {
-  height: 2px;
-}
+:root[data-skin="studio"] [data-ui="app-shell"] [data-slot="navigation"] a::after { height: 2px; }
 
-:root[data-skin="studio"] .app-nav a:hover,
-:root[data-skin="studio"] .app-nav a.active {
+:root[data-skin="studio"] [data-ui="app-shell"] [data-slot="navigation"] a:hover,
+:root[data-skin="studio"] [data-ui="app-shell"] [data-slot="navigation"] a[aria-current="page"] {
   background: transparent;
   color: var(--ad-action-primary);
 }
 
-/* R47 — the dashboard toolbar rule and group headings read as quiet
-   organizing landmarks rather than a bold technical section break. */
-:root[data-skin="studio"] .grid-toolbar {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+/* Shared route headings establish the calm Studio reading scale. */
+:root[data-skin="studio"] [data-ui="page-header"],
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="header"],
+:root[data-skin="studio"] [data-ui="settings"] [data-slot="header"] { border-bottom: var(--ad-border-thin) solid var(--ad-border-default); }
+
+:root[data-skin="studio"] [data-ui="page-header"] [data-slot="title"],
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="header"] h1,
+:root[data-skin="studio"] [data-ui="settings"] [data-slot="header"] {
+  font-size: 1.875rem;
+  line-height: 1;
 }
 
-:root[data-skin="studio"] .agent-group-header {
-  border-bottom: none;
-  min-height: 36px;
-}
+/* Dashboard cards are a working index: identity and preview lead, state stays bounded. */
+:root[data-skin="studio"] [data-ui="agent-group"] [data-slot="header"] { border-bottom: none; min-height: 36px; }
 
-:root[data-skin="studio"] .agent-group-header > strong {
+:root[data-skin="studio"] [data-ui="agent-group"] [data-slot="header"] > strong {
   color: var(--ad-text-secondary);
   font-family: var(--ad-font-text);
   font-size: 1.05rem;
@@ -126,234 +118,149 @@
   letter-spacing: normal;
 }
 
-/* R47 — a collapsed card leads with name/state (unchanged DOM order);
-   project and state accents become bounded edges instead of a full-card
-   wash, and the conversation preview reads as the second-priority line
-   while role/project/runtime metadata quiet down into subordinate text. */
-:root[data-skin="studio"] .agent-card {
+:root[data-skin="studio"] [data-ui="agent-card"] {
   background: var(--ad-surface-panel);
   border: var(--ad-border-thin) solid var(--ad-border-default);
   border-inline-start: 3px solid color-mix(in srgb, var(--ad-project-accent) 65%, var(--ad-border-default));
   box-shadow: var(--ad-shadow-keyline);
 }
 
-:root[data-skin="studio"] .agent-card:hover {
-  box-shadow: var(--ad-shadow-offset);
-  transform: translate(-1px, -1px);
-}
+:root[data-skin="studio"] [data-ui="agent-card"]::after { height: 3px; }
 
-:root[data-skin="studio"] .agent-card[data-state="waiting_input"] {
-  background: var(--ad-surface-emphasis);
-}
+:root[data-skin="studio"] [data-ui="agent-card"]:hover { box-shadow: var(--ad-shadow-offset); transform: translate(-1px, -1px); }
 
-:root[data-skin="studio"] .agent-subtitle {
-  font-family: var(--ad-font-text);
-  font-size: 0.8rem;
-}
+:root[data-skin="studio"] [data-ui="agent-card"][data-state="waiting_input"] { background: var(--ad-surface-emphasis); }
 
-:root[data-skin="studio"] .agent-preview {
+:root[data-skin="studio"] [data-ui="agent-card"] [data-slot="metadata"] { font-family: var(--ad-font-text); font-size: 0.8rem; }
+
+:root[data-skin="studio"] [data-ui="agent-card"] [data-slot="preview"] {
   border-top: none;
   color: var(--ad-text-secondary);
   font-size: 0.95rem;
   padding-top: 0;
 }
 
-/* R46 — route titles and section headings read at a friendly, readable
-   size (26-32px) instead of Core's oversized display treatment. The
-   shared page-header hook covers Dashboard/Tasks/Pipelines; Archive and
-   Settings render their own bespoke route title. */
-:root[data-skin="studio"] [data-ui="page-header"] {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+/* One chat workspace: the root owns a single surface; regions keep their existing scroll and focus contracts. */
+:root[data-skin="studio"] [data-ui="agent-workspace"] {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
+  gap: 0;
+  overflow: hidden;
 }
 
-:root[data-skin="studio"] [data-ui="page-header"] h1,
-:root[data-skin="studio"] .archive-header h1,
-:root[data-skin="studio"] .settings-page > h1 {
-  font-size: 1.875rem;
+:root[data-skin="studio"] [data-ui="agent-workspace"] > [data-slot="header"] {
+  border: 0;
+  border-inline-start: 3px solid var(--ad-action-primary);
+  border-radius: 0;
 }
 
-:root[data-skin="studio"] .pipeline-run-title h2,
-:root[data-skin="studio"] .wizard-step h3,
-:root[data-skin="studio"] .onboarding-step h3 {
-  font-size: 1.75rem;
+:root[data-skin="studio"] [data-ui="agent-workspace"] [data-slot="identity"] h1 { font-size: 1.5rem; }
+
+:root[data-skin="studio"] [data-ui="agent-workspace"] > [data-slot="tabs"] {
+  background: var(--ad-surface-raised);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
 }
 
-/* R48 — the full agent screen's header/tabs are visually subordinate to
-   the transcript, and header/transcript/composer read as one joined
-   workspace surface instead of three separate boxed panels. */
-:root[data-skin="studio"] .chat-header {
-  border-color: var(--ad-border-default);
-  border-bottom: none;
-  border-left: 3px solid var(--ad-action-primary);
-  border-radius: var(--ad-radius-large) var(--ad-radius-large) 0 0;
-}
+:root[data-skin="studio"] [data-ui="agent-workspace"] > [data-slot="tabs"] > [data-slot="tabs"] { border-bottom: var(--ad-border-thin) solid var(--ad-border-default); }
 
-:root[data-skin="studio"] .chat-header h1 {
-  font-size: 1.5rem;
-}
-
-:root[data-skin="studio"] .chat-tabs-list {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
-}
-
-:root[data-skin="studio"] .chat-tabs-list button {
+:root[data-skin="studio"] [data-ui="agent-workspace"] [data-slot="tabs"] > button {
   font-family: var(--ad-font-text);
   font-size: 0.85rem;
   letter-spacing: normal;
   text-transform: none;
 }
 
-:root[data-skin="studio"] .chat-tabs-list button[data-state="active"] {
+:root[data-skin="studio"] [data-ui="agent-workspace"] [data-slot="tabs"] > button[data-state="active"] {
   background: transparent;
   border-color: transparent;
   border-bottom: var(--ad-border-thick) solid var(--ad-action-primary);
   color: var(--ad-action-primary);
 }
 
-:root[data-skin="studio"] .transcript-view {
-  border-color: var(--ad-border-default);
-  border-radius: 0;
-  border-top: none;
-}
+:root[data-skin="studio"] [data-ui="transcript"] > [data-slot="list"] { background: var(--ad-surface-raised); border: 0; border-radius: 0; }
 
-:root[data-skin="studio"] .user-message {
-  border-color: var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="agent-workspace"] > [data-slot="composer"] { background: var(--ad-surface-raised); border-top: var(--ad-border-thin) solid var(--ad-border-default); }
 
-:root[data-skin="studio"] .composer {
-  background: var(--ad-surface-raised);
-  border: none;
-  border-radius: 0 0 var(--ad-radius-large) var(--ad-radius-large);
-  border-top: var(--ad-border-thin) solid var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="agent-workspace"] [data-ui="composer"] { background: transparent; border: 0; border-radius: 0; }
 
-/* The expanded dashboard pane's header stays subordinate to its chat
-   content the same way; the card border already frames the workspace. */
-:root[data-skin="studio"] .agent-card[data-variant="expanded"] .agent-card-name-link {
-  font-size: 1.05rem;
-}
+/* The grid pane is the same chat language, but keeps its fixed one-track bounds. */
+:root[data-skin="studio"] [data-ui="agent-card"][data-variant="expanded"] [data-slot="chat-pane"] { background: var(--ad-surface-raised); border-top: var(--ad-border-thin) solid var(--ad-border-default); }
 
-/* R49 — Tasks reads as an attention-first queue: routine rows quiet down,
-   interrupted/dependency-blocked rows carry a bounded accent instead of
-   all rows sharing one equal-weight card treatment. */
-:root[data-skin="studio"] .task-row {
-  border-color: var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="composer"][data-variant="dashboard"] { background: var(--ad-surface-panel); border: 0; border-top: var(--ad-border-thin) solid var(--ad-border-default); border-radius: 0; }
+
+/* Tasks becomes an attention-led queue, with rows rather than a field of equal cards. */
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="toolbar"] { align-items: center; background: var(--ad-surface-subtle); border-left: 3px solid var(--ad-action-primary); padding: var(--ad-space-3) var(--ad-space-4); }
+
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="attention"] { font-family: var(--ad-font-text); font-size: 1rem; font-weight: 700; }
+
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="list"] { border-top: var(--ad-border-thin) solid var(--ad-border-default); gap: 0; }
+
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"] { background: transparent; border: 0; border-bottom: var(--ad-border-thin) solid var(--ad-border-default); border-radius: 0; padding: var(--ad-space-4) 0; }
 
 :root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="interrupted"],
-:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="dependency_failed"] {
-  background: var(--ad-surface-emphasis);
-  border-inline-start: 3px solid var(--ad-state-busy);
-}
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="dependency_failed"] { background: var(--ad-surface-emphasis); border-inline-start: 3px solid var(--ad-state-busy); padding-inline: var(--ad-space-4); }
 
-:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="finished"] {
-  opacity: 0.78;
-}
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="finished"] { opacity: 0.78; }
 
-:root[data-skin="studio"] .tasks-attention-count {
-  font-family: var(--ad-font-text);
-  font-size: 1rem;
-  font-weight: 700;
-}
+/* Pipelines distinguish the live ledger from a slower authoring workspace. */
+:root[data-skin="studio"] [data-ui="pipelines"] [data-slot="navigation"] { border-bottom: var(--ad-border-thin) solid var(--ad-border-default); }
 
-/* R49 — Pipeline Runs keeps its ledger/timeline shape; the surrounding
-   chrome quiets to match. Templates/editor share the same panel and
-   section-heading treatment as an authoring surface. */
-:root[data-skin="studio"] .pipeline-section-heading h2,
-:root[data-skin="studio"] .pipeline-editor-heading h2 {
-  font-size: 1.75rem;
-}
+:root[data-skin="studio"] [data-ui="pipelines"] [data-slot="navigation"] a { font-family: var(--ad-font-text); font-size: 0.9rem; }
 
-:root[data-skin="studio"] .pipeline-tabs {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="pipeline-section"] h2 { font-size: 1.75rem; line-height: 1; }
 
-:root[data-skin="studio"] .pipeline-tab {
-  font-family: var(--ad-font-text);
-}
+:root[data-skin="studio"] [data-ui="pipeline-run-list"],
+:root[data-skin="studio"] [data-ui="pipeline-template-library"] { border-color: var(--ad-border-default); box-shadow: var(--ad-shadow-keyline); }
 
-:root[data-skin="studio"] .pipeline-ledger,
-:root[data-skin="studio"] .pipeline-template-library,
-:root[data-skin="studio"] .pipeline-panel {
-  border-color: var(--ad-border-default);
-  box-shadow: var(--ad-shadow-keyline);
-}
+:root[data-skin="studio"] [data-ui="pipeline-run-list"] [data-slot="item"],
+:root[data-skin="studio"] [data-ui="pipeline-template-library"] [data-slot="item"] { border-color: var(--ad-border-default); }
 
-/* R49 — Archive stays search-first: the search field keeps its highlight
-   as the focal element while list chrome quiets to scan-friendly rows. */
-:root[data-skin="studio"] .archive-header {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="pipeline-template-editor"] [data-slot="workspace"] { background: var(--ad-surface-panel); border: var(--ad-border-thin) solid var(--ad-border-default); box-shadow: var(--ad-shadow-keyline); }
 
-:root[data-skin="studio"] .archive-list,
-:root[data-skin="studio"] .archive-row {
-  border-color: var(--ad-border-default);
-}
+:root[data-skin="studio"] [data-ui="pipeline-template-editor"] [data-slot="navigator"] { background: var(--ad-surface-subtle); border-color: var(--ad-border-default); }
 
-/* R49 — Settings keeps its two-column shell; the tab rail reads as a
-   quiet navigation spine instead of dense uppercase technical labels. */
-:root[data-skin="studio"] .settings-page > h1 {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
-}
+/* Archive leads with search and makes results read like records, not mini cards. */
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="search"] { background: var(--ad-surface-subtle); border-color: var(--ad-border-default); border-radius: var(--ad-radius-large); padding: var(--ad-space-4); }
 
-:root[data-skin="studio"] .settings-tabs-list {
-  border-top: none;
-}
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="results"] { border-top-color: var(--ad-border-default); }
 
-:root[data-skin="studio"] .settings-tabs-list button {
-  font-family: var(--ad-font-text);
-  font-size: 0.85rem;
-  letter-spacing: normal;
-  text-transform: none;
-}
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="result"] { background: transparent; border-color: var(--ad-border-default); padding-inline: 0; }
 
-:root[data-skin="studio"] .config-editor-header h2 {
-  font-size: 1.75rem;
-}
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="result"]:hover,
+:root[data-skin="studio"] [data-ui="archive"] [data-slot="result"]:focus-visible { background: var(--ad-surface-emphasis); padding-inline: var(--ad-space-4); }
+
+/* Settings keeps the navigation spine quiet and makes configuration readable rather than card-heavy. */
+:root[data-skin="studio"] [data-ui="settings"] [data-slot="navigation"] { border-top: 0; border-inline-start: var(--ad-border-thin) solid var(--ad-border-default); }
+
+:root[data-skin="studio"] [data-ui="settings"] [data-slot="navigation"] button { font-family: var(--ad-font-text); font-size: 0.85rem; letter-spacing: normal; text-transform: none; }
+
+:root[data-skin="studio"] [data-ui="settings"] [data-slot="content"] { max-width: 76rem; }
+
+:root[data-skin="studio"] [data-ui="config-editor"] [data-slot="header"] h2 { font-size: 1.75rem; }
+
+:root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] { border-color: var(--ad-border-default); }
+
+/* Onboarding and overlays use the same composed surfaces without changing their flows. */
+:root[data-skin="studio"] [data-ui="dialog"][data-slot="content"] { border-color: var(--ad-border-default); border-width: var(--ad-border-thin); }
+
+:root[data-skin="studio"] [data-ui="onboarding"] [data-slot="progress"] { gap: var(--ad-space-2); }
+
+:root[data-skin="studio"] [data-ui="onboarding"] [data-slot="progress"] [data-state] { border-radius: var(--ad-radius-medium); font-family: var(--ad-font-text); text-transform: none; }
+
+:root[data-skin="studio"] [data-ui="onboarding"] [data-slot="step"] h3 { font-size: 1.75rem; }
+
+:root[data-skin="studio"] [data-ui="toast"] { border-bottom-color: var(--ad-border-default); border-left-width: 4px; border-right-color: var(--ad-border-default); border-top-color: var(--ad-border-default); }
+
+:root[data-skin="studio"] [data-ui="permission-prompt"] { border-width: var(--ad-border-thin); border-inline-start-width: 4px; }
 
 :root[data-skin="studio"] [data-ui="surface"],
 :root[data-skin="studio"] [data-ui="dialog"][data-slot="content"],
-:root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] {
-  border-radius: var(--ad-radius-large);
-}
+:root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] { border-radius: var(--ad-radius-large); }
 
-:root[data-skin="studio"] [data-ui="button"] {
-  border-radius: var(--ad-radius-medium);
-}
+:root[data-skin="studio"] [data-ui="button"] { border-radius: var(--ad-radius-medium); }
 
-/* The message itself carries the transcript hook; a descendant selector would
-   also tint the full-width event row around it. */
-:root[data-skin="studio"] [data-ui="transcript"][data-variant="user"] {
-  background: color-mix(in srgb, var(--ad-studio-soft-blue) 60%, var(--ad-surface-raised));
-}
-
-/* R49 — overlays (dialogs, context menus, toasts, permission prompts)
-   keep their semantic state color but trade a heavy all-around border
-   for the same bounded-accent language used across the rest of Studio. */
-:root[data-skin="studio"] .dialog-content {
-  border-color: var(--ad-border-default);
-  border-width: var(--ad-border-thin);
-}
-
-:root[data-skin="studio"] .context-menu {
-  border-color: var(--ad-border-default);
-  border-width: var(--ad-border-thin);
-}
-
-/* border-color would also win over .toast.done/.waiting_input/.error's
-   left-edge state color (layer precedence beats selector specificity), so
-   the quieter default only touches the three non-accented sides. */
-:root[data-skin="studio"] .toast {
-  border-bottom-color: var(--ad-border-default);
-  border-left-width: 4px;
-  border-right-color: var(--ad-border-default);
-  border-top-color: var(--ad-border-default);
-}
-
-:root[data-skin="studio"] .permission-prompt {
-  border-width: var(--ad-border-thin);
-  border-inline-start-width: 4px;
-}
+:root[data-skin="studio"] [data-ui="transcript"][data-variant="user"] { background: color-mix(in srgb, var(--ad-studio-soft-blue) 60%, var(--ad-surface-raised)); }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] {
   background-color: var(--ad-studio-canvas);
@@ -363,23 +270,11 @@
   border-radius: var(--ad-studio-radius-medium);
 }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-sky {
-  background: var(--ad-studio-soft-blue);
-  border-radius: var(--ad-studio-radius-small);
-}
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] [data-slot="preview-sky"] { background: var(--ad-studio-soft-blue); border-radius: var(--ad-studio-radius-small); }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-surface {
-  background: var(--ad-studio-panel);
-  border-color: var(--ad-studio-line);
-  border-radius: var(--ad-studio-radius-medium);
-}
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] [data-slot="preview-surface"] { background: var(--ad-studio-panel); border-color: var(--ad-studio-line); border-radius: var(--ad-studio-radius-medium); }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-action {
-  background: var(--ad-studio-coral);
-  border-radius: var(--ad-studio-radius-medium);
-}
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] [data-slot="preview-action"] { background: var(--ad-studio-coral); border-radius: var(--ad-studio-radius-medium); }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] .appearance-preview-signal {
-  background: var(--ad-studio-forest);
-}
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] [data-slot="preview-signal"] { background: var(--ad-studio-forest); }
 }

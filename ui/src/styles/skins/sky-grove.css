@@ -97,23 +97,23 @@
   border-radius: var(--ad-sky-grove-radius-medium);
 }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-sky {
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-sky"] {
   background: var(--ad-sky-grove-canvas);
   border-radius: var(--ad-sky-grove-radius-small);
 }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-surface {
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-surface"] {
   background: var(--ad-sky-grove-panel);
   border-color: var(--ad-sky-grove-line);
   border-radius: var(--ad-sky-grove-radius-medium);
 }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-action {
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-action"] {
   background: var(--ad-sky-grove-primary);
   border-radius: var(--ad-sky-grove-radius-medium);
 }
 
-[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] .appearance-preview-signal {
+[data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-signal"] {
   background: var(--ad-sky-grove-secondary);
 }
 }

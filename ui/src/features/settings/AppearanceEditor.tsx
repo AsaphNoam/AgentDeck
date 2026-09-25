@@ -95,11 +95,11 @@ export function AppearanceEditor() {
               type="radio"
               value={appearance.value}
             />
-            <span className="appearance-preview" data-preview-skin={appearance.id} aria-hidden="true">
-              <span className="appearance-preview-sky" />
-              <span className="appearance-preview-surface" />
-              <span className="appearance-preview-action" />
-              <span className="appearance-preview-signal" />
+            <span className="appearance-preview" data-slot="preview" data-preview-skin={appearance.id} aria-hidden="true">
+              <span className="appearance-preview-sky" data-slot="preview-sky" />
+              <span className="appearance-preview-surface" data-slot="preview-surface" />
+              <span className="appearance-preview-action" data-slot="preview-action" />
+              <span className="appearance-preview-signal" data-slot="preview-signal" />
             </span>
             <span className="appearance-copy">
               <strong>{appearance.name}</strong>

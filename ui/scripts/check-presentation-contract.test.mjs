@@ -28,7 +28,7 @@ function fixture({
   fs.writeFileSync(path.join(root, "src", "Component.tsx"), `${allowlist}${component}${skinMarkup}`);
   fs.writeFileSync(path.join(root, "src", "presentation", "VisualMatrix.tsx"), "export function VisualMatrix() { return null; }");
   fs.writeFileSync(path.join(root, "src", "presentation", "contract.json"), JSON.stringify({
-    version: 3,
+    version: 4,
     skins,
     tokens: ["--ad-public"],
     components: skinComponents,
@@ -76,6 +76,19 @@ test("accepts several built-in skins, each with its own private palette", () => 
   const crossed = fixture({ skins: ["sky-grove", "studio"] });
   fs.appendFileSync(path.join(crossed, "src", "styles", "skins", "studio.css"), '\n@layer ad-skins { :root[data-skin="studio"] { --ad-public: var(--ad-sky-grove-canvas); } }');
   expectFailure(crossed, "may be used only in sky-grove.css");
+});
+
+test("rejects implementation classes in production skin selectors", () => {
+  expectFailure(fixture({
+    skins: ["sky-grove"],
+    skinCss: {
+      "sky-grove": `@layer ad-skins {
+        :root { --ad-sky-grove-canvas: #def; }
+        :root[data-skin="sky-grove"] .known { color: var(--ad-sky-grove-canvas); }
+        [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] { color: var(--ad-sky-grove-canvas); }
+      }`,
+    },
+  }), "uses implementation class .known");
 });
 
 test("rejects literal classes without selectors", () => {

@@ -51,11 +51,12 @@ function filterCommands(commands: AvailableCommand[], query: string): PickerItem
     }));
 }
 
-export function Composer({ agentId, busy, running = true, steerable = false }: {
+export function Composer({ agentId, busy, running = true, steerable = false, variant }: {
   agentId: string;
   busy: boolean;
   running?: boolean;
   steerable?: boolean;
+  variant?: "dashboard";
 }) {
   const [text, setText] = useState(() => getChatDraft(agentId));
   const [error, setError] = useState<string | null>(null);
@@ -299,7 +300,7 @@ export function Composer({ agentId, busy, running = true, steerable = false }: {
   };
 
   return (
-    <form className="composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+    <form className="composer" data-ui="composer" data-variant={variant} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <div className="composer-input">
         <textarea
           ref={textareaRef}

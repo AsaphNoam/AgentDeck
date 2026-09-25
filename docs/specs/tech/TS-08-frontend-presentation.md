@@ -720,7 +720,10 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   handlers, accessible labels, state derivation, and children in every appearance. Components do
   not branch on `studio`, copy the Make prototype's markup, or build a second transcript or
   appearance-specific route. Shared markup changes must render with unchanged Core and Sky & Grove
-  geometry and behavior (R7–R9/R26–R28, FS-12.R44/R48, INV §2/§13).
+  geometry and behavior (R7–R9/R26–R28, FS-12.R44/R48, INV §2/§13). The composition repair advances
+  the contract to version 4 for neutral shell `header`/`brand`, `composer`, pipeline-section/workspace,
+  and appearance-preview slots; the presentation checker rejects implementation-class selectors in every
+  production skin.
 - **R67 (shipped 2026-09-25) — Existing layout contracts bound Studio's freedom.** The dashboard keeps the
   persisted `perRow`/gap template, one-track expanded pane, fixed pane height, row order, and
   internally scrolling real transcript under R41/R45 and FS-02.R55; visual card hierarchy must

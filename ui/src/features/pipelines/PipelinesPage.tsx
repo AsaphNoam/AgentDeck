@@ -68,7 +68,7 @@ export function RunsPage() {
 
   return (
     <div className="pipeline-destination pipeline-runs-destination">
-      <header className="pipeline-section-heading">
+      <header className="pipeline-section-heading" data-ui="pipeline-section">
         <div><p className="pipeline-eyebrow">Operational ledger</p><h2>Runs</h2><p>Follow what is active now, then drill into the full execution record.</p></div>
         <div className="pipeline-start-gate">
           <Button variant="primary" disabled={noTemplate} onClick={() => { setProposal(null); setStartOpen(true); }}>Start run</Button>
@@ -107,7 +107,7 @@ export function TemplatesPage() {
 
   return (
     <div className="pipeline-destination pipeline-templates-destination">
-      <header className="pipeline-section-heading">
+      <header className="pipeline-section-heading" data-ui="pipeline-section">
         <div><p className="pipeline-eyebrow">Reusable definitions</p><h2>Templates</h2><p>Keep stage logic model-neutral; choose runtimes only when a run starts.</p></div>
         <Button variant="primary" onClick={() => navigate("/pipelines/templates/new")}>Create manually</Button>
       </header>

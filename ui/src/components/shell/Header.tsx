@@ -5,8 +5,8 @@ import { ActiveProjectNav } from "./ActiveProjectNav";
 
 export function Header() {
   return (
-    <header className="app-header" data-ui="app-shell">
-      <Link to="/" className="app-logo">
+    <header className="app-header" data-ui="app-shell" data-slot="header">
+      <Link to="/" className="app-logo" data-slot="brand">
         <AgentDeckMark />
       </Link>
       <nav className="app-nav" data-slot="navigation" aria-label="Primary navigation">

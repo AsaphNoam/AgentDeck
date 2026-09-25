@@ -153,7 +153,7 @@ export function TemplateEditor({
   return (
     <section className="pipeline-template-editor" data-ui="pipeline-template-editor">
       <Link className="pipeline-back-link" to="/pipelines/templates">← All templates</Link>
-      <div className="pipeline-editor-heading">
+      <div className="pipeline-editor-heading" data-ui="pipeline-section">
         <div>
           <p className="pipeline-eyebrow">Reusable definition · version 2</p>
           <h2>{draft.title || (savedID ? id : "New template")}</h2>
@@ -203,7 +203,7 @@ export function TemplateEditor({
         </div>
       </details>
 
-      <div className="pipeline-editor-workspace">
+      <div className="pipeline-editor-workspace" data-slot="workspace">
         <aside className="pipeline-stage-navigator" data-slot="navigator">
           <div className="pipeline-stage-nav-heading"><div><p className="pipeline-eyebrow">Flow order</p><h3>Stages</h3></div>
           <button type="button" onClick={() => mutate((next) => next.stages.push({

@@ -16,7 +16,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `complete-studio-composition` finished 2026-09-25 and awaits `/review`.
+- **Active change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -43,7 +43,25 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `complete-studio-composition` finished 2026-09-25 and awaits `/review`.
+**Change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
+
+**Changelog — 2026-09-25 (work: Studio composition correction, FS-12.R46–R49/
+TS-08.R65–R67):** Repaired the real dashboard and full-screen agent-workspace composition: Studio
+now removes the Core grid gap and makes the header, tabs, transcript, and dashboard composer one
+clipped surface without changing their scroll or focus ownership. Tasks, Pipelines, Archive, and
+Settings now use their required Studio hierarchies (attention strip/rows, ledger and authoring
+surfaces, search-first records, and a quiet navigation spine), with the same bounded treatment for
+onboarding and overlays. Contract v4 exposes neutral presentation hooks for the shell, dashboard
+composer, pipeline workspace/sections, and appearance preview. Production skin CSS is now checked
+to reject implementation-class selectors; Sky & Grove was migrated to those preview hooks too.
+
+Rendered evidence: Visual Matrix Studio at 1024px; the built application at 1024px for Settings,
+empty Tasks, Pipelines, and Archive; and the Tasks authoring layout at 1440px with no horizontal
+overflow. `ui/npm run check:styles` (37 tests), `ui/npm test` (458 tests), `ui/npm run build`,
+`make embed && make build`, and `make test` (both Go tag variants) pass. **Still owed:** A21–A23
+and TS-08.R68 remain `(planned)`: populated long/dense task, pipeline, template, and archive
+states; every Settings/onboarding state; and desaturated review beyond the dashboard were not
+available as deterministic evidence in this correction.
 
 **Changelog — 2026-09-25 (design: complete Studio composition, FS-12.R46–R49/TS-08.R65–R67
 shipped):** The operator rejected the first Studio slice as a palette change; this shipped the

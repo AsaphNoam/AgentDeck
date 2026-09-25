@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "skins": [
     "sky-grove",
     "studio"
@@ -116,6 +116,8 @@
     },
     "app-shell": {
       "slots": [
+        "header",
+        "brand",
         "mark",
         "wordmark",
         "navigation",
@@ -269,6 +271,13 @@
         "unknown"
       ]
     },
+    "composer": {
+      "slots": [],
+      "states": [],
+      "variants": [
+        "dashboard"
+      ]
+    },
     "file-viewer": {
       "slots": [
         "header",
@@ -419,7 +428,12 @@
         "list",
         "item",
         "form",
-        "actions"
+        "actions",
+        "preview",
+        "preview-sky",
+        "preview-surface",
+        "preview-action",
+        "preview-signal"
       ],
       "states": [
         "empty",
@@ -568,8 +582,14 @@
         "navigator",
         "stage",
         "inputs",
-        "actions"
+        "actions",
+        "workspace"
       ],
+      "states": [],
+      "variants": []
+    },
+    "pipeline-section": {
+      "slots": [],
       "states": [],
       "variants": []
     },

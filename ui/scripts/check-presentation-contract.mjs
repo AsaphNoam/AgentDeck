@@ -272,7 +272,7 @@ export function auditPresentation(root) {
   const add = (file, rule, message) => diagnostics.push({ file, rule, message });
   const addRaw = (file, rule, message) => rawDiagnostics.push({ file, rule, message });
 
-  if (contract.version !== 3) add("src/presentation/contract.json", "manifest", "version must be 3");
+  if (contract.version !== 4) add("src/presentation/contract.json", "manifest", "version must be 4");
   if (!Array.isArray(contract.skins) || !Array.isArray(contract.tokens) || !contract.components || !Array.isArray(contract.decorative_slots)) add("src/presentation/contract.json", "manifest", "invalid contract shape");
   if (new Set(contract.skins ?? []).size !== (contract.skins ?? []).length) add("src/presentation/contract.json", "manifest", "duplicate built-in skin id");
   for (const skin of contract.skins ?? []) {
@@ -320,7 +320,10 @@ export function auditPresentation(root) {
             const hooks = { "data-ui": [], "data-slot": [], "data-state": [], "data-variant": [] };
             const skinValues = [];
             const previewValues = [];
-            selector.walkClasses((node) => selectorClasses.add(node.value));
+            selector.walkClasses((node) => {
+              selectorClasses.add(node.value);
+              if (fileSkin) add(file, "skin-hook", `skin selector ${selector.toString().trim()} uses implementation class .${node.value}`);
+            });
             selector.walkAttributes((node) => {
               const value = node.operator === "=" && node.value ? node.value.replace(/^['"]|['"]$/g, "") : null;
               if (node.attribute === "data-skin") skinValues.push(value);
