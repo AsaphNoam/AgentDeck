@@ -260,6 +260,40 @@ Requirements are user-observable.
   Every first-party route, dialog, menu, notification, onboarding step, syntax/diff renderer, and
   terminal surface receives the selected appearance without a network-loaded asset.
 
+### 2.11 Studio composition upgrade
+
+- **R46 (planned)** — Studio is a compositional alternative, not merely a recoloring of Core.
+  Its shell uses a quieter, more compact single-row header with less boxed navigation; route titles
+  and section headings use a friendly, readable hierarchy (route titles around 26–32px, body copy
+  no smaller than 14px) instead of Core's oversized display and dense uppercase technical
+  treatment. The canvas remains visually open, with substantial space
+  between meaningful groups rather than a repeated equal-card frame. Route identity, project links,
+  connection state, navigation order, and accessible current-route cues remain intact. Core and
+  Sky & Grove retain their shipped appearance. This extends R43 beyond palette and ornament.
+- **R47 (planned)** — Studio's Dashboard makes the agent work—not chrome or card borders—the first
+  scan target. Group headings are quiet organizing landmarks; a collapsed card presents agent name
+  and live state first, a readable current detail/preview second, and role/project/runtime/mail
+  metadata as subordinate information, with the existing project and state accents bounded.
+  Spacing and surface treatment distinguish card header, conversation preview, and metadata without
+  adding nested generic cards or hiding content. All existing dashboard/project views, grouping,
+  density values, drag affordances, ordering, collapsed/expanded states, and actions remain.
+- **R48 (planned)** — Studio's expanded dashboard card and full agent screen read as actual chat
+  workspaces. The existing chronological `TranscriptView` receives a clear reading region with
+  message and tool hierarchy; the existing `Composer` reads as its anchored continuation, not a
+  separate utility panel or a mock transcript. The card header and full-screen header/tabs are
+  visually subordinate to the conversation while retaining state, context, controls, Files,
+  Commands, conditional Terminal, permissions, annotations, and archived read-only behavior. The
+  expanded card remains in its existing grid track, with the same scroll, focus, activation, and
+  neighboring-card stability behavior; no chat action or event projection changes.
+- **R49 (planned)** — Studio gives each remaining destination a deliberate content hierarchy:
+  Tasks reads as an attention-first work queue, not a stack of equal cards; Pipeline Runs reads as
+  an operational ledger and run timeline, while Templates/editor reads as an authoring surface;
+  Archive is search-first with scan-friendly result rows; Settings uses a quiet navigation spine
+  and readable configuration measures; onboarding and dialogs have clear step/form/action
+  hierarchy. This applies to populated, empty, attention/error, long-content, and narrow desktop
+  states without removing fields, outcomes, actions, tabs, validation, or recovery feedback.
+  Existing route and task flows do not change.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -390,6 +424,25 @@ Requirements are user-observable.
   chronological chat, composer, permissions, tool disclosure, and navigation behavior as Core;
   collapsed card density and grouping are unchanged. *Verify:* existing dashboard/chat behavior
   tests plus a real-browser expanded-pane and agent-screen journey in Core and Studio.
+- **A21 (planned)** (R46–R49) — At 1024px and a wider desktop viewport, paired rendered views of
+  Core, Sky & Grove, and Studio show Studio-specific changes to spatial hierarchy, grouping,
+  typography scale, and surface composition on the shell, dashboard, expanded card, agent screen,
+  Tasks, Pipelines, Archive, and Settings. A desaturated comparison still identifies Studio by its
+  layout and hierarchy; changing only color, radius, shadow, or the dot pattern does not pass.
+  *Verify:* real-browser side-by-side design review against the Figma Make direction and the
+  screen-specific requirements R46–R49, with representative long/dense and empty states.
+- **A22 (planned)** (R47–R48) — A grouped dashboard at every existing density keeps the same card
+  positions before and after one pane expands; a long-name card, waiting/error card, stopped card,
+  and terminal card remain scannable. The expanded chat uses the real transcript and composer,
+  exposes permission/tool detail, and neither clips controls nor visually reads as a static code
+  sample. *Verify:* FS-02.A37–A41 regressions plus Core/Sky & Grove/Studio browser screenshots
+  and the live expanded-pane journey.
+- **A23 (planned)** (R48–R49) — Studio's active and archived agent views, task attention and
+  waiting rows, active/paused/finished pipeline runs, template editor, archive results, all
+  Settings sections, and four onboarding steps retain their existing controls and reading order
+  while meeting their distinct composition in R48–R49. Focus, hover, disabled, error, success,
+  permission, and long-content states remain clear. *Verify:* the deterministic visual matrix,
+  affected feature tests, and real-browser route/state review at the supported desktop floor.
 
 ## 6. Deviations & open decisions
 
@@ -410,6 +463,10 @@ Requirements are user-observable.
 - R39 and A15 specify the confirmed same-row compact active-project navigation and `+n` overflow.
   FS-02.R54 fixes title/id alphabetical ordering and keeps the current project directly visible;
   no product decision remains open before technical design.
+- Studio's first shipped slice (R42–R45) established selection and visual values but retained
+  Core's composition. The operator rejected that as an incomplete UI redesign on 2026-09-25.
+  Planned R46–R49/A21–A23 add Studio-only spatial and typographic composition while preserving
+  the existing interactions; TS-08.R65–R68 supersede the restrictive Studio clauses in R62–R63.
 
 ## 7. Traceability
 

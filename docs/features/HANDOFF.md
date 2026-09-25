@@ -23,7 +23,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `persistent-pipeline-orchestration` (2026-09-13) are closed; their fix commits are not new units.
   `stop-telling-agents-to-poll` shipped without entering this queue on
   the operator's explicit 2026-09-10 instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `complete-studio-composition.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -42,6 +42,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** None. `simplify-pipeline-run-detail` and `add-studio-skin` await `/review`.
+
+**Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
+slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23
+and TS-08.R65–R68 authorize Studio-scoped spatial and typographic design across the existing
+surfaces while preserving all interactions, the real dashboard chat, grid stability, and Core/Sky &
+Grove. `complete-studio-composition.md` is Waiting to start; no product code changed.
 
 **Changelog — 2026-09-23 (work: Studio skin):** Shipped FS-12.R42–R45/A18, TS-02.R36, TS-03.R45,
 TS-08.R61–R64 in one slice: `studio` in `config.BuiltInAppearanceSkins`, `BUILT_IN_SKINS` and

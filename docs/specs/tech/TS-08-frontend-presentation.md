@@ -700,6 +700,46 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   or behavior-only mockup assertion substitutes for rendered evidence (FS-12.A18–A20;
   INV §10/§13/§17).
 
+### 2.9 Studio composition completion
+
+- **R65 (planned) — Studio may own skin-scoped spatial composition.** The initial Studio sheet
+  in R62 changes mostly semantic values and ornament; that is not the full R46–R49 result. Inside
+  `ad-skins`, `:root[data-skin="studio"]` may now override layout, spacing, type scale, border
+  weight, and surface grouping on documented public hooks and their documented slots for the shell,
+  Dashboard, agent workspace, Tasks, Pipelines, Archive, Settings, onboarding, and overlays. This
+  supersedes R62's prohibition on Studio layout ownership and R63's prohibition on Studio sizing
+  changes only; it does not give presentation authority over feature data or behavior. Keep Core
+  styles and Sky & Grove selectors intact, and do not make either depend on Studio values. The
+  Studio sheet remains the sole skin-specific source rather than a second component library or
+  provider (FS-12.R46–R49, INV §10/§13).
+- **R66 (planned) — Structural support is neutral and minimal.** Prefer the existing
+  `data-ui`/`data-slot` surface and CSS layout over rewriting components. Where the requested
+  composition cannot be expressed without selecting an implementation class or an undocumented
+  descendant, add the smallest product-native wrapper or slot in the owning feature, register it
+  in `contract.json` with a version advance, and keep the same semantic DOM reading order,
+  handlers, accessible labels, state derivation, and children in every appearance. Components do
+  not branch on `studio`, copy the Make prototype's markup, or build a second transcript or
+  appearance-specific route. Shared markup changes must render with unchanged Core and Sky & Grove
+  geometry and behavior (R7–R9/R26–R28, FS-12.R44/R48, INV §2/§13).
+- **R67 (planned) — Existing layout contracts bound Studio's freedom.** The dashboard keeps the
+  persisted `perRow`/gap template, one-track expanded pane, fixed pane height, row order, and
+  internally scrolling real transcript under R41/R45 and FS-02.R55; visual card hierarchy must
+  fit those dimensions rather than silently changing density or shifting neighbors. The compact
+  header still fits primary and active-project navigation plus connection state at 1024px under
+  R44 and FS-12.R39. The agent workspace preserves file-viewer docking, annotation behavior,
+  conditional Terminal, and composer focus; task, pipeline, archive, Settings, and onboarding
+  surfaces preserve their existing action/validation order. No CSS visual reordering may make
+  keyboard or screen-reader order disagree with the reading path (FS-12.R47–R49, INV §8/§10).
+- **R68 (planned) — Composition is a separate acceptance gate from skin activation.** Extend the
+  deterministic matrix only with representative content/states the shipped fixture lacks; do not
+  duplicate feature components or construct a Make-derived dashboard. Real-browser review compares
+  Core, Sky & Grove, and Studio at 1024px and a wider desktop viewport for the exact route/state
+  set in FS-12.A21–A23. Record evidence of changes in spatial hierarchy and text measure on each
+  named surface, including a desaturated side-by-side comparison; a palette-only diff fails even
+  when R64's token/contract checks pass. Focused behavior tests protect interaction parity,
+  while presentation-contract/style checks protect every new slot or skin selector. No stored
+  screenshot baseline is introduced (INV §10/§13/§17).
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract
