@@ -46,6 +46,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Thin AgentDecker role, shared operating skill, progressive references, discovery fallback, seed prompts free of polling instructions, and exact per-role prompt migration |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
+| FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, attention-first phone web app, attention notifications, keep-awake |
 
 ### Technical specs
 
@@ -63,6 +64,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task lineage, scoped work management, and same-task wait/continuation |
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional delivery, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
+| TS-13 | [tech/TS-13-remote-control.md](tech/TS-13-remote-control.md) | Partial | Embedded Tailscale node, tailnet listener guard and allowlist, phone pairing and device credentials, Web Push, keep-awake, phone web-app entry |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

@@ -184,6 +184,14 @@ MCP, steer idle fallback, thought delivery, one native subagent, one background 
 stop, clone/fork with multi-page history, canonical tool name, file report, stop/resume and load. It
 records the exact adapter/CLI versions and cannot be replaced by fake-ACP success (INV §12/§17).
 
+**R27 (planned) — Remote control pins its Tailscale dependency and toolchain.** `tailscale.com` is
+required at one exact version, and `go.mod`'s `go` directive rises to that module's minimum (≥ 1.26.6
+as of v1.102.5); CI, release, and documented source toolchains move together. The release binary's
+growth (about 15–22 MiB measured) is accepted. A bump re-verifies the TS-13 evidence surface —
+`ListenTLS` prerequisites, `WhoIs` fields, `StatusWithoutPeers` auth URL, and `Close` behavior —
+before landing. Automated tests exercise the remote chain through a fake listener and fake `WhoIs`
+and never contact a real tailnet or push service; FS-20's manual gates own those.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

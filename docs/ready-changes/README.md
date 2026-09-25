@@ -47,6 +47,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
+- [`add-mobile-remote-control.md`](add-mobile-remote-control.md) — pair phones over the person's
+  tailnet and supervise, answer, redirect and start work from an installable phone web app.
 
 ## Paused changes
 

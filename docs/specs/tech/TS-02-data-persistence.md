@@ -259,6 +259,18 @@ Core is never inserted into the manifest as if it were a skin id.
 second preference, schema version, SQLite row, launch snapshot, project/session field, or retained
 visual data is introduced (FS-12.R42, TS-08.R61).
 
+**R37 (planned) — Remote control persists paired devices, two preferences, and owned secrets.**
+A forward-only migration adds `remote_devices`: text `id` primary key, `name`, unique `token_hash`
+(SHA-256), `node_stable_id`, `node_login`, `paired_at`, `last_seen_at`, and nullable
+`push_endpoint`, `push_p256dh`, `push_auth`, integer `push_enabled`, and `push_state`
+(`active`/`expired`). Revoke and unpair hard-delete the row; nothing else about a device is
+retained. `config.json` version 1 gains optional booleans `remote_enabled` and `keep_awake`
+(absent = false) under R3's owner-only atomic rewrite with no config-version bump. The embedded
+Tailscale node state lives in `$AGENTDECK_HOME/remote/tailscale/` (`0700`) and the VAPID key pair in
+`$AGENTDECK_HOME/remote/vapid.json` (`0600`). Pairing codes and pending requests are memory-only and
+lost on restart. The phone's "since you last looked" time lives only in the phone's own storage
+(TS-13.R10, R7, R8, R11).
+
 **R22 — AgentDecker proposal records are authoritative, consumable, and
 bounded.** A forward-only `pipeline_proposals` table is the durable authority for the Pipelines
 approval surface: content-addressed `proposal_id`, kind, digest, non-null canonical `payload_json`,

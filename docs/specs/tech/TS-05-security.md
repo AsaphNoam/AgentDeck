@@ -214,6 +214,14 @@ sensitive-context sharing is a practical problem.
   created by the same agent in other stages. Standing interventions do not change this boundary.
   FS-14.R78's material intervention mail is deliberately supplied same-scope data; source
   references remain subject to ordinary context checks, not blanket access to private conversations.
+- **R23 (planned) — Paired phones on the person's tailnet are the one remote exception.** When
+  remote control is on (FS-20), a second listener exists only inside the embedded Tailscale node
+  (TS-13.R2) and serves only TS-13.R5's allowlist to devices that pass TS-13.R4's guard and R7's
+  node-bound device credential. R1's loopback bind, R2's `localOnly` guard, and R3's same-machine
+  trust keep governing the desktop interface unchanged; the two chains never share middleware.
+  Nothing is published to the public internet. A remote request never widens permission policy
+  (TS-13.R6), and device management, pairing issuance, and every configuration route stay
+  loopback-only.
 
 ## 3. Interfaces & data shapes
 

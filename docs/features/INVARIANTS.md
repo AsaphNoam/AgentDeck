@@ -409,6 +409,9 @@ response headers). And any other account on the machine can read world-readable 
   (DNS rebinding) and non-local `Origin` headers (cross-site WS/CSRF) with 403. The guard wraps
   the **entire mux** in `routes.go`; never mount a handler outside it, and never rely on CORS
   headers as access control — they only gate what a compliant browser lets a page *read*.
+  (planned, TS-05.R23) The tailnet remote listener is the one other chain: its routes sit behind
+  the remote guard, device authentication, and allowlist of TS-13.R4/R5 instead — never behind
+  neither guard, and never mixed with `localOnly`.
 - Everything under `~/.agentdeck` (config with backend env/API keys, `state.db`, transcripts,
   hook/MCP token files, logs) is owner-only: `0o700` dirs, `0o600` files (hook scripts `0o700`).
   `MkdirAll` never re-modes an existing dir and SQLite creates files umask-relative, so creation

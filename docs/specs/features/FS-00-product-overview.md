@@ -23,6 +23,11 @@ past work — without juggling a dozen terminal tabs.
   no account.
 - **R2** — The server binds `127.0.0.1` only and is never exposed publicly. The API is unauthenticated
   on loopback; `/api/hook` and `/mcp` additionally require a per-launch token (see TS-05).
+- **R18 — Paired phones over the person's tailnet are the one remote exception.** (planned) When
+  the person turns on remote control (FS-20), AgentDeck also answers on its own device in the
+  person's Tailscale network, to paired phones only. It is never published to the public internet,
+  AgentDeck still operates no cloud component and requires no AgentDeck account, and the loopback
+  desktop interface keeps R2's same-machine trust unchanged.
 - **R3** — The product goals are: run N sessions concurrently, each addressable as `role@project`;
   show live status at a glance; provide a full streaming chat view per agent; persist and
   search/resume every session; let agents message each other; and support multiple
