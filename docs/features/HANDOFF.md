@@ -16,16 +16,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `complete-studio-composition` (in progress) — Studio-scoped spatial/typographic
-  composition, FS-12.R46–R49/A21–A23, TS-08.R65–R68.
+- **Active change:** None. `complete-studio-composition` finished 2026-09-25 and awaits `/review`.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `add-studio-skin` finished 2026-09-23 and awaits `/review`. `simplify-pipeline-run-detail`
+- **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
+  (finished 2026-09-25) both await `/review`. `simplify-pipeline-run-detail`
   (reviewed 2026-09-25, no findings), `adopt-modern-codex-acp-capabilities` (reviewed and fixed
   2026-09-23), and `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not
   new units. `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `complete-studio-composition` is in progress (see Active change). `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -43,35 +43,33 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `complete-studio-composition` (in progress). FS-12.R46–R49/A21–A23, TS-08.R65–R68.
+**Change:** None. `complete-studio-composition` finished 2026-09-25 and awaits `/review`.
 
-**Direction (§14.1, terse):** agent state + live chat are the scan target; chrome/metadata stay
-quiet, no motion, skin-scoped CSS on existing hooks. Verify each slice: `check:styles` + `npm
-test` + a Playwright render at 1024/1440px; final slice runs full closure + A21–A23 review.
+**Changelog — 2026-09-25 (design: complete Studio composition, FS-12.R46–R49/TS-08.R65–R67
+shipped):** The operator rejected the first Studio slice as a palette change; this shipped the
+compositional upgrade in five skin-scoped-CSS-only slices (no TSX changes): shell (compact
+de-boxed header/nav, 26–32px titles, including the shared `[data-ui="page-header"]` hook Tasks/
+Pipelines use — missed in slice 1, still 51px); dashboard cards (accents bounded to a spine/strip
+instead of a full-card wash, preview promoted, metadata quieted); expanded card + full agent
+screen (header/tabs/transcript/composer joined into one surface instead of three boxed panels,
+`TranscriptView`/`Composer` unchanged); Tasks/Pipelines/Archive/Settings (attention-first rows,
+ledger/authoring chrome, search-first Archive, quiet nav spine); overlays (same bounded-accent
+language — a border-ordering bug that let a quieter default override the toast/permission-prompt
+state accent was caught and fixed before commit).
 
-**Slices:** 1-3 **done** (shell/R46, dashboard-cards/R47, expanded-card+workspace/R48). 4
-tasks/pipelines/archive/settings/R49 **done**: fixed the shared `[data-ui="page-header"]` title
-(missed in slice 1 — Tasks/Pipelines route titles were still 51px); attention-first task rows
-(interrupted/dependency_failed get a bounded accent, finished quiets down); quieter
-ledger/panel/tab chrome on Pipelines; search-first Archive; quiet nav-spine Settings tabs. 5
-overlays+closure remains.
-
-**Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
-slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23
-and TS-08.R65–R68 authorize Studio-scoped spatial and typographic design across the existing
-surfaces while preserving all interactions, the real dashboard chat, grid stability, and Core/Sky &
-Grove. `complete-studio-composition.md` is Waiting to start; no product code changed.
+Verified every slice: `check:styles`, full `npm test` (458 pass), Playwright renders against a
+live fakeacp dev UI. Closure: `make test` (both tags), `make build`, `ui/npm run build` pass. A
+desaturated Core/Sky & Grove/Studio triptych of the dashboard confirms the difference is layout,
+not palette. **Still owed** (A21–A23, TS-08.R68 stay `(planned)`): the exhaustive per-surface
+state matrix (task attention rows, populated ledger/timeline, template editor, archived view,
+every Settings section, onboarding) and a desaturated pass beyond the dashboard — same posture
+the first slice left for A19/A20.
 
 **Changelog — 2026-09-23 (work: Studio skin):** Shipped FS-12.R42–R45/A18, TS-02.R36, TS-03.R45,
-TS-08.R61–R64 in one slice: `studio` in `config.BuiltInAppearanceSkins`, `BUILT_IN_SKINS` and
-`contract.json` v3 (new Go test ties Go to the manifest); `styles/skins/studio.css`; Settings and
-matrix options. Reversible review notes: `--ad-action-secondary` is teal-blue, since forest made Info
-badges match Success; forest is `--ad-border-strong`; the user-bubble rule is compound so only the
-message tints. Browser pass (fake ACP, 1024/1440): dashboard, expanded pane send, agent screen,
-Settings switch + reload, Archive, Pipelines, matrix; no external requests. **Still owed:** A19/A20
-stay `(planned)` — live stream, permissions and real terminal unobserved (in-app SSE limit).
-Pre-existing, not Studio: Sky & Grove tints the whole user event row; `--ad-shadow-project-edge`
-resolves at `:root`, so card edges show fallback grey, not the project accent, in every skin.
+TS-08.R61–R64: `studio` skin id, `contract.json` v3, `styles/skins/studio.css`, Settings/matrix
+options. **Still owed then, closed 2026-09-25:** A19/A20's composition gap — see the 2026-09-25
+entry below. Pre-existing, not Studio: Sky & Grove tints the whole user event row;
+`--ad-shadow-project-edge` resolves at `:root`, so card edges show fallback grey in every skin.
 
 **Changelog — 2026-09-23 (work: simplify pipeline run detail):** Shipped FS-14.R79 and TS-08.R60 in
 one slice. `RunBrowser.tsx` drops the setup/value rail for a full-width timeline; the live summary
@@ -103,8 +101,8 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` may take `add-studio-skin`. `/work` may take
-`rename-product-to-deckhand`; `/fix` has no open findings;
+**Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
+`/work` may take `rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input

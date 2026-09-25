@@ -327,6 +327,34 @@
   background: color-mix(in srgb, var(--ad-studio-soft-blue) 60%, var(--ad-surface-raised));
 }
 
+/* R49 — overlays (dialogs, context menus, toasts, permission prompts)
+   keep their semantic state color but trade a heavy all-around border
+   for the same bounded-accent language used across the rest of Studio. */
+:root[data-skin="studio"] .dialog-content {
+  border-color: var(--ad-border-default);
+  border-width: var(--ad-border-thin);
+}
+
+:root[data-skin="studio"] .context-menu {
+  border-color: var(--ad-border-default);
+  border-width: var(--ad-border-thin);
+}
+
+/* border-color would also win over .toast.done/.waiting_input/.error's
+   left-edge state color (layer precedence beats selector specificity), so
+   the quieter default only touches the three non-accented sides. */
+:root[data-skin="studio"] .toast {
+  border-bottom-color: var(--ad-border-default);
+  border-left-width: 4px;
+  border-right-color: var(--ad-border-default);
+  border-top-color: var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .permission-prompt {
+  border-width: var(--ad-border-thin);
+  border-inline-start-width: 4px;
+}
+
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] {
   background-color: var(--ad-studio-canvas);
   background-image: radial-gradient(circle, color-mix(in srgb, var(--ad-studio-dot) 30%, transparent) 1px, transparent 1.4px);

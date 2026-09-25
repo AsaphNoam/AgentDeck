@@ -262,7 +262,7 @@ Requirements are user-observable.
 
 ### 2.11 Studio composition upgrade
 
-- **R46 (planned)** — Studio is a compositional alternative, not merely a recoloring of Core.
+- **R46 (shipped 2026-09-25)** — Studio is a compositional alternative, not merely a recoloring of Core.
   Its shell uses a quieter, more compact single-row header with less boxed navigation; route titles
   and section headings use a friendly, readable hierarchy (route titles around 26–32px, body copy
   no smaller than 14px) instead of Core's oversized display and dense uppercase technical
@@ -270,14 +270,14 @@ Requirements are user-observable.
   between meaningful groups rather than a repeated equal-card frame. Route identity, project links,
   connection state, navigation order, and accessible current-route cues remain intact. Core and
   Sky & Grove retain their shipped appearance. This extends R43 beyond palette and ornament.
-- **R47 (planned)** — Studio's Dashboard makes the agent work—not chrome or card borders—the first
+- **R47 (shipped 2026-09-25)** — Studio's Dashboard makes the agent work—not chrome or card borders—the first
   scan target. Group headings are quiet organizing landmarks; a collapsed card presents agent name
   and live state first, a readable current detail/preview second, and role/project/runtime/mail
   metadata as subordinate information, with the existing project and state accents bounded.
   Spacing and surface treatment distinguish card header, conversation preview, and metadata without
   adding nested generic cards or hiding content. All existing dashboard/project views, grouping,
   density values, drag affordances, ordering, collapsed/expanded states, and actions remain.
-- **R48 (planned)** — Studio's expanded dashboard card and full agent screen read as actual chat
+- **R48 (shipped 2026-09-25)** — Studio's expanded dashboard card and full agent screen read as actual chat
   workspaces. The existing chronological `TranscriptView` receives a clear reading region with
   message and tool hierarchy; the existing `Composer` reads as its anchored continuation, not a
   separate utility panel or a mock transcript. The card header and full-screen header/tabs are
@@ -285,7 +285,7 @@ Requirements are user-observable.
   Commands, conditional Terminal, permissions, annotations, and archived read-only behavior. The
   expanded card remains in its existing grid track, with the same scroll, focus, activation, and
   neighboring-card stability behavior; no chat action or event projection changes.
-- **R49 (planned)** — Studio gives each remaining destination a deliberate content hierarchy:
+- **R49 (shipped 2026-09-25)** — Studio gives each remaining destination a deliberate content hierarchy:
   Tasks reads as an attention-first work queue, not a stack of equal cards; Pipeline Runs reads as
   an operational ledger and run timeline, while Templates/editor reads as an authoring surface;
   Archive is search-first with scan-friendly result rows; Settings uses a quiet navigation spine
@@ -465,8 +465,17 @@ Requirements are user-observable.
   no product decision remains open before technical design.
 - Studio's first shipped slice (R42–R45) established selection and visual values but retained
   Core's composition. The operator rejected that as an incomplete UI redesign on 2026-09-25.
-  Planned R46–R49/A21–A23 add Studio-only spatial and typographic composition while preserving
-  the existing interactions; TS-08.R65–R68 supersede the restrictive Studio clauses in R62–R63.
+  R46–R49 (shipped 2026-09-25) added Studio-only spatial and typographic composition while
+  preserving the existing interactions; TS-08.R65–R67 (shipped) superseded the restrictive Studio
+  clauses in R62–R63. A21–A23 stay `(planned)`: every named surface received at least one real-
+  browser render in Studio (several against Core), and a desaturated Core/Sky & Grove/Studio
+  triptych of the dashboard and expanded card confirmed the difference is layout, not palette: a
+  bounded left-spine/top-strip accent and one joined header/transcript/composer surface replace
+  Core's full-card wash and three separately boxed panels even with color removed. Still owed
+  before A21–A23 close: the exhaustive per-surface long/dense/empty/attention-state matrix (task
+  attention/interrupted rows, populated pipeline ledger and run timeline, template editor,
+  archived agent view, every Settings section, the four onboarding steps) and a desaturated pass
+  beyond the dashboard.
 
 ## 7. Traceability
 
