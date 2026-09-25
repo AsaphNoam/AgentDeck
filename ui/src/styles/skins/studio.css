@@ -72,6 +72,54 @@
   overflow: hidden;
 }
 
+/* R46 — a quieter, more compact single-row header with less boxed
+   navigation, replacing Core's tall boxed-cell treatment. */
+:root[data-skin="studio"] .app-header {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+  min-height: 60px;
+}
+
+:root[data-skin="studio"] .app-logo {
+  border-right: none;
+}
+
+:root[data-skin="studio"] .app-mark strong {
+  font-size: 1.35rem;
+}
+
+:root[data-skin="studio"] .app-nav a {
+  border-right: none;
+  font-family: var(--ad-font-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:root[data-skin="studio"] .app-nav a::after {
+  height: 2px;
+}
+
+:root[data-skin="studio"] .app-nav a:hover,
+:root[data-skin="studio"] .app-nav a.active {
+  background: transparent;
+  color: var(--ad-action-primary);
+}
+
+/* R46 — route titles and section headings read at a friendly, readable
+   size (26-32px) instead of Core's oversized display treatment. */
+:root[data-skin="studio"] .grid-toolbar h1,
+:root[data-skin="studio"] .archive-header h1,
+:root[data-skin="studio"] .settings-page > h1 {
+  font-size: 1.875rem;
+}
+
+:root[data-skin="studio"] .pipeline-run-title h2,
+:root[data-skin="studio"] .wizard-step h3,
+:root[data-skin="studio"] .onboarding-step h3 {
+  font-size: 1.75rem;
+}
+
 :root[data-skin="studio"] [data-ui="surface"],
 :root[data-skin="studio"] [data-ui="dialog"][data-slot="content"],
 :root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] {

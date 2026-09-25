@@ -16,7 +16,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None.
+- **Active change:** `complete-studio-composition` (in progress) — Studio-scoped spatial/typographic
+  composition, FS-12.R46–R49/A21–A23, TS-08.R65–R68.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** `add-studio-skin` finished 2026-09-23 and awaits `/review`. `simplify-pipeline-run-detail`
@@ -24,7 +25,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   2026-09-23), and `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not
   new units. `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `complete-studio-composition.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `complete-studio-composition` is in progress (see Active change). `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -42,7 +43,17 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `add-studio-skin` awaits `/review`.
+**Change:** `complete-studio-composition` (in progress). FS-12.R46–R49/A21–A23, TS-08.R65–R68.
+
+**Direction (§14.1, terse):** agent state + live chat are the scan target; chrome/metadata stay
+quiet. No motion. Skin-scoped CSS on existing `data-ui`/`data-slot` hooks; new slot only if R66
+forces it. Verify each slice: `check:styles` + affected `npm test` + a Playwright render at
+1024/1440px against the real dev UI (seeded temp `AGENTDECK_HOME`); final slice runs the full
+closure matrix + A21–A23 review.
+
+**Slices:** 1 shell/R46 **done** (compact de-boxed header/nav; route/section titles → 26-32px) ·
+2 dashboard-cards/R47 · 3 expanded-card+workspace/R48 · 4 tasks-pipelines-archive-settings/R49 ·
+5 overlays+closure.
 
 **Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
 slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23
