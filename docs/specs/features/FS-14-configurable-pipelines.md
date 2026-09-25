@@ -649,6 +649,24 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   named-value projection and setup on the run page, R44's secondary-rail placement, and R56's
   finished-run default expansion. Stage-local outputs remain available under R56.
 
+- **R80 (planned) — Run setup accepts configured runtime defaults without a runtime-editing step.**
+  The start dialog uses Setup → Review. Setup collects its existing project/template/name/goal/input
+  fields and shows a compact summary of the standing owner's and dedicated coordinators' configured
+  runtime assignments. One **Customize runtimes** disclosure contains the existing per-assignment
+  backend/model/effort/fast controls. Equal assignments may share a summary with a coordinator count;
+  differing assignments and enabled fast mode remain apparent while collapsed. A normal run can reach
+  Review without opening the disclosure. This refines R36/R72's input presentation only: accepting
+  defaults still supplies explicit validated, frozen assignments for every required owner/coordinator;
+  templates remain model-neutral and default resolution does not change. Review shows every actual
+  assignment, including fast mode. Missing/invalid settings expose the relevant controls and named
+  diagnostic rather than hiding a start blocker. Disclosure toggles preserve values and do not
+  invalidate an exact proposal; an actual edit retains the existing proposal-invalidation behavior.
+  In proposal mode the compact summary derives from the hydrated proposal assignments and identifies
+  them as the proposal's selected runtimes, never as inherited defaults. Only non-proposal drafts use
+  the configured-default resolver; proposal assignments are never overwritten by it.
+  Inline start forms use the same summary/disclosure; shared-workspace confirmation, exact-proposal
+  confirmation, start idempotency and run-detail presentation remain unchanged.
+
 ## 5. Acceptance criteria
 
 - **A35** (shipped 2026-09-13; R61–R64, R75) — Run spec → implementation → correctness review → additional
@@ -917,6 +935,14 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   pipeline run-start validation tests, a manager test starting a run with per-stage fast modes, a
   manager test against a `fakeacp` scenario that withholds the option, and `RunStartForm` /
   `RunBrowser` tests.
+
+- **A47 (planned)** (R80) — Start a run with a standing owner and at least two dedicated coordinators
+  through Setup → Review using defaults without opening Customize runtimes. Change one assignment
+  and fast mode, collapse/reopen, and verify the summary, review and submitted assignments agree.
+  Exact-proposal values survive toggling and catalog refresh; editing invalidates confirmation as
+  before. Invalid/missing runtime fields open and focus the appropriate controls while retaining
+  the rest of the form. Shared-workspace refusal/confirmation and start retry remain intact.
+  *Verify by* run-start component tests and FS-12.A24's rendered pass.
 
 ## 6. Deviations & open decisions
 

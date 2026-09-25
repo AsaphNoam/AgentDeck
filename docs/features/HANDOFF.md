@@ -29,7 +29,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not new units.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `simplify-agent-and-automation-setup.md` and `rename-product-to-deckhand.md` are
+  Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -48,6 +49,15 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
+
+**Changelog — 2026-09-25 (design: simplify agent and automation setup):** User-approved suggestions
+7–11 are one Waiting-to-start change in `docs/ready-changes/simplify-agent-and-automation-setup.md`:
+compact New Agent, removal of unavailable config actions, optional provider-aware config linking,
+named task dependencies and collapsed pipeline runtime setup. Planned FS-01.R37, FS-04.R49,
+FS-08.R35–R36, FS-12.R50, FS-14.R80, FS-16.R39–R40 and TS-08.R69–R72 define behavior and gates.
+No product code changed; implementation owns browser acceptance. `make check-specs`, twin-skill
+comparison and `git diff --check` pass. Additional expert-workflow
+suggestions were researched separately and are not part of this approved unit.
 
 **Changelog — 2026-09-25 (acceptance evidence: Studio composition, FS-12.A21–A23 /
 TS-08.R68):** Exercised an isolated built application backed by fakeACP and real API state: all four
@@ -142,7 +152,8 @@ verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
-`/work` may take `rename-product-to-deckhand`; `/fix` has no open findings;
+`/work` may take `simplify-agent-and-automation-setup` or `rename-product-to-deckhand`;
+`/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input

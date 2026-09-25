@@ -294,6 +294,17 @@ Requirements are user-observable.
   states without removing fields, outcomes, actions, tabs, validation, or recovery feedback.
   Existing route and task flows do not change.
 
+- **R50 (planned) — Setup forms prioritize an experienced operator's decisions.** The compact
+  setup changes in FS-01.R37, FS-04.R49, FS-08.R35–R36, FS-14.R80 and FS-16.R39–R40 use existing
+  form, disclosure and dialog treatments across Core, Sky & Grove and Studio. Reading and keyboard
+  order follow the task: workspace/role or work instruction, selected runtime/dependency summary,
+  optional detail, action. Collapsed detail is one directly labelled interaction away; its values
+  survive toggles and important errors/warnings remain visible. Duplicate-name disambiguation and
+  active overrides remain legible with long real names. No tutorial, new skin, extra confirmation
+  ceremony, animation, or stored beginner/expert mode is introduced. This narrowly supersedes
+  R17/R18's preservation of the old editor/onboarding composition; the owning feature requirements
+  define the changed behavior, including skipping unsupported Config steps.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -443,6 +454,15 @@ Requirements are user-observable.
   while meeting their distinct composition in R48–R49. Focus, hover, disabled, error, success,
   permission, and long-content states remain clear. *Verify:* the deterministic visual matrix,
   affected feature tests, and real-browser route/state review at the supported desktop floor.
+
+- **A24 (planned)** (R50) — In an isolated built application at 1024px and a wider desktop viewport,
+  exercise compact/custom New Agent; bound/unbound/error native linking plus an unsupported-provider
+  onboarding path; named/manual task prerequisites and Re-arm; and default/custom/proposed pipeline
+  start. Compare Core, Sky & Grove and Studio with long/duplicate names, fast mode and a hidden-field
+  validation error. Verify keyboard operation, visible draft/override summaries, no clipping, and
+  that default flows need no advanced-editor interaction. Reuse representative deterministic fixtures
+  and fake ACP where a launch is needed; record actual browser evidence at implementation closure.
+  This is an affected-surface check, not a whole-application redesign or provider-compatibility claim.
 
 ## 6. Deviations & open decisions
 

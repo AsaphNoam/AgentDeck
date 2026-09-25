@@ -43,6 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`simplify-agent-and-automation-setup.md`](simplify-agent-and-automation-setup.md) — reduce setup
+  overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 

@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -241,6 +241,34 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   id; the recorded launch generation is provenance only, so an agent that was stopped and resumed
   keeps the right to cancel work it created earlier, and a task created by a person can never be
   cancelled by an agent. A creator id supplied in a tool argument is never authority (TS-05.R17).
+
+- **R39 (planned) — Task dependencies are selected by name.** Create and Re-arm offer a **Wait for**
+  choice over named tasks and pipeline runs in the selected project rather than requiring an opaque
+  id. Labels distinguish task/run, display name and current state; duplicate names remain
+  distinguishable with secondary ids. Choosing a source records its stable id, never its name.
+  Satisfying outcomes default to Success and offer the complete labelled choice set for the source's
+  registered outcome vocabulary: tasks support success/failure/blocked/cancelled; pipeline runs support
+  success/failure/cancelled (R3/R13). The UI does not infer success from an agent's live status or
+  treat a stage's blocked report as a terminal run outcome. A selected work prerequisite requires
+  at least one outcome. No dependency means immediate readiness under R5, as today.
+
+  Advanced controls retain explicit task/run-id entry, signal names and the existing context-reference
+  attachment fields; no context browser or discovery API is added. Named and manual selection edit
+  the same dependency, not two hidden copies. Create keeps its existing capacity of one work-result
+  prerequisite plus an optional signal; a general dependency-graph editor is outside this change.
+  Re-arm remains whole-set replacement under R23: it shows the current waiting conditions and the
+  proposed replacement, explicitly says unlisted conditions will be removed, and never implies an
+  additive edit. Empty replacement explicitly means removing all waits. R23's eligibility and
+  the server's atomic graph validation remain authoritative.
+- **R40 (planned) — Dependency choices remain honest when data is partial.** Task/run choices
+  distinguish loading, failed, empty and partially loaded lists; a failed read never looks like no
+  available work. Run history exposes Load more while retained pages remain and does not silently
+  stop at the first page. Changing project clears the previous project's dependency selection;
+  refreshing a list or changing between named/manual entry never silently substitutes another id.
+  An unavailable selected source remains identifiable and correctable, and a refused Create/Re-arm
+  keeps the user's draft and reports the server reason. Advanced disclosures retain their values
+  and expose any field that needs correction. Existing task launch/runtime, retry and signal firing
+  semantics remain unchanged.
 
 ## 3. States & transitions
 
@@ -533,6 +561,18 @@ Each names the verification that demonstrates it.
   applied fast mode as off rather than failing the attempt. *Verify by* MCP, HTTP, and task-dispatch
   tests, a dispatch test against a `fakeacp` scenario that withholds the option, and a Tasks-view
   test that the fast-mode field round trips through create.
+
+- **A25 (planned)** (R39) — Create a task after a named task, then after a named pipeline run; verify
+  the existing typed arm payloads and source-specific outcome choices, including Cancelled and the
+  absence of Blocked for runs. Exercise duplicate names, explicit-id fallback, an advanced signal and
+  context reference, and creation with no waits. Re-arm a task carrying multiple existing arms and
+  verify that the displayed replacement/removal matches the complete submitted set, including an
+  explicitly empty set. *Verify by* Tasks component tests and FS-12.A24's rendered pass.
+- **A26 (planned)** (R40) — Exercise a selected project's run beyond the first global history page,
+  loading/error/empty states, project changes, disappearance of a selected source, and rejected
+  mutations. No missing page is called an empty history, no refetch changes the selected id or loses
+  draft values, and all existing mutation errors remain visible. *Verify by* Tasks component tests
+  using paginated API fixtures and the rendered setup pass.
 
 ## 6. Deviations & open decisions
 

@@ -743,6 +743,50 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   while presentation-contract/style checks protect every new slot or skin selector. No stored
   screenshot baseline is introduced (INV §10/§13/§17).
 
+### 2.10 Compact agent and automation setup
+
+- **R69 (planned) — Disclosures are feature-owned composition over existing state.** Implement
+  FS-01.R37/FS-12.R50 within the existing New Agent form and its runtime-selection helpers; reuse
+  existing HTML/Radix and tokenized form treatments. Keep draft values owned above conditional
+  content so collapsing cannot reset or reinitialize them. Visible summaries derive from the same
+  ids/values that build the submitted request, not a second default resolver; duplicate display
+  names never become identity. Preserve configured-default resolution and terminal/effort/fast gates.
+  Validation reveals the owning disclosure before focusing a control; global errors and source or
+  compatibility warnings remain outside it. Add no saved disclosure preference or UI mode, generic
+  form framework, dependency, API, or persistence shape. Extend public presentation hooks only when
+  the changed structure needs them, updating their contract and skin consumers together.
+- **R70 (planned) — Native linking retains one connection implementation.** Give the existing
+  ConfigSourcePanel a compact onboarding presentation or extract only its shared connection seam;
+  do not duplicate preview/bind/import orchestration. Settings keeps its existing full inspection
+  surface, while onboarding owns a Details disclosure. Both remove the unavailable detached-copy
+  controls and preserve ordinary unlink. Derive the wizard's applicable steps from the selected
+  backend's actual type, including resumed entry, instead of fixed indexes plus a Claude fallback.
+  Preserve mutation claims, consent ownership, source/backend query invalidation, catalog drafts,
+  and the mounted-wizard latch; no additional onboarding server flags or source-write authority are
+  introduced. FS-04.R49 and FS-08.R35–R36 own the observable contract.
+- **R71 (planned) — Dependency pickers project existing task/run queries.** Share the dependency
+  selection/serialization used by Create and Re-arm within the Tasks feature (INV §2). Use
+  `useTasks(project)` and the existing paginated `usePipelineRuns()` projection, filtering loaded
+  runs to the selected project and exposing explicit next-page loading without fetching the entire
+  history automatically. Distinguish no matching rows yet from exhausted history; errors retain
+  draft selections. Named and manual input use one typed source kind/id and outcome set, serialized
+  into the existing TaskArmInput. Source-specific outcome choices follow FS-16.R3/R13; source and
+  project changes cannot silently turn a hidden invalid outcome into a valid different request.
+  Re-arm keeps its full-set replacement request and server graph validation. Context attachments
+  stay explicit ids under Advanced: there is no browser context-discovery endpoint, so this effort
+  adds none and does not repurpose agent-scoped MCP discovery. No task schema or authorization change.
+- **R72 (planned) — Pipeline runtime disclosure preserves resolved request semantics.** Refactor
+  RunStartForm's existing assignment fields into the shared compact summary/disclosure for inline
+  and dialog usage; the dialog becomes Setup → Review under FS-14.R80. Keep the existing configured
+  runtime default resolution, explicit orchestrator/dedicated_assignments payloads, capability
+  validation, request id and conflict-confirmation handling. Proposal hydration supplies exact
+  values independently of defaults: toggling a disclosure is not an edit, while changing a value
+  invalidates the existing exact-proposal confirmation. Review includes fast as well as backend,
+  model and effort. Named diagnostics open the owning pane/disclosure before focusing it. Runtime
+  choices stay frontend drafts until the existing start operation freezes them; no template,
+  pipeline state machine, run-detail, retention, or transport change is introduced. Focused component
+  tests cover request equivalence and recovery; FS-12.A24 owns the rendered gate for R69–R72.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

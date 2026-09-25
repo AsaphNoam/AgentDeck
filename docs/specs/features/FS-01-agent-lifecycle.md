@@ -73,6 +73,19 @@ orphaned processes.
   restored before Resume, and an agent whose project is archived cannot restore or resume until that
   project is reactivated.
 
+- **R37 (planned) — Compact New Agent setup.** The modal in R1 leads with role and project;
+  a project-scoped launch displays its fixed project without adding another chooser. A compact
+  runtime summary shows the selected backend/model, effort when set, fast mode when enabled, and
+  interface. One directly reachable **Options** disclosure contains the suggested editable name
+  and the backend/model/effort/fast/interface controls. Default launches require no disclosure
+  interaction. Labels use configured display names, adding ids only to disambiguate equal names;
+  selection and submission still use the original ids. Existing defaults, name suggestions,
+  capability gates, model/effort reset rules, source warnings, and launch payload semantics remain
+  unchanged. Opening or closing Options changes no value, and a rejected launch retains entered
+  values; errors associated with a hidden control reveal it. Source-health and runtime-compatibility
+  warnings remain visible outside the disclosure. This refines R1's presentation, not the launch,
+  native-configuration inheritance, or CLI contract.
+
 ### Stop, cancel, rename, clone
 
 - **R6** — **Stop** (`POST /api/sessions/{id}/stop`) terminates the agent's process group, deletes the
@@ -326,6 +339,13 @@ transitions:
   runtime, and a source without a native session expose no weaker clone path, while a rejected fork
   leaves no partial AgentDeck state. *Verify by* lifecycle/runtime/API tests and card-menu tests for
   capability, state, success and rollback, plus journey J7.
+
+- **A21 (planned)** (R37) — Launch from both global and fixed-project entry points without opening
+  Options, then customize name and runtime and launch again. Assert the request values match the
+  existing default/custom contracts; toggling Options changes none. Duplicate display names remain
+  distinguishable; unsupported effort/fast/terminal controls stay gated; source warnings remain
+  visible and a refused launch preserves values and exposes the relevant control. *Verify by*
+  `NewAgentModal.test.tsx` and the rendered setup pass in FS-12.A24.
 
 ## 6. Deviations & open decisions
 

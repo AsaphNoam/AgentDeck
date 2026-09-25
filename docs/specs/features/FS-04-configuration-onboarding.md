@@ -233,6 +233,15 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   It is a single positive integer, validated and persisted like every other setting on this screen,
   and it never counts or affects agents a person launches or resumes themselves.
 
+- **R49 (planned) — Optional configuration linking is compact and provider-aware.** After Project,
+  Claude/Codex onboarding offers FS-08.R36's compact native-configuration connection; other provider
+  types proceed directly to Launch with no empty Config step or progress item. This supersedes
+  only R19/R23/R32's universal four-step presentation: the guided sequence is Backend → Project →
+  optional provider-supported Config → Launch. Readiness, project selection, the mounted-wizard
+  latch, Set up later, and completion writes keep their existing contracts. Returning/resuming
+  onboarding derives the selected configured backend and its actual type before deciding whether
+  Config applies; it never silently links a different provider through a hard-coded fallback.
+
 ## 3. States & transitions
 
 - **R21.** `GET /api/config` computes an `onboarding` block with per-step `{done, detail}` for
@@ -409,6 +418,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   agent that was launched as `agentdecker` still addressable and displayed as FirstMate. A home that
   already has both roles leaves both files untouched. *Verified:* role-rename migration tests plus
   a pipeline-tool authorization test on the new id.
+
+- **A29 (planned)** (R49) — Component tests exercise Claude and Codex with the compact Config step,
+  and OpenCode/OpenHands with Project → Launch and a matching progress indicator. A resumed wizard
+  with a configured Codex backend links Codex rather than the initial Claude fallback. Polls cannot
+  eject an open wizard, pending link mutations cannot race Continue, and Set up later/completion
+  still issue only their existing writes. *Verify by* onboarding tests and FS-12.A24's rendered pass.
 
 ## 6. Deviations & open decisions
 
