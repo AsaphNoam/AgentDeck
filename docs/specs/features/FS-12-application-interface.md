@@ -467,15 +467,17 @@ Requirements are user-observable.
   Core's composition. The operator rejected that as an incomplete UI redesign on 2026-09-25.
   R46–R49 (shipped 2026-09-25) added Studio-only spatial and typographic composition while
   preserving the existing interactions; TS-08.R65–R67 (shipped) superseded the restrictive Studio
-  clauses in R62–R63. A21–A23 stay `(planned)`: every named surface received at least one real-
-  browser render in Studio (several against Core), and a desaturated Core/Sky & Grove/Studio
-  triptych of the dashboard and expanded card confirmed the difference is layout, not palette: a
-  bounded left-spine/top-strip accent and one joined header/transcript/composer surface replace
-  Core's full-card wash and three separately boxed panels even with color removed. Still owed
-  before A21–A23 close: the exhaustive per-surface long/dense/empty/attention-state matrix (task
-  attention/interrupted rows, populated pipeline ledger and run timeline, template editor,
-  archived agent view, every Settings section, the four onboarding steps) and a desaturated pass
-  beyond the dashboard.
+  clauses in R62–R63. A19–A23 remain `(planned)` acceptance, distinct from the shipped
+  implementation. An earlier desaturated Core/Sky & Grove/Studio dashboard comparison showed
+  Studio's bounded card accent beyond palette differences; a later correction removed the
+  full-chat panel gaps. An isolated built-app pass then exercised all four onboarding steps,
+  populated attention/waiting Tasks, active and paused pipeline states, the template editor,
+  Archive and archived chat, active permission chat, and all six Settings tabs; populated Tasks
+  were compared across all three appearances. Before acceptance closes, review the remaining
+  long/dense and interaction states across routes at a confirmed 1024px and wider desktop viewport,
+  complete the non-dashboard desaturated comparison, and inspect a genuine finished-run timeline.
+  The later Chrome adapter reported 1280px after a 1024px viewport request, so that pass is not
+  floor-width evidence.
 
 ## 7. Traceability
 

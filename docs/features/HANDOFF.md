@@ -20,10 +20,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
-  (finished 2026-09-25) both await `/review`. `simplify-pipeline-run-detail`
-  (reviewed 2026-09-25, no findings), `adopt-modern-codex-acp-capabilities` (reviewed and fixed
-  2026-09-23), and `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not
-  new units. `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
+  (finished 2026-09-25) both await `/review`. Review `add-studio-skin` against
+  `e474d8a..1d78e1d` and `complete-studio-composition` against `9ae10ee..4bb5b2e`;
+  `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
+  FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
+  `simplify-pipeline-run-detail` (reviewed 2026-09-25, no findings),
+  `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23), and
+  `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not new units.
+  `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
@@ -55,12 +59,13 @@ wide desktop geometry. The Studio full-chat transcript had no horizontal overflo
 `scrollWidth` both 1215px), and the active permission surface retained its joined header, transcript,
 and composer.
 
-**Acceptance remains planned, not shipped:** the available Chrome browser adapter reports
-1280×1125 after its 1024×900 viewport request, so this pass cannot supply fresh true-1024 evidence;
-the in-app browser was unavailable. It also cannot apply a faithful desaturation filter for the required
-cross-skin, non-dashboard comparison. fakeACP can produce active and paused pipeline state but does
-not submit pipeline-stage results, so a genuine finished-run timeline was not available without
-inventing fixture state. No product code or specifications changed in this evidence pass.
+**Acceptance remains planned, not shipped:** FS-12.A19–A23 and TS-08.R68 still need the complete
+route/state comparison. In this pass, the available Chrome browser adapter reported 1280×1125 after
+its 1024×900 viewport request, so the populated built-app review does not establish true-1024
+behavior; the in-app browser was unavailable to that run. A faithful desaturated cross-skin
+comparison beyond the dashboard was also unavailable. fakeACP produced active and paused pipeline
+states but not a genuine finished-run timeline. No product code or specifications changed in this
+evidence pass.
 
 **Changelog — 2026-09-25 (work: Studio composition correction, FS-12.R46–R49/
 TS-08.R65–R67):** Repaired the real dashboard and full-screen agent-workspace composition: Studio
@@ -72,13 +77,12 @@ onboarding and overlays. Contract v4 exposes neutral presentation hooks for the 
 composer, pipeline workspace/sections, and appearance preview. Production skin CSS is now checked
 to reject implementation-class selectors; Sky & Grove was migrated to those preview hooks too.
 
-Rendered evidence: Visual Matrix Studio at 1024px; the built application at 1024px for Settings,
-empty Tasks, Pipelines, and Archive; and the Tasks authoring layout at 1440px with no horizontal
-overflow. `ui/npm run check:styles` (37 tests), `ui/npm test` (458 tests), `ui/npm run build`,
-`make embed && make build`, and `make test` (both Go tag variants) pass. **Still owed:** A21–A23
-and TS-08.R68 remain `(planned)`: populated long/dense task, pipeline, template, and archive
-states; every Settings/onboarding state; and desaturated review beyond the dashboard were not
-available as deterministic evidence in this correction.
+Rendered evidence at this correction checkpoint: a Visual Matrix Studio view with a 1024px viewport
+request; built-app Settings and empty Tasks, Pipelines, and Archive under viewport requests; and a
+wider Tasks authoring view without horizontal overflow. The later acceptance pass above established
+populated states but found the browser's reported viewport did not honor the requested 1024px floor.
+`ui/npm run check:styles` (37 tests), `ui/npm test` (458 tests), `ui/npm run build`,
+`make embed && make build`, and `make test` (both Go tag variants) pass.
 
 **Changelog — 2026-09-25 (design: complete Studio composition, FS-12.R46–R49/TS-08.R65–R67
 shipped):** The operator rejected the first Studio slice as a palette change; this shipped the
@@ -95,15 +99,16 @@ state accent was caught and fixed before commit).
 Verified every slice: `check:styles`, full `npm test` (458 pass), Playwright renders against a
 live fakeacp dev UI. Closure: `make test` (both tags), `make build`, `ui/npm run build` pass. A
 desaturated Core/Sky & Grove/Studio triptych of the dashboard confirms the difference is layout,
-not palette. **Still owed** (A21–A23, TS-08.R68 stay `(planned)`): the exhaustive per-surface
-state matrix (task attention rows, populated ledger/timeline, template editor, archived view,
-every Settings section, onboarding) and a desaturated pass beyond the dashboard — same posture
-the first slice left for A19/A20.
+not palette. **Still owed at this earlier checkpoint** (A21–A23, TS-08.R68 stayed `(planned)`):
+the exhaustive per-surface state matrix (task attention rows, populated ledger/timeline, template
+editor, archived view, every Settings section, onboarding) and a desaturated pass beyond the
+dashboard. The later acceptance pass above covers some of those states but does not close the gate.
 
 **Changelog — 2026-09-23 (work: Studio skin):** Shipped FS-12.R42–R45/A18, TS-02.R36, TS-03.R45,
 TS-08.R61–R64: `studio` skin id, `contract.json` v3, `styles/skins/studio.css`, Settings/matrix
-options. **Still owed then, closed 2026-09-25:** A19/A20's composition gap — see the 2026-09-25
-entry below. Pre-existing, not Studio: Sky & Grove tints the whole user event row;
+options. **Implementation gap corrected 2026-09-25:** the composition issue underlying A19/A20 —
+see the correction entry above. Acceptance remains planned. Pre-existing, not Studio: Sky & Grove
+tints the whole user event row;
 `--ad-shadow-project-edge` resolves at `:root`, so card edges show fallback grey in every skin.
 
 **Changelog — 2026-09-23 (work: simplify pipeline run detail):** Shipped FS-14.R79 and TS-08.R60 in

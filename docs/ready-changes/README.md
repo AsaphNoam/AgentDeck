@@ -43,7 +43,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`complete-studio-composition.md`](complete-studio-composition.md) — make Studio a compositional interface upgrade rather than only a palette variant, with existing interactions intact.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 
