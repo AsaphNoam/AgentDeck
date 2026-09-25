@@ -159,8 +159,14 @@
 }
 
 /* R46 — route titles and section headings read at a friendly, readable
-   size (26-32px) instead of Core's oversized display treatment. */
-:root[data-skin="studio"] .grid-toolbar h1,
+   size (26-32px) instead of Core's oversized display treatment. The
+   shared page-header hook covers Dashboard/Tasks/Pipelines; Archive and
+   Settings render their own bespoke route title. */
+:root[data-skin="studio"] [data-ui="page-header"] {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] [data-ui="page-header"] h1,
 :root[data-skin="studio"] .archive-header h1,
 :root[data-skin="studio"] .settings-page > h1 {
   font-size: 1.875rem;
@@ -225,6 +231,84 @@
    content the same way; the card border already frames the workspace. */
 :root[data-skin="studio"] .agent-card[data-variant="expanded"] .agent-card-name-link {
   font-size: 1.05rem;
+}
+
+/* R49 — Tasks reads as an attention-first queue: routine rows quiet down,
+   interrupted/dependency-blocked rows carry a bounded accent instead of
+   all rows sharing one equal-weight card treatment. */
+:root[data-skin="studio"] .task-row {
+  border-color: var(--ad-border-default);
+}
+
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="interrupted"],
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="dependency_failed"] {
+  background: var(--ad-surface-emphasis);
+  border-inline-start: 3px solid var(--ad-state-busy);
+}
+
+:root[data-skin="studio"] [data-ui="tasks"] [data-slot="task"][data-state="finished"] {
+  opacity: 0.78;
+}
+
+:root[data-skin="studio"] .tasks-attention-count {
+  font-family: var(--ad-font-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* R49 — Pipeline Runs keeps its ledger/timeline shape; the surrounding
+   chrome quiets to match. Templates/editor share the same panel and
+   section-heading treatment as an authoring surface. */
+:root[data-skin="studio"] .pipeline-section-heading h2,
+:root[data-skin="studio"] .pipeline-editor-heading h2 {
+  font-size: 1.75rem;
+}
+
+:root[data-skin="studio"] .pipeline-tabs {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .pipeline-tab {
+  font-family: var(--ad-font-text);
+}
+
+:root[data-skin="studio"] .pipeline-ledger,
+:root[data-skin="studio"] .pipeline-template-library,
+:root[data-skin="studio"] .pipeline-panel {
+  border-color: var(--ad-border-default);
+  box-shadow: var(--ad-shadow-keyline);
+}
+
+/* R49 — Archive stays search-first: the search field keeps its highlight
+   as the focal element while list chrome quiets to scan-friendly rows. */
+:root[data-skin="studio"] .archive-header {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .archive-list,
+:root[data-skin="studio"] .archive-row {
+  border-color: var(--ad-border-default);
+}
+
+/* R49 — Settings keeps its two-column shell; the tab rail reads as a
+   quiet navigation spine instead of dense uppercase technical labels. */
+:root[data-skin="studio"] .settings-page > h1 {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .settings-tabs-list {
+  border-top: none;
+}
+
+:root[data-skin="studio"] .settings-tabs-list button {
+  font-family: var(--ad-font-text);
+  font-size: 0.85rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:root[data-skin="studio"] .config-editor-header h2 {
+  font-size: 1.75rem;
 }
 
 :root[data-skin="studio"] [data-ui="surface"],

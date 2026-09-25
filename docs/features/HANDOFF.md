@@ -49,9 +49,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 quiet, no motion, skin-scoped CSS on existing hooks. Verify each slice: `check:styles` + `npm
 test` + a Playwright render at 1024/1440px; final slice runs full closure + A21–A23 review.
 
-**Slices:** 1 shell/R46 **done** · 2 dashboard-cards/R47 **done** · 3 expanded-card+workspace/R48
-**done** (header/tabs/transcript/composer read as one joined surface, not 3 boxed panels; tabs
-de-boxed; header text subordinate) · 4 tasks/pipelines/archive/settings/R49 · 5 overlays+closure.
+**Slices:** 1-3 **done** (shell/R46, dashboard-cards/R47, expanded-card+workspace/R48). 4
+tasks/pipelines/archive/settings/R49 **done**: fixed the shared `[data-ui="page-header"]` title
+(missed in slice 1 — Tasks/Pipelines route titles were still 51px); attention-first task rows
+(interrupted/dependency_failed get a bounded accent, finished quiets down); quieter
+ledger/panel/tab chrome on Pipelines; search-first Archive; quiet nav-spine Settings tabs. 5
+overlays+closure remains.
 
 **Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
 slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23
