@@ -45,6 +45,23 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
 
+**Changelog — 2026-09-25 (acceptance evidence: Studio composition, FS-12.A21–A23 /
+TS-08.R68):** Exercised an isolated built application backed by fakeACP and real API state: all four
+Studio onboarding steps; populated Tasks with an attention failure, armed wait, and terminal source;
+the active pipeline ledger, timeline, genuine paused/retryable stage, and three-stage template editor;
+Archive search plus its archived read-only long transcript; an active permission-required chat; and all
+six Settings tabs. Core, Sky & Grove, and Studio were compared on populated Tasks at the available
+wide desktop geometry. The Studio full-chat transcript had no horizontal overflow (`clientWidth` and
+`scrollWidth` both 1215px), and the active permission surface retained its joined header, transcript,
+and composer.
+
+**Acceptance remains planned, not shipped:** the available Chrome browser adapter reports
+1280×1125 after its 1024×900 viewport request, so this pass cannot supply fresh true-1024 evidence;
+the in-app browser was unavailable. It also cannot apply a faithful desaturation filter for the required
+cross-skin, non-dashboard comparison. fakeACP can produce active and paused pipeline state but does
+not submit pipeline-stage results, so a genuine finished-run timeline was not available without
+inventing fixture state. No product code or specifications changed in this evidence pass.
+
 **Changelog — 2026-09-25 (work: Studio composition correction, FS-12.R46–R49/
 TS-08.R65–R67):** Repaired the real dashboard and full-screen agent-workspace composition: Studio
 now removes the Core grid gap and makes the header, tabs, transcript, and dashboard composer one
