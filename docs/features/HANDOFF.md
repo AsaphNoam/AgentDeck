@@ -49,9 +49,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 quiet, no motion, skin-scoped CSS on existing hooks. Verify each slice: `check:styles` + `npm
 test` + a Playwright render at 1024/1440px; final slice runs full closure + A21–A23 review.
 
-**Slices:** 1 shell/R46 **done** · 2 dashboard-cards/R47 **done** (quiet group headings; accents
-bounded to a left spine + top strip, not a full-card wash; preview promoted, metadata quieted) ·
-3 expanded-card+workspace/R48 · 4 tasks/pipelines/archive/settings/R49 · 5 overlays+closure.
+**Slices:** 1 shell/R46 **done** · 2 dashboard-cards/R47 **done** · 3 expanded-card+workspace/R48
+**done** (header/tabs/transcript/composer read as one joined surface, not 3 boxed panels; tabs
+de-boxed; header text subordinate) · 4 tasks/pipelines/archive/settings/R49 · 5 overlays+closure.
 
 **Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
 slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23

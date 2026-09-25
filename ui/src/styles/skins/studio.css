@@ -172,6 +172,61 @@
   font-size: 1.75rem;
 }
 
+/* R48 — the full agent screen's header/tabs are visually subordinate to
+   the transcript, and header/transcript/composer read as one joined
+   workspace surface instead of three separate boxed panels. */
+:root[data-skin="studio"] .chat-header {
+  border-color: var(--ad-border-default);
+  border-bottom: none;
+  border-left: 3px solid var(--ad-action-primary);
+  border-radius: var(--ad-radius-large) var(--ad-radius-large) 0 0;
+}
+
+:root[data-skin="studio"] .chat-header h1 {
+  font-size: 1.5rem;
+}
+
+:root[data-skin="studio"] .chat-tabs-list {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .chat-tabs-list button {
+  font-family: var(--ad-font-text);
+  font-size: 0.85rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+:root[data-skin="studio"] .chat-tabs-list button[data-state="active"] {
+  background: transparent;
+  border-color: transparent;
+  border-bottom: var(--ad-border-thick) solid var(--ad-action-primary);
+  color: var(--ad-action-primary);
+}
+
+:root[data-skin="studio"] .transcript-view {
+  border-color: var(--ad-border-default);
+  border-radius: 0;
+  border-top: none;
+}
+
+:root[data-skin="studio"] .user-message {
+  border-color: var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .composer {
+  background: var(--ad-surface-raised);
+  border: none;
+  border-radius: 0 0 var(--ad-radius-large) var(--ad-radius-large);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+/* The expanded dashboard pane's header stays subordinate to its chat
+   content the same way; the card border already frames the workspace. */
+:root[data-skin="studio"] .agent-card[data-variant="expanded"] .agent-card-name-link {
+  font-size: 1.05rem;
+}
+
 :root[data-skin="studio"] [data-ui="surface"],
 :root[data-skin="studio"] [data-ui="dialog"][data-slot="content"],
 :root[data-skin="studio"] [data-ui="config-editor"] [data-slot="item"] {
