@@ -46,14 +46,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 **Change:** `complete-studio-composition` (in progress). FS-12.R46–R49/A21–A23, TS-08.R65–R68.
 
 **Direction (§14.1, terse):** agent state + live chat are the scan target; chrome/metadata stay
-quiet. No motion. Skin-scoped CSS on existing `data-ui`/`data-slot` hooks; new slot only if R66
-forces it. Verify each slice: `check:styles` + affected `npm test` + a Playwright render at
-1024/1440px against the real dev UI (seeded temp `AGENTDECK_HOME`); final slice runs the full
-closure matrix + A21–A23 review.
+quiet, no motion, skin-scoped CSS on existing hooks. Verify each slice: `check:styles` + `npm
+test` + a Playwright render at 1024/1440px; final slice runs full closure + A21–A23 review.
 
-**Slices:** 1 shell/R46 **done** (compact de-boxed header/nav; route/section titles → 26-32px) ·
-2 dashboard-cards/R47 · 3 expanded-card+workspace/R48 · 4 tasks-pipelines-archive-settings/R49 ·
-5 overlays+closure.
+**Slices:** 1 shell/R46 **done** · 2 dashboard-cards/R47 **done** (quiet group headings; accents
+bounded to a left spine + top strip, not a full-card wash; preview promoted, metadata quieted) ·
+3 expanded-card+workspace/R48 · 4 tasks/pipelines/archive/settings/R49 · 5 overlays+closure.
 
 **Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
 slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23

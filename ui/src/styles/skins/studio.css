@@ -106,6 +106,58 @@
   color: var(--ad-action-primary);
 }
 
+/* R47 — the dashboard toolbar rule and group headings read as quiet
+   organizing landmarks rather than a bold technical section break. */
+:root[data-skin="studio"] .grid-toolbar {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
+:root[data-skin="studio"] .agent-group-header {
+  border-bottom: none;
+  min-height: 36px;
+}
+
+:root[data-skin="studio"] .agent-group-header > strong {
+  color: var(--ad-text-secondary);
+  font-family: var(--ad-font-text);
+  font-size: 1.05rem;
+  font-variation-settings: normal;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+/* R47 — a collapsed card leads with name/state (unchanged DOM order);
+   project and state accents become bounded edges instead of a full-card
+   wash, and the conversation preview reads as the second-priority line
+   while role/project/runtime metadata quiet down into subordinate text. */
+:root[data-skin="studio"] .agent-card {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-inline-start: 3px solid color-mix(in srgb, var(--ad-project-accent) 65%, var(--ad-border-default));
+  box-shadow: var(--ad-shadow-keyline);
+}
+
+:root[data-skin="studio"] .agent-card:hover {
+  box-shadow: var(--ad-shadow-offset);
+  transform: translate(-1px, -1px);
+}
+
+:root[data-skin="studio"] .agent-card[data-state="waiting_input"] {
+  background: var(--ad-surface-emphasis);
+}
+
+:root[data-skin="studio"] .agent-subtitle {
+  font-family: var(--ad-font-text);
+  font-size: 0.8rem;
+}
+
+:root[data-skin="studio"] .agent-preview {
+  border-top: none;
+  color: var(--ad-text-secondary);
+  font-size: 0.95rem;
+  padding-top: 0;
+}
+
 /* R46 — route titles and section headings read at a friendly, readable
    size (26-32px) instead of Core's oversized display treatment. */
 :root[data-skin="studio"] .grid-toolbar h1,
