@@ -19,10 +19,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Active change:** None.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `simplify-pipeline-run-detail` and `add-studio-skin` finished 2026-09-23 and await `/review`. `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23) and
-  `persistent-pipeline-orchestration` (2026-09-13) are closed; their fix commits are not new units.
-  `stop-telling-agents-to-poll` shipped without entering this queue on
-  the operator's explicit 2026-09-10 instruction; it can be added later.
+- **Review units:** `add-studio-skin` finished 2026-09-23 and awaits `/review`. `simplify-pipeline-run-detail`
+  (reviewed 2026-09-25, no findings), `adopt-modern-codex-acp-capabilities` (reviewed and fixed
+  2026-09-23), and `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not
+  new units. `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
+  2026-09-10 instruction; it can be added later.
 - **Work units:** `complete-studio-composition.md` and `rename-product-to-deckhand.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
@@ -41,7 +42,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `simplify-pipeline-run-detail` and `add-studio-skin` await `/review`.
+**Change:** None. `add-studio-skin` awaits `/review`.
 
 **Changelog — 2026-09-25 (design: Studio composition):** The operator rejected the shipped Studio
 slice as a palette change and confirmed a composition-only correction. Planned FS-12.R46–R49/A21–A23
@@ -70,27 +71,14 @@ real-browser J14 pass (Core and Sky & Grove, desktop floor and wider, long expan
 stays `(planned)`. Review note (reversible): the run id kicker stays in the hero as run identity;
 the per-task id line was removed as an opaque id.
 
-**Changelog — 2026-09-23 (fix: modern Codex ACP capabilities):** Closed all three findings.
-INV §2/§3/§15: `transcript.CloneCompletedPrefix` is now the one clone builder and drops source
-annotations (session_meta was already dropped by the reader); a failed clone discards its
-transcript and index rows (TS-02.R35 text updated). INV §11: child permission resolutions stay in
-the request's scope. INV §11/§17: a malformed file report no longer consumes the pending request.
-Go tests pass. TS-04's two citations of the deleted Cursor draft were then reworded, so
-`make check-specs` passes; its planned Cursor R55–R60 (committed in `42e2ba5`) were retired.
-
-**Changelog — 2026-09-23 (work: modern Codex ACP capabilities):** Eight slices shipped: Codex ACP
-1.12.0/CLI 0.154.0 with the rebased steering patch; bilateral capability negotiation frozen on the
-session; canonical tool names; live-only reasoning; nested native child sessions; background tasks
-with targeted Stop; Clone as a native `session/fork`; file-change reports as tracking supplements.
-Closure matrix passed (`make test` both variants, focused `-race`, `make build`, UI 453 tests + build).
-A fake-ACP real-browser pass (Core, desktop and the one-column dashboard pane) confirmed Thinking,
-child nesting, the task list with Stop, and Clone's copied history and marker; it led to keeping the
-task list open after Stop. **Still owed before release:** the credentialed Codex 1.12.0 receipt
-(TS-06.R26, stays `(planned)`), which also gates FS-03.A41/A42 and FS-01.A20 (J7); Sky & Grove was
-not viewed. The in-app browser pane cannot run the shared-worker SSE stream (its worker reports an
-error and the app never falls back to a direct stream) — not reproduced elsewhere, not recorded as a
-finding. Settled 2026-09-14 entries are in
-[`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
+**Changelog — 2026-09-23 (work+fix: modern Codex ACP capabilities):** Eight slices shipped Codex ACP
+1.12.0/CLI 0.154.0 (rebased steering patch, negotiated capabilities, canonical tool names, live-only
+reasoning, nested children, background tasks with Stop, Clone as `session/fork`, file-change tracking
+supplements); the follow-up fix closed all three review findings (INV §2/§3/§15 clone builder/discard,
+INV §11 permission scope, INV §11/§17 malformed report). Closure matrix and a fake-ACP browser pass
+(Core) passed. **Still owed before release:** the credentialed Codex 1.12.0 receipt (TS-06.R26,
+`(planned)`), gating FS-03.A41/A42 and FS-01.A20 (J7); Sky & Grove unviewed. Settled 2026-09-14
+entries are in [`HANDOFF-through-2026-09-14`](../archive/state/HANDOFF-through-2026-09-14.md).
 
 **Release state:** `v0.5.0` is published and verified on tag `8ab84d3`. `make test` (both tag
 variants, including `make check-specs`), the UI suite (54 files, 437 tests), and
@@ -103,7 +91,7 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` may take `simplify-pipeline-run-detail` or `add-studio-skin`. `/work` may take
+**Available by role:** `/review` may take `add-studio-skin`. `/work` may take
 `rename-product-to-deckhand`; `/fix` has no open findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
