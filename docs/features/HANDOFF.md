@@ -17,14 +17,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `simplify-agent-and-automation-setup` finished 2026-09-26 and awaits `/review`.
+- **Active change:** None. `simplify-agent-and-automation-setup` was reviewed 2026-09-26 and has
+  open findings for `/fix`.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `add-studio-skin` (finished 2026-09-23), `complete-studio-composition`
-  (finished 2026-09-25), and `simplify-agent-and-automation-setup` (finished 2026-09-26) await
-  `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d`, `complete-studio-composition`
-  against `9ae10ee..4bb5b2e`, and `simplify-agent-and-automation-setup` against `7d6db5e..d359640`;
-  `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
+- **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
+  (finished 2026-09-25) await `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d` and
+  `complete-studio-composition` against `9ae10ee..4bb5b2e`; `71c2810` is the latter's
+  evidence-only handoff follow-up, not another unit. `simplify-agent-and-automation-setup`
+  (`7d6db5e..d359640`, reviewed 2026-09-26) stays open on its **Review findings**; `d804d90` is
+  administrative closure, not another unit.
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
   `simplify-pipeline-run-detail` (reviewed 2026-09-25, no findings),
   `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23), and
@@ -38,7 +40,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** None. `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
+- **Open findings:** `simplify-agent-and-automation-setup` has two **Must fix** and one
+  **Worth fixing** under **Review findings**. `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
 - **Bug reports:** BR-1, BR-2, BR-3, and BR-4 are investigated, fixed and closed. Pinned Claude model
@@ -50,25 +53,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `simplify-agent-and-automation-setup` finished 2026-09-26 and awaits `/review`.
+**Change:** None. `simplify-agent-and-automation-setup` was reviewed 2026-09-26; its findings are
+open for `/fix`.
 
-**Plan:** (1) compact New Agent and provider-aware onboarding/config linking; (2) shared named/manual
-Tasks dependency selection; (3) pipeline Setup → Review with runtime summary/disclosure; (4) Core,
-Sky & Grove and Studio rendered validation at the desktop floor and wider viewport, then closure.
-All four slices are complete. `make test`, `make build`, the UI suite (58 files / 473 tests), UI
-production build, style/presentation checks and `git diff --check` pass. An isolated built-app
-browser pass at 1024×900 found no horizontal overflow or console errors in the compact New Agent,
-Tasks and pipeline setup surfaces; New Agent was compared in Core, Sky & Grove and Studio at 1024px
-and 1440px. The Studio pipeline dialog completed Setup → Review from a real saved template. Focused
-tests cover provider-aware onboarding, source Details/retry, partial run history, replacement waits,
-proposal hydration, hidden diagnostics, fast mode and rejected drafts.
-
-**Changelog — 2026-09-26 (implementation: compact agent and automation setup):** New Agent now
-leads with role/project and a truthful runtime summary, onboarding skips unsupported Config steps and
-keeps native linking compact, Tasks select named task/run prerequisites with honest pagination and
-replacement semantics, and pipeline start uses Setup → Review with optional runtime customization.
-Requirements FS-01.R37, FS-04.R49, FS-08.R35–R36, FS-12.R50, FS-14.R80, FS-16.R39–R40 and
-TS-08.R69–R72 are shipped. Implementation commit `d359640`; review range `7d6db5e..d359640`.
+**Changelog — 2026-09-26 (review: compact agent and automation setup, `7d6db5e..d359640`):**
+Two **Must fix** and one **Worth fixing** recorded under **Review findings**. The implementation
+(FS-01.R37, FS-04.R49, FS-08.R35–R36, FS-12.R50, FS-14.R80, FS-16.R39–R40, TS-08.R69–R72) passed
+`make test`, `make build`, the UI suite (58 files / 473 tests) and a 1024px/1440px built-app pass
+across Core, Sky & Grove and Studio. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
 **Changelog — 2026-09-25 (design: mobile remote control):** Waiting-to-start
 `add-mobile-remote-control.md`: paired phones supervise and direct work over the person's tailnet
@@ -111,9 +103,8 @@ verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
-`/work` may take `simplify-agent-and-automation-setup`, `rename-product-to-deckhand`, or
-`add-mobile-remote-control`;
-`/fix` has no open findings;
+`/work` may take `rename-product-to-deckhand` or `add-mobile-remote-control`;
+`/fix` may take `simplify-agent-and-automation-setup`'s findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -130,7 +121,37 @@ verification debt is unchanged and is recorded in
 
 ## Review findings
 
-None open.
+### simplify-agent-and-automation-setup — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+Range `7d6db5e..d359640`, reviewed 2026-09-26.
+
+- **Must fix** (INV §1) — `ui/src/features/onboarding/OnboardingWizard.tsx`: a returning wizard with
+  the backend step done but the project step not done starts at Project with `backend` seeded once
+  at mount. `OnboardingGate` waits only for config, so the backend catalog is usually not loaded yet
+  and the seed falls back to the hard-coded `claude`/`claude-acp`; the resume effect only runs when
+  both steps are done. After Project, a person whose configured backend is Codex is offered Claude
+  linking (binding the wrong backend id), and an OpenCode/OpenHands person gets a Config step they
+  should skip. Violates FS-04.R49's last sentence and TS-08.R70 ("including resumed entry").
+  *Fix:* when Backend was not chosen in this wizard session, derive backend id/type from the loaded
+  catalog when leaving Project (or extend the resume effect to the backend-done case). *Test:*
+  resume with `backend.done`, `project.done=false`, a Codex or OpenCode default backend served
+  after first render; complete Project and assert Codex linking or direct advance to Launch.
+- **Must fix** (INV §10) — `ui/src/features/launch/NewAgentModal.tsx`: with `fixedProject` the
+  Project control is hidden and nothing shows which project the agent will launch into. FS-01.R37
+  requires a project-scoped launch to display its fixed project without another chooser; the test
+  "locks a scoped launch to its fixed project" asserts the absence instead. *Fix:* render the
+  fixed project's title as read-only text in the Project position. *Test:* assert the fixed
+  project's title is visible and no project combobox exists.
+- **Worth fixing** (INV §8) — `ui/src/features/pipelines/RunStartForm.tsx`: when an assignment is
+  missing (e.g. a catalog with no usable default model), Review is disabled and the blocker says
+  "Customize runtimes…", but the disclosure stays collapsed. FS-14.R80 requires missing settings to
+  expose the relevant controls. *Fix:* open **Customize runtimes** once catalogs have loaded and
+  `assignmentsMissing` is true. *Test:* a backend with no models keeps Review disabled and shows
+  the runtime controls without a toggle.
+
+Invariant sweep: §§1, 8, 10 found above; §13 checked (every new class has a selector); §§2, 3, 11,
+16, 17 checked with no finding (shared dependency helpers, draft ownership, existing APIs, paged
+run loading, focused tests); §§4–7, 9, 12, 14, 15 have no surface in this UI-only diff.
 
 ## Design consistency notes
 
