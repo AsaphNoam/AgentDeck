@@ -116,12 +116,14 @@ export function VisualMatrix() {
                 <legend>Runtime</legend>
                 <label className="form-field"><span>Backend</span><select defaultValue="codex"><option value="codex">Codex (codex)</option></select></label>
                 <label className="form-field"><span>Model</span><select defaultValue="gpt-5"><option value="gpt-5">GPT-5 (gpt-5)</option></select></label>
+                <button className="chat-runtime-switch" type="button">Switch</button>
               </fieldset>
               <fieldset className="chat-session-settings">
                 <legend>Session settings</legend>
                 <label className="form-field"><span>Effort</span><select defaultValue="high"><option value="low">low</option><option value="high">high</option></select></label>
                 <label className="form-field"><span>Speed</span><span><input type="checkbox" defaultChecked /> Fast mode — higher provider usage</span></label>
               </fieldset>
+              <p className="form-error" role="alert">Runtime switch failed; current settings were restored.</p>
             </div>
           </div>
           <div data-slot="context"><ContextBar value={0.34} /></div>

@@ -61,6 +61,14 @@ describe("VisualMatrix", () => {
     expect(menu.querySelectorAll(".project-color-preset")).toHaveLength(6);
   });
 
+  // FS-12.A25: the deterministic chat fixture must retain the high-height states
+  // used by the rendered width/skin check, not only the compact happy path.
+  it("renders the staged runtime action and visible chat error state", () => {
+    render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Switch" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Runtime switch failed; current settings were restored.");
+  });
+
   it("renders zero, one, and overflowing active-project navigation fixtures", () => {
     render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const fixture = screen.getByRole("heading", { name: "Active-project shell navigation" }).parentElement!;

@@ -61,11 +61,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 the forked conversation; selected transcript text has Copy beside Annotate; the agent header copies
 the stable thread id and uses a compact left identity/runtime band. Six unresolved product/security
 questions were recorded under **Ideas being defined**; stale global-template and pipeline-run notes
-were not duplicated. Focused UI tests and presentation checks pass. A real-browser matrix pass in
-Core, Sky & Grove and Studio at 1024px and 1440px kept every control inside the header with no
-horizontal overflow; header height measured 130.5px and 98.5px respectively, with no browser
-warnings or errors. `make test`, `make build`, the UI suite (58 files / 476 tests), the UI
-production build, specification checks, and diff checks pass.
+were not duplicated. The follow-up workflow audit regenerated the embedded UI, added the staged
+Switch and visible-error states to the deterministic matrix, and exercised the actual built product
+against fakeACP: Clone navigated to the new agent while retaining history, selected transcript text
+and the header copied the expected text/id, and the full live header plus rollback error stayed
+inside 1024px and 1440px with no horizontal overflow. The Core, Sky & Grove and Studio matrix also
+kept its full staged/error controls inside both widths (197.1px high at 1024px and 121.5px at
+1440px). Focused UI tests and presentation checks pass. `make test`, `make build`, the UI suite, the
+UI production/embed build, specification checks, and diff checks pass.
 
 **Changelog — 2026-09-26 (review: compact agent and automation setup, `7d6db5e..d359640`):**
 Two **Must fix** and one **Worth fixing** recorded under **Review findings**. The implementation
