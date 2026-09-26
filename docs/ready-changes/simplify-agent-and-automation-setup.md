@@ -1,6 +1,6 @@
 # Simplify agent and automation setup
 
-**State:** In progress
+**State:** Finished
 **Why:** User approval, 2026-09-25, of discovery suggestions 7–11 as one effort. The audience already
 knows Claude Code/Codex; reduce AgentDeck-specific configuration overhead rather than teach agent basics.
 **Relevant requirements:** FS-01.R37/A21, FS-04.R49/A29, FS-08.R35–R36/A12–A13,

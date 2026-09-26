@@ -17,13 +17,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `simplify-agent-and-automation-setup` is in progress; the compact setup change
-  is split into New Agent/onboarding, Tasks dependencies, pipeline start, and rendered closure slices.
+- **Active change:** None. `simplify-agent-and-automation-setup` finished 2026-09-26 and awaits `/review`.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
-  (finished 2026-09-25) both await `/review`. Review `add-studio-skin` against
-  `e474d8a..1d78e1d` and `complete-studio-composition` against `9ae10ee..4bb5b2e`;
+- **Review units:** `add-studio-skin` (finished 2026-09-23), `complete-studio-composition`
+  (finished 2026-09-25), and `simplify-agent-and-automation-setup` (finished 2026-09-26) await
+  `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d`, `complete-studio-composition`
+  against `9ae10ee..4bb5b2e`, and `simplify-agent-and-automation-setup` against `7d6db5e..d359640`;
   `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
   `simplify-pipeline-run-detail` (reviewed 2026-09-25, no findings),
@@ -31,8 +31,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not new units.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `simplify-agent-and-automation-setup.md` is in progress. `rename-product-to-deckhand.md`
-  and `add-mobile-remote-control.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `rename-product-to-deckhand.md` and `add-mobile-remote-control.md` are Waiting to
+  start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -50,7 +50,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `simplify-agent-and-automation-setup` — in progress.
+**Change:** None. `simplify-agent-and-automation-setup` finished 2026-09-26 and awaits `/review`.
 
 **Plan:** (1) compact New Agent and provider-aware onboarding/config linking; (2) shared named/manual
 Tasks dependency selection; (3) pipeline Setup → Review with runtime summary/disclosure; (4) Core,
@@ -62,6 +62,13 @@ Tasks and pipeline setup surfaces; New Agent was compared in Core, Sky & Grove a
 and 1440px. The Studio pipeline dialog completed Setup → Review from a real saved template. Focused
 tests cover provider-aware onboarding, source Details/retry, partial run history, replacement waits,
 proposal hydration, hidden diagnostics, fast mode and rejected drafts.
+
+**Changelog — 2026-09-26 (implementation: compact agent and automation setup):** New Agent now
+leads with role/project and a truthful runtime summary, onboarding skips unsupported Config steps and
+keeps native linking compact, Tasks select named task/run prerequisites with honest pagination and
+replacement semantics, and pipeline start uses Setup → Review with optional runtime customization.
+Requirements FS-01.R37, FS-04.R49, FS-08.R35–R36, FS-12.R50, FS-14.R80, FS-16.R39–R40 and
+TS-08.R69–R72 are shipped. Implementation commit `d359640`; review range `7d6db5e..d359640`.
 
 **Changelog — 2026-09-25 (design: mobile remote control):** Waiting-to-start
 `add-mobile-remote-control.md`: paired phones supervise and direct work over the person's tailnet
