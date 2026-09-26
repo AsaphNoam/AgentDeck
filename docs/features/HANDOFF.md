@@ -43,7 +43,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
 - **Open findings:** `simplify-agent-and-automation-setup` has two **Must fix** and one
-  **Worth fixing** under **Review findings**. `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
+  **Worth fixing** under **Review findings**. The 2026-09-26 usability review adds one **Must fix**
+  for a stale J14 run status; see the report and **Review findings** below. `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
 - **Bug reports:** BR-1, BR-2, BR-3, and BR-4 are investigated, fixed and closed. Pinned Claude model
@@ -118,7 +119,8 @@ verification debt is unchanged and is recorded in
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
 `/work` may take `rename-product-to-deckhand` or `add-mobile-remote-control`;
-`/fix` may take `simplify-agent-and-automation-setup`'s findings;
+`/fix` may take `simplify-agent-and-automation-setup`'s findings or the J14 run-status finding from
+the [2026-09-26 usability review](../archive/reviews/usability-review-run-2026-09-26.md);
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -134,6 +136,21 @@ verification debt is unchanged and is recorded in
 - None.
 
 ## Review findings
+
+### usability-review-run-2026-09-26 — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Full J1–J17 and S1–S5 results are in
+[`usability-review-run-2026-09-26.md`](../archive/reviews/usability-review-run-2026-09-26.md).
+
+- **Must fix** (FS-14.R36–R37) — Pipelines run page: after starting a run and the first stage
+  attempt begins, the primary run badge can remain **QUEUED** while the page identifies the current
+  stage and its task row says attempt 1 is **RUNNING**. A person supervising the run cannot trust
+  its primary status to tell whether work has begun. Reproduced on an isolated home with a saved
+  four-stage template on 2026-09-26; the mismatch remained after three seconds and a refresh.
+  Evidence: `docs/archive/reviews/usability-review-2026-09-26-evidence/j14-run-page-stage-one.png`.
+  *Fix:* keep the run-page state synchronized with the durable run/attempt lifecycle. *Verify:*
+  the badge moves from queued to running when the first attempt starts and stays consistent after
+  refresh.
 
 ### simplify-agent-and-automation-setup — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
