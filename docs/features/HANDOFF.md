@@ -22,7 +22,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** `tighten-chat-actions-and-triage-notes` (finished 2026-09-26; review
-  `a716aea..2007ca8`),
+  `a716aea..0c24d3a`, excluding state-only `7738065`),
   `add-studio-skin` (finished 2026-09-23), and `complete-studio-composition`
   (finished 2026-09-25) await `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d` and
   `complete-studio-composition` against `9ae10ee..4bb5b2e`; `71c2810` is the latter's
