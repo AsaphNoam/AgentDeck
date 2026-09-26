@@ -6,6 +6,22 @@ resumable position, including any debt these entries still owe.
 
 ## Changelog
 
+**Changelog — 2026-09-25 (design: mobile remote control):** Waiting-to-start
+`add-mobile-remote-control.md`: paired phones supervise and direct work over the person's tailnet
+(planned FS-20, FS-00.R18, TS-13, TS-02.R37, TS-03.R46, TS-05.R23, TS-06.R27, TS-08.R73, INV §14
+note). User chose embedded Tailscale, QR pairing, a web app over Expo, an `/api` allowlist and a
+node-bound cookie. No product code changed; spec, twin-skill and diff checks pass.
+
+**Changelog — 2026-09-25 (acceptance evidence: Studio composition, FS-12.A21–A23 /
+TS-08.R68):** Exercised an isolated built application backed by fakeACP and real API state: all four
+Studio onboarding steps; populated Tasks with an attention failure, armed wait, and terminal source;
+the active pipeline ledger, timeline, genuine paused/retryable stage, and three-stage template editor;
+Archive search plus its archived read-only long transcript; an active permission-required chat; and all
+six Settings tabs. Core, Sky & Grove, and Studio were compared on populated Tasks at the available
+wide desktop geometry. The Studio full-chat transcript had no horizontal overflow (`clientWidth` and
+`scrollWidth` both 1215px), and the active permission surface retained its joined header, transcript,
+and composer. The handoff keeps the remaining planned-acceptance debt.
+
 **Changelog — 2026-09-25 (design: simplify agent and automation setup):** User-approved suggestions
 7–11 are one Waiting-to-start change in `docs/ready-changes/simplify-agent-and-automation-setup.md`:
 compact New Agent, removal of unavailable config actions, optional provider-aware config linking,

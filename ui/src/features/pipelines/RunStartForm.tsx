@@ -82,6 +82,7 @@ export function RunStartForm({
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [runtimeOpen, setRuntimeOpen] = useState(false);
+  const [seededTemplate, setSeededTemplate] = useState<unknown>(null);
   const [runtimeSource, setRuntimeSource] = useState<"defaults" | "proposal" | "selected">("defaults");
   const formRef = useRef<HTMLElement>(null);
 
@@ -152,6 +153,7 @@ export function RunStartForm({
       const model = current[stage.id]?.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
       return [stage.id, { backend: backendID, model, effort: current[stage.id]?.effort || backend?.models[model]?.default_effort || "", fast: current[stage.id]?.fast ?? false }];
     })));
+    if (backends.data) setSeededTemplate(template);
   }, [backends.data, defaultBackend, proposal, template]);
 
   const edit = () => {
@@ -205,6 +207,11 @@ export function RunStartForm({
   const missingInputs = template?.inputs.filter((input) => input.required && !inputs[input.name]?.trim()) ?? [];
   const requiredMissing = template ? missingInputs.length > 0 : true;
   const assignmentsMissing = !orchestrator.backend || !orchestrator.model || (template?.stages.some((stage) => stage.coordination === "dedicated" && (!dedicatedAssignments[stage.id]?.backend || !dedicatedAssignments[stage.id]?.model)) ?? true);
+  // FS-14.R80: defaults that cannot fill every assignment expose the controls
+  // that must be set, instead of leaving the blocker behind a closed disclosure.
+  useEffect(() => {
+    if (template && seededTemplate === template && assignmentsMissing) setRuntimeOpen(true);
+  }, [assignmentsMissing, seededTemplate, template]);
   const projectAvailable = Boolean(project && projects.data?.[project] && !projects.data[project].archived);
   const cannotStart = !template || !projectAvailable || !goal.trim() || requiredMissing || assignmentsMissing || start.isPending;
   const setupIncomplete = !template || !projectAvailable || !goal.trim() || requiredMissing;

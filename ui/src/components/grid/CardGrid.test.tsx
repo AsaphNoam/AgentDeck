@@ -505,7 +505,8 @@ describe("CardGrid", () => {
     fireEvent.click(await screen.findByText("New Agent"));
     await screen.findByText("New agent");
 
-    expect(screen.queryByText("Project")).toBeNull();
+    expect(screen.getByLabelText("Project").tagName).toBe("OUTPUT");
+    expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();
     fireEvent.click(screen.getByText("Launch"));
 
     await waitFor(() => expect(capturedBody).toBeDefined());

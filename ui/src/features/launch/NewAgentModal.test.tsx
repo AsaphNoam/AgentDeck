@@ -115,7 +115,7 @@ describe("NewAgentModal", () => {
     expect(roleSelect).toHaveTextContent("Implementer (implementer-copy)");
   });
 
-  it("locks a scoped launch to its fixed project without rendering a picker", async () => {
+  it("shows a scoped launch's fixed project without rendering a picker", async () => {
     let capturedBody: unknown;
     server.use(
       http.post("/api/sessions", async ({ request }) => {
@@ -127,7 +127,8 @@ describe("NewAgentModal", () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} fixedProject="billing" />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
 
-    expect(screen.queryByText("Project")).toBeNull();
+    expect(await screen.findByLabelText("Project")).toHaveTextContent("Billing");
+    expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();
     const launchButton = screen.getByRole("button", { name: "Launch" });
     await waitFor(() => expect(launchButton).toBeEnabled());
     fireEvent.click(launchButton);

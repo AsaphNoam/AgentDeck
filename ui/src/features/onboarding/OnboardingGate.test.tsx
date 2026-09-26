@@ -304,6 +304,10 @@ describe("OnboardingGate", () => {
     let release!: () => void;
     let completionWrites = 0;
     server.use(
+      http.get("/api/backends", () => HttpResponse.json({
+        version: 2,
+        backends: { claude: { name: "Claude", type: "claude-acp", default: true, default_model: "m", models: { m: { name: "M", model: "m" } } } },
+      })),
       http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", cwd: "/tmp/app" } })),
       http.get("/api/config-sources", () => HttpResponse.json({ bindings: [], candidates: [] })),
       http.post("/api/config-sources/preview", async () => {

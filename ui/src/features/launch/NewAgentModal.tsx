@@ -174,7 +174,12 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
               </select>
             </div>
 
-            {!fixedProject && (
+            {fixedProject ? (
+              <div className="form-field">
+                <label htmlFor="new-agent-project">Project</label>
+                <output id="new-agent-project">{projectsData?.[fixedProject]?.title || fixedProject}</output>
+              </div>
+            ) : (
               <div className="form-field">
                 <label htmlFor="new-agent-project">Project</label>
                 <select id="new-agent-project" value={project} onChange={(e) => setProject(e.target.value)}>

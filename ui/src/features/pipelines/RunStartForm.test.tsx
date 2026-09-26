@@ -130,6 +130,24 @@ describe("RunStartForm", () => {
     });
   });
 
+  it("opens the runtime controls when the defaults leave an assignment missing", async () => {
+    server.use(http.get("/api/backends", () => HttpResponse.json({
+      version: 2,
+      backends: { empty: { name: "Empty", type: "codex-acp", default: true, default_model: "", models: {} } },
+    })));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
+
+    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
+    fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
+
+    expect(await screen.findByText(/Customize runtimes for the standing owner/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Customize runtimes").closest("details")).toHaveAttribute("open"));
+    expect(screen.getAllByLabelText("Backend")[0]).toBeVisible();
+    expect(screen.getByRole("button", { name: "Review" })).toBeDisabled();
+  });
+
   it("keeps customized runtimes and fast mode through disclosure toggles and review", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);

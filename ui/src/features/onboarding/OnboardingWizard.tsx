@@ -20,27 +20,24 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   const configuredBackend = Object.entries(backendsData?.backends ?? {}).find(([, backend]) => backend.default)?.[0]
     ?? Object.keys(backendsData?.backends ?? {})[0];
   const configuredBackendEntry = configuredBackend ? backendsData?.backends[configuredBackend] : undefined;
+  const configuredType = configuredBackendEntry?.type;
   const [step, setStep] = useState<WizardStep>(() => !steps.backend.done ? "backend" : !steps.project.done ? "project" : "resume");
   const [createdProject, setCreatedProject] = useState<string | undefined>(undefined);
-  const [backend, setBackend] = useState<{ id: string; type: BackendType }>(() => configuredBackendEntry && configuredBackend
-    ? { id: configuredBackend, type: configuredBackendEntry.type }
-    : { id: "claude", type: "claude-acp" });
+  // A returning wizard has no backend-selection step to report its choice, so
+  // it uses the saved catalog's backend — never a hard-coded provider (FS-04.R49).
+  const [chosenBackend, setChosenBackend] = useState<{ id: string; type: BackendType } | null>(null);
+  const backend = chosenBackend ?? (configuredBackend && configuredType ? { id: configuredBackend, type: configuredType } : undefined);
+  const hasSource = !!backend && supportsConfigSource(backend.type);
   const [skipError, setSkipError] = useState<string | null>(null);
   const mutationClaimed = useRef(false);
   const [stepPending, setStepPending] = useState(false);
-  const userAdvanced = useRef(false);
   const putConfig = usePutConfig();
 
-  // A returning wizard has no backend-selection step to report its choice. Wait
-  // for the saved catalog, then resume at Config only for a supported provider.
+  // Resume waits for the saved catalog, then offers Config only for a supported provider.
   useEffect(() => {
-    if (!steps.backend.done || !steps.project.done || !backendsData || userAdvanced.current) return;
-    const selected = configuredBackendEntry && configuredBackend
-      ? { id: configuredBackend, type: configuredBackendEntry.type }
-      : { id: "claude", type: "claude-acp" as BackendType };
-    setBackend(selected);
-    setStep(supportsConfigSource(selected.type) ? "source" : "launch");
-  }, [steps.backend.done, steps.project.done, backendsData, configuredBackend, configuredBackendEntry]);
+    if (step !== "resume" || !backendsData) return;
+    setStep(configuredType && supportsConfigSource(configuredType) ? "source" : "launch");
+  }, [step, backendsData, configuredType]);
 
   const claimMutation = () => {
     if (mutationClaimed.current) return false;
@@ -54,9 +51,8 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   };
 
   const continueFromProject = (projectId: string) => {
-    userAdvanced.current = true;
     setCreatedProject(projectId);
-    setStep(supportsConfigSource(backend.type) ? "source" : "launch");
+    setStep(!backend ? "resume" : hasSource ? "source" : "launch");
   };
 
   // Set up later is the escape hatch for someone who cannot finish now — an
@@ -68,7 +64,6 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // next poll (INV §8).
   const handleSetUpLater = () => {
     if (!claimMutation()) return;
-    userAdvanced.current = true;
     setSkipError(null);
     putConfig.mutate(
       { onboarding_complete: true },
@@ -95,10 +90,10 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
           <div className="onboarding-flow" data-ui="onboarding" data-variant={step === "resume" ? "backend" : step}>
             <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
             <div className="wizard-progress" data-slot="progress">
-              {(["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as const).map((key) => {
+              {(["backend", "project", ...(hasSource ? ["source"] : []), "launch"] as const).map((key) => {
                 const label = key === "backend" ? "Backend" : key === "project" ? "Project" : key === "source" ? "Config" : "Launch";
-                const activeIndex = step === "resume" ? -1 : (["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as string[]).indexOf(step);
-                const index = (["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as string[]).indexOf(key);
+                const activeIndex = step === "resume" ? -1 : (["backend", "project", ...(hasSource ? ["source"] : []), "launch"] as string[]).indexOf(step);
+                const index = (["backend", "project", ...(hasSource ? ["source"] : []), "launch"] as string[]).indexOf(key);
                 return <div
                   key={key}
                   className={`wizard-step-indicator ${index < activeIndex ? "done" : index === activeIndex ? "active" : ""}`}
@@ -110,15 +105,15 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
             </div>
             <div data-slot="content">
               {step === "resume" && <p className="wizard-step-desc">Loading your configured backend…</p>}
-              {step === "backend" && <BackendStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(b) => { userAdvanced.current = true; setBackend(b); setStep("project"); }} />}
+              {step === "backend" && <BackendStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(b) => { setChosenBackend(b); setStep("project"); }} />}
               {step === "project" && <ProjectStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={continueFromProject} />}
-              {step === "source" && (
+              {step === "source" && backend && (
                 <SourceStep
                   backendId={backend.id}
                   backendType={backend.type}
                   claimMutation={claimMutation}
                   releaseMutation={releaseMutation}
-                  onDone={() => { userAdvanced.current = true; setStep("launch"); }}
+                  onDone={() => setStep("launch")}
                 />
               )}
               {step === "launch" && <LaunchStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={onComplete} initialProject={createdProject} />}
