@@ -89,6 +89,42 @@
   margin: 0;
 }
 
+.new-agent-runtime {
+  align-items: baseline;
+  background: var(--ad-surface-subtle);
+  border-left: var(--ad-border-thick) solid var(--ad-action-primary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2) var(--ad-space-3);
+  padding: var(--ad-space-3);
+}
+
+.new-agent-runtime > span:first-child {
+  color: var(--ad-text-muted);
+  flex-basis: 100%;
+  font-size: 0.8rem;
+}
+
+.new-agent-runtime > strong,
+.new-agent-runtime > span:not(:first-child) {
+  font-size: 0.9rem;
+}
+
+.new-agent-options {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  padding-top: var(--ad-space-3);
+}
+
+.new-agent-options > summary {
+  cursor: pointer;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.new-agent-options > .config-form {
+  margin-top: var(--ad-space-3);
+}
+
 .chat-tabs {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

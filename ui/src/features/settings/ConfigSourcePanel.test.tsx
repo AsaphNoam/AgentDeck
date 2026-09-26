@@ -137,6 +137,39 @@ describe("ConfigSourcePanel", () => {
     expect(await screen.findByText(/No new configured models to import/)).toBeInTheDocument();
   });
 
+  it("keeps onboarding connection errors visible outside Details and exposes repair there", async () => {
+    server.use(
+      http.post("/api/config-sources/preview", () => HttpResponse.json(
+        { error: { code: "source_not_found", message: "no native configuration found for claude-code" } },
+        { status: 404 },
+      )),
+    );
+    renderWithQuery(
+      <ConfigSourcePanel backendId="claude" backendType="claude-acp" compactOnboarding />,
+    );
+    expect(screen.queryByText(/unavailable/)).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Use my Claude Code configuration" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("no native configuration found");
+    expect(screen.getByRole("button", { name: "Use my Claude Code configuration" })).toBeEnabled();
+
+    server.use(
+      http.get("/api/config-sources", () => HttpResponse.json({
+        bindings: [{ backend_id: "claude", provider: "claude-code", mode: "linked", root: "/h/.claude", claims: [], approved_roots: [], health: "source_invalid", stale: true }],
+        candidates: [],
+      })),
+      http.post("/api/config-sources/claude/refresh", () => HttpResponse.json(
+        { error: { code: "source_invalid", message: "fix the invalid source before refreshing" } },
+        { status: 422 },
+      )),
+    );
+    cleanup();
+    renderWithQuery(<ConfigSourcePanel backendId="claude" backendType="claude-acp" compactOnboarding />);
+    expect(await screen.findByText(/needs attention \(source_invalid\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh source" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("fix the invalid source before refreshing");
+    expect(screen.getByText("Details").closest("details")).not.toHaveAttribute("open");
+  });
+
   // Regression (review fix): Codex emits plural asset kinds (instructions,
   // mcp_servers), so the inventory groups must match them or a Codex user sees
   // neither AGENTS.md nor MCP servers.

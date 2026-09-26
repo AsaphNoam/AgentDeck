@@ -122,6 +122,7 @@ export function ConfigSourcePanel({
   backendType,
   persisted = true,
   defaultOpen,
+  compactOnboarding = false,
   claimMutation,
   releaseMutation,
   onConnected,
@@ -132,6 +133,7 @@ export function ConfigSourcePanel({
   // is saved. Binding against it would fail with "unknown backend".
   persisted?: boolean;
   defaultOpen?: boolean;
+  compactOnboarding?: boolean;
   claimMutation?: () => boolean;
   releaseMutation?: () => void;
   // onConnected lets the enclosing editor refresh just this backend's card after
@@ -157,6 +159,7 @@ export function ConfigSourcePanel({
   // AgentDeck override inputs for a bound source (empty = inherit the native value).
   const [overrideModel, setOverrideModel] = useState("");
   const [overrideEffort, setOverrideEffort] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const binding = (sources?.bindings ?? []).find((b) => b.backend_id === backendId);
   const visualState = configSourceVisualState(binding);
@@ -278,12 +281,9 @@ export function ConfigSourcePanel({
     );
   };
 
-  return (
-    <details className="backend-source-section" data-ui="config-source" data-state={visualState} open={defaultOpen}>
-      <summary>Configuration source ({providerLabel(provider)})</summary>
-
+  const panelContents = (
       <div className="source-panel">
-        {!binding && (
+        {!binding && !compactOnboarding && (
           <div className="source-unbound" data-slot="status">
             <p className="source-hint">
               AgentDeck reads {providerLabel(provider)}'s existing setup — its model, instructions and
@@ -295,16 +295,13 @@ export function ConfigSourcePanel({
                   ? "Connecting…"
                   : `Use my ${providerLabel(provider)} configuration`}
               </button>
-              <button type="button" className="btn-link" disabled title="Detached import is not available yet">
-                Import detached copy (unavailable)
-              </button>
             </div>
           </div>
         )}
 
         {binding && (
           <div className="source-bound">
-            <div className="source-status-row" data-slot="status">
+            {!compactOnboarding && <div className="source-status-row" data-slot="status">
               <span className={`source-health source-health-${visualState}`}>
                 {binding.stale ? "stale" : binding.health ?? "unknown"}
               </span>
@@ -312,8 +309,8 @@ export function ConfigSourcePanel({
               <code className="source-root" data-slot="root" title={binding.root}>
                 {binding.root}
               </code>
-            </div>
-            {(binding.stale || binding.health === "source_invalid" || binding.health === "approval_required") && (
+            </div>}
+            {!compactOnboarding && (binding.stale || binding.health === "source_invalid" || binding.health === "approval_required") && (
               <p className="source-warning" data-slot="warning">
                 This source needs attention ({binding.health}). Refresh after fixing it, or unlink.
               </p>
@@ -361,17 +358,11 @@ export function ConfigSourcePanel({
               </div>
             </div>
             <div className="source-actions" data-slot="actions">
-              <button type="button" disabled={refresh.isPending} onClick={runRefresh}>
-                {refresh.isPending ? "Refreshing…" : effective ? "Refresh" : "Load effective view"}
-              </button>
-              <button
-                type="button"
-                className="btn-link"
-                disabled
-                title="Detached import (materializing an AgentDeck-owned copy) is not available yet — deferred until a verified launch-injection path exists"
-              >
-                Detach copy (unavailable)
-              </button>
+              {!(compactOnboarding && (binding.stale || binding.health === "source_invalid" || binding.health === "approval_required")) && (
+                <button type="button" disabled={refresh.isPending} onClick={runRefresh}>
+                  {refresh.isPending ? "Refreshing…" : effective ? "Refresh" : "Load effective view"}
+                </button>
+              )}
               <button type="button" className="btn-danger btn-sm" disabled={del.isPending} onClick={runUnlink}>
                 Unlink
               </button>
@@ -382,9 +373,55 @@ export function ConfigSourcePanel({
         {/* The import result stands on its own: it stays readable while the
             invalidated binding query refetches, and states plainly that it
             lists what the configuration names rather than what is available. */}
-        {importNote && <p className="source-hint">{importNote}</p>}
-        {error && <p className="form-error">{error}</p>}
+        {importNote && !compactOnboarding && <p className="source-hint">{importNote}</p>}
+        {error && !compactOnboarding && <p className="form-error" role="alert">{error}</p>}
       </div>
+  );
+
+  if (compactOnboarding) {
+    return (
+      <div className="backend-source-section" data-ui="config-source" data-state={visualState}>
+        <div className="source-panel">
+          {!binding ? (
+            <div className="source-unbound" data-slot="status">
+              <div className="source-actions" data-slot="actions">
+                <button type="button" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
+                  {preview.isPending || bind.isPending ? "Connecting…" : `Use my ${providerLabel(provider)} configuration`}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="source-status-row" data-slot="status">
+                <span className={`source-health source-health-${visualState}`}>{binding.stale ? "stale" : binding.health ?? "unknown"}</span>
+                <span className="source-mode">{binding.mode}</span>
+                <code className="source-root" data-slot="root" title={binding.root}>{binding.root}</code>
+              </div>
+              {(binding.stale || binding.health === "source_invalid" || binding.health === "approval_required") && (
+                <div className="source-actions">
+                  <p className="source-warning" data-slot="warning">This source needs attention ({binding.health}). Refresh after fixing it, or unlink.</p>
+                  <button type="button" disabled={refresh.isPending} onClick={runRefresh}>
+                    {refresh.isPending ? "Refreshing…" : "Refresh source"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {importNote && <p className="source-hint" role="status">{importNote}</p>}
+          {error && <p className="form-error" role="alert">{error}</p>}
+        </div>
+        <details open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+          <summary>Details</summary>
+          {panelContents}
+        </details>
+      </div>
+    );
+  }
+
+  return (
+    <details className="backend-source-section" data-ui="config-source" data-state={visualState} open={defaultOpen}>
+      <summary>Configuration source ({providerLabel(provider)})</summary>
+      {panelContents}
     </details>
   );
 }

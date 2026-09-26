@@ -166,12 +166,12 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   but never renders source contents or secret values. A stale/invalid/approval-required source
   shows a repair message offering refresh after correction or unlink.
 
-- **R35 (planned) — Unimplemented detached-copy actions leave the UI.** Settings and onboarding
+- **R35 (shipped 2026-09-26) — Unimplemented detached-copy actions leave the UI.** Settings and onboarding
   render neither **Import detached copy (unavailable)** nor **Detach copy (unavailable)**. This
   supersedes only R9's requirement to display unavailable actions; detached import remains
   unimplemented, its API continues to refuse it, and ordinary unlink and existing mirrored
   bindings remain supported. Removing these controls grants no new configuration authority.
-- **R36 (planned) — Onboarding exposes the existing connection without the full editor.** For a
+- **R36 (shipped 2026-09-26) — Onboarding exposes the existing connection without the full editor.** For a
   compatible backend, the optional source step initially shows R34's provider-specific connection
   action, its existing read-only consequence, current connection/health state, and Continue.
   **Details** reveals the existing source inspection and editing controls on demand. Connection
@@ -265,10 +265,10 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   create-only/create-and-connect, saved-unbound failure and retry, dirty-draft preservation,
   provider-specific target-only import, global query/SSE invalidation, and mirrored compatibility.
 
-- **A12 (planned)** (R35) — Settings and onboarding, for unbound and bound backends, contain no
+- **A12 (shipped 2026-09-26)** (R35) — Settings and onboarding, for unbound and bound backends, contain no
   detached-import/copy action; ordinary unlink, existing mirrored status and the detached API's
   refusal are unchanged. *Verify by* configuration-source component tests and existing API tests.
-- **A13 (planned)** (R36) — An experienced operator connects an existing native configuration
+- **A13 (shipped 2026-09-26)** (R36) — An experienced operator connects an existing native configuration
   without opening Details, inspects it through Details, and continues. Tests cover existing binding,
   discovery/bind failure, consent, retry and collapse during a pending operation; they assert the
   same requests as Settings, no duplicate mutation, no hidden repair state and no write when skipped.

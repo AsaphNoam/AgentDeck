@@ -649,7 +649,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   named-value projection and setup on the run page, R44's secondary-rail placement, and R56's
   finished-run default expansion. Stage-local outputs remain available under R56.
 
-- **R80 (planned) — Run setup accepts configured runtime defaults without a runtime-editing step.**
+- **R80 (shipped 2026-09-26) — Run setup accepts configured runtime defaults without a runtime-editing step.**
   The start dialog uses Setup → Review. Setup collects its existing project/template/name/goal/input
   fields and shows a compact summary of the standing owner's and dedicated coordinators' configured
   runtime assignments. One **Customize runtimes** disclosure contains the existing per-assignment
@@ -936,7 +936,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   manager test against a `fakeacp` scenario that withholds the option, and `RunStartForm` /
   `RunBrowser` tests.
 
-- **A47 (planned)** (R80) — Start a run with a standing owner and at least two dedicated coordinators
+- **A47 (shipped 2026-09-26)** (R80) — Start a run with a standing owner and at least two dedicated coordinators
   through Setup → Review using defaults without opening Customize runtimes. Change one assignment
   and fast mode, collapse/reopen, and verify the summary, review and submitted assignments agree.
   Exact-proposal values survive toggling and catalog refresh; editing invalidates confirmation as

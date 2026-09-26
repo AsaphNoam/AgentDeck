@@ -73,7 +73,7 @@ orphaned processes.
   restored before Resume, and an agent whose project is archived cannot restore or resume until that
   project is reactivated.
 
-- **R37 (planned) — Compact New Agent setup.** The modal in R1 leads with role and project;
+- **R37 (shipped 2026-09-26) — Compact New Agent setup.** The modal in R1 leads with role and project;
   a project-scoped launch displays its fixed project without adding another chooser. A compact
   runtime summary shows the selected backend/model, effort when set, fast mode when enabled, and
   interface. One directly reachable **Options** disclosure contains the suggested editable name
@@ -340,7 +340,7 @@ transitions:
   leaves no partial AgentDeck state. *Verify by* lifecycle/runtime/API tests and card-menu tests for
   capability, state, success and rollback, plus journey J7.
 
-- **A21 (planned)** (R37) — Launch from both global and fixed-project entry points without opening
+- **A21 (shipped 2026-09-26)** (R37) — Launch from both global and fixed-project entry points without opening
   Options, then customize name and runtime and launch again. Assert the request values match the
   existing default/custom contracts; toggling Options changes none. Duplicate display names remain
   distinguishable; unsupported effort/fast/terminal controls stay gated; source warnings remain

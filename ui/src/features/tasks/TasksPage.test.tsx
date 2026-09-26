@@ -41,6 +41,12 @@ const parked = {
   arms: [{ ...baseTask.arms[0], arm_id: "tk_2_arm00", task_id: "tk_2", state: "unsatisfiable" as const }],
 };
 
+const runSummary = {
+  run_id: "pr_1", template_id: "release", display_name: "Release", project: "my-app", state: "completed",
+  revision: 1, pending_action: "", current_stage_id: "", current_stage_title: "", current_agent_id: "",
+  attention_reason: "", final_outcome: "success", updated_at: "2026-08-24T10:00:00Z", diagnostics: [],
+};
+
 // Parked because its three start attempts were spent: every arm is satisfied,
 // so Retry — not Re-arm — is the repair that restores the allowance (FS-16.R25).
 const exhausted = {
@@ -56,13 +62,17 @@ const exhausted = {
 let lastRequest: { url: string; body: unknown } | null = null;
 
 const server = setupServer(
-  http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My App", cwd: "/tmp" } })),
+  http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My App", cwd: "/tmp" }, other: { title: "Other", cwd: "/tmp/other" } })),
   http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker" }, impl: { title: "Impl" } })),
   http.get("/api/config", () => HttpResponse.json({ default_role: "impl" })),
   http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: {
     codex: { name: "Codex", type: "codex-acp", default: true, default_model: "gpt-5", models: { "gpt-5": { name: "GPT-5", model: "gpt-5", fast: true } } },
   } })),
-  http.get("/api/tasks", () => HttpResponse.json({ tasks: [baseTask, parked] })),
+  http.get("/api/tasks", ({ request }) => {
+    const project = new URL(request.url).searchParams.get("project");
+    return HttpResponse.json({ tasks: project === "other" ? [{ ...baseTask, task_id: "tk_other", project: "other" }] : [baseTask, parked] });
+  }),
+  http.get("/api/pipeline-runs", () => HttpResponse.json([runSummary], { headers: { "X-Total-Count": "1" } })),
   http.post("/api/tasks/:id/retry", async ({ params }) => {
     lastRequest = { url: `retry:${params.id}`, body: null };
     return HttpResponse.json({
@@ -87,13 +97,14 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-function renderPage() {
+function renderPage(initialEntry = "/tasks?project=my-app") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/tasks?project=my-app"]}><TasksPage /></MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}><TasksPage /></MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...result, client };
 }
 
 describe("Tasks view", () => {
@@ -111,38 +122,172 @@ describe("Tasks view", () => {
   it("omits retry on parked work and re-arms in place", async () => {
     renderPage();
     await screen.findByText("parked work");
-    const rows = screen.getAllByRole("listitem");
-    const parkedRow = rows[1];
+    const parkedRow = screen.getByText("parked work").closest("li") as HTMLElement;
 
     expect(within(parkedRow).queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
 
 
+    fireEvent.click(within(parkedRow).getByText("Advanced signals"));
     fireEvent.change(within(parkedRow).getByLabelText("Wait for signal"), { target: { value: "ci-green" } });
     fireEvent.click(within(parkedRow).getByRole("button", { name: "Re-arm" }));
     await waitFor(() => expect(lastRequest?.url).toBe("rearm:tk_2"));
     expect(lastRequest?.body).toEqual({ arms: [{ kind: "signal", signal_name: "ci-green" }] });
   });
 
-	 it("authors an existing-agent task with a pipeline arm, outcomes, and context", async () => {
+  it("authors an existing-agent task with a pipeline arm, outcomes, and context", async () => {
 		renderPage();
 		await screen.findByText("New task");
+		const createSurface = within(screen.getByText("New task").parentElement as HTMLElement);
 		fireEvent.change(screen.getByLabelText("Name"), { target: { value: "review" } });
 		fireEvent.change(screen.getByLabelText("Instruction"), { target: { value: "review it" } });
 		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "agent" } });
 		// The fixture has no agents, so switch back to launch after proving the full
 		// payload fields are available on the same form.
 		fireEvent.change(screen.getByLabelText("Target"), { target: { value: "launch" } });
-		fireEvent.change(screen.getByLabelText("Wait for task or pipeline run (optional)"), { target: { value: "pr_1" } });
-		const prerequisiteKinds = screen.getAllByLabelText("Prerequisite kind");
-		const satisfyingOutcomes = screen.getAllByLabelText("Satisfying outcomes");
-		fireEvent.change(prerequisiteKinds[prerequisiteKinds.length - 1], { target: { value: "pipeline_run" } });
-		fireEvent.change(satisfyingOutcomes[satisfyingOutcomes.length - 1], { target: { value: "success,failure" } });
-		fireEvent.change(screen.getByLabelText("Context reference (optional)"), { target: { value: "cx_1" } });
-		fireEvent.change(screen.getByLabelText("Context label"), { target: { value: "brief" } });
+		fireEvent.change(createSurface.getByLabelText("Source type"), { target: { value: "pipeline_run" } });
+		await screen.findByRole("option", { name: "Release · completed · pr_1" });
+		fireEvent.change(createSurface.getByLabelText("Named prerequisite"), { target: { value: "pr_1" } });
+		fireEvent.click(createSurface.getByLabelText("Failure"));
+		fireEvent.click(screen.getByText("Advanced signal and context"));
+		fireEvent.change(createSurface.getByLabelText("Context reference ID"), { target: { value: "cx_1" } });
+		fireEvent.change(createSurface.getByLabelText("Context label"), { target: { value: "brief" } });
 		fireEvent.click(screen.getByRole("button", { name: "Create task" }));
 		await waitFor(() => expect(lastRequest?.url).toBe("create"));
 		expect(lastRequest?.body).toMatchObject({ target_kind: "launch", arms: [{ source_kind: "pipeline_run", source_id: "pr_1", satisfying_outcomes: ["success", "failure"] }], attachments: [{ context_ref_id: "cx_1", label: "brief" }] });
 	 });
+
+  it("disambiguates duplicate task names and submits the selected stable ID", async () => {
+    server.use(http.get("/api/tasks", () => HttpResponse.json({ tasks: [
+      { ...baseTask, display_name: "Build", task_id: "tk_a" },
+      { ...parked, display_name: "Build", task_id: "tk_b" },
+    ] })));
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    const named = create.getByLabelText("Named prerequisite");
+    await within(named).findByRole("option", { name: "Build · armed · tk_a" });
+    expect(within(named).getByRole("option", { name: "Build · dependency_failed · tk_b" })).toBeInTheDocument();
+    fireEvent.change(named, { target: { value: "tk_b" } });
+    fireEvent.change(create.getByLabelText("Name"), { target: { value: "follow up" } });
+    fireEvent.change(create.getByLabelText("Instruction"), { target: { value: "continue" } });
+    fireEvent.click(create.getByRole("button", { name: "Create task" }));
+    await waitFor(() => expect(lastRequest?.url).toBe("create"));
+    expect(lastRequest?.body).toMatchObject({ arms: [{ kind: "work_result", source_kind: "task", source_id: "tk_b", satisfying_outcomes: ["success"] }] });
+  });
+
+  it("keeps an unavailable outcome visible when changing source type and blocks submission until corrected", async () => {
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    await within(create.getByLabelText("Named prerequisite")).findByRole("option", { name: "parked work · dependency_failed · tk_2" });
+    fireEvent.change(create.getByLabelText("Named prerequisite"), { target: { value: "tk_2" } });
+    fireEvent.click(create.getByLabelText("Blocked"));
+    fireEvent.change(create.getByLabelText("Source type"), { target: { value: "pipeline_run" } });
+    expect(create.getByLabelText("blocked (unavailable for pipeline runs)")).toBeChecked();
+    fireEvent.click(create.getByRole("button", { name: "Create task" }));
+    expect(await create.findByRole("alert")).toHaveTextContent("Remove outcomes that are unavailable for pipeline runs.");
+    expect(lastRequest).toBeNull();
+  });
+
+  it("loads a later global run page without treating project-filtered partial results as empty", async () => {
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({ ...runSummary, run_id: `pr_other_${index}`, project: "other" }));
+    server.use(http.get("/api/pipeline-runs", ({ request }) => {
+      const offset = Number(new URL(request.url).searchParams.get("offset") ?? 0);
+      return HttpResponse.json(offset === 0 ? firstPage : [{ ...runSummary, run_id: "pr_page2" }], { headers: { "X-Total-Count": "51" } });
+    }));
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    fireEvent.change(create.getByLabelText("Source type"), { target: { value: "pipeline_run" } });
+    expect(await create.findByText("No matching runs in the loaded pages yet.")).toBeInTheDocument();
+    fireEvent.click(create.getByRole("button", { name: "Load more runs" }));
+    await create.findByRole("option", { name: "Release · completed · pr_page2" });
+    fireEvent.change(create.getByLabelText("Named prerequisite"), { target: { value: "pr_page2" } });
+    fireEvent.change(create.getByLabelText("Name"), { target: { value: "after release" } });
+    fireEvent.change(create.getByLabelText("Instruction"), { target: { value: "continue" } });
+    fireEvent.click(create.getByRole("button", { name: "Create task" }));
+    await waitFor(() => expect(lastRequest?.url).toBe("create"));
+    expect(lastRequest?.body).toMatchObject({ arms: [{ kind: "work_result", source_kind: "pipeline_run", source_id: "pr_page2", satisfying_outcomes: ["success"] }] });
+  });
+
+  it("keeps manual IDs in the same selection and preserves the Create draft after refusal", async () => {
+    server.use(http.post("/api/tasks", async ({ request }) => {
+      lastRequest = { url: "create", body: await request.json() };
+      return HttpResponse.json({ error: { code: "validation", message: "source is no longer available" } }, { status: 422 });
+    }));
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    fireEvent.change(create.getByLabelText("Name"), { target: { value: "manual follow-up" } });
+    fireEvent.change(create.getByLabelText("Instruction"), { target: { value: "continue the work" } });
+    fireEvent.click(create.getByText("Advanced", { selector: "summary" }));
+    fireEvent.click(create.getByLabelText("Enter an ID manually"));
+    fireEvent.change(create.getByLabelText("Source ID"), { target: { value: "tk_manual" } });
+    fireEvent.click(create.getByLabelText("Choose a named source"));
+    fireEvent.click(create.getByLabelText("Enter an ID manually"));
+    expect((create.getByLabelText("Source ID") as HTMLInputElement).value).toBe("tk_manual");
+    fireEvent.click(create.getByRole("button", { name: "Create task" }));
+    expect(await create.findByRole("alert")).toHaveTextContent("source is no longer available");
+    expect(lastRequest?.body).toMatchObject({ arms: [{ kind: "work_result", source_kind: "task", source_id: "tk_manual", satisfying_outcomes: ["success"] }] });
+    expect((create.getByLabelText("Name") as HTMLInputElement).value).toBe("manual follow-up");
+    expect((create.getByLabelText("Instruction") as HTMLTextAreaElement).value).toBe("continue the work");
+  });
+
+  it("keeps a disappeared named source visible after a list refresh", async () => {
+    let taskReads = 0;
+    server.use(
+      http.get("/api/tasks", () => {
+        taskReads += 1;
+        return HttpResponse.json({ tasks: taskReads === 1 ? [baseTask, parked] : [parked] });
+      }),
+    );
+    const { client } = renderPage();
+    const parkedRow = (await screen.findByText("parked work")).closest("li") as HTMLElement;
+    const named = within(parkedRow).getByLabelText("Named prerequisite");
+    await within(named).findByRole("option", { name: "build it · armed · tk_1" });
+    fireEvent.change(named, { target: { value: "tk_1" } });
+    await client.invalidateQueries({ queryKey: ["tasks", "my-app"] });
+    await waitFor(() => expect(taskReads).toBeGreaterThan(1));
+    expect((within(parkedRow).getByLabelText("Named prerequisite") as HTMLSelectElement).value).toBe("tk_1");
+    expect(within(parkedRow).getByRole("option", { name: "Unavailable task · tk_1" })).toBeInTheDocument();
+  });
+
+  it("keeps run query errors distinct from an empty project history", async () => {
+    server.use(http.get("/api/pipeline-runs", () => HttpResponse.json({ error: { message: "history unavailable" } }, { status: 503 })));
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    fireEvent.change(create.getByLabelText("Source type"), { target: { value: "pipeline_run" } });
+    expect(await create.findByText("Pipeline runs could not be loaded. The current selection is kept.")).toBeInTheDocument();
+    expect(create.queryByText("No pipeline runs in this project.")).not.toBeInTheDocument();
+  });
+
+  it("clears the named selection when the project changes", async () => {
+    renderPage();
+    const create = within(screen.getByText("New task").parentElement as HTMLElement);
+    await within(create.getByLabelText("Named prerequisite")).findByRole("option", { name: "build it · armed · tk_1" });
+    fireEvent.change(create.getByLabelText("Named prerequisite"), { target: { value: "tk_1" } });
+    fireEvent.change(screen.getByLabelText("Project"), { target: { value: "other" } });
+    await screen.findByText("build it");
+    const nextCreate = within(screen.getByText("New task").parentElement as HTMLElement);
+    expect((nextCreate.getByLabelText("Named prerequisite") as HTMLSelectElement).value).toBe("");
+  });
+
+  it("keeps the full replacement draft and reports a refused Re-arm", async () => {
+    server.use(http.post("/api/tasks/:id/rearm", () => HttpResponse.json({ error: { code: "conflict", message: "wait graph changed" } }, { status: 409 })));
+    renderPage();
+    const parkedRow = (await screen.findByText("parked work")).closest("li") as HTMLElement;
+    expect(within(parkedRow).getByText(/Re-arm replaces this entire wait set/)).toBeInTheDocument();
+    expect(within(parkedRow).getByText(/Task: Unavailable task · tk_0/)).toBeInTheDocument();
+    fireEvent.change(within(parkedRow).getByLabelText("Named prerequisite"), { target: { value: "tk_1" } });
+    fireEvent.click(within(parkedRow).getByRole("button", { name: "Re-arm" }));
+    expect(await within(parkedRow).findByRole("alert")).toHaveTextContent("wait graph changed");
+    expect((within(parkedRow).getByLabelText("Named prerequisite") as HTMLSelectElement).value).toBe("tk_1");
+  });
+
+  it("makes an empty Re-arm replacement explicit and submits no waits", async () => {
+    renderPage();
+    const parkedRow = (await screen.findByText("parked work")).closest("li") as HTMLElement;
+    expect(within(parkedRow).getByText("None — this removes all waits.")).toBeInTheDocument();
+    fireEvent.click(within(parkedRow).getByRole("button", { name: "Re-arm" }));
+    await waitFor(() => expect(lastRequest?.url).toBe("rearm:tk_2"));
+    expect(lastRequest?.body).toEqual({ arms: [] });
+  });
 
 	 // FS-16.A18 (R27) — the effort a person names beside backend and model
 	 // reaches the create request, and only for a launch target: an existing agent

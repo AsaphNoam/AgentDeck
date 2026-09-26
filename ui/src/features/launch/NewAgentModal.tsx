@@ -33,6 +33,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
 
   const roleEntries = Object.entries(rolesData ?? {});
   const projectEntries = Object.entries(projectsData ?? {}).filter(([, project]) => !project.archived);
+  const roleLabels = roleEntries.map(([id, role]) => [id, role.title] as [string, string]);
+  const projectLabels = projectEntries.map(([id, project]) => [id, project.title] as [string, string]);
 
   const defaultBackendId =
     Object.entries(backendsData?.backends ?? {}).find(([, b]) => b.default)?.[0] ??
@@ -46,6 +48,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const [effort, setEffort] = useState("");
   const [fast, setFast] = useState(false);
   const [agentInterface, setAgentInterface] = useState<"chat" | "terminal">("chat");
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
@@ -100,7 +103,10 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   }, [open]);
 
   const selectedBackend = backendsData?.backends[backendId];
+  const backendEntries = Object.entries(backendsData?.backends ?? {});
+  const backendLabels = backendEntries.map(([id, backend]) => [id, backend.name] as [string, string]);
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
+  const modelLabels = modelEntries.map(([id, model]) => [id, model.name] as [string, string]);
   const selectedModel = selectedBackend?.models[modelId];
   const effortLevels = selectedModel?.efforts ?? [];
   const codexPathOverride = selectedModel?.env?.CODEX_PATH || selectedBackend?.env?.CODEX_PATH;
@@ -146,6 +152,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
           // Surface the server's actual reason (e.g. a nonexistent project cwd
           // → runtime launch failure) instead of an opaque "HTTP 502".
           const e = err as { body?: { error?: { message?: string } } };
+          setOptionsOpen(true);
           setLaunchError(e?.body?.error?.message ?? String(err));
         },
       },
@@ -160,100 +167,99 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
           <Dialog.Title>New agent</Dialog.Title>
           <form onSubmit={handleSubmit} className="config-form">
             <div className="form-field">
-              <label>Name</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Atlas"
-              />
-            </div>
-
-            {effortLevels.length > 0 && (
-              <div className="form-field">
-                <label>Effort</label>
-                <select value={effort} onChange={(e) => setEffort(e.target.value)}>
-                  {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
-                </select>
-              </div>
-            )}
-
-            {selectedModel?.fast && agentInterface === "chat" && (
-              <label className="form-field">
-                <span>Speed</span>
-                <span><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /> Fast mode — faster responses with higher provider usage</span>
-              </label>
-            )}
-
-            <div className="form-field">
-              <label>Role</label>
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <label htmlFor="new-agent-role">Role</label>
+              <select id="new-agent-role" value={role} onChange={(e) => setRole(e.target.value)}>
                 {roleEntries.length === 0 && <option value="">No roles</option>}
-                {roleEntries.map(([id, r]) => (
-                  <option key={id} value={id}>{r.title} ({id})</option>
-                ))}
+                {roleEntries.map(([id]) => <option key={id} value={id}>{displayLabel(roleLabels, id)}</option>)}
               </select>
             </div>
 
             {!fixedProject && (
               <div className="form-field">
-                <label>Project</label>
-                <select value={project} onChange={(e) => setProject(e.target.value)}>
+                <label htmlFor="new-agent-project">Project</label>
+                <select id="new-agent-project" value={project} onChange={(e) => setProject(e.target.value)}>
                   {projectEntries.length === 0 && <option value="">No projects</option>}
-                  {projectEntries.map(([id, p]) => (
-                    <option key={id} value={id}>{p.title}</option>
-                  ))}
+                  {projectEntries.map(([id]) => <option key={id} value={id}>{displayLabel(projectLabels, id)}</option>)}
                 </select>
               </div>
             )}
 
-            <div className="form-field">
-              <label>Backend</label>
-              <select value={backendId} onChange={(e) => setBackendId(e.target.value)}>
-                {Object.entries(backendsData?.backends ?? {}).map(([id, b]) => (
-                  <option key={id} value={id}>{b.name} ({id})</option>
-                ))}
-              </select>
-              {selectedBackend?.type === "codex-acp" && codexPathOverride && (
-                <small>Codex runtime override: {codexPathOverride} (version not verified).</small>
-              )}
-              {selectedBackend?.type === "codex-acp" && !codexPathOverride && backendsData?.codex_runtime?.version && (
-                <small className={backendsData.codex_runtime.catalog_status === "mismatch" ? "form-warning" : undefined}>
-                  Codex runtime {backendsData.codex_runtime.version} ({backendsData.codex_runtime.path}).
-                  {backendsData.codex_runtime.catalog_status === "mismatch" &&
-                    ` Model auto-sync skipped cache from ${backendsData.codex_runtime.cache_version || "an unknown version"}; use a matching Codex runtime or cache.`}
-                </small>
-              )}
+            <div className="new-agent-runtime" aria-live="polite">
+              <span>Runs with</span>
+              <strong>{displayLabel(backendLabels, backendId) || "Configured backend"}</strong>
+              <span>{displayLabel(modelLabels, modelId) || "Default model"}</span>
+              {effort && <span>{effort} effort</span>}
+              {fast && <span>Fast mode</span>}
+              <span>{agentInterface === "terminal" ? "Terminal" : "Chat"}</span>
             </div>
+            {selectedBackend?.type === "codex-acp" && codexPathOverride && (
+              <p className="form-warning">Codex runtime override: {codexPathOverride} (version not verified).</p>
+            )}
+            {selectedBackend?.type === "codex-acp" && !codexPathOverride && backendsData?.codex_runtime?.version && (
+              <p className={backendsData.codex_runtime.catalog_status === "mismatch" ? "form-warning" : undefined}>
+                Codex runtime {backendsData.codex_runtime.version} ({backendsData.codex_runtime.path}).
+                {backendsData.codex_runtime.catalog_status === "mismatch" &&
+                  ` Model auto-sync skipped cache from ${backendsData.codex_runtime.cache_version || "an unknown version"}; use a matching Codex runtime or cache.`}
+              </p>
+            )}
 
-            <div className="form-field">
-              <label>Model</label>
-              <select
-                value={modelId}
-                onChange={(e) => {
-                  const runtime = resetRuntimeForModel(backendsData, backendId, e.target.value);
-                  setModelId(runtime.model);
-                  setEffort(runtime.effort);
-                }}
-              >
-                {modelEntries.map(([id, m]) => (
-                  <option key={id} value={id}>{m.name} ({id})</option>
-                ))}
-              </select>
-            </div>
+            <details className="new-agent-options" open={optionsOpen} onToggle={(event) => setOptionsOpen(event.currentTarget.open)}>
+              <summary>Options</summary>
+              <div className="config-form">
+                <div className="form-field">
+                  <label htmlFor="new-agent-name">Name</label>
+                  <input id="new-agent-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Atlas" />
+                </div>
 
-            <div className="form-field">
-              <label>Interface</label>
-              <div className="interface-controls">
-                <label className="interface-option">
-                  <input type="radio" name="interface" value="chat" checked={agentInterface === "chat"} onChange={() => setAgentInterface("chat")} />
-                  Chat
-                </label>
-                <label className={canTerminal ? "interface-option" : "interface-option interface-disabled"} title={canTerminal ? "Terminal runtime" : !backendTerminalOK ? "Terminal is only supported by the Claude backend" : "Terminal unavailable"}>
-                  <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!canTerminal} onChange={() => setAgentInterface("terminal")} />
-                  Terminal
-                </label>
+                <div className="form-field">
+                  <label htmlFor="new-agent-backend">Backend</label>
+                  <select id="new-agent-backend" value={backendId} onChange={(e) => setBackendId(e.target.value)}>
+                    {backendEntries.map(([id]) => <option key={id} value={id}>{displayLabel(backendLabels, id)}</option>)}
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="new-agent-model">Model</label>
+                  <select id="new-agent-model" value={modelId} onChange={(e) => {
+                    const runtime = resetRuntimeForModel(backendsData, backendId, e.target.value);
+                    setModelId(runtime.model);
+                    setEffort(runtime.effort);
+                  }}>
+                    {modelEntries.map(([id]) => <option key={id} value={id}>{displayLabel(modelLabels, id)}</option>)}
+                  </select>
+                </div>
+
+                {effortLevels.length > 0 && (
+                  <div className="form-field">
+                    <label htmlFor="new-agent-effort">Effort</label>
+                    <select id="new-agent-effort" value={effort} onChange={(e) => setEffort(e.target.value)}>
+                      {effortLevels.map((level) => <option key={level} value={level}>{level}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {selectedModel?.fast && agentInterface === "chat" && (
+                  <label className="form-field">
+                    <span>Speed</span>
+                    <span><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /> Fast mode — faster responses with higher provider usage</span>
+                  </label>
+                )}
+
+                <div className="form-field">
+                  <label>Interface</label>
+                  <div className="interface-controls">
+                    <label className="interface-option">
+                      <input type="radio" name="interface" value="chat" checked={agentInterface === "chat"} onChange={() => setAgentInterface("chat")} />
+                      Chat
+                    </label>
+                    <label className={canTerminal ? "interface-option" : "interface-option interface-disabled"} title={canTerminal ? "Terminal runtime" : !backendTerminalOK ? "Terminal is only supported by the Claude backend" : "Terminal unavailable"}>
+                      <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!canTerminal} onChange={() => setAgentInterface("terminal")} />
+                      Terminal
+                    </label>
+                  </div>
+                </div>
               </div>
-            </div>
+            </details>
 
             {sourceNeedsAttention && (
               <p className="source-warning">
@@ -278,4 +284,11 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function displayLabel(entries: [string, string][], id: string): string {
+  const entry = entries.find(([entryId]) => entryId === id);
+  if (!entry) return "";
+  const duplicates = entries.filter(([, label]) => label === entry[1]).length > 1;
+  return duplicates ? `${entry[1]} (${entry[0]})` : entry[1];
 }

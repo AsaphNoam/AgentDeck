@@ -1,25 +1,14 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Onboarding } from "../../schemas/config";
 import type { BackendType } from "../../schemas/backends";
-import { usePutConfig, configErrorMessage } from "../../api/config";
+import { useBackends, usePutConfig, configErrorMessage } from "../../api/config";
 import { BackendStep } from "./steps/BackendStep";
 import { ProjectStep } from "./steps/ProjectStep";
-import { SourceStep } from "./steps/SourceStep";
+import { SourceStep, supportsConfigSource } from "./steps/SourceStep";
 import { LaunchStep } from "./steps/LaunchStep";
 
-// The optional Config (federation) step lives between Project and Launch. It is
-// purely client-side and skippable, so it is not tracked in the server-side
-// onboarding step flags; a returning user who finished project setup resumes at
-// it and can simply Continue.
-const LAST_STEP = 3;
-const STEP_VARIANTS = ["backend", "project", "source", "launch"] as const;
-
-function initialStep(steps: Onboarding["steps"]): number {
-  if (!steps.backend.done) return 0;
-  if (!steps.project.done) return 1;
-  return 2;
-}
+type WizardStep = "backend" | "project" | "source" | "launch" | "resume";
 
 interface OnboardingWizardProps {
   steps: Onboarding["steps"];
@@ -27,15 +16,31 @@ interface OnboardingWizardProps {
 }
 
 export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
-  const [step, setStep] = useState(() => initialStep(steps));
+  const { data: backendsData } = useBackends();
+  const configuredBackend = Object.entries(backendsData?.backends ?? {}).find(([, backend]) => backend.default)?.[0]
+    ?? Object.keys(backendsData?.backends ?? {})[0];
+  const configuredBackendEntry = configuredBackend ? backendsData?.backends[configuredBackend] : undefined;
+  const [step, setStep] = useState<WizardStep>(() => !steps.backend.done ? "backend" : !steps.project.done ? "project" : "resume");
   const [createdProject, setCreatedProject] = useState<string | undefined>(undefined);
-  // The backend chosen in step 0, so the federation Config step targets the right
-  // provider (default Claude only until the user picks otherwise).
-  const [backend, setBackend] = useState<{ id: string; type: BackendType }>({ id: "claude", type: "claude-acp" });
+  const [backend, setBackend] = useState<{ id: string; type: BackendType }>(() => configuredBackendEntry && configuredBackend
+    ? { id: configuredBackend, type: configuredBackendEntry.type }
+    : { id: "claude", type: "claude-acp" });
   const [skipError, setSkipError] = useState<string | null>(null);
   const mutationClaimed = useRef(false);
   const [stepPending, setStepPending] = useState(false);
+  const userAdvanced = useRef(false);
   const putConfig = usePutConfig();
+
+  // A returning wizard has no backend-selection step to report its choice. Wait
+  // for the saved catalog, then resume at Config only for a supported provider.
+  useEffect(() => {
+    if (!steps.backend.done || !steps.project.done || !backendsData || userAdvanced.current) return;
+    const selected = configuredBackendEntry && configuredBackend
+      ? { id: configuredBackend, type: configuredBackendEntry.type }
+      : { id: "claude", type: "claude-acp" as BackendType };
+    setBackend(selected);
+    setStep(supportsConfigSource(selected.type) ? "source" : "launch");
+  }, [steps.backend.done, steps.project.done, backendsData, configuredBackend, configuredBackendEntry]);
 
   const claimMutation = () => {
     if (mutationClaimed.current) return false;
@@ -48,7 +53,11 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
     setStepPending(false);
   };
 
-  const advance = () => setStep((s) => Math.min(s + 1, LAST_STEP));
+  const continueFromProject = (projectId: string) => {
+    userAdvanced.current = true;
+    setCreatedProject(projectId);
+    setStep(supportsConfigSource(backend.type) ? "source" : "launch");
+  };
 
   // Set up later is the escape hatch for someone who cannot finish now — an
   // unconfigured provider, no credentials to hand, or simply wanting to look
@@ -59,6 +68,7 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
   // next poll (INV §8).
   const handleSetUpLater = () => {
     if (!claimMutation()) return;
+    userAdvanced.current = true;
     setSkipError(null);
     putConfig.mutate(
       { onboarding_complete: true },
@@ -82,32 +92,36 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
           onEscapeKeyDown={(e) => e.preventDefault()}
           aria-describedby={undefined}
         >
-          <div className="onboarding-flow" data-ui="onboarding" data-variant={STEP_VARIANTS[step]}>
+          <div className="onboarding-flow" data-ui="onboarding" data-variant={step === "resume" ? "backend" : step}>
             <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
             <div className="wizard-progress" data-slot="progress">
-              {["Backend", "Project", "Config", "Launch"].map((label, i) => (
-                <div
-                  key={label}
-                  className={`wizard-step-indicator ${i < step ? "done" : i === step ? "active" : ""}`}
-                  data-state={i < step ? "complete" : i === step ? "current" : "upcoming"}
+              {(["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as const).map((key) => {
+                const label = key === "backend" ? "Backend" : key === "project" ? "Project" : key === "source" ? "Config" : "Launch";
+                const activeIndex = step === "resume" ? -1 : (["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as string[]).indexOf(step);
+                const index = (["backend", "project", ...(supportsConfigSource(backend.type) ? ["source"] : []), "launch"] as string[]).indexOf(key);
+                return <div
+                  key={key}
+                  className={`wizard-step-indicator ${index < activeIndex ? "done" : index === activeIndex ? "active" : ""}`}
+                  data-state={index < activeIndex ? "complete" : index === activeIndex ? "current" : "upcoming"}
                 >
                   {label}
                 </div>
-              ))}
+              })}
             </div>
             <div data-slot="content">
-              {step === 0 && <BackendStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(b) => { setBackend(b); advance(); }} />}
-              {step === 1 && <ProjectStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(projectId) => { setCreatedProject(projectId); advance(); }} />}
-              {step === 2 && (
+              {step === "resume" && <p className="wizard-step-desc">Loading your configured backend…</p>}
+              {step === "backend" && <BackendStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={(b) => { userAdvanced.current = true; setBackend(b); setStep("project"); }} />}
+              {step === "project" && <ProjectStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={continueFromProject} />}
+              {step === "source" && (
                 <SourceStep
                   backendId={backend.id}
                   backendType={backend.type}
                   claimMutation={claimMutation}
                   releaseMutation={releaseMutation}
-                  onDone={advance}
+                  onDone={() => { userAdvanced.current = true; setStep("launch"); }}
                 />
               )}
-              {step === 3 && <LaunchStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={onComplete} initialProject={createdProject} />}
+              {step === "launch" && <LaunchStep claimMutation={claimMutation} releaseMutation={releaseMutation} onDone={onComplete} initialProject={createdProject} />}
             </div>
             <div className="onboarding-actions" data-slot="footer">
               {skipError && <p className="form-error">{skipError}</p>}

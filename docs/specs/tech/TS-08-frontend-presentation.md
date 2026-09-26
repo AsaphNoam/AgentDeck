@@ -745,7 +745,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
 
 ### 2.10 Compact agent and automation setup
 
-- **R69 (planned) — Disclosures are feature-owned composition over existing state.** Implement
+- **R69 (shipped 2026-09-26) — Disclosures are feature-owned composition over existing state.** Implement
   FS-01.R37/FS-12.R50 within the existing New Agent form and its runtime-selection helpers; reuse
   existing HTML/Radix and tokenized form treatments. Keep draft values owned above conditional
   content so collapsing cannot reset or reinitialize them. Visible summaries derive from the same
@@ -755,7 +755,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   compatibility warnings remain outside it. Add no saved disclosure preference or UI mode, generic
   form framework, dependency, API, or persistence shape. Extend public presentation hooks only when
   the changed structure needs them, updating their contract and skin consumers together.
-- **R70 (planned) — Native linking retains one connection implementation.** Give the existing
+- **R70 (shipped 2026-09-26) — Native linking retains one connection implementation.** Give the existing
   ConfigSourcePanel a compact onboarding presentation or extract only its shared connection seam;
   do not duplicate preview/bind/import orchestration. Settings keeps its existing full inspection
   surface, while onboarding owns a Details disclosure. Both remove the unavailable detached-copy
@@ -764,7 +764,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Preserve mutation claims, consent ownership, source/backend query invalidation, catalog drafts,
   and the mounted-wizard latch; no additional onboarding server flags or source-write authority are
   introduced. FS-04.R49 and FS-08.R35–R36 own the observable contract.
-- **R71 (planned) — Dependency pickers project existing task/run queries.** Share the dependency
+- **R71 (shipped 2026-09-26) — Dependency pickers project existing task/run queries.** Share the dependency
   selection/serialization used by Create and Re-arm within the Tasks feature (INV §2). Use
   `useTasks(project)` and the existing paginated `usePipelineRuns()` projection, filtering loaded
   runs to the selected project and exposing explicit next-page loading without fetching the entire
@@ -775,7 +775,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Re-arm keeps its full-set replacement request and server graph validation. Context attachments
   stay explicit ids under Advanced: there is no browser context-discovery endpoint, so this effort
   adds none and does not repurpose agent-scoped MCP discovery. No task schema or authorization change.
-- **R72 (planned) — Pipeline runtime disclosure preserves resolved request semantics.** Refactor
+- **R72 (shipped 2026-09-26) — Pipeline runtime disclosure preserves resolved request semantics.** Refactor
   RunStartForm's existing assignment fields into the shared compact summary/disclosure for inline
   and dialog usage; the dialog becomes Setup → Review under FS-14.R80. Keep the existing configured
   runtime default resolution, explicit orchestrator/dedicated_assignments payloads, capability

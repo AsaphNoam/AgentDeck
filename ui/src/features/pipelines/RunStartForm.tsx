@@ -42,6 +42,15 @@ function RuntimeAssignment({ label, field, number = 1, value, backends, entries,
   </div>;
 }
 
+function runtimeSummary(value: PipelineRuntimeAssignment, backends: Record<string, Backend> | undefined) {
+  const backend = backends?.[value.backend];
+  const model = backend?.models[value.model];
+  const backendLabel = backend ? `${backend.name} (${value.backend})` : value.backend || "Choose a backend";
+  const modelLabel = model ? `${model.name} (${value.model})` : value.model || "choose a model";
+  const fastLabel = model?.fast ? (value.fast ? "Fast mode on" : "Fast mode off") : "";
+  return [backendLabel, modelLabel, value.effort, fastLabel].filter(Boolean).join(" · ");
+}
+
 export function RunStartForm({
   proposal: proposalSeed,
   onStarted,
@@ -72,6 +81,8 @@ export function RunStartForm({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const [runtimeOpen, setRuntimeOpen] = useState(false);
+  const [runtimeSource, setRuntimeSource] = useState<"defaults" | "proposal" | "selected">("defaults");
   const formRef = useRef<HTMLElement>(null);
 
   const templateRecord = useMemo(
@@ -93,6 +104,7 @@ export function RunStartForm({
     setOrchestrator(structuredClone(payload.orchestrator));
     setDedicatedAssignments(structuredClone(payload.dedicated_assignments));
     setProposal(proposalSeed);
+    setRuntimeSource("proposal");
     setPendingRequest(null);
     setConflicts([]);
     setDiagnostics([]);
@@ -104,10 +116,17 @@ export function RunStartForm({
   useEffect(() => {
     const field = diagnostics[0]?.field;
     if (!field) return;
+    setStep(0);
+    if (field.startsWith("orchestrator") || field.startsWith("dedicated_assignments.")) setRuntimeOpen(true);
+  }, [diagnostics]);
+
+  useEffect(() => {
+    const field = diagnostics[0]?.field;
+    if (!field || step !== 0) return;
     const owner = [...(formRef.current?.querySelectorAll<HTMLElement>("[data-field]") ?? [])]
       .find((item) => field === item.dataset.field || field.startsWith(`${item.dataset.field}.`));
     owner?.querySelector<HTMLElement>("input, select, textarea")?.focus();
-  }, [diagnostics, step]);
+  }, [diagnostics, runtimeOpen, step]);
 
   useEffect(() => {
     if (project || !config.data?.default_project) return;
@@ -141,6 +160,7 @@ export function RunStartForm({
     setDiagnostics([]);
     if (proposal) {
       setProposal(undefined);
+      setRuntimeSource("selected");
       setNotice("The proposed run changed. Its confirmation was invalidated; this is now a manual run setup.");
     }
   };
@@ -176,9 +196,7 @@ export function RunStartForm({
           setConflicts(shared);
           setDiagnostics(pipelineDiagnostics(reason));
           setError(shared.length === 0 ? (reason instanceof Error ? reason.message : String(reason)) : null);
-          const fields = pipelineDiagnostics(reason).map((item) => item.field);
-          if (fields.some((field) => field.startsWith("orchestrator") || field.startsWith("dedicated_assignments."))) setStep(1);
-          else if (fields.length > 0) setStep(0);
+          if (pipelineDiagnostics(reason).length > 0) setStep(0);
         },
       },
     );
@@ -201,7 +219,21 @@ export function RunStartForm({
         : missingInputs.length > 0
           ? `Fill the required named input${missingInputs.length === 1 ? "" : "s"}: ${missingInputs.map((input) => input.name).join(", ")}`
           : null;
-  const blocker = setupBlocker ?? (assignmentsMissing && (!stepMode || step > 0) ? "Assign a runtime to the standing owner and every dedicated coordinator." : null);
+  const blocker = setupBlocker ?? (assignmentsMissing ? "Customize runtimes for the standing owner and every dedicated coordinator." : null);
+
+  const runtimeRows = template ? [
+    { key: "orchestrator", label: `Standing owner · ${template.orchestrator_role}`, value: orchestrator },
+    ...template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => ({
+      key: stage.id,
+      label: `${stage.title} coordinator · ${stage.dedicated_role}`,
+      value: dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false },
+    })),
+  ] : [];
+  const runtimeSourceLabel = runtimeSource === "proposal"
+    ? "Proposal selections"
+    : runtimeSource === "defaults"
+      ? "Configured defaults"
+      : "Selected values";
 
   return (
     <section ref={formRef} className={stepMode ? "pipeline-run-start pipeline-run-start-dialog" : "pipeline-panel pipeline-run-start"} data-ui="pipeline-start-dialog">
@@ -212,7 +244,7 @@ export function RunStartForm({
         </div>
       </div>}
       {stepMode && <ol className="pipeline-start-steps" aria-label="Start run steps" data-slot="steps">
-        {["Setup", "Runtimes", "Review"].map((label, index) => <li key={label} className={step === index ? "pipeline-start-step-active" : step > index ? "pipeline-start-step-complete" : ""}><span>{index + 1}</span>{label}</li>)}
+        {["Setup", "Review"].map((label, index) => <li key={label} className={step === index ? "pipeline-start-step-active" : step > index ? "pipeline-start-step-complete" : ""}><span>{index + 1}</span>{label}</li>)}
       </ol>}
       {(!stepMode || step === 0) && <div className="pipeline-start-pane" data-slot="content"><div className="pipeline-form-grid">
         <label className="form-field" data-field="template_id"><span>Template</span><select value={templateID} onChange={(event) => { edit(); setTemplateID(event.target.value); }}>
@@ -236,23 +268,28 @@ export function RunStartForm({
             <textarea rows={2} value={inputs[input.name] ?? ""} onChange={(event) => { edit(); setInputs((current) => ({ ...current, [input.name]: event.target.value })); }} />
           </label>)}
         </div>
-      </div>}</div>}
-
-      {template && (!stepMode || step === 1) && <div className={stepMode ? "pipeline-start-pane" : "pipeline-subsection"} data-slot="content">
-        <h3>Runtime assignments</h3>
-        <div className="pipeline-runtime-list">
-          <RuntimeAssignment label={`Standing owner · ${template.orchestrator_role}`} field="orchestrator" value={orchestrator} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setOrchestrator(value); }} />
-          {template.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => <RuntimeAssignment key={stage.id} label={`${stage.title} · coordinator ${stage.dedicated_role}`} field={`dedicated_assignments.${stage.id}`} number={index + 2} value={dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false }} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setDedicatedAssignments((current) => ({ ...current, [stage.id]: value })); }} />)}
-        </div>
       </div>}
+      {template && <section className="pipeline-runtime-summary" aria-label="Selected runtimes">
+        <div className="pipeline-runtime-summary-heading"><h3>Selected runtimes</h3><span>{runtimeSourceLabel}</span></div>
+        <ol>{runtimeRows.map((row) => <li key={row.key}><strong>{row.label}</strong><small>{runtimeSummary(row.value, backends.data?.backends)}</small></li>)}</ol>
+      </section>}
+      {template && <details className="pipeline-disclosure pipeline-runtime-customize" open={runtimeOpen} onToggle={(event) => setRuntimeOpen(event.currentTarget.open)}>
+        <summary>Customize runtimes</summary>
+        <div className="pipeline-disclosure-body"><div className="pipeline-runtime-list">
+          <RuntimeAssignment label={`Standing owner · ${template.orchestrator_role}`} field="orchestrator" value={orchestrator} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setRuntimeSource("selected"); setOrchestrator(value); }} />
+          {template.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => <RuntimeAssignment key={stage.id} label={`${stage.title} · coordinator ${stage.dedicated_role}`} field={`dedicated_assignments.${stage.id}`} number={index + 2} value={dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false }} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setRuntimeSource("selected"); setDedicatedAssignments((current) => ({ ...current, [stage.id]: value })); }} />)}
+        </div></div>
+      </details>}</div>}
 
-      {stepMode && step === 2 && <div className="pipeline-start-pane pipeline-start-review" data-slot="content">
+      {template && (!stepMode || step === 1) && <div className={stepMode ? "pipeline-start-pane pipeline-start-review" : "pipeline-subsection"} data-slot="content">
+        {stepMode && <>
         <div className="pipeline-review-hero"><p className="pipeline-eyebrow">Ready to launch</p><h3>{displayName || template?.title || "Untitled run"}</h3><p>{goal}</p></div>
         <dl className="pipeline-review-facts"><div><dt>Template</dt><dd>{template?.title || templateID}</dd></div><div><dt>Project</dt><dd>{projects.data?.[project]?.title || project}</dd></div><div><dt>Stages</dt><dd>{template?.stages.length ?? 0}</dd></div><div><dt>Named inputs</dt><dd>{Object.values(inputs).filter((value) => value.trim()).length}</dd></div></dl>
-        <ol className="pipeline-review-runtimes"><li><span>1</span><div><strong>Standing owner · {template?.orchestrator_role}</strong><small>{[orchestrator.backend, orchestrator.model, orchestrator.effort].filter(Boolean).join(" · ")}</small></div></li>{template?.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => { const runtime = dedicatedAssignments[stage.id]; return <li key={stage.id}><span>{index + 2}</span><div><strong>{stage.title} coordinator · {stage.dedicated_role}</strong><small>{[runtime?.backend, runtime?.model, runtime?.effort].filter(Boolean).join(" · ")}</small></div></li>; })}</ol>
+        <ol className="pipeline-review-runtimes">{runtimeRows.map((row, index) => <li key={row.key}><span>{index + 1}</span><div><strong>{row.label}</strong><small>{runtimeSummary(row.value, backends.data?.backends)}</small></div></li>)}</ol>
+        </>}
       </div>}
 
-      {proposal && (!stepMode || step === 2) && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
+      {proposal && (!stepMode || step === 1) && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
       {conflicts.length > 0 && <div className="pipeline-warning">
         <strong>Shared project workspace</strong>
         <p>These active agents or runs use the same project directory. AgentDeck does not isolate their filesystem changes.</p>
@@ -269,9 +306,9 @@ export function RunStartForm({
       {stepMode ? <div className="pipeline-start-actions" data-slot="actions">
         <button type="button" onClick={onCancel}>Cancel</button>
         <span className="pipeline-start-blocker">{blocker}</span>
-        {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)}>Back</button>}
-        {step < 2 && <button type="button" disabled={step === 0 ? setupIncomplete : assignmentsMissing} onClick={() => setStep((value) => value + 1)}>Next</button>}
-        {step === 2 && <button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
+        {step === 0 && <button type="button" disabled={setupIncomplete || assignmentsMissing} onClick={() => setStep(1)}>Review</button>}
+        {step === 1 && <button type="button" onClick={() => setStep(0)}>Back</button>}
+        {step === 1 && <button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
       </div> : <div className="form-actions"><span className="pipeline-start-blocker">{blocker}</span><button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
     </section>
   );

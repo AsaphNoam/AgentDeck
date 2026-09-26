@@ -4,7 +4,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
-import { SourceStep } from "./SourceStep";
+import { SourceStep, supportsConfigSource } from "./SourceStep";
 
 const server = setupServer(
   http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", cwd: "/tmp/app" } })),
@@ -30,7 +30,8 @@ describe("SourceStep", () => {
     renderWithQuery(<SourceStep project="app" backendId="claude" backendType="claude-acp" onDone={onDone} />);
     expect(await screen.findByText(/Link your CLI configuration/)).toBeInTheDocument();
     // The reused federation panel is present and expanded, targeting Claude.
-    expect(screen.getByText(/Configuration source \(Claude Code\)/)).toBeInTheDocument();
+    expect(screen.getByText("Details")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use my Claude Code configuration" })).toBeInTheDocument();
     fireEvent.click(screen.getByText("Continue"));
     expect(onDone).toHaveBeenCalledTimes(1);
   });
@@ -38,16 +39,14 @@ describe("SourceStep", () => {
   it("links the selected provider (Codex), not a hard-coded Claude", async () => {
     renderWithQuery(<SourceStep project="app" backendId="codex" backendType="codex-acp" onDone={vi.fn()} />);
     // The panel must target Codex, proving the chosen backend is carried through.
-    expect(await screen.findByText(/Configuration source \(Codex\)/)).toBeInTheDocument();
-    expect(screen.queryByText(/Configuration source \(Claude Code\)/)).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Use my Codex configuration" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use my Claude Code configuration" })).not.toBeInTheDocument();
   });
 
-  it("shows no federation controls for a non-federated backend", async () => {
-    const onDone = vi.fn();
-    renderWithQuery(<SourceStep project="app" backendId="opencode" backendType="opencode-acp" onDone={onDone} />);
-    expect(await screen.findByText(/configured directly in Settings/)).toBeInTheDocument();
-    expect(screen.queryByText(/Configuration source/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("Continue"));
-    expect(onDone).toHaveBeenCalledTimes(1);
+  it("marks only providers with native configuration as source-step eligible", () => {
+    expect(supportsConfigSource("claude-acp")).toBe(true);
+    expect(supportsConfigSource("codex-acp")).toBe(true);
+    expect(supportsConfigSource("opencode-acp")).toBe(false);
+    expect(supportsConfigSource("openhands-acp")).toBe(false);
   });
 });

@@ -14,13 +14,13 @@ interface SourceStepProps {
 // Only Claude Code / Codex have a native configuration to federate; OpenCode and
 // OpenHands are configured directly in Settings.
 const FEDERATED: Partial<Record<BackendType, true>> = { "claude-acp": true, "codex-acp": true };
+export const supportsConfigSource = (backendType: BackendType) => !!FEDERATED[backendType];
 
 // SourceStep is an OPTIONAL onboarding step: it lets a new user link their native
 // Claude Code / Codex configuration up front, but linking can equally be done
 // later in Settings, so the step is always skippable. It reuses the same
 // ConfigSourcePanel as Settings so there is one federation UI, not two.
 export function SourceStep({ backendId, backendType, onDone, claimMutation, releaseMutation }: SourceStepProps) {
-  const federated = !!FEDERATED[backendType];
   const handleContinue = () => {
     if (claimMutation && !claimMutation()) return;
     releaseMutation?.();
@@ -29,27 +29,18 @@ export function SourceStep({ backendId, backendType, onDone, claimMutation, rele
   return (
     <div className="onboarding-step source-step" data-ui="onboarding" data-slot="step" data-variant="source">
       <h3>Link your CLI configuration (optional)</h3>
-      {federated ? (
-        <>
-          <p className="source-hint">
-            AgentDeck can read your existing Claude Code or Codex setup — model, instructions and tooling —
-            so agents launch with your real configuration. Nothing is copied or modified. You can also do
-            this anytime from Settings → Backends.
-          </p>
-          <ConfigSourcePanel
-            backendId={backendId}
-            backendType={backendType}
-            defaultOpen
-            claimMutation={claimMutation}
-            releaseMutation={releaseMutation}
-          />
-        </>
-      ) : (
-        <p className="source-hint">
-          This backend is configured directly in Settings → Backends — there is no external CLI
-          configuration to link. You can continue.
-        </p>
-      )}
+      <p className="source-hint">
+        AgentDeck can read your existing {backendType === "claude-acp" ? "Claude Code" : "Codex"} setup —
+        model, instructions and tooling — so agents launch with your real configuration. Nothing is
+        copied or modified. You can also link it later in Settings → Backends.
+      </p>
+      <ConfigSourcePanel
+        backendId={backendId}
+        backendType={backendType}
+        compactOnboarding
+        claimMutation={claimMutation}
+        releaseMutation={releaseMutation}
+      />
 
       <div className="onboarding-actions" data-slot="actions">
         <button type="button" onClick={handleContinue}>

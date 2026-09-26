@@ -294,7 +294,7 @@ Requirements are user-observable.
   states without removing fields, outcomes, actions, tabs, validation, or recovery feedback.
   Existing route and task flows do not change.
 
-- **R50 (planned) — Setup forms prioritize an experienced operator's decisions.** The compact
+- **R50 (shipped 2026-09-26) — Setup forms prioritize an experienced operator's decisions.** The compact
   setup changes in FS-01.R37, FS-04.R49, FS-08.R35–R36, FS-14.R80 and FS-16.R39–R40 use existing
   form, disclosure and dialog treatments across Core, Sky & Grove and Studio. Reading and keyboard
   order follow the task: workspace/role or work instruction, selected runtime/dependency summary,
@@ -455,7 +455,7 @@ Requirements are user-observable.
   permission, and long-content states remain clear. *Verify:* the deterministic visual matrix,
   affected feature tests, and real-browser route/state review at the supported desktop floor.
 
-- **A24 (planned)** (R50) — In an isolated built application at 1024px and a wider desktop viewport,
+- **A24 (shipped 2026-09-26)** (R50) — In an isolated built application at 1024px and a wider desktop viewport,
   exercise compact/custom New Agent; bound/unbound/error native linking plus an unsupported-provider
   onboarding path; named/manual task prerequisites and Re-arm; and default/custom/proposed pipeline
   start. Compare Core, Sky & Grove and Studio with long/duplicate names, fast mode and a hidden-field

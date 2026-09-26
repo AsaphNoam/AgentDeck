@@ -17,7 +17,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
+- **Active change:** `simplify-agent-and-automation-setup` is in progress; the compact setup change
+  is split into New Agent/onboarding, Tasks dependencies, pipeline start, and rendered closure slices.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -30,8 +31,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not new units.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `simplify-agent-and-automation-setup.md`, `rename-product-to-deckhand.md`, and
-  `add-mobile-remote-control.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
+- **Work units:** `simplify-agent-and-automation-setup.md` is in progress. `rename-product-to-deckhand.md`
+  and `add-mobile-remote-control.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -49,7 +50,18 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `complete-studio-composition` was corrected 2026-09-25 and awaits `/review`.
+**Change:** `simplify-agent-and-automation-setup` — in progress.
+
+**Plan:** (1) compact New Agent and provider-aware onboarding/config linking; (2) shared named/manual
+Tasks dependency selection; (3) pipeline Setup → Review with runtime summary/disclosure; (4) Core,
+Sky & Grove and Studio rendered validation at the desktop floor and wider viewport, then closure.
+All four slices are complete. `make test`, `make build`, the UI suite (58 files / 473 tests), UI
+production build, style/presentation checks and `git diff --check` pass. An isolated built-app
+browser pass at 1024×900 found no horizontal overflow or console errors in the compact New Agent,
+Tasks and pipeline setup surfaces; New Agent was compared in Core, Sky & Grove and Studio at 1024px
+and 1440px. The Studio pipeline dialog completed Setup → Review from a real saved template. Focused
+tests cover provider-aware onboarding, source Details/retry, partial run history, replacement waits,
+proposal hydration, hidden diagnostics, fast mode and rejected drafts.
 
 **Changelog — 2026-09-25 (design: mobile remote control):** Waiting-to-start
 `add-mobile-remote-control.md`: paired phones supervise and direct work over the person's tailnet

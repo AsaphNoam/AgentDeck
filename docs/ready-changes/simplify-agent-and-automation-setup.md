@@ -1,6 +1,6 @@
 # Simplify agent and automation setup
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** User approval, 2026-09-25, of discovery suggestions 7–11 as one effort. The audience already
 knows Claude Code/Codex; reduce AgentDeck-specific configuration overhead rather than teach agent basics.
 **Relevant requirements:** FS-01.R37/A21, FS-04.R49/A29, FS-08.R35–R36/A12–A13,
@@ -74,4 +74,21 @@ their composition and records the affected-state pass after the change.
 
 ## Waiting on
 
-Nothing. User approved the five changes together. No product code has been changed by this design.
+Nothing. User approved the five changes together.
+
+## Implementation plan
+
+1. Compact New Agent and provider-aware onboarding/config linking; verify request preservation,
+   provider step selection, connection states and focused component coverage.
+2. Add shared named/manual dependency selection to Tasks Create and Re-arm; verify pagination,
+   outcome vocabulary, replacement semantics and rejected-draft retention.
+3. Reshape pipeline start to Setup → Review with a shared runtime summary/disclosure; verify defaults,
+   proposal hydration, diagnostics, fast mode and conflict/shared-workspace recovery.
+4. Run the affected rendered journey in Core, Sky & Grove and Studio at the supported desktop floor
+   and a wider viewport, then run the applicable UI and repository closure matrix.
+
+**Design/UX direction:** Experienced operators see role/workspace or work instruction first, then a
+truthful summary of the runtime or dependency request that will be submitted. Advanced controls stay
+one labelled interaction away and retain their values. No motion or new visual system. Loading,
+partial history, duplicate names, unsupported providers, errors, proposals, overrides and fast mode
+remain visible and actionable; collapsed structure never hides a consequential warning or repair.
