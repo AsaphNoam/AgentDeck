@@ -17,11 +17,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `simplify-agent-and-automation-setup` was reviewed 2026-09-26 and has
-  open findings for `/fix`.
+- **Active change:** None. `tighten-chat-actions-and-triage-notes` finished 2026-09-26 and awaits
+  `/review`; `simplify-agent-and-automation-setup` retains its open `/fix` findings.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
+- **Review units:** `tighten-chat-actions-and-triage-notes` (finished 2026-09-26),
+  `add-studio-skin` (finished 2026-09-23), and `complete-studio-composition`
   (finished 2026-09-25) await `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d` and
   `complete-studio-composition` against `9ae10ee..4bb5b2e`; `71c2810` is the latter's
   evidence-only handoff follow-up, not another unit. `simplify-agent-and-automation-setup`
@@ -53,8 +54,17 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `simplify-agent-and-automation-setup` was reviewed 2026-09-26; its findings are
-open for `/fix`.
+**Change:** None. `tighten-chat-actions-and-triage-notes` finished 2026-09-26 and awaits `/review`.
+
+**Changelog — 2026-09-26 (implementation: chat actions and stale-note triage):** Clone now opens
+the forked conversation; selected transcript text has Copy beside Annotate; the agent header copies
+the stable thread id and uses a compact left identity/runtime band. Six unresolved product/security
+questions were recorded under **Ideas being defined**; stale global-template and pipeline-run notes
+were not duplicated. Focused UI tests and presentation checks pass. A real-browser matrix pass in
+Core, Sky & Grove and Studio at 1024px and 1440px kept every control inside the header with no
+horizontal overflow; header height measured 130.5px and 98.5px respectively, with no browser
+warnings or errors. `make test`, `make build`, the UI suite (58 files / 476 tests), the UI
+production build, specification checks, and diff checks pass.
 
 **Changelog — 2026-09-26 (review: compact agent and automation setup, `7d6db5e..d359640`):**
 Two **Must fix** and one **Worth fixing** recorded under **Review findings**. The implementation

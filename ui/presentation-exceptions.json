@@ -20,9 +20,9 @@
     "reason": "Coordinates are live pointer position data"
   },
   {
-    "file": "src/components/chat/AnnotationContextMenu.tsx",
+    "file": "src/components/ui/PointerContextMenu.tsx",
     "rule": "inline-style",
-    "reason": "Coordinates are live pointer position data"
+    "reason": "Shared pointer-menu coordinates are live pointer position data"
   },
   {
     "file": "src/components/ui/ProjectColorPicker.tsx",

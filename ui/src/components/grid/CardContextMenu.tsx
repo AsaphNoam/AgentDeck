@@ -134,7 +134,9 @@ export function CardContextMenu() {
         disabled={!agent.clone?.available}
         title={agent.clone?.available ? "Start a new agent that continues this conversation from its last completed turn" : agent.clone?.reason || "Clone is not available for this agent"}
         onClick={() => {
-          cloneAgent(agent.agent_id).catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
+          cloneAgent(agent.agent_id)
+            .then((result) => navigate(`/agent/${result.agent.agent_id}`))
+            .catch((err) => pushError("Clone failed", err instanceof Error ? err.message : String(err)));
           close();
         }}
       >

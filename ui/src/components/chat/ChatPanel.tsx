@@ -9,7 +9,9 @@ import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
+import { useUiStore } from "../../store/uiStore";
 import { ContextBar } from "../grid/ContextBar";
+import { PointerContextMenu, type PointerMenuState } from "../ui/PointerContextMenu";
 import { Composer } from "./Composer";
 import { TranscriptView } from "./TranscriptView";
 import { FilesTab } from "./FilesTab";
@@ -51,6 +53,7 @@ export function ChatPanel() {
   const heldAfterSeq = useHeldStore((state) => state.afterSeqByAgent[id] ?? 0);
   const hold = useHeldStore((state) => state.hold);
   const releaseHeld = useHeldStore((state) => state.release);
+  const pushError = useUiStore((state) => state.pushError);
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
@@ -59,6 +62,7 @@ export function ChatPanel() {
   const [switching, setSwitching] = useState(false);
   const [applyingSetting, setApplyingSetting] = useState<"effort" | "fast" | null>(null);
   const [liveFast, setLiveFast] = useState(agent?.fast ?? false);
+  const [headerMenu, setHeaderMenu] = useState<PointerMenuState | null>(null);
 
   // The agent often isn't in the store yet at mount (it hydrates over SSE), so
   // the useState initializer above can't see its interface. Once it loads, apply
@@ -209,7 +213,29 @@ export function ChatPanel() {
     // a container query cannot reach it; this is a state attribute of the kind the
     // annotation tray already carries, not a measurement (FS-03.R53, TS-08.R57).
     <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-file-open={openFile ? "true" : undefined} data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
-      <header className="chat-header" data-slot="header">
+      <header
+        className="chat-header"
+        data-slot="header"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setHeaderMenu({
+            x: event.clientX,
+            y: event.clientY,
+            actions: [{
+              label: "Copy thread identity",
+              select: () => {
+                if (!navigator.clipboard) {
+                  pushError("Copy failed", "Clipboard access is not available in this browser.");
+                  return;
+                }
+                void navigator.clipboard.writeText(agent.agent_id).catch((error) => {
+                  pushError("Copy failed", error instanceof Error ? error.message : String(error));
+                });
+              },
+            }],
+          });
+        }}
+      >
         <Link to={backTarget}>Back</Link>
         <div data-slot="identity">
           <h1>{agent.name}</h1>
@@ -269,6 +295,7 @@ export function ChatPanel() {
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} /></div>
       </header>
+      <PointerContextMenu menu={headerMenu} onClose={() => setHeaderMenu(null)} />
       <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs" data-slot="tabs">
         <Tabs.List className="chat-tabs-list" data-slot="tabs">
           <Tabs.Trigger value="transcript">Transcript</Tabs.Trigger>

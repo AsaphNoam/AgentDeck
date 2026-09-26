@@ -297,6 +297,21 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   effort still restarts the process — more work than needed, retained deliberately rather than
   removed, because narrowing a shipped request field would be a compatibility break for no gain.
 
+- **R62 (shipped 2026-09-26) — The agent header stays compact and exposes stable identity.** Agent name and
+  the existing runtime/session controls share the left reading band instead of stacking into a
+  separate tall block; Back remains first, context remains a quiet right-hand summary, and long
+  names, staged changes, errors, and unavailable settings may wrap without hiding or reordering a
+  control. Right-clicking the header opens the existing pointer-menu treatment with **Copy thread
+  identity**, which copies the exact stable AgentDeck `agent_id`. A clipboard failure leaves the
+  workspace usable and surfaces an actionable error.
+
+- **R63 (shipped 2026-09-26) — Selected transcript text has an explicit Copy action.** When a person
+  right-clicks a non-empty selection inside an annotatable transcript event, the existing context
+  menu offers both **Copy selection** and **Annotate selection**. Copy writes the exact selected
+  text without creating an annotation or changing the transcript. With no selection, the existing
+  whole-event annotation action is unchanged; where annotations are disabled, the browser-native
+  context menu remains available. A clipboard failure surfaces an actionable error.
+
 ### 2.6 Composer file and ACP command autocomplete
 
 - **R30.** Typing `@` in the composer at a word boundary — the start of the input or
@@ -808,6 +823,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   event; completed MCP elicitation leaves no pending permission; and existing diff events preserve
   their path/content correlation. Plan updates produce no product event. *Verify by* fake-ACP wire
   tests and a credentialed Codex 1.12.0 compatibility receipt.
+
+- **A43 (shipped 2026-09-26)** (R62) — The live chat header renders its existing controls in the compact
+  left-hand identity band, and a header context-menu activation copies the exact `agent_id`; an
+  injected clipboard refusal produces visible error feedback. *Verify:* `ChatPanel.test.tsx`,
+  presentation styles, and a real-browser check at 1024px and a wider desktop viewport.
+
+- **A44 (shipped 2026-09-26)** (R63) — Right-clicking selected event text exposes Copy and Annotate; Copy
+  writes the exact selection and does not create a draft, while Annotate keeps the clipped selected
+  excerpt. With no selection only whole-event annotation appears, and annotations-disabled events
+  retain the native context menu. *Verify:* `TranscriptView.test.tsx`.
 
 
 ## 6. Deviations & open decisions

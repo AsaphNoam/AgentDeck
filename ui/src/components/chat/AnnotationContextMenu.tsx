@@ -1,42 +1,19 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { useMenuPlacement } from "../../lib/menuPlacement";
+import { PointerContextMenu } from "../ui/PointerContextMenu";
 
-export type AnnotationMenuState = { x: number; y: number; label: string; annotate: () => void };
+export type AnnotationMenuState = { x: number; y: number; label: string; annotate: () => void; copy?: () => void };
 
 export function AnnotationContextMenu({ menu, onClose }: { menu: AnnotationMenuState | null; onClose: () => void }) {
-  const placement = useMenuPlacement(menu);
-  useEffect(() => {
-    if (!menu) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement)?.closest(".context-menu")) onClose();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("mousedown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menu, onClose]);
-
-  if (!menu) return null;
-
-  return createPortal(
-    <div className="context-menu" data-ui="context-menu" ref={placement.ref} style={placement.style} role="menu">
-      <button
-        type="button"
-        data-slot="item"
-        onClick={() => {
-          menu.annotate();
-          onClose();
-        }}
-      >
-        {menu.label}
-      </button>
-    </div>,
-    document.body,
+  return (
+    <PointerContextMenu
+      menu={menu ? {
+        x: menu.x,
+        y: menu.y,
+        actions: [
+          ...(menu.copy ? [{ label: "Copy selection", select: menu.copy }] : []),
+          { label: menu.label, select: menu.annotate },
+        ],
+      } : null}
+      onClose={onClose}
+    />
   );
 }

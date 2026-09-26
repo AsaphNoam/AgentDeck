@@ -118,6 +118,11 @@ orphaned processes.
   session. Background commands remain owned by the source and do not continue in the clone; any
   copied running task row is closed at the fork boundary as not carried. A failed fork creates no
   new agent, transcript, running process, or messaging identity.
+- **R38 (shipped 2026-09-26)** — A successful Clone action in the dashboard opens the newly created agent's
+  conversation immediately, so the person lands on the copied transcript and fork marker instead
+  of remaining on the source card. The client routes only after the fork response returns the new
+  `agent_id`; a refused or failed clone leaves the person on the source surface and exposes the
+  existing actionable error.
 
 ### Resume
 
@@ -346,6 +351,10 @@ transitions:
   distinguishable; unsupported effort/fast/terminal controls stay gated; source warnings remain
   visible and a refused launch preserves values and exposes the relevant control. *Verify by*
   `NewAgentModal.test.tsx` and the rendered setup pass in FS-12.A24.
+
+- **A22 (shipped 2026-09-26)** (R38) — Activating Clone from an eligible dashboard card calls only the fork
+  route and, after success, opens `/agent/<new-agent-id>`; a failed fork stays on the source surface
+  and keeps the existing error feedback. *Verify:* `CardContextMenu.test.tsx`.
 
 ## 6. Deviations & open decisions
 

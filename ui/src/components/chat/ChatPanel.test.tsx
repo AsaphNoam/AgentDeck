@@ -7,6 +7,7 @@ import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
+import { useUiStore } from "../../store/uiStore";
 import { ChatPanel, initialTab } from "./ChatPanel";
 
 const mocks = vi.hoisted(() => ({
@@ -57,6 +58,7 @@ afterEach(() => {
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {} });
   useHeldStore.setState({ byAgent: {}, afterSeqByAgent: {} });
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
+  useUiStore.setState({ toasts: [] });
 });
 
 // initialTab drives which tab a chat panel opens on. The load-bearing case for
@@ -205,6 +207,29 @@ describe("ChatPanel back target", () => {
 // runtime switch. It shares backend/model/effort reset behavior with launch and
 // the dashboard switch dialog.
 describe("ChatPanel runtime picker", () => {
+  it("copies the stable thread identity from the header context menu", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    const { container } = renderPanel("a_live");
+    fireEvent.contextMenu(container.querySelector(".chat-header") as HTMLElement, { clientX: 20, clientY: 30 });
+    fireEvent.click(screen.getByRole("button", { name: "Copy thread identity" }));
+
+    expect(writeText).toHaveBeenCalledWith("a_live");
+  });
+
+  it("surfaces a clipboard refusal from the header action", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error("clipboard denied")) } });
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    const { container } = renderPanel("a_live");
+    fireEvent.contextMenu(container.querySelector(".chat-header") as HTMLElement, { clientX: 20, clientY: 30 });
+    fireEvent.click(screen.getByRole("button", { name: "Copy thread identity" }));
+
+    await waitFor(() => expect(useUiStore.getState().toasts.some((toast) => toast.title === "Copy failed" && toast.body === "clipboard denied")).toBe(true));
+  });
+
   it("resets the model and effort, then switches a running chat agent", async () => {
     mocks.useBackends.mockReturnValue({ data: backends });
     mocks.switchRuntime.mockResolvedValue({ history_handoff: "native_resume" });

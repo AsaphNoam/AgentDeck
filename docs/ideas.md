@@ -52,6 +52,32 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Read files from configured additional project directories.** Let an operator open files under
+  explicitly configured project `add_dirs`, not arbitrary host paths. Define whether the readable
+  roots come from the frozen session snapshot, how symlinks and `.git` paths are handled, and how
+  the existing type/size limits and browser-facing path security boundary apply.
+- **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
+  per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
+  under a separate workspace base. Define ownership records, base-directory changes, recovery,
+  migration, and safe deletion before changing the canonical worktree path.
+- **Continue a blocked pipeline stage from its agent conversation.** The run page already names the
+  active stage, shows its attention reason, and accepts continuation input. Decide whether input
+  sent directly to the stage agent should also become authoritative continuation input despite the
+  current out-of-band chat contract, and how the run records and deduplicates that answer.
+- **Live permission policy and provider-native autonomy modes.** Define a chat-page permission-mode
+  control and the requested defaults: an AgentDeck-owned “approve for me” policy for Codex and the
+  provider's automatic mode for Claude. Specify scope, persistence, provider mapping, whether a
+  running session can change policy safely, and how this relates to frozen role/global
+  `skip_permissions` and per-request Approve/Deny.
+- **Split a conversation at an earlier message.** Track the requested split action with the existing
+  edit-message design problem: whole-session Clone now forks only at the latest completed turn,
+  while an earlier split needs a truthful provider-context boundary, parent/child lineage, visible
+  history rules, and behavior for providers without point-in-time fork support.
+- **Hide raw ids unless they disambiguate a name.** Runtime, project, role, and template selectors
+  often render `Name (id)`. Define one cross-product label rule that shows the readable name by
+  default, reveals the stable id only for duplicate names or an explicit detail surface, and keeps
+  values/keys identity-safe.
+
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
   Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and

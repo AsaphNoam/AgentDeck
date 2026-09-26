@@ -110,7 +110,7 @@ export function VisualMatrix() {
         <header className="chat-header" data-slot="header">
           <Link to="/">Back</Link>
           <div data-slot="identity">
-            <h1>Nova</h1>
+            <h1>Nova orchestration reviewer</h1>
             <div className="chat-runtime-picker">
               <fieldset className="chat-runtime-staged">
                 <legend>Runtime</legend>

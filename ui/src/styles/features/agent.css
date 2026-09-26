@@ -25,17 +25,26 @@
   border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small);
   display: grid;
   gap: var(--ad-space-4);
-  grid-template-columns: auto minmax(0, 1fr) minmax(200px, 300px);
-  padding: var(--ad-space-3) var(--ad-space-4);
+  grid-template-columns: auto minmax(0, 1fr) minmax(160px, 240px);
+  padding: var(--ad-space-2) var(--ad-space-3);
 }
 
 .chat-header > div {
   min-width: 0;
 }
 
+.chat-header [data-slot="identity"] {
+  align-items: center;
+  display: grid;
+  gap: var(--ad-space-2);
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .chat-header h1 {
-  font-size: 2rem;
+  font-size: 1.5rem;
   line-height: 1;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .chat-header span:not(.context-bar span) {
@@ -49,7 +58,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2);
-  margin-top: var(--ad-space-2);
+  margin-top: 0;
 }
 
 .chat-runtime-staged,
@@ -61,7 +70,15 @@
   flex-wrap: wrap;
   gap: var(--ad-space-2);
   margin: 0;
-  padding: var(--ad-space-2);
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.chat-runtime-staged {
+  flex: 1 1 17rem;
+}
+
+.chat-session-settings {
+  flex: 1 1 19rem;
 }
 
 .chat-runtime-staged legend,
@@ -73,11 +90,17 @@
 }
 
 .chat-runtime-picker .form-field {
-  min-width: 8rem;
+  flex: 1 1 6rem;
+  min-width: 0;
+}
+
+.chat-session-settings .form-field:last-child {
+  flex: 1.6 1 10rem;
 }
 
 .chat-runtime-picker select {
   min-height: 2rem;
+  width: 100%;
 }
 
 .chat-runtime-switch {
@@ -87,6 +110,13 @@
 .chat-runtime-picker .form-error {
   flex-basis: 100%;
   margin: 0;
+}
+
+@media (min-width: 80rem) {
+  .chat-header [data-slot="identity"] {
+    gap: var(--ad-space-3);
+    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+  }
 }
 
 .new-agent-runtime {

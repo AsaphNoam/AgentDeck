@@ -58,6 +58,23 @@ describe("TranscriptView annotation entry point", () => {
     ]);
   });
 
+  it("copies the exact highlighted text without creating an annotation", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const { container } = renderTranscript();
+    const item = container.querySelector('[data-slot="event"]') as HTMLElement;
+    const text = document.createTextNode("  Second line  ");
+    item.appendChild(text);
+    selectWithin(text);
+
+    fireEvent.contextMenu(item, { clientX: 20, clientY: 30 });
+
+    expect(screen.getByRole("button", { name: "Annotate selection" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Copy selection" }));
+    expect(writeText).toHaveBeenCalledWith("  Second line  ");
+    expect(useAnnotationStore.getState().bySource.a1).toBeUndefined();
+  });
+
   it("falls back to the whole event when nothing is highlighted", () => {
     const { container } = renderTranscript();
     const item = container.querySelector('[data-slot="event"]') as HTMLElement;

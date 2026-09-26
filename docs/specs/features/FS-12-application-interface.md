@@ -305,6 +305,14 @@ Requirements are user-observable.
   R17/R18's preservation of the old editor/onboarding composition; the owning feature requirements
   define the changed behavior, including skipping unsupported Config steps.
 
+- **R51 (shipped 2026-09-26) — Chat chrome yields space to the conversation.** The full agent workspace keeps
+  one compact header whose left reading band contains Back, agent identity, and the existing runtime
+  and live-session controls, while context stays subordinate on the right. The composition may wrap
+  for long names, errors, or narrow supported desktop widths but does not hide, reorder, or change
+  the apply model of any control. Header identity-copy and transcript selection-copy actions use
+  the existing pointer-menu construction across Core, Sky & Grove, and Studio; no new motion,
+  context-menu language, route, or transcript behavior is introduced (FS-03.R62–R63).
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -463,6 +471,12 @@ Requirements are user-observable.
   that default flows need no advanced-editor interaction. Reuse representative deterministic fixtures
   and fake ACP where a launch is needed; record actual browser evidence at implementation closure.
   This is an affected-surface check, not a whole-application redesign or provider-compatibility claim.
+
+- **A25 (shipped 2026-09-26)** (R51) — At 1024px and a wider desktop viewport, a running agent with the full
+  runtime picker, long identity, staged Switch action, live settings, and an error keeps every
+  header control visible while giving more height to the transcript than the prior stacked header.
+  Core, Sky & Grove, and Studio retain their existing hierarchy and the shared pointer menu remains
+  inside the viewport. *Verify:* focused component/style tests plus a real-browser comparison.
 
 ## 6. Deviations & open decisions
 

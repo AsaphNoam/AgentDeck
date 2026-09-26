@@ -22,6 +22,7 @@ import { useAnnotationStore } from "../../store/annotationStore";
 import { useAgentStore } from "../../store/agentStore";
 import { useHeldStore } from "../../store/heldStore";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
+import { useUiStore } from "../../store/uiStore";
 
 // openFile/onOpenFile are per-surface, exactly as annotationsEnabled already is
 // (TS-08.R57). The agent and archived-agent screens pass the file their route
@@ -36,6 +37,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   const [atBottom, setAtBottom] = useState(true);
   const [menu, setMenu] = useState<AnnotationMenuState | null>(null);
   const addAnnotation = useAnnotationStore((state) => state.add);
+  const pushError = useUiStore((state) => state.pushError);
   // The queued follow-up renders beside the event list, never inside it: the
   // server sends no event for a message it has not delivered (TS-08.R56).
   const held = useHeldStore((state) => state.byAgent[agentId]);
@@ -52,6 +54,15 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       x: mouse.clientX,
       y: mouse.clientY,
       label: selected ? "Annotate selection" : "Annotate whole event",
+      copy: selected ? () => {
+        if (!navigator.clipboard) {
+          pushError("Copy failed", "Clipboard access is not available in this browser.");
+          return;
+        }
+        void navigator.clipboard.writeText(selected).catch((error) => {
+          pushError("Copy failed", error instanceof Error ? error.message : String(error));
+        });
+      } : undefined,
       annotate: () => addAnnotation(agentId, draft),
     });
   };
@@ -327,7 +338,8 @@ function selectionWithin(host: HTMLElement): string | null {
   const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   if (!host.contains(selection.getRangeAt(0).commonAncestorContainer)) return null;
-  return selection.toString().trim() || null;
+  const text = selection.toString();
+  return text.trim() ? text : null;
 }
 
 function eventDraft(event: TranscriptEvent): AnnotationDraft {

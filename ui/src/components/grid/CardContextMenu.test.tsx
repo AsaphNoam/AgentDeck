@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
@@ -48,9 +48,14 @@ function renderMenu() {
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <CardContextMenu />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().pathname}</output>;
 }
 
 describe("CardContextMenu error surfacing", () => {
@@ -163,6 +168,7 @@ describe("CardContextMenu error surfacing", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Clone$/i }));
 
     await waitFor(() => expect(cloned).toBe("a_1"));
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/agent/a_2"));
     expect(launched).toBe(false);
   });
 
