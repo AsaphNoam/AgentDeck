@@ -239,6 +239,16 @@ func (s *Server) PublishPipelineUpdate(update pipeline.PipelineUpdate) {
 	}
 }
 
+// publishPipelineRun republishes a run whose durable state the server changed
+// outside the pipeline manager.
+func (s *Server) publishPipelineRun(run state.PipelineRunRecord) {
+	s.PublishPipelineUpdate(pipeline.PipelineUpdate{
+		RunID: run.RunID, DisplayName: run.DisplayName, Revision: run.Revision,
+		State: run.State, CurrentStageID: run.CurrentStageID, CurrentAgentID: run.CurrentAgentID,
+		AttentionReason: run.AttentionReason, FinalOutcome: run.FinalOutcome,
+	})
+}
+
 func (s *Server) PublishPipelineProposalUpdate() {
 	s.eventBus.Publish("pipeline_proposal_update", nil, map[string]any{})
 }

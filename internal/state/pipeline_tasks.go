@@ -407,7 +407,7 @@ func (s *Store) BindPipelineStageTaskStandingAgent(taskID, agentID string) error
 		return err
 	}
 	defer tx.Rollback()
-	var coordinator string
+	var coordinator, runID string
 	res, err := tx.Exec(`UPDATE pipeline_stage_tasks SET standing_agent_id = ? WHERE task_id = ? AND state = 'open' AND (standing_agent_id = '' OR standing_agent_id = ?)`, agentID, taskID, agentID)
 	if err != nil {
 		return fmt.Errorf("state: bind pipeline standing agent: %w", err)
@@ -419,7 +419,13 @@ func (s *Store) BindPipelineStageTaskStandingAgent(taskID, agentID string) error
 	if n != 1 {
 		return ErrPipelineStageConflict
 	}
-	if err := tx.QueryRow(`SELECT coordinator_task_id FROM pipeline_stage_tasks WHERE task_id = ?`, taskID).Scan(&coordinator); err != nil {
+	if err := tx.QueryRow(`SELECT run_id, coordinator_task_id FROM pipeline_stage_tasks WHERE task_id = ?`, taskID).Scan(&runID, &coordinator); err != nil {
+		return err
+	}
+	// The confirmed start is the run's queued → running boundary (FS-14 §3,
+	// R37). Only a dispatch-pending run moves, so a Stop that already
+	// committed keeps its state.
+	if _, err := tx.Exec(`UPDATE pipeline_runs SET state = 'running', pending_action = '', revision = revision + 1, updated_at = ? WHERE run_id = ? AND state = 'queued' AND pending_action = 'dispatch_stage_task'`, formatTime(timeNow()), runID); err != nil {
 		return err
 	}
 	if coordinator != "" {

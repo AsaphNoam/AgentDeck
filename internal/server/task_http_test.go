@@ -757,6 +757,70 @@ func TestAcceptedStageResultPublishesItsRunUpdate(t *testing.T) {
 	}
 }
 
+// FS-14.R37, INV §1 — the dispatcher's confirmed stage start is the run's
+// queued → running boundary. The run stayed QUEUED beside a RUNNING attempt,
+// even after a refresh, because nothing moved or republished it.
+func TestConfirmedStageStartMovesAndPublishesRunningRun(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	owner := launchAndWaitIdle(t, ts, "impl", "tmpproj")
+	now := time.Now().UTC()
+	runID, err := srv.stateStore.NewPipelineRunID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stageTaskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: runID, TemplateID: "quality", TemplateSnapshot: json.RawMessage(`{"version":2}`),
+		DisplayName: "Quality", Project: "tmpproj", Goal: "ship", Inputs: json.RawMessage(`{}`),
+		Assignments: json.RawMessage(`{}`), State: "queued", Revision: 1,
+		PendingAction: "dispatch_stage_task", CurrentStageID: "implement", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "start-publish", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "implement",
+		Task: state.Task{TaskID: stageTaskID, Project: "tmpproj", DisplayName: "Implement",
+			Instruction: "implement", TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = ?, start_attempt_id = 'at_start' WHERE task_id = ?`,
+		state.TaskStarting, owner, stageTaskID); err != nil {
+		t.Fatal(err)
+	}
+
+	events, unsubscribe := srv.eventBus.Subscribe()
+	defer unsubscribe()
+	srv.confirmTaskStart(state.Task{TaskID: stageTaskID, StartAttemptID: "at_start"})
+
+	run, err := srv.stateStore.ReadPipelineRun(runID)
+	if err != nil || run.State != "running" {
+		t.Fatalf("run after confirmed start = %s, %v; want running", run.State, err)
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			if ev.Type != "pipeline_update" {
+				continue
+			}
+			encoded, err := json.Marshal(ev.Data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var update pipeline.PipelineUpdate
+			if err := json.Unmarshal(encoded, &update); err != nil {
+				t.Fatal(err)
+			}
+			if update.RunID == runID && update.State == "running" && update.Revision == run.Revision {
+				return
+			}
+		case <-deadline:
+			t.Fatal("a confirmed stage start published no running run update")
+		}
+	}
+}
+
 // FS-16.R10 / TS-05.R17 — attaching is not a way to reach context: an agent may
 // attach only what it can already read, and the attachment grants the assignee a
 // work-derived route rather than a direct share.

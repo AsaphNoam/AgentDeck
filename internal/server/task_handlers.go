@@ -11,7 +11,6 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/contextref"
 	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -743,11 +742,7 @@ func (s *Server) ReportAgentTaskResult(req messaging.AgentTaskResultRequest) (st
 	if err != nil {
 		return state.Task{}, err
 	}
-	s.PublishPipelineUpdate(pipeline.PipelineUpdate{
-		RunID: updated.RunID, DisplayName: updated.DisplayName, Revision: updated.Revision,
-		State: updated.State, CurrentStageID: updated.CurrentStageID, CurrentAgentID: updated.CurrentAgentID,
-		AttentionReason: updated.AttentionReason, FinalOutcome: updated.FinalOutcome,
-	})
+	s.publishPipelineRun(updated)
 	return s.stateStore.ReadTask(task.TaskID)
 }
 

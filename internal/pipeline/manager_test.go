@@ -138,9 +138,6 @@ func startStagePipeline(t *testing.T, manager *Manager, requestID, agentID, gene
 	if err := manager.store.BindPipelineStageTaskStandingAgent(stages[0].TaskID, agentID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'running', pending_action = '' WHERE run_id = ?`, detail.Run.RunID); err != nil {
-		t.Fatal(err)
-	}
 	detail, err = manager.Detail(detail.Run.RunID)
 	if err != nil {
 		t.Fatal(err)
@@ -206,6 +203,12 @@ func TestDedicatedCoordinatorWaitsForStandingOwnerConfirmation(t *testing.T) {
 	coordinator, err = manager.store.ReadTask(stages[0].CoordinatorTaskID)
 	if err != nil || coordinator.State != state.TaskReady {
 		t.Fatalf("coordinator after bind = %#v, err=%v", coordinator, err)
+	}
+	// FS-14.R37 — the confirmed start is the run's queued → running boundary;
+	// a run page must not keep reporting QUEUED beside a running attempt.
+	run, err := manager.store.ReadPipelineRun(detail.Run.RunID)
+	if err != nil || run.State != "running" || run.PendingAction != "" || run.Revision <= detail.Run.Revision {
+		t.Fatalf("run after confirmed start = %s/%q rev %d, err=%v", run.State, run.PendingAction, run.Revision, err)
 	}
 }
 

@@ -41,8 +41,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** The 2026-09-26 usability review has one **Must fix** for a stale J14 run
-  status; see the report and **Review findings** below. `simplify-agent-and-automation-setup`,
+- **Open findings:** None recorded. The 2026-09-26 usability review's J14 stale run-status
+  **Must fix** was fixed and closed 2026-09-26. `simplify-agent-and-automation-setup`,
   `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
@@ -57,25 +57,22 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** None. `tighten-chat-actions-and-triage-notes` finished 2026-09-26 and awaits `/review`.
 
+**Changelog — 2026-09-26 (fix: usability review J14 run status, closed):** INV §1 — the
+dispatcher-confirmed stage start now moves a dispatch-pending run `queued → running` and republishes
+it (FS-14 §3, R37); a test helper that forced `running` was removed (INV §17). Regression tests fail
+pre-fix; no spec change. `make test`, `make build`, focused `-race` pass; no browser re-run.
+
 **Changelog — 2026-09-26 (implementation: chat actions and stale-note triage):** Clone now opens
 the forked conversation; selected transcript text has Copy beside Annotate; the agent header copies
 the stable thread id and uses a compact left identity/runtime band. Six unresolved product/security
-questions were recorded under **Ideas being defined**; stale global-template and pipeline-run notes
-were not duplicated. The follow-up workflow audit regenerated the embedded UI, added the staged
-Switch and visible-error states to the deterministic matrix, and exercised the actual built product
-against fakeACP: Clone navigated to the new agent while retaining history, selected transcript text
-and the header copied the expected text/id, and the full live header plus rollback error stayed
-inside 1024px and 1440px with no horizontal overflow. The Core, Sky & Grove and Studio matrix also
-kept its full staged/error controls inside both widths (197.1px high at 1024px and 121.5px at
-1440px). Focused UI tests and presentation checks pass. `make test`, `make build`, the UI suite, the
-UI production/embed build, specification checks, and diff checks pass.
+questions were recorded under **Ideas being defined**. The built product was exercised against
+fakeACP: Clone kept history, both copy paths copied the expected text/id, and the header, rollback
+error and Core/Sky & Grove/Studio staged/error matrix stayed inside 1024px and 1440px without
+overflow. `make test`, `make build`, the UI suite, UI embed build, spec and diff checks pass.
 
-**Changelog — 2026-09-26 (review + fix: compact agent and automation setup, `7d6db5e..d359640`,
-closed):** INV §1 — a wizard resumed at Project derives its backend from the loaded catalog, not a
-mount-time Claude fallback (FS-04.R49). INV §10 — a scoped New Agent launch shows its fixed
-project read-only (FS-01.R37). INV §8 — **Customize runtimes** opens when seeded defaults leave an
-assignment missing (FS-14.R80). Regression tests fail pre-fix; no spec change. `make test`,
-`make build`, UI suite (58 files / 480 tests), UI build and diff checks pass.
+**Changelog — 2026-09-26 (review + fix: compact agent and automation setup, closed):** INV §1
+wizard backend from the loaded catalog (FS-04.R49); INV §10 scoped launch shows its fixed project
+(FS-01.R37); INV §8 **Customize runtimes** opens for missing assignments (FS-14.R80). All checks pass.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -101,10 +98,10 @@ was retired from this file on the operator's explicit decision during this relea
 verification debt is unchanged and is recorded in
 [`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
 
-**Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
+**Available by role:** `/review` may take `tighten-chat-actions-and-triage-notes`,
+`add-studio-skin`, or `complete-studio-composition`.
 `/work` may take `rename-product-to-deckhand` or `add-mobile-remote-control`;
-`/fix` may take the J14 run-status finding from
-the [2026-09-26 usability review](../archive/reviews/usability-review-run-2026-09-26.md);
+`/fix` has no recorded findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -121,20 +118,7 @@ the [2026-09-26 usability review](../archive/reviews/usability-review-run-2026-0
 
 ## Review findings
 
-### usability-review-run-2026-09-26 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-Full J1–J17 and S1–S5 results are in
-[`usability-review-run-2026-09-26.md`](../archive/reviews/usability-review-run-2026-09-26.md).
-
-- **Must fix** (FS-14.R36–R37) — Pipelines run page: after starting a run and the first stage
-  attempt begins, the primary run badge can remain **QUEUED** while the page identifies the current
-  stage and its task row says attempt 1 is **RUNNING**. A person supervising the run cannot trust
-  its primary status to tell whether work has begun. Reproduced on an isolated home with a saved
-  four-stage template on 2026-09-26; the mismatch remained after three seconds and a refresh.
-  Evidence: `docs/archive/reviews/usability-review-2026-09-26-evidence/j14-run-page-stage-one.png`.
-  *Fix:* keep the run-page state synchronized with the durable run/attempt lifecycle. *Verify:*
-  the badge moves from queued to running when the first attempt starts and stays consistent after
-  refresh.
+None open.
 
 ## Design consistency notes
 
