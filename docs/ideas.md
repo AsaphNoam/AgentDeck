@@ -73,10 +73,10 @@ the relevant feature and technical specifications; it does not change product co
   edit-message design problem: whole-session Clone now forks only at the latest completed turn,
   while an earlier split needs a truthful provider-context boundary, parent/child lineage, visible
   history rules, and behavior for providers without point-in-time fork support.
-- **Hide raw ids unless they disambiguate a name.** Runtime, project, role, and template selectors
-  often render `Name (id)`. Define one cross-product label rule that shows the readable name by
-  default, reveals the stable id only for duplicate names or an explicit detail surface, and keeps
-  values/keys identity-safe.
+- **Finish hiding raw ids in UI labels.** Most selectors now use readable names, but remaining
+  runtime, project, role, and template surfaces still need one cross-product rule: show the stable
+  id only for duplicate names or an explicit detail surface, while keeping values and keys
+  identity-safe.
 
 - **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
   recent message edits it in place, and editing an older one forks the conversation from that point.
@@ -104,33 +104,21 @@ the relevant feature and technical specifications; it does not change product co
   stated honestly; a true session rebuild that accepts the primer's context loss; or a display-only
   supersede that makes the visible history stop matching what the agent received. Each needs a
   product decision about what "edit" should promise.
-- **Richer agent-facing orchestration API (remainder).** The first slice — typed retry
-  classification on refused tool calls and structured result delivery — is shipped in FS-17.
-  Investigation of the original idea found that most of what it asked for had already shipped:
-  tools return typed JSON with stable codes, `create_task` arms already register durable host-managed
-  waiting instead of polling, and `get_assigned_task` already returns a task's own context-reference
-  ids with per-attachment presentation. What remains unbuilt, each needing its own product decision:
-  - **Agent-side re-arm and retry.** `POST /api/tasks/{id}/rearm` and `/retry` exist for people but
-    have no MCP counterpart, so an agent told `retry_requires_rearm` cannot act on it.
-  - **Work inspection.** Reading work you created or are assigned to. FS-16 §6 and TS-04.R29
-    deliberately exclude any task-graph query as anti-polling; on 2026-08-25 the user chose to hold
-    that exclusion. Reversing it needs a reason stronger than convenience.
-  - **Lifecycle control.** Agent-callable stop, resume, or launch of another agent without going
-    through a task. Largest new authority surface; no threat model yet.
-  - **Group fan-out.** Multiple arms already give fan-in/join; creating several related tasks as one
-    unit does not exist. TS-10 §5 excludes it.
-- **Real-provider acceptance.** Run the credentialed OpenCode/OpenHands and Claude/Codex federation
-  checks, then reconcile any observed provider incompatibility before making release claims.
-- **AgentDeck product knowledge MCP.** Define a versioned, non-secret `agentdeck_docs` topic service
-  for AgentDeck roles, including ownership, registration, and acceptance checks.
+- **Agent-side re-arm and retry.** `POST /api/tasks/{id}/rearm` and `/retry` exist for people but
+  have no MCP counterpart, so an agent told `retry_requires_rearm` cannot act on it.
+- **Agent-side work inspection.** Reading work an agent created or is assigned to. FS-16 §6 and
+  TS-04.R29 deliberately exclude task-graph queries as anti-polling; reversing that choice needs a
+  reason stronger than convenience.
+- **Agent-side lifecycle control.** Agent-callable stop, resume, or launch of another agent without
+  going through a task. This is a new authority surface and needs a threat model.
+- **Agent-side group fan-out.** Multiple arms already provide fan-in/join; creating several related
+  tasks as one unit does not exist. TS-10 §5 excludes it.
 - **Detached configuration import.** Define verified copyable fields/assets and provider injection
   paths before implementing detached import.
 - **Activity map.** Explore a repository/session activity view using server APIs only, with clear
   privacy, scale, and normal-user value boundaries.
-- **API authentication / multi-user boundary.** Revisit local API authentication only with an
-  explicit threat model and UI/CLI handshake design.
-- **Operational CLI.** Complete the specification for dashboard control, install/update, pidfile
-  concurrency, and actionable startup diagnostics.
+- **Local API authentication.** Revisit loopback API authentication only with an explicit threat
+  model and UI/CLI handshake design; remote-control device authentication is a separate concern.
 
 ## ACP Wait-list
 
