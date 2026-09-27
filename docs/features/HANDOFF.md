@@ -19,7 +19,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Current position
 
 - **Active change:** None.
-- **Release:** `v0.6.0` is tagged; **Release state** carries its contents. `v0.5.0` and earlier
+- **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
   (finished 2026-09-25) await `/review`; the operator shipped them unreviewed in `v0.6.0`. Review
@@ -59,7 +59,10 @@ comparison beyond the dashboard was also unavailable. fakeACP produced active an
 states but not a genuine finished-run timeline. No product code or specifications changed in this
 evidence pass.
 
-**Release state:** `v0.6.0` is tagged on the release commit (range `v0.5.0..main`, 49 commits).
+**Release state:** `v0.6.0` is published on tag `24ab07b` (range `v0.5.0..main`, 49 commits). The
+CI and Release macOS installer runs both succeeded; the GitHub Release carries the darwin/arm64
+archive, `install.sh`, and a manifest declaring `0.6.0` whose SHA-256 and size match the uploaded
+archive.
 `make test` (both tag variants, including `make check-specs`), the UI suite (58 files, 481 tests),
 and `make dist VERSION=0.6.0` pass; the local distributable reports `0.6.0` with `sqlite_fts5`. The
 range changed nothing an operating agent must know, so `operating-agentdeck` is unchanged; README,
