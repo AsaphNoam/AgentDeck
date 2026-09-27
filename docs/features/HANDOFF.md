@@ -17,18 +17,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `tighten-chat-actions-and-triage-notes` was reviewed 2026-09-26 with two
-  **Worth fixing** findings open for `/fix`. `simplify-agent-and-automation-setup` was fixed and
-  closed 2026-09-26.
+- **Active change:** None. `tighten-chat-actions-and-triage-notes` was reviewed, fixed and closed
+  2026-09-27. `simplify-agent-and-automation-setup` was fixed and closed 2026-09-26.
 - **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
   earlier are in the state archive.
-- **Review units:** `tighten-chat-actions-and-triage-notes` (`a716aea..0c24d3a`, excluding
-  state-only `7738065`) was reviewed 2026-09-26 and stays open on its findings.
-  `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
+- **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
   (finished 2026-09-25) await `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d` and
   `complete-studio-composition` against `9ae10ee..4bb5b2e`; `71c2810` is the latter's
   evidence-only handoff follow-up, not another unit.
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
+  `tighten-chat-actions-and-triage-notes` (reviewed 2026-09-26, fixed 2026-09-27),
   `simplify-agent-and-automation-setup` (reviewed and fixed 2026-09-26),
   `simplify-pipeline-run-detail` (reviewed 2026-09-25, no findings),
   `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23), and
@@ -42,9 +40,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** Two **Worth fixing** on `tighten-chat-actions-and-triage-notes` (see
-  **Review findings**). The 2026-09-26 usability review's J14 stale run-status
-  **Must fix** was fixed and closed 2026-09-26. `simplify-agent-and-automation-setup`,
+- **Open findings:** None recorded. The 2026-09-26 usability review's J14 stale run-status
+  **Must fix** was fixed and closed 2026-09-26. `tighten-chat-actions-and-triage-notes`,
+  `simplify-agent-and-automation-setup`,
   `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
   The injected-steer lifetime edge case is still named in prose but was never recorded
   as a finding; it needs `/investigate-bug` before `/fix` can take it.
@@ -57,14 +55,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None. `tighten-chat-actions-and-triage-notes` has two open review findings.
+**Change:** None.
 
-**Changelog — 2026-09-26 (review: chat actions and stale-note triage):** Two **Worth fixing**
-findings (INV §17 annotation-excerpt trim regression; INV §2 duplicated copy handler). Specs cover
-the shipped Clone, header copy, selection copy, and compact header (FS-01.R38, FS-03.R62–R63,
-FS-12.R51); no local-choice notes were recorded. Swept classes 1, 3–9, 11–16: no applicable
-surface or no defect (§8 copy/clone errors surface as toasts; §10 Clone has one UI entry point;
-§13 new selectors resolve).
+**Changelog — 2026-09-27 (review 2026-09-26 + fix: chat actions and stale-note triage, closed):**
+INV §17 — **Annotate selection** trims its excerpt again while Copy keeps the exact selection
+(FS-03.R63 now says so); the padded-selection test fails pre-fix. INV §2 — header and selection copy
+share `ui/src/lib/copyText.ts` (registered). All checks pass; no browser re-run. FilesTab and
+CommandsTab still copy silently via bare `writeText` (outside this unit).
 
 **Changelog — 2026-09-26 (fix: usability review J14 run status, closed):** INV §1 — the
 dispatcher-confirmed stage start now moves a dispatch-pending run `queued → running` and republishes
@@ -109,7 +106,6 @@ verification debt is unchanged and is recorded in
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
 `/work` may take `rename-product-to-deckhand` or `add-mobile-remote-control`;
-`/fix` may take the `tighten-chat-actions-and-triage-notes` findings;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -125,24 +121,6 @@ verification debt is unchanged and is recorded in
 - None.
 
 ## Review findings
-
-### `tighten-chat-actions-and-triage-notes` (reviewed 2026-09-26, `a716aea..0c24d3a`)
-
-**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Worth fixing** (INV §17, FS-03.R63/A44) — `ui/src/components/chat/TranscriptView.tsx`
-  `selectionWithin` stopped trimming so Copy writes the exact selection, but the same untrimmed
-  string now also feeds `clipAnnotationExcerpt` for **Annotate selection**. Trigger: triple-click a
-  paragraph (browsers include the trailing newline) or drag across surrounding whitespace, then
-  annotate; the stored and delivered excerpt now carries leading/trailing whitespace that shipped
-  behavior removed. R63 changes Copy only, and no test covers annotate with padded selection. Fix:
-  keep the raw text for Copy and trim for the annotation draft; add a test that annotating
-  `"  Second line  "` stores `"Second line"`.
-- **Worth fixing** (INV §2) — `ChatPanel.tsx` header **Copy thread identity** and
-  `TranscriptView.tsx` **Copy selection** each inline the same clipboard-availability check,
-  `writeText`, and `Copy failed` toast. Trigger: the next copy action or error-wording change edits
-  one path and not the other. Fix: one small `copyText(text, pushError)` helper in `ui/src/lib`
-  used by both; existing tests keep covering both actions.
 
 ## Design consistency notes
 

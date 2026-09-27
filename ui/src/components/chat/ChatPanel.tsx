@@ -19,6 +19,7 @@ import { CommandsTab } from "./CommandsTab";
 import { TerminalTab } from "./TerminalTab";
 import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
 import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
+import { copyText } from "../../lib/copyText";
 import type { FileLink } from "./renderers/filePath";
 
 function runtimeSelection(agent: AgentState): RuntimeSelection {
@@ -223,15 +224,7 @@ export function ChatPanel() {
             y: event.clientY,
             actions: [{
               label: "Copy thread identity",
-              select: () => {
-                if (!navigator.clipboard) {
-                  pushError("Copy failed", "Clipboard access is not available in this browser.");
-                  return;
-                }
-                void navigator.clipboard.writeText(agent.agent_id).catch((error) => {
-                  pushError("Copy failed", error instanceof Error ? error.message : String(error));
-                });
-              },
+              select: () => copyText(agent.agent_id, pushError),
             }],
           });
         }}

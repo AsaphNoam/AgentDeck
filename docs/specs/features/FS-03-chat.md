@@ -308,7 +308,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R63 (shipped 2026-09-26) — Selected transcript text has an explicit Copy action.** When a person
   right-clicks a non-empty selection inside an annotatable transcript event, the existing context
   menu offers both **Copy selection** and **Annotate selection**. Copy writes the exact selected
-  text without creating an annotation or changing the transcript. With no selection, the existing
+  text without creating an annotation or changing the transcript; **Annotate selection** still
+  stores the selection with surrounding whitespace trimmed. With no selection, the existing
   whole-event annotation action is unchanged; where annotations are disabled, the browser-native
   context menu remains available. A clipboard failure surfaces an actionable error.
 

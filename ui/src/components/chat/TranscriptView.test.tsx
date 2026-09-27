@@ -58,6 +58,21 @@ describe("TranscriptView annotation entry point", () => {
     ]);
   });
 
+  it("trims surrounding whitespace from an annotated selection", () => {
+    const { container } = renderTranscript();
+    const item = container.querySelector('[data-slot="event"]') as HTMLElement;
+    const text = document.createTextNode("  Second line  ");
+    item.appendChild(text);
+    selectWithin(text);
+
+    fireEvent.contextMenu(item, { clientX: 20, clientY: 30 });
+    fireEvent.click(screen.getByRole("button", { name: "Annotate selection" }));
+
+    expect(useAnnotationStore.getState().bySource.a1).toEqual([
+      { seq: 7, excerpt: "Second line", instruction: "" },
+    ]);
+  });
+
   it("copies the exact highlighted text without creating an annotation", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });

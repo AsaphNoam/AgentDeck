@@ -541,6 +541,7 @@ the old behavior before relying on it.
 | `foldTranscript` / `appendRenderedEvent` | `ui/src/store/transcriptStore.ts` | identical live and replay event projection (§2) |
 | `transcript.ProjectEvent` / `runtime.AllEventTypes` | `internal/transcript`, `internal/runtime` | every Go transcript text consumer and exhaustive normalized-event coverage (§2) |
 | `clipAnnotationExcerpt` | `ui/src/lib/annotations.ts` (server copy authoritative: `internal/server/sessions.go`) | every UI surface that captures an annotation excerpt (§2) |
+| `copyText` | `ui/src/lib/copyText.ts` | UI copy actions that report clipboard failures as a toast (§2, §8) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
 | `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`); it drops out-of-schema session-request members like the pinned peer (§17) |

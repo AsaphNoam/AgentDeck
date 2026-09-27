@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
+import { copyText } from "../../lib/copyText";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { AssistantText } from "./renderers/AssistantText";
 import { DiffBlock } from "./renderers/DiffBlock";
@@ -49,20 +50,13 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
     if (!annotationsEnabled || !canAnnotate(event)) return;
     const selected = selectionWithin(mouse.currentTarget);
     mouse.preventDefault();
-    const draft = selected ? { seq: Number(event.seq), excerpt: clipAnnotationExcerpt(selected), instruction: "" } : eventDraft(event);
+    // Copy keeps the exact selection; the annotation excerpt stays trimmed (FS-03.R63).
+    const draft = selected ? { seq: Number(event.seq), excerpt: clipAnnotationExcerpt(selected.trim()), instruction: "" } : eventDraft(event);
     setMenu({
       x: mouse.clientX,
       y: mouse.clientY,
       label: selected ? "Annotate selection" : "Annotate whole event",
-      copy: selected ? () => {
-        if (!navigator.clipboard) {
-          pushError("Copy failed", "Clipboard access is not available in this browser.");
-          return;
-        }
-        void navigator.clipboard.writeText(selected).catch((error) => {
-          pushError("Copy failed", error instanceof Error ? error.message : String(error));
-        });
-      } : undefined,
+      copy: selected ? () => copyText(selected, pushError) : undefined,
       annotate: () => addAnnotation(agentId, draft),
     });
   };
