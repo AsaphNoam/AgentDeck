@@ -38,9 +38,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 investigated; findings await `/fix`. An uncommitted, skipped BR-5
-  reproduction in `AssistantText.test.tsx` (percent-encoded link names) predates this
-  investigation and has no handoff record; it was left untouched.
+- **Bug reports:** BR-6 investigated; findings await `/fix`.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
