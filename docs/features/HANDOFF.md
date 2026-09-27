@@ -35,10 +35,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
+- **Open findings:** BR-6's investigation unit (four findings) and BR-7's (one observability
+  finding), both in **Review findings**. The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 investigated; findings await `/fix`.
+- **Bug reports:** BR-6 investigated; findings await `/fix`. BR-7 (whole UI dead, `startTime`
+  error) not reproduced, root cause undetermined; needs the reporter's console stack trace.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -130,6 +132,38 @@ absolute in-directory paths read correctly, so the failures are in which path re
   without the query and the status without the refusal code, so this report could not be tied to a
   link form. Log the refusal code and the requested `path` at `handleFileRead` (local-only log), so
   the next report answers "which link, which boundary".
+
+### BR-7 investigation unit (2026-09-27) — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Report, verbatim: "nothing loads, opening any page does nothing and I get "cannot read properties of
+undefined (reading 'startTime')". Version, browser, route, and where the message appeared were not
+given; no stack trace or log was supplied. The dashboard log has no matching entry, and could not:
+browser errors never reach the server. Governing items: none — FS-12 and TS-03 do not specify client
+failure handling or reporting (spec gap, below).
+
+Not reproduced (root cause **undetermined**). A scripted clean-profile Chrome loaded every top-level
+route, a project page, two live agent pages, and their tabs on all four running instances (the
+`main` dev server on 4317 and three `v0.6.0`/`88e7e06` binaries on 4405/4416/4417) with no page
+error or console error. Every `startTime` read in the main bundle is guarded: React's scheduler
+reads it only off a non-null heap peek, and Monaco's smooth-scroll reads it only inside
+`if (this._smoothScrolling)`. The other reads live in lazily loaded Mermaid gantt/cynefin and
+Cytoscape chunks, which load only when a chat renders such a diagram and cannot stop page
+navigation. A render error would have shown the dashboard error boundary's "Something went wrong"
+panel instead; "nothing loads and navigation does nothing" fits a failure outside React's render
+(the scheduler loop or a script injected into the page, e.g. a browser extension), but no
+evidence distinguishes these. Next evidence: the full console stack, and whether a private window
+without extensions reproduces it.
+
+- **Worth fixing** — observability plus spec gap, confirmed from the code path; INV §8, §14, §16.
+  A browser-side failure leaves no trace the operator can send: `ErrorBoundary.componentDidCatch`
+  (`ui/src/components/ErrorBoundary.tsx:22`) only `console.error`s, its fallback shows no error
+  text, and nothing handles `window` `error`/`unhandledrejection`. This report therefore carries a
+  bare message with no stack, file, route, or build. Specify (FS-12 plus a TS-03 route) that
+  uncaught errors and boundary catches are posted with message, stack, component stack, route, and
+  build version to a local-only, size-bounded, rate-limited endpoint that writes them to the
+  dashboard log, and that the boundary fallback shows the message. Test: a UI test that a thrown
+  render error and a window error each post one bounded report, and a Go test that the endpoint
+  truncates and logs it.
 
 ## Design consistency notes
 
