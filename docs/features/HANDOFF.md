@@ -40,7 +40,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
 - **Bug reports:** BR-6 investigated; findings await `/fix`. BR-7 (whole UI dead, `startTime`
-  error) not reproduced, root cause undetermined; needs the reporter's console stack trace.
+  error) not reproduced on repeat investigation, root cause undetermined; needs the affected
+  browser/URL and full error stack (see BR-7).
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -86,7 +87,9 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 
 ## Blocked on human
 
-- None.
+- BR-7: identify the affected browser and URL, where the `startTime` message appears, and copy
+  its full error stack. The connected in-app browser had no existing tabs; its fresh session does
+  not reproduce the reported failure, so it cannot establish the failing browser's state.
 
 ## Review findings
 
@@ -148,11 +151,25 @@ error or console error. Every `startTime` read in the main bundle is guarded: Re
 reads it only off a non-null heap peek, and Monaco's smooth-scroll reads it only inside
 `if (this._smoothScrolling)`. The other reads live in lazily loaded Mermaid gantt/cynefin and
 Cytoscape chunks, which load only when a chat renders such a diagram and cannot stop page
-navigation. A render error would have shown the dashboard error boundary's "Something went wrong"
-panel instead; "nothing loads and navigation does nothing" fits a failure outside React's render
-(the scheduler loop or a script injected into the page, e.g. a browser extension), but no
-evidence distinguishes these. Next evidence: the full console stack, and whether a private window
-without extensions reproduces it.
+navigation on their own. Correction from repeat investigation: the dashboard error boundary only
+wraps `Outlet` (`ui/src/App.tsx:11`); Header and NotificationCenter are outside it, as are the root
+providers (`ui/src/main.tsx`). A failure outside that boundary can reach React Router's default
+error UI or escape the router, so the reported wording does not establish a scheduler or injected
+script failure. No evidence identifies either as the cause. Next evidence: the full error stack,
+affected browser/URL, and whether a private window without extensions reproduces it.
+
+Repeat report, verbatim (2026-09-27): "/investigate-bug nothing loads, opening any page does
+nothing and I get \"cannot read properties of undefined (reading 'startTime'). Opus tried andfailed".
+At clean commit `2b52de9`, the connected Codex in-app browser had no existing tabs. A new tab at
+`http://localhost:4317` rendered the populated Dashboard, Settings roles, Tasks, Pipelines runs,
+and Archive via visible navigation, with no captured warning/error logs. This is fresh-session
+evidence only, not a reproduction of the reporter's browser. Expected route navigation follows
+FS-12.R6/R16/R17; client error reporting remains the separate gap below. Source tracing again
+found no application-source `startTime` read. Scheduler reads are protected by its queue contract;
+the Cytoscape animation candidate reads `ani_p.easing` before `ani_p.startTime`, so an absent
+`_private` would fail on `easing` first and does not explain this exact error. No new confirmed
+cause or skipped reproduction test; no product/spec changes. Awaiting the requested browser/URL,
+message location, and full stack rather than treating another clean session as a resolution.
 
 - **Worth fixing** — observability plus spec gap, confirmed from the code path; INV §8, §14, §16.
   A browser-side failure leaves no trace the operator can send: `ErrorBoundary.componentDidCatch`
