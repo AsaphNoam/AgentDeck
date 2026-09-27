@@ -119,6 +119,24 @@ describe("FileViewer", () => {
     expect(screen.queryByRole("button", { name: "Rendered" })).not.toBeInTheDocument();
   });
 
+  // BR-6 reproduction, skipped until /fix: a link inside a rendered Markdown file is handed on
+  // verbatim, so the server resolves it against the working directory instead of the file's own
+  // directory. `../archive/x.md` from `docs/features/notes.md` is refused as outside the working
+  // directory, and a sibling link reads the wrong file or none.
+  it.skip("resolves a rendered file's own links against that file's directory (BR-6)", async () => {
+    server.use(http.get("/api/sessions/:id/file", ({ request }) => {
+      const requested = new URL(request.url).searchParams.get("path") ?? "";
+      return HttpResponse.json(fileBody({ path: requested, content: "See [up](../archive/x.md) and [side](sibling.md).\n", language: "markdown", line_count: 1 }));
+    }));
+    const onOpenFile = vi.fn();
+    render(<FileViewer agentId="a_1" link={{ path: "docs/features/notes.md" }} onClose={vi.fn()} onOpenFile={onOpenFile} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "up" }));
+    expect(onOpenFile).toHaveBeenLastCalledWith({ path: "docs/archive/x.md" });
+    fireEvent.click(screen.getByRole("button", { name: "side" }));
+    expect(onOpenFile).toHaveBeenLastCalledWith({ path: "docs/features/sibling.md" });
+  });
+
   it("closes without reading anything else", async () => {
     const onClose = vi.fn();
     render(<FileViewer agentId="a_1" link={{ path: "internal/state/messages.go" }} onClose={onClose} />);

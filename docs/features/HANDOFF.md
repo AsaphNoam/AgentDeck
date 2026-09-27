@@ -35,10 +35,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** None recorded. The injected-steer lifetime edge case is still named in prose
+- **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** None open.
+- **Bug reports:** BR-6 investigated; findings await `/fix`. An uncommitted, skipped BR-5
+  reproduction in `AssistantText.test.tsx` (percent-encoded link names) predates this
+  investigation and has no handoff record; it was left untouched.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -87,6 +89,49 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 - None.
 
 ## Review findings
+
+### BR-6 investigation unit (2026-09-27) — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Report, verbatim: "links clicked on in the agents aren't opened (refused), even if it's in the
+working directory". Version: `v0.6.0` era (the live dev instance runs `main`); macOS. No link, agent,
+or log was supplied. Nothing was logged: the local instances' request logs contain no `/file`
+request, and the dev instance logs to its terminal. Governing items: FS-03.R51–R55/A34–A37,
+TS-03.R40, TS-05.R21. The server route was probed live against real agents: relative, `./`, and
+absolute in-directory paths read correctly, so the failures are in which path reaches it.
+
+- **Must fix** — confirmed (reproduced), spec gap plus defect; INV §11. Links inside a file shown in the
+  viewer's **Rendered** form are sent verbatim and resolved against the agent's working directory,
+  not the viewed file's directory. From `docs/features/HANDOFF.md`, `../archive/state/x.md` is
+  refused as outside the working directory though the target is inside it, and a sibling
+  `AGENT-WORKFLOW.md` reads as missing; this repository's own docs link this way throughout.
+  `FileViewer.tsx:95` passes `onOpenFile` straight to `SanitizedMarkdown`. FS-03.R52 does not say
+  what a rendered file's relative link is relative to; specify the file's own directory (ordinary
+  Markdown semantics), resolve it client-side before `onOpenFile`, and let a result that climbs
+  above the working directory still reach the server's refusal. The existing A35 test expects the
+  current behavior (`other.go` from `docs/notes.md`) and must change. Regression: the skipped
+  BR-6 test in `ui/src/components/chat/FileViewer.test.tsx`.
+- **Worth fixing** — confirmed (reproduced); INV §11. A bare file name with a line suffix
+  (a link whose target is `README.md:12`) matches `filePath.ts`'s scheme regex (`README.md:` reads as a
+  scheme), so it is not a file link, the default URL transform strips it, and the click does
+  nothing. FS-03.R51/A34. Fix: treat a target whose apparent scheme is followed only by a line
+  suffix as a path. Regression: skipped test in `renderers/filePath.test.ts`.
+- **Worth fixing** — confirmed (reproduced); INV §11. A `:start-end` line range, which Codex writes (18
+  occurrences in this machine's recent Codex sessions, e.g. `dashboard.css:49-125`), stays part of
+  the file name, so the viewer reports the file missing. FS-03.R51 names only `:line` and
+  `:line:col`; extend it to a range cited by its start line. Regression: skipped test in
+  `renderers/filePath.test.ts`.
+- **Worth fixing** — probable (refusal reproduced live, trigger not observed); INV §14. On macOS's
+  case-insensitive disk, an absolute link whose spelling differs from the recorded working
+  directory only by case (`/users/…/projects/agentdeck/README.md` against
+  `/Users/…/Projects/AgentDeck`) is refused as outside the directory by `rebaseAbsolute`'s lexical
+  `filepath.Rel` (`internal/server/fileread.go:117`). An agent that takes its root from `git` or
+  `realpath` while the directory was typed in another case produces this. Fix at that seam, e.g.
+  by also accepting a base whose canonical on-disk spelling matches; keep the refusal on form
+  alone (TS-05.R21). Regression: a `fileread_test.go` case on a case-insensitive temp volume.
+- **Worth fixing** — observability, confirmed from the code path; INV §8. A refused read leaves no trace: `requestLog` records the path
+  without the query and the status without the refusal code, so this report could not be tied to a
+  link form. Log the refusal code and the requested `path` at `handleFileRead` (local-only log), so
+  the next report answers "which link, which boundary".
 
 ## Design consistency notes
 
