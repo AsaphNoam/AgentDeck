@@ -2,7 +2,8 @@
 
 **Live agent state.** Read the **Current position** and **Active change** below, then open the
 requirements they name. Settled state is archived in `../archive/state/`: the dated
-[`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md),
+[`HANDOFF-through-2026-09-27`](../archive/state/HANDOFF-through-2026-09-27.md),
+[`-25`](../archive/state/HANDOFF-through-2026-09-25.md),
 [`-14`](../archive/state/HANDOFF-through-2026-09-14.md),
 [`-13`](../archive/state/HANDOFF-through-2026-09-13.md),
 [`-12`](../archive/state/HANDOFF-through-2026-09-12.md),
@@ -17,20 +18,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None. `tighten-chat-actions-and-triage-notes` was reviewed, fixed and closed
-  2026-09-27. `simplify-agent-and-automation-setup` was fixed and closed 2026-09-26.
-- **Release:** `v0.5.0` is tagged and published; **Release state** carries its contents. `v0.4.3` and
-  earlier are in the state archive.
+- **Active change:** None.
+- **Release:** `v0.6.0` is tagged; **Release state** carries its contents. `v0.5.0` and earlier
+  are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
-  (finished 2026-09-25) await `/review`. Review `add-studio-skin` against `e474d8a..1d78e1d` and
-  `complete-studio-composition` against `9ae10ee..4bb5b2e`; `71c2810` is the latter's
-  evidence-only handoff follow-up, not another unit.
+  (finished 2026-09-25) await `/review`; the operator shipped them unreviewed in `v0.6.0`. Review
+  `add-studio-skin` against `e474d8a..1d78e1d` and `complete-studio-composition` against
+  `9ae10ee..4bb5b2e`; `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
-  `tighten-chat-actions-and-triage-notes` (reviewed 2026-09-26, fixed 2026-09-27),
-  `simplify-agent-and-automation-setup` (reviewed and fixed 2026-09-26),
-  `simplify-pipeline-run-detail` (reviewed 2026-09-25, no findings),
-  `adopt-modern-codex-acp-capabilities` (reviewed and fixed 2026-09-23), and
-  `persistent-pipeline-orchestration` (2026-09-13) are closed; fix commits are not new units.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` and `add-mobile-remote-control.md` are Waiting to
@@ -40,45 +35,16 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** None recorded. The 2026-09-26 usability review's J14 stale run-status
-  **Must fix** was fixed and closed 2026-09-26. `tighten-chat-actions-and-triage-notes`,
-  `simplify-agent-and-automation-setup`,
-  `adopt-modern-codex-acp-capabilities`, `persistent-pipeline-orchestration`, BR-1, and BR-4 are all closed.
-  The injected-steer lifetime edge case is still named in prose but was never recorded
-  as a finding; it needs `/investigate-bug` before `/fix` can take it.
-- **Bug reports:** BR-1, BR-2, BR-3, and BR-4 are investigated, fixed and closed. Pinned Claude model
-  delivery through `_meta` works; an ACP model `currentValue` is adapter configuration evidence and
-  no execution-model oracle (TS-04.R54). BR-4 (2026-09-22, "the main project page looks off, the
-  cards are stretched and stuck to the bottom") is fixed the same day; see **Review findings**.
+- **Open findings:** None recorded. The injected-steer lifetime edge case is still named in prose
+  but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
+  FilesTab and CommandsTab still copy silently via bare `writeText`.
+- **Bug reports:** None open.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
 ## Active change
 
 **Change:** None.
-
-**Changelog — 2026-09-27 (review 2026-09-26 + fix: chat actions and stale-note triage, closed):**
-INV §17 — **Annotate selection** trims its excerpt again while Copy keeps the exact selection
-(FS-03.R63 now says so); the padded-selection test fails pre-fix. INV §2 — header and selection copy
-share `ui/src/lib/copyText.ts` (registered). All checks pass; no browser re-run. FilesTab and
-CommandsTab still copy silently via bare `writeText` (outside this unit).
-
-**Changelog — 2026-09-26 (fix: usability review J14 run status, closed):** INV §1 — the
-dispatcher-confirmed stage start now moves a dispatch-pending run `queued → running` and republishes
-it (FS-14 §3, R37); a test helper that forced `running` was removed (INV §17). Regression tests fail
-pre-fix; no spec change. `make test`, `make build`, focused `-race` pass; no browser re-run.
-
-**Changelog — 2026-09-26 (implementation: chat actions and stale-note triage):** Clone now opens
-the forked conversation; selected transcript text has Copy beside Annotate; the agent header copies
-the stable thread id and uses a compact left identity/runtime band. Six unresolved product/security
-questions were recorded under **Ideas being defined**. The built product was exercised against
-fakeACP: Clone kept history, both copy paths copied the expected text/id, and the header, rollback
-error and Core/Sky & Grove/Studio staged/error matrix stayed inside 1024px and 1440px without
-overflow. `make test`, `make build`, the UI suite, UI embed build, spec and diff checks pass.
-
-**Changelog — 2026-09-26 (review + fix: compact agent and automation setup, closed):** INV §1
-wizard backend from the loaded catalog (FS-04.R49); INV §10 scoped launch shows its fixed project
-(FS-01.R37); INV §8 **Customize runtimes** opens for missing assignments (FS-14.R80). All checks pass.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -93,16 +59,13 @@ comparison beyond the dashboard was also unavailable. fakeACP produced active an
 states but not a genuine finished-run timeline. No product code or specifications changed in this
 evidence pass.
 
-**Release state:** `v0.5.0` is published and verified on tag `8ab84d3`. `make test` (both tag
-variants, including `make check-specs`), the UI suite (54 files, 437 tests), and
-`make dist VERSION=0.5.0` pass; the local distributable reports `0.5.0` with `sqlite_fts5`. The CI
-and Release macOS installer runs both succeeded, and the GitHub Release carries the darwin/arm64
-archive, `install.sh`, and a manifest declaring `0.5.0` whose SHA-256 and size match the uploaded
-archive. No credentialed or real-browser journey was run for this release, and none may be described
-as verified. The standing acceptance-gate checklist
-was retired from this file on the operator's explicit decision during this release; the underlying
-verification debt is unchanged and is recorded in
-[`HANDOFF-through-2026-09-13`](../archive/state/HANDOFF-through-2026-09-13.md).
+**Release state:** `v0.6.0` is tagged on the release commit (range `v0.5.0..main`, 49 commits).
+`make test` (both tag variants, including `make check-specs`), the UI suite (58 files, 481 tests),
+and `make dist VERSION=0.6.0` pass; the local distributable reports `0.6.0` with `sqlite_fts5`. The
+range changed nothing an operating agent must know, so `operating-agentdeck` is unchanged; README,
+`install.sh` and `scripts/release/assemble.sh` pins still match. Two Studio review units shipped
+unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
+login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
 `/work` may take `rename-product-to-deckhand` or `add-mobile-remote-control`;
