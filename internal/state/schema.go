@@ -573,4 +573,25 @@ ALTER TABLE sessions ADD COLUMN forked_from_agent_id TEXT;
 ALTER TABLE sessions ADD COLUMN forked_from_seq INTEGER;
 `,
 	},
+	{
+		// Paired phones. Only the credential's hash is stored; revoke and unpair
+		// hard-delete the row (TS-02.R37, TS-13.R7).
+		version: 34,
+		sql: `
+CREATE TABLE remote_devices (
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  token_hash     TEXT NOT NULL UNIQUE,
+  node_stable_id TEXT NOT NULL,
+  node_login     TEXT NOT NULL DEFAULT '',
+  paired_at      TEXT NOT NULL,
+  last_seen_at   TEXT NOT NULL,
+  push_endpoint  TEXT,
+  push_p256dh    TEXT,
+  push_auth      TEXT,
+  push_enabled   INTEGER NOT NULL DEFAULT 0,
+  push_state     TEXT NOT NULL DEFAULT 'active'
+);
+`,
+	},
 }

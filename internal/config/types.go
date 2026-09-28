@@ -121,6 +121,10 @@ type Config struct {
 	// (FS-04.R43, FS-16.R21).
 	TaskConcurrency      int `json:"task_concurrency"`
 	MessageBudgetPerTurn int `json:"message_budget_per_turn,omitempty"`
+	// RemoteEnabled and KeepAwake are the remote-control preferences; absent
+	// means off (FS-20.R1/R22, TS-02.R37).
+	RemoteEnabled bool `json:"remote_enabled,omitempty"`
+	KeepAwake     bool `json:"keep_awake,omitempty"`
 }
 
 type NotificationsConfig struct {

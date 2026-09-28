@@ -21,6 +21,7 @@ import (
 	persistindex "github.com/agentdeck/agentdeck/internal/index"
 	"github.com/agentdeck/agentdeck/internal/messaging"
 	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/agentdeck/agentdeck/internal/remote"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/agentdeck/agentdeck/internal/state"
@@ -169,6 +170,15 @@ type Server struct {
 	// bind's target-scoped model merge (TS-07.R17/R18). Without it a create and
 	// a full save can each write a catalog that erases the other's entry.
 	catalogMu sync.Mutex
+
+	// configMu serializes read-modify-write of config.json across PUT
+	// /api/config and PUT /api/remote so neither erases the other's field.
+	configMu sync.Mutex
+
+	// remote is the optional remote-control subsystem (TS-13.R1). newRemoteNode
+	// is its node factory seam; tests inject a fake tailnet node.
+	remote        *remote.Manager
+	newRemoteNode func() (remote.Node, error)
 }
 
 type taskStartLock struct {
@@ -288,6 +298,8 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		worktreeLocks:             map[string]*worktreeLock{},
 		repoBackedCache:           map[string]repoBackedEntry{},
 	}
+	s.newRemoteNode = func() (remote.Node, error) { return nil, errRemoteUnsupported }
+	s.remote = s.newRemoteManager()
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)
 	msg.SetPipelineManager(s.pipelineMgr)
@@ -485,6 +497,12 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		serveErr <- nil
 	}()
+	// Remote control rejoins on its own at every start while it stays on
+	// (FS-20.R1); its failure never blocks the loopback server (TS-13.R1).
+	if current, err := s.configStore.ReadConfig(); err == nil && current.RemoteEnabled {
+		s.remote.Enable()
+	}
+	defer s.remote.Disable()
 	if s.pipelineMgr != nil {
 		if err := s.pipelineMgr.Startup(sweepCtx); err != nil {
 			cancelBase()
@@ -512,6 +530,7 @@ func (s *Server) Start(ctx context.Context) error {
 		if err := hooks.RemoveAllAgentSettings(s.configStore.Home()); err != nil {
 			s.log.Warn("cleanup hook settings dir", "err", err)
 		}
+		s.remote.Disable()
 		// End open streaming handlers (SSE) so Shutdown doesn't block on them.
 		cancelBase()
 		if err := srv.Shutdown(shutCtx); err != nil {

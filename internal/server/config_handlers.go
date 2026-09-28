@@ -865,6 +865,8 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.configMu.Lock()
+	defer s.configMu.Unlock()
 	cfg, err := s.configStore.ReadConfig()
 	if err != nil {
 		if errors.Is(err, config.ErrNotFound) || errors.Is(err, config.ErrCorrupt) {

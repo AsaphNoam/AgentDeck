@@ -30,6 +30,8 @@ func (s *Server) routes() http.Handler {
 	api("PUT /api/backends", s.handlePutBackends)
 	api("GET /api/config", s.handleGetConfig)
 	api("PUT /api/config", s.handlePutConfig)
+	api("GET /api/remote", s.handleGetRemote)
+	api("PUT /api/remote", s.handlePutRemote)
 	api("GET /api/layout", s.handleLayout)
 	api("PUT /api/layout", s.handlePutLayout)
 	api("POST /api/directory-picker", s.handleDirectoryPicker)

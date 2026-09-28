@@ -40,6 +40,8 @@ func (s *Store) ReadConfig() (Config, error) {
 		Switch               SwitchConfig        `json:"switch"`
 		TaskConcurrency      int                 `json:"task_concurrency"`
 		MessageBudgetPerTurn json.RawMessage     `json:"message_budget_per_turn"`
+		RemoteEnabled        bool                `json:"remote_enabled"`
+		KeepAwake            bool                `json:"keep_awake"`
 	}
 	if err := readJSON(s.configPath(), &disk); err != nil {
 		return Config{}, err
@@ -49,6 +51,7 @@ func (s *Store) ReadConfig() (Config, error) {
 		DefaultRole: disk.DefaultRole, AppearanceSkin: disk.AppearanceSkin,
 		SkipPermissions: disk.SkipPermissions, OnboardingComplete: disk.OnboardingComplete,
 		Notifications: disk.Notifications, Switch: disk.Switch, TaskConcurrency: disk.TaskConcurrency,
+		RemoteEnabled: disk.RemoteEnabled, KeepAwake: disk.KeepAwake,
 	}
 	_ = json.Unmarshal(disk.MessageBudgetPerTurn, &c.MessageBudgetPerTurn)
 	return c, nil
