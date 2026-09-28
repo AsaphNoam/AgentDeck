@@ -171,6 +171,15 @@ the Cytoscape animation candidate reads `ani_p.easing` before `ani_p.startTime`,
 cause or skipped reproduction test; no product/spec changes. Awaiting the requested browser/URL,
 message location, and full stack rather than treating another clean session as a resolution.
 
+Follow-up (2026-09-28): the reporter says it began after installing the latest release. Release
+check: `git log -S startTime -- ui/src` is empty, so no AgentDeck UI source has ever read
+`startTime`; `ui/package.json` and `ui/package-lock.json` are identical across `v0.5.0..v0.6.0`,
+so every bundled library that does read it is unchanged from `v0.5.0`. The release's 61 changed UI
+files cannot produce this message directly. A new-code bug that hands a library bad data (for
+example an unguarded diagram or runtime-activity payload), a skipped-version upgrade, or a browser
+tab left open from the old version remain possible and untested. This Mac's installed release is still
+`0.1.2`, so the reporter's install is elsewhere and its prior version is unknown.
+
 - **Worth fixing** — observability plus spec gap, confirmed from the code path; INV §8, §14, §16.
   A browser-side failure leaves no trace the operator can send: `ErrorBoundary.componentDidCatch`
   (`ui/src/components/ErrorBoundary.tsx:22`) only `console.error`s, its fallback shows no error
