@@ -35,13 +35,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-- **Open findings:** BR-6's investigation unit (four findings) and BR-7's (one observability
-  finding), both in **Review findings**. The injected-steer lifetime edge case is still named in prose
+- **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 investigated; findings await `/fix`. BR-7 (whole UI dead, `startTime`
-  error) not reproduced on repeat investigation, root cause undetermined; needs the affected
-  browser/URL and full error stack (see BR-7).
+- **Bug reports:** BR-6 investigated; findings await `/fix`.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -87,9 +84,7 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 
 ## Blocked on human
 
-- BR-7: identify the affected browser and URL, where the `startTime` message appears, and copy
-  its full error stack. The connected in-app browser had no existing tabs; its fresh session does
-  not reproduce the reported failure, so it cannot establish the failing browser's state.
+- None.
 
 ## Review findings
 
@@ -135,70 +130,6 @@ absolute in-directory paths read correctly, so the failures are in which path re
   without the query and the status without the refusal code, so this report could not be tied to a
   link form. Log the refusal code and the requested `path` at `handleFileRead` (local-only log), so
   the next report answers "which link, which boundary".
-
-### BR-7 investigation unit (2026-09-27) — **Fix model:** medium — Codex Terra or Claude Opus.
-
-Report, verbatim: "nothing loads, opening any page does nothing and I get "cannot read properties of
-undefined (reading 'startTime')". Version, browser, route, and where the message appeared were not
-given; no stack trace or log was supplied. The dashboard log has no matching entry, and could not:
-browser errors never reach the server. Governing items: none — FS-12 and TS-03 do not specify client
-failure handling or reporting (spec gap, below).
-
-Not reproduced (root cause **undetermined**). A scripted clean-profile Chrome loaded every top-level
-route, a project page, two live agent pages, and their tabs on all four running instances (the
-`main` dev server on 4317 and three `v0.6.0`/`88e7e06` binaries on 4405/4416/4417) with no page
-error or console error. Every `startTime` read in the main bundle is guarded: React's scheduler
-reads it only off a non-null heap peek, and Monaco's smooth-scroll reads it only inside
-`if (this._smoothScrolling)`. The other reads live in lazily loaded Mermaid gantt/cynefin and
-Cytoscape chunks, which load only when a chat renders such a diagram and cannot stop page
-navigation on their own. Correction from repeat investigation: the dashboard error boundary only
-wraps `Outlet` (`ui/src/App.tsx:11`); Header and NotificationCenter are outside it, as are the root
-providers (`ui/src/main.tsx`). A failure outside that boundary can reach React Router's default
-error UI or escape the router, so the reported wording does not establish a scheduler or injected
-script failure. No evidence identifies either as the cause. Next evidence: the full error stack,
-affected browser/URL, and whether a private window without extensions reproduces it.
-
-Repeat report, verbatim (2026-09-27): "/investigate-bug nothing loads, opening any page does
-nothing and I get \"cannot read properties of undefined (reading 'startTime'). Opus tried andfailed".
-At clean commit `2b52de9`, the connected Codex in-app browser had no existing tabs. A new tab at
-`http://localhost:4317` rendered the populated Dashboard, Settings roles, Tasks, Pipelines runs,
-and Archive via visible navigation, with no captured warning/error logs. This is fresh-session
-evidence only, not a reproduction of the reporter's browser. Expected route navigation follows
-FS-12.R6/R16/R17; client error reporting remains the separate gap below. Source tracing again
-found no application-source `startTime` read. Scheduler reads are protected by its queue contract;
-the Cytoscape animation candidate reads `ani_p.easing` before `ani_p.startTime`, so an absent
-`_private` would fail on `easing` first and does not explain this exact error. No new confirmed
-cause or skipped reproduction test; no product/spec changes. Awaiting the requested browser/URL,
-message location, and full stack rather than treating another clean session as a resolution.
-
-Follow-up (2026-09-28): the reporter says it began after installing the latest release. Release
-check: `git log -S startTime -- ui/src` is empty, so no AgentDeck UI source has ever read
-`startTime`; `ui/package.json` and `ui/package-lock.json` are identical across `v0.5.0..v0.6.0`,
-so every bundled library that does read it is unchanged from `v0.5.0`. The release's 61 changed UI
-files cannot produce this message directly. A new-code bug that hands a library bad data (for
-example an unguarded diagram or runtime-activity payload), a skipped-version upgrade, or a browser
-tab left open from the old version remain possible and untested. This Mac's installed release is still
-`0.1.2`, so the reporter's install is elsewhere and its prior version is unknown.
-
-Follow-up (2026-09-28): the reporter's incognito window works; clearing cookies, local storage and
-session storage in the normal profile did not help. The UI registers no service worker and uses no
-IndexedDB or Cache Storage (only `localStorage` for drafts, annotations and the builder ID), so the
-remaining normal-vs-incognito differences are extensions (off in incognito by default) and the
-HTTP cache, which clearing storage does not empty. The server sends no `Cache-Control`, `ETag` or
-`Last-Modified` and asset names are content-hashed, so a stale cache is unlikely. Root cause
-**probable**: a browser extension in the normal profile. Not a code defect unless the extension
-bisection points at AgentDeck behavior; the observability finding stands either way.
-
-- **Worth fixing** — observability plus spec gap, confirmed from the code path; INV §8, §14, §16.
-  A browser-side failure leaves no trace the operator can send: `ErrorBoundary.componentDidCatch`
-  (`ui/src/components/ErrorBoundary.tsx:22`) only `console.error`s, its fallback shows no error
-  text, and nothing handles `window` `error`/`unhandledrejection`. This report therefore carries a
-  bare message with no stack, file, route, or build. Specify (FS-12 plus a TS-03 route) that
-  uncaught errors and boundary catches are posted with message, stack, component stack, route, and
-  build version to a local-only, size-bounded, rate-limited endpoint that writes them to the
-  dashboard log, and that the boundary fallback shows the message. Test: a UI test that a thrown
-  render error and a window error each post one bounded report, and a Go test that the endpoint
-  truncates and logs it.
 
 ## Design consistency notes
 
