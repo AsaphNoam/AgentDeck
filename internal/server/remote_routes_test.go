@@ -160,8 +160,8 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 		{"POST", "/mcp"},
 		{"POST", "/api/hook"},
 		{"GET", "/api/archive"},
-		{"GET", "/"},
-		{"GET", "/assets/index.js"},
+		{"POST", "/"},
+		{"GET", "/api/unknown"},
 	} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, phoneRequest(c.method, c.path, "{}", token))

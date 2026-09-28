@@ -134,4 +134,15 @@ Done:
   joins the shared-worker event allowlist and invalidates `["remote"]`. Embed not yet
   refreshed (closure `make dist`).
 
-Next: slice 7 (phone app shell).
+- **Slice 7** (2026-09-28) — second Vite entry (`ui/remote.html`, `ui/src/remote/`), public
+  `remote.webmanifest`/`remote-sw.js`/`remote-icon.svg` (SVG icon only — iOS Home Screen
+  falls back to a page snapshot; a PNG apple-touch-icon is a follow-up). Tailnet static:
+  `phoneSPAHandler` serves assets, `remote.html` for every app path and `/sw.js`; the loopback
+  `spaHandler` hides phone files; unauthenticated GETs outside `/api/` reach only static.
+  Phone: path router, pairing (QR fragment code, iOS install-first), unpaired screen, Home
+  (Needs you / Moving by project / Since last, `since` in localStorage), link states with
+  "Mac unreachable since" + stale dimming. Styles: `styles/remote.css` entry +
+  `styles/features/phone.css`; checker permits the one new entry import. Test:
+  `npx vitest run src/remote`.
+
+Next: slice 8 (phone actions: cards, conversation, task/run actions, New work).

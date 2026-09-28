@@ -1,0 +1,10 @@
+{
+  "name": "AgentDeck",
+  "short_name": "AgentDeck",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f0e9",
+  "theme_color": "#f2f0e9",
+  "icons": [{ "src": "/remote-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

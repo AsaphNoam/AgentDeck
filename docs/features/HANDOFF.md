@@ -56,7 +56,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 **Change:** `add-mobile-remote-control` — in progress (2026-09-28). Slice plan and progress live in
-the change file's **Progress** section. Slices 1–6 and 10 committed; next: 7 (phone app shell).
+the change file's **Progress** section. Slices 1–7 and 10 committed; next: 8 (phone actions).
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating

@@ -24,3 +24,8 @@ func (s *Server) staticHandler() http.Handler {
 	}
 	return spaHandler(sub)
 }
+
+// phoneStaticHandler serves the phone app from disk on the tailnet listener.
+func (s *Server) phoneStaticHandler() http.Handler {
+	return phoneSPAHandler(os.DirFS(distDir))
+}

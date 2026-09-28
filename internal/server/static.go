@@ -32,3 +32,15 @@ func (s *Server) staticHandler() http.Handler {
 	}
 	return spaHandler(sub)
 }
+
+// phoneStaticHandler serves the embedded phone app on the tailnet listener.
+func (s *Server) phoneStaticHandler() http.Handler {
+	sub, err := uiFS()
+	if err != nil {
+		s.log.Error("static: embedded UI unavailable", "err", err)
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			writeRemoteError(w, http.StatusInternalServerError, "internal", "ui assets unavailable")
+		})
+	}
+	return phoneSPAHandler(sub)
+}

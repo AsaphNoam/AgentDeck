@@ -590,7 +590,8 @@ export function auditPresentation(root) {
     const match = /^\.\/skins\/([a-z][a-z0-9-]*)\.css$/.exec(imported);
     if (match && !declaredSkins.has(match[1])) add("src/styles/index.css", "skin-import", `undeclared skin import ${imported}`);
   }
-  const permittedImports = new Set(["./styles/index.css", "@xterm/xterm/css/xterm.css", "./contract-fixture.css"]);
+  // ../styles/remote.css is the phone entry's own stylesheet (TS-08.R73).
+  const permittedImports = new Set(["./styles/index.css", "../styles/remote.css", "@xterm/xterm/css/xterm.css", "./contract-fixture.css"]);
   for (const { file, imported } of importedStyles) if (!permittedImports.has(imported)) add(file, "css-import", `unsupported stylesheet import ${imported}`);
   for (const { file, imported } of importedStyles) {
     if (imported === "./contract-fixture.css" && file !== "src/presentation/VisualMatrix.tsx") add(file, "fixture-production", "contract fixture may be imported only by VisualMatrix");

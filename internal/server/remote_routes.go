@@ -254,7 +254,20 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 	outer := http.NewServeMux()
 	outer.HandleFunc("POST /api/remote/pair", s.handlePairClaim)
 	outer.HandleFunc("GET /api/remote/pair/{pending_id}", s.handlePairWait)
-	outer.Handle("/", s.remoteAuth(authed))
+	// Everything under /api/ needs a paired device. Other GETs are the phone
+	// app itself, which an unpaired device may load to learn it must pair
+	// (FS-20.R7); it carries no agent, task, project, or transcript data.
+	api, static := s.remoteAuth(authed), s.phoneStaticHandler()
+	outer.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/"):
+			api.ServeHTTP(w, r)
+		case r.Method == http.MethodGet || r.Method == http.MethodHead:
+			static.ServeHTTP(w, r)
+		default:
+			writeRemoteError(w, http.StatusNotFound, codeRemoteRouteNotAvailable, "this action is only available on the Mac")
+		}
+	})
 	return s.remoteRequestLog(s.remoteGuard(domain, whois, outer))
 }
 

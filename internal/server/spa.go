@@ -7,10 +7,19 @@ import (
 	"strings"
 )
 
+// phoneFiles are the phone app's own files. Only the tailnet listener serves
+// them, and it never serves the desktop entry (TS-13.R14, TS-08.R73).
+var phoneFiles = map[string]bool{
+	"remote.html":        true,
+	"remote-sw.js":       true,
+	"remote.webmanifest": true,
+	"remote-icon.svg":    true,
+}
+
 // spaHandler serves files from fsys and falls back to index.html for any path
 // that does not resolve to an existing file — the standard single-page-app
 // routing behavior. Shared by both the embedded (production) and disk (dev)
-// static handlers.
+// static handlers. The desktop never serves the phone app's files.
 func spaHandler(fsys fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(fsys))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -19,7 +28,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 		if reqPath == "" || strings.HasPrefix(reqPath, "..") {
 			reqPath = "index.html"
 		}
-		if _, err := fs.Stat(fsys, reqPath); err != nil {
+		if _, err := fs.Stat(fsys, reqPath); err != nil || phoneFiles[reqPath] {
 			// Not a real asset → SPA fallback to index.html.
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = "/"
@@ -27,5 +36,36 @@ func spaHandler(fsys fs.FS) http.Handler {
 			return
 		}
 		fileServer.ServeHTTP(w, r)
+	})
+}
+
+// phoneSPAHandler is the tailnet listener's static handler: built assets, the
+// phone entry for every app route, and the service worker at /sw.js so it can
+// control the whole origin. The desktop entry is never served.
+func phoneSPAHandler(fsys fs.FS) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		switch {
+		case reqPath == "sw.js":
+			w.Header().Set("Cache-Control", "no-cache")
+			reqPath = "remote-sw.js"
+		case reqPath == "" || strings.HasPrefix(reqPath, "..") || reqPath == "index.html":
+			reqPath = "remote.html"
+		}
+		if st, err := fs.Stat(fsys, reqPath); err != nil || st.IsDir() {
+			reqPath = "remote.html"
+		}
+		if reqPath == "remote.html" {
+			w.Header().Set("Cache-Control", "no-cache")
+			if _, err := fs.Stat(fsys, reqPath); err != nil {
+				writeRemoteError(w, http.StatusNotFound, codeRemoteRouteNotAvailable, "the phone app is not built")
+				return
+			}
+		}
+		// Serve under the resolved name: ServeFileFS redirects any request
+		// path ending in /index.html.
+		r2 := r.Clone(r.Context())
+		r2.URL.Path = "/" + reqPath
+		http.ServeFileFS(w, r2, fsys, reqPath)
 	})
 }

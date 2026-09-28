@@ -1,0 +1,9 @@
+/* The phone app's own compact shell (TS-08.R73): Core tokens only, designed for
+   360–430px widths, no desktop shell, skins, or 1024px floor. */
+@layer ad-reset, ad-tokens, ad-base, ad-components, ad-features, ad-integrations, ad-skins;
+
+@import "./foundation.css";
+@import "./tokens.css";
+@import "./base.css";
+@import "./components/primitives.css";
+@import "./features/phone.css";

@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -10,6 +11,14 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // Two entries share one build and embed: the desktop app and the phone app
+    // the tailnet listener serves (TS-08.R73, TS-13.R14).
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        remote: resolve(__dirname, "remote.html"),
+      },
+    },
   },
   server: {
     port: 5173,
