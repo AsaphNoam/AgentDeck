@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -221,4 +222,17 @@ type countingNode struct {
 func (n *countingNode) Close() error {
 	n.onClose()
 	return nil
+}
+
+func TestRedactTailscaleLog(t *testing.T) {
+	in := "To authenticate, visit: https://login.tailscale.com/a/1b2c3d4e5f key tskey-auth-kAbC-123 nodekey:0123abcd privkey:deadbeef ok"
+	got := RedactTailscaleLog(in)
+	for _, secret := range []string{"1b2c3d4e5f", "kAbC-123", "0123abcd", "deadbeef"} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("redacted line still carries %q: %s", secret, got)
+		}
+	}
+	if !strings.Contains(got, "https://login.tailscale.com/a/[redacted]") || !strings.HasSuffix(got, " ok") {
+		t.Fatalf("redaction mangled the line: %s", got)
+	}
 }

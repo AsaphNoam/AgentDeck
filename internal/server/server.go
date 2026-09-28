@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -300,7 +301,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		worktreeLocks:             map[string]*worktreeLock{},
 		repoBackedCache:           map[string]repoBackedEntry{},
 	}
-	s.newRemoteNode = func() (remote.Node, error) { return nil, errRemoteUnsupported }
+	s.newRemoteNode = func() (remote.Node, error) {
+		return remote.NewTSNetNode(filepath.Join(cfgStore.Home(), "remote", "tailscale"), remoteHostname, log)
+	}
 	s.remoteDevices = newRemoteDevices()
 	s.remotePairing = &remotePairing{failures: map[string]*peerFailures{}}
 	s.remote = s.newRemoteManager()

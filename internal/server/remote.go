@@ -12,9 +12,9 @@ import (
 	"github.com/agentdeck/agentdeck/internal/runtime"
 )
 
-// errRemoteUnsupported is the node factory's answer until the embedded tailnet
-// node is built in; the manager reports it as Unavailable (TS-13.R1).
-var errRemoteUnsupported = errors.New("remote control is not available in this build")
+// remoteHostname is the tailnet device name; the product name governs it
+// (FS-20.R1, FS-00.R16).
+const remoteHostname = "agentdeck"
 
 // remoteView is the GET /api/remote and remote_update shape (TS-13 §3).
 type remoteView struct {

@@ -104,4 +104,15 @@ Done:
   carries `pending_pairing` and `devices` (TS-13 §3 to be reconciled). Tailnet request log
   redacts the wait token. Disable resets pairing.
 
-Next: slice 4 (real `tsnet` node).
+- **Slice 4** (2026-09-28) — `tailscale.com` v1.102.5 pinned, `go 1.26.6` (local 1.25 switches
+  through `GOTOOLCHAIN=auto`; CI/release read `go-version-file`), README updated.
+  `remote.NewTSNetNode` pre-checks MagicDNS/cert domains so refusals map to stable reasons,
+  routes `Logf`→Debug and `UserLogf`→Info through `RedactTailscaleLog`. Review note (reversible
+  privacy choice): `envknob.SetNoLogsNoSupport()` stops the node uploading logs to Tailscale.
+  `testServer` injects a failing node factory so no suite reaches a real tailnet. Measured
+  stripped `sqlite_fts5` binary: 15.9 MB → 39.8 MB (+22.8 MiB, top of the accepted range);
+  TS-06.R27 must record it. Observed unrelated flake under full `./...` load:
+  `TestContextSharingStartsNoModelTurn` (baseline sampled before the held turn's prompt lands);
+  passes alone and in the server package.
+
+Next: slice 5 (attention helper + `GET /api/remote/home`).

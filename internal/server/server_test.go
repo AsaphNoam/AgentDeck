@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/remote"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -44,8 +46,13 @@ func testServer(t *testing.T, seed bool) *Server {
 	t.Cleanup(func() { _ = stateStore.Close() })
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	registry := runtime.NewRegistry(stateStore)
-	return New(cfgStore, stateStore, registry, config.DefaultConfig(), log)
+	s := New(cfgStore, stateStore, registry, config.DefaultConfig(), log)
+	// No suite contacts a real tailnet (TS-06.R27); remote tests inject a fake.
+	s.newRemoteNode = func() (remote.Node, error) { return nil, errNoTailnetInTests }
+	return s
 }
+
+var errNoTailnetInTests = errors.New("no tailnet in tests")
 
 // newLocalRequest is httptest.NewRequest with a loopback Host: httptest's
 // default Host is example.com, which the localOnly guard rejects by design.

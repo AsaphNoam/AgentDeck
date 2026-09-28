@@ -49,7 +49,7 @@ signing they do not independently authenticate a compromised release account or 
 
 ## Prerequisites
 
-- **Go 1.25** — server / single binary (authoritative version: `go.mod`)
+- **Go 1.26.6** — server / single binary (authoritative version: `go.mod`)
 - **Node 20+ and npm** — UI build only; Node 22+ is required at runtime when source-installing the
   optional official Claude ACP adapter with `INSTALL_ACP=1`
 - macOS or Linux. The default terminal runtime is an embedded xterm.js/PTY bridge;
