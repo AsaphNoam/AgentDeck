@@ -35,7 +35,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
-  The shared creative-workspace layout has a feature draft, FS-12.R52–R57/A26–A29; it awaits
+  The shared creative-workspace layout has a feature draft, FS-12.R52–R59/A26–A31, including
+  redesigned active-project tabs and prominent, state-paced agent badges; it awaits
   scope confirmation before technical design. No ready change or implementation authorization
   is claimed for that draft.
 - **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose

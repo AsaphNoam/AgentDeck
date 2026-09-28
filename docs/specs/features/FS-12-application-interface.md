@@ -360,13 +360,37 @@ Requirements are user-observable.
   measures rather than one global card grid: quiet compact navigation, operational run ledger and
   timeline, template authoring, search-first Archive, readable Settings and clear dialog/onboarding
   actions. Existing selected, hover, focus, disabled, busy, error, destructive, permission and
-  success states remain visible in all three palettes. No new motion or behavior is introduced.
+  success states remain visible in all three palettes. The only new motion is R59's explicit
+  status indication; no new action or task behavior is introduced.
 - **R57 (planned)** — This is a presentation upgrade to existing appearances, not a fourth skin,
   replacement appearance preference, migration or legacy-layout toggle. It changes no route, data,
   persistence, API, retention, lifecycle, action, shortcut or supported viewport policy. Figma
   provides composition and finish, not a pixel-exact product specification: prototype-only menus,
   density controls, synthetic transcripts and task flows are excluded. Existing FS-02 grid and
   FS-03 chat contracts take precedence over mockup anatomy.
+- **R58 (planned)** — Active-project navigation joins the redesigned shell rather than retaining
+  miniature boxed monospaced chips. Project titles use readable text typography, comfortable
+  horizontal spacing and quiet tab-like geometry subordinate to primary navigation. The selected
+  project has a clear structural marker plus restrained emphasis; a project's accent remains a
+  supporting cue, not a full saturated button or the only selection signal. Hover, keyboard focus
+  and overflow share that treatment. Preserve R39's single row, five-link cap, current-project
+  visibility, full accessible names, truncation and `+n` access at 1024px. No new navigation row,
+  project membership/order rule, route or persisted tab state is added. This refines R39's visual
+  treatment without changing its navigation contract.
+- **R59 (planned)** — Agent-card state badges are intentionally prominent scan targets in both
+  collapsed and expanded cards: legible text, stronger state-colored fill/edge and a clear indicator,
+  distinguishable from quieter runtime/mail metadata. Do not copy the mockup's ambiguous faint
+  badges. Busy uses a slow smooth repeating pulse (approximately 2.4 seconds per cycle);
+  error and waiting-input use a faster pulse (approximately 1.2 seconds). Waiting-input includes
+  the existing blocked-on-human/approval condition; this does not invent a `blocked` agent state,
+  infer a new state from pipeline status, or label every wait as permission approval. Text remains
+  readable throughout: pulse the indicator/emphasis, never disappear the whole badge or alternate
+  sharply between fully bright and dark. Idle, done, unknown and stopped remain static. Pulsing
+  follows the current displayed live state, including after reload, and stops immediately when
+  that state ends or the agent stops; an archived/read-only agent remains static. This is sustained
+  state indication, not a replayed lifecycle celebration. Reduced-motion preference renders equally
+  prominent static badges. Motion and color are never the sole status signals; no card movement,
+  sound, notification, automatic expansion or layout shift is added.
 
 ## 3. States & transitions
 
@@ -561,9 +585,23 @@ Requirements are user-observable.
   existing task behavior tests and real-browser keyboard/form review across appearances. Review
   the Figma comparison for spacing and hierarchy without copying its task interaction changes.
 
+- **A30 (planned)** (R58) — All three appearances render zero, one, five and overflowing active
+  projects with long titles at 1024px and wider desktop. Text tabs, selection, hover/focus and
+  overflow look native to the shared shell, without tiny technical chips or clipping/displacing
+  primary navigation and connection state. Current-project visibility and all overflow links remain
+  keyboard-reachable. *Verify:* existing project-nav tests, matched rendered shell fixtures and
+  real-browser keyboard/overflow checks; compare actual title legibility, not only DOM presence.
+- **A31 (planned)** (R59) — Matched collapsed/expanded cards show legible, prominent badges for
+  every agent state in every appearance. Observe several slow busy and faster error/waiting cycles
+  at normal speed, reload in those states and transition out of them: labels never vanish, cadence
+  differs clearly, and geometry stays stable. Stopped/archived and idle/done/unknown badges do not
+  pulse. Repeat with reduced motion and confirm static salience. *Verify:* focused badge/card state
+  tests plus real-browser motion and reduced-motion checks; a static screenshot cannot prove pace.
+
 ## 6. Deviations & open decisions
 
-- R52–R57/A26–A29 are the 2026-09-28 proposed cross-appearance upgrade. Product scope awaits
+- R52–R59/A26–A31 are the 2026-09-28 proposed cross-appearance upgrade, including the operator's
+  follow-up for project tabs and stronger pulsing badges. Product scope awaits
   the operator's confirmation before technical design and creation of a ready change. Older
   shipped Studio behavior remains the incumbent until implementation; previous A19–A23/TS-08.R68
   evidence debt is not closed by this draft. A21's Studio-only layout oracle will be superseded
