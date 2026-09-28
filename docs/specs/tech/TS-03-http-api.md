@@ -66,11 +66,12 @@ is one row per live agent, overwritten in place and deleted on removal, so it is
 agent set rather than by stream traffic, and it is discarded on every new stream open because it is
 derived from the generation that produced it (INV §1). A tab that leaves says so, and the worker
 drops its port; the shared stream is closed when the last port leaves (INV §4). Sharing is
-best-effort: a tab whose
-browser cannot construct the shared stream, whose worker script does not load, or whose shared
-stream never opens within the liveness window falls back to its own direct `/api/events` connection
-for the rest of the session, so live updates are never silently lost. That tab counts against the
-origin's connection pool again.
+best-effort: a tab whose browser cannot construct the shared stream, whose worker script does not
+load, or whose worker sends nothing through its port before the first stream open within the
+liveness window falls back to its own direct `/api/events` connection for the rest of the session,
+so live updates are never silently lost. Any worker port message, including an error reported while
+its underlying stream retries, proves the worker is alive and keeps the tab on the shared reconnect
+path through a server outage. That tab counts against the origin's connection pool again.
 
 **R8 — SSE event types are versioned by payload contract.** Current types include `state_update`,
 `new_message`, `notification`, `config_source_update`, `pipeline_update`, `task_update`, `hydrated`,

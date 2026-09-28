@@ -463,25 +463,47 @@ describe("SseClient watchdog reconnect", () => {
     expect(FakeEventSource.instances).toHaveLength(2);
   });
 
-  // BR-7 reproduction (skipped until /fix): a live worker whose server is down
-  // is not a dead worker. A restart longer than the liveness window demoted
-  // every open tab to its own direct stream for good, and five such tabs
-  // exhausted Chrome's six-connection pool so nothing else loaded (TS-03.R7).
-  it.skip("keeps a live shared worker through a server outage instead of demoting", async () => {
+  // BR-7 regression / FS-02.A27 transport coverage: a live worker whose server
+  // is down is not a dead worker. A restart longer than the liveness window
+  // must keep tabs on one shared reconnect path so the six-tab browser check
+  // (TS-06.R6) does not exhaust the HTTP/1.1 connection pool.
+  it("keeps a live shared worker through a server outage instead of demoting", async () => {
     FakeSharedWorker.instances = [];
     vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
     const { sseClient } = await import("./sse");
     sseClient.connect();
-    FakeSharedWorker.instances[0].port.deliver({ kind: "open" });
+    const { useUiStore } = await import("../store/uiStore");
+    const port = FakeSharedWorker.instances[0].port;
+    port.deliver({ kind: "open" });
 
     // The server goes away: the worker's EventSource retries and reports each
     // failure to every port, including the one the watchdog reconnects onto.
     for (let elapsed = 0; elapsed < 90_000; elapsed += 3_000) {
-      for (const worker of FakeSharedWorker.instances) worker.port.deliver({ kind: "error" });
+      FakeSharedWorker.instances.at(-1)!.port.deliver({ kind: "error" });
       vi.advanceTimersByTime(3_000);
     }
 
     expect(FakeEventSource.instances).toHaveLength(0);
+    FakeSharedWorker.instances.at(-1)!.port.deliver({ kind: "open" });
+    expect(useUiStore.getState().connection).toBe("open");
+  });
+
+  it("keeps a live shared worker through an initial server outage before first open", async () => {
+    FakeSharedWorker.instances = [];
+    vi.stubGlobal("SharedWorker", FakeSharedWorker as unknown as typeof SharedWorker);
+    const { sseClient } = await import("./sse");
+    const { useUiStore } = await import("../store/uiStore");
+    sseClient.connect();
+    for (let elapsed = 0; elapsed < 90_000; elapsed += 3_000) {
+      FakeSharedWorker.instances.at(-1)!.port.deliver({ kind: "error" });
+      vi.advanceTimersByTime(3_000);
+    }
+
+    expect(FakeEventSource.instances).toHaveLength(0);
+    expect(FakeSharedWorker.instances).toHaveLength(4);
+    expect(FakeSharedWorker.instances.slice(0, -1).every((worker) => worker.port.closed)).toBe(true);
+    FakeSharedWorker.instances.at(-1)!.port.deliver({ kind: "open" });
+    expect(useUiStore.getState().connection).toBe("open");
   });
 
   it("uses Web Notification for hidden tabs when permission is granted", async () => {

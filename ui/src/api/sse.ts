@@ -16,6 +16,7 @@ class SseClient {
   private es: EventSourceLike | null = null;
   private watchdog: number | null = null;
   private lastPing = Date.now();
+  private receivedSharedWorkerMessage = false;
   private opened = false;
   private sharedStreamUnavailable = false;
   private hydrationIds: string[] = [];
@@ -30,6 +31,7 @@ class SseClient {
     // the new stream before its first ping arrives, looping forever.
     this.lastPing = Date.now();
     this.opened = false;
+    this.receivedSharedWorkerMessage = false;
     useUiStore.getState().setConnection("connecting");
     this.es = this.createTransport();
     this.es.onopen = () => {
@@ -200,7 +202,10 @@ class SseClient {
       return new EventSource("/api/events");
     }
     try {
-      return new SharedWorkerEventSource(() => this.useDirectStream());
+      return new SharedWorkerEventSource(
+        () => this.useDirectStream(),
+        () => { this.receivedSharedWorkerMessage = true; },
+      );
     } catch {
       this.sharedStreamUnavailable = true;
       return new EventSource("/api/events");
@@ -222,10 +227,10 @@ class SseClient {
     if (this.watchdog) window.clearInterval(this.watchdog);
     this.watchdog = window.setInterval(() => {
       if (Date.now() - this.lastPing <= 25_000) return;
-      // A stream that never opened at all is a broken transport, not a dropped
-      // connection. Reconnecting it would loop on the same dead worker forever,
-      // so demote once and let the direct stream take the liveness window.
-      if (!this.opened && !this.sharedStreamUnavailable) {
+      // A worker that sends nothing before its stream opens is a broken
+      // transport. A port message proves it is alive, even if its EventSource
+      // is retrying through a server outage.
+      if (!this.opened && !this.receivedSharedWorkerMessage && !this.sharedStreamUnavailable) {
         this.useDirectStream();
         return;
       }
@@ -277,7 +282,7 @@ class SharedWorkerEventSource implements EventSourceLike {
     if (!event.persisted) this.close();
   };
 
-  constructor(onTransportFailure: () => void) {
+  constructor(onTransportFailure: () => void, private readonly onMessage: () => void) {
     const worker = new SharedWorker(new URL("./sse-shared-worker.ts", import.meta.url), {
       name: "agentdeck-events",
       type: "module",
@@ -311,6 +316,7 @@ class SharedWorkerEventSource implements EventSourceLike {
   }
 
   private receive(message: SharedWorkerMessage) {
+    this.onMessage();
     if (message.kind === "open") {
       this.onopen?.(new Event("open"));
       return;

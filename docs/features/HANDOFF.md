@@ -41,11 +41,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   The shared creative-workspace scope was approved 2026-09-28 and promoted to
   `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. Implementation
   is now active; the design scope is settled.
-- **Open findings:** BR-6's investigation unit (four findings) and BR-7's (one), both in
+- **Open findings:** BR-6's investigation unit (four findings), in
   **Review findings**. The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 and BR-7 investigated; findings await `/fix` (**Review findings**).
+- **Bug reports:** BR-6 investigated; findings await `/fix` (**Review findings**). BR-7 closed
+  2026-09-28: live shared workers retain the shared reconnect path during server outages.
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -166,31 +167,6 @@ absolute in-directory paths read correctly, so the failures are in which path re
   link form. Log the refusal code and the requested `path` at `handleFileRead` (local-only log), so
   the next report answers "which link, which boundary".
 
-### BR-7 investigation unit (2026-09-28) — **Fix model:** medium — Codex Terra or Claude Opus.
-
-Report, verbatim: "nothing loads, opening any page does nothing" — began after installing the
-latest release; fine in incognito; clearing site storage did not help; an empty-cache hard reload
-helped for about a minute. Resolved by closing all of the operator's ~5 AgentDeck tabs (separate
-windows). A console error accompanying it came from injected extension code (absent from every
-served AgentDeck asset) and is unrelated. Nothing was logged. Governing items: TS-03.R7, FS-02.A27.
-
-- **Must fix** — confirmed (reproduced); spec defect plus code; INV §1, §16. TS-03.R7's third
-  fallback ("whose shared stream never opens within the liveness window falls back to its own
-  direct `/api/events` connection for the rest of the session") cannot tell a dead worker from a
-  live worker whose server is down. Any AgentDeck restart longer than ~25–30s — an install or
-  upgrade — makes the watchdog (`ui/src/api/sse.ts` `startWatchdog`: `!opened &&
-  !sharedStreamUnavailable`) permanently demote every open tab, since `connect()` reset `opened`
-  on the reap. Five demoted tabs hold five direct streams; with the worker's own stream (restarted
-  by any freshly loaded tab) Chrome's six-per-origin HTTP/1.1 pool is exhausted and every REST
-  request queues forever — the exact failure R7's sharing exists to prevent. Fix: demote only on
-  evidence the worker itself is dead — a live worker reports each failed retry as a port `error`
-  message (`sse-shared-worker.ts` `onerror` broadcast), so any port message proves it alive;
-  keep reconnecting through it through an outage. Amend R7's third fallback to "a worker that sends
-  nothing within the liveness window"; the existing test "demotes a shared worker that never opens
-  instead of reconnecting into it" still holds (silent worker). Regression: the skipped BR-7 test
-  "keeps a live shared worker through a server outage instead of demoting" in
-  `ui/src/api/sse.test.ts` (fails today: two direct streams after a 90s outage).
-
 ## Design consistency notes
 
 - The paused direct-action change cites `TS-04.R32–R40`, while TS-01.R25 and TS-03.R32 cite
@@ -198,3 +174,15 @@ served AgentDeck asset) and is unrelated. Nothing was logged. Governing items: T
   resumes.
 - FS-17 §6's opening sentence should be scoped when its planned direct-cutover work resumes; it
   currently reads as covering a section that also contains planned R13–R19 boundaries.
+
+## Changelog
+
+- **2026-09-28 — Fix BR-7 (INV §1 boundary-derived state; §16 bounded streams).** A worker port
+  message now proves worker liveness for the current connection, preventing server outages from
+  permanently multiplying per-tab streams. TS-03.R7 reconciled; silent-worker and failed-load
+  fallbacks remain covered. The unskipped 90s-outage regression failed before the fix (two direct
+  streams), then passed; initial-outage recovery and old-port teardown are also covered.
+  Focused SSE tests: 26 passed; full UI: 484 passed/3 existing skips. `make dist`, both Go test
+  variants and `make check-specs` pass. The first `make test` stopped on a concurrent FS-06 index
+  status edit; after that session committed the correction, spec lint and both Go variants passed
+  separately. BR-7 is closed; BR-6 remains open. FS-02.A27's six-tab real-browser check is still owed.
