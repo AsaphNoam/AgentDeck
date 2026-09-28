@@ -55,26 +55,25 @@ the relevant feature and technical specifications; it does not change product co
   provider's automatic mode for Claude. Specify scope, persistence, provider mapping, whether a
   running session can change policy safely, and how this relates to frozen role/global
   `skip_permissions` and per-request Approve/Deny.
-- **Split a conversation at an earlier message.** Track the requested split action with the existing
-  edit-message design problem: whole-session Clone now forks only at the latest completed turn,
-  while an earlier split needs a truthful provider-context boundary, parent/child lineage, visible
-  history rules, and behavior for providers without point-in-time fork support.
 - **Finish hiding raw ids in UI labels.** Most selectors now use readable names, but remaining
   runtime, project, role, and template surfaces still need one cross-product rule: show the stable
   id only for duplicate names or an explicit detail surface, while keeping values and keys
-  identity-safe.
-
-- **Edit a sent chat message.** From the 2026-08-10 play session: like Codex, editing the most
-  recent message edits it in place, and editing an older one forks the conversation from that point.
-  Designing this on 2026-08-27 established that AgentDeck cannot give it the meaning Codex does, and
-  the user chose to hold the idea rather than ship a weaker meaning under the same name. Codex owns
-  its own conversation state; AgentDeck supervises a provider CLI session that has already ingested
-  the message. Findings, so a later attempt does not re-derive them:
-  - **The protocol has no rewind.** The ACP client is hand-rolled and pins protocol version 1. The
-    complete implemented session-method set is `session/new`, `session/load`, `session/prompt`,
-    `session/cancel`, `session/request_permission`, `session/set_config_option`, and
-    `session/update`. Nothing edits, rewinds, truncates, forks, or resumes from a point;
-    `session/load` is a whole-session resume keyed by id and takes no offset or sequence.
+  identity-safe. Example: the pipeline template select always renders `title (id)`
+  (`ui/src/features/pipelines/RunStartForm.tsx`), unlike the duplicate-gated task/run labels
+  (FS-16).
+- **Edit a sent message, or split a conversation at an earlier one.** From the 2026-08-10 play
+  session: like Codex, editing the most recent message edits it in place, and editing an older one
+  forks the conversation from that point; a separate request asked for an explicit split action.
+  Both need the same missing capability. Designing edit on 2026-08-27 established that AgentDeck
+  cannot give it the meaning Codex does, and the user chose to hold the idea rather than ship a
+  weaker meaning under the same name. Codex owns its own conversation state; AgentDeck supervises a
+  provider CLI session that has already ingested the message. Findings, so a later attempt does not
+  re-derive them:
+  - **The protocol has no rewind.** The ACP client is hand-rolled and pins protocol version 1.
+    Whole-session Clone (FS-01.R36) now uses `session/fork` and `session/delete`, but the fork takes
+    only a session id and branches at the latest completed turn. Nothing edits, rewinds, truncates,
+    or forks from an earlier point; `session/load` is a whole-session resume keyed by id and takes
+    no offset or sequence.
   - **The transcript is append-only.** `internal/transcript/writer.go` exposes only
     `Append`/`Sync`/`Close`, and `Open()` repairs a torn trailing record on the assumption that only
     the final line can ever be incomplete (TS-02.R8, INV §9).
@@ -89,22 +88,19 @@ the relevant feature and technical specifications; it does not change product co
   Anything shippable is therefore one of: correct-and-resend as a new turn with the supersession
   stated honestly; a true session rebuild that accepts the primer's context loss; or a display-only
   supersede that makes the visible history stop matching what the agent received. Each needs a
-  product decision about what "edit" should promise.
-- **Agent-side re-arm and retry.** `POST /api/tasks/{id}/rearm` and `/retry` exist for people but
-  have no MCP counterpart, so an agent told `retry_requires_rearm` cannot act on it.
-- **Agent-side work inspection.** Reading work an agent created or is assigned to. FS-16 §6 and
-  TS-04.R29 deliberately exclude task-graph queries as anti-polling; reversing that choice needs a
-  reason stronger than convenience.
-- **Agent-side lifecycle control.** Agent-callable stop, resume, or launch of another agent without
-  going through a task. This is a new authority surface and needs a threat model.
-- **Agent-side group fan-out.** Multiple arms already provide fan-in/join; creating several related
-  tasks as one unit does not exist. TS-10 §5 excludes it.
+  product decision about what "edit" should promise. An earlier split additionally needs a truthful
+  provider-context boundary, parent/child lineage, visible history rules, and behavior for
+  providers without point-in-time fork support.
+- **Broader agent authority.** Agents can already create, list, read, retry and re-arm their own
+  tasks (TS-10.R34). Two further powers remain undefined: stopping, resuming or launching another
+  agent without going through a task, which is a new authority surface and needs a threat model;
+  and creating several related tasks as one unit, which TS-10 §5 excludes (multiple arms already
+  provide fan-in/join).
 - **Detached configuration import.** Define verified copyable fields/assets and provider injection
-  paths before implementing detached import.
+  paths before implementing detached import. The API still returns 501; FS-08.R35 removed the
+  unavailable UI controls.
 - **Activity map.** Explore a repository/session activity view using server APIs only, with clear
   privacy, scale, and normal-user value boundaries.
-- **Local API authentication.** Revisit loopback API authentication only with an explicit threat
-  model and UI/CLI handshake design; remote-control device authentication is a separate concern.
 
 ## ACP Wait-list
 
@@ -112,7 +108,7 @@ These are capabilities AgentDeck implements above ACP, or has deliberately defer
 pinned adapter contract is missing or unverified. An adapter release is a reason to recheck the
 capability; it is not by itself authority to remove the fallback or ship the deferred feature.
 
-- **Steering.** The pinned Claude 0.75.1 and Codex 1.10.0 adapters advertise
+- **Steering.** The pinned Claude 0.75.1 and Codex 1.12.0 adapters advertise
   `_session/steering`, and AgentDeck uses it. Codex 1.12.0 still starts a detached turn when a steer
   arrives idle and ignores AgentDeck's `promptRequired` metadata, so the packaged steering patch
   remains necessary until upstream advertises the same no-consumption contract.
@@ -122,9 +118,9 @@ capability; it is not by itself authority to remove the fallback or ship the def
   from Steer.
 - **Internal actions without MCP.** AgentDeck's fifteen coordination actions remain on its scoped,
   authenticated HTTP MCP server. `migrate-internal-actions-from-mcp.md` is paused until packaged
-  Codex/ACP exposes a narrowly scoped direct transport reachable under the default sandbox. Codex
-  ACP 1.10.0 still advertises ACP MCP transport unsupported and HTTP supported, so this bump does
-  not clear the gate.
+  Codex/ACP exposes a narrowly scoped direct transport reachable under the default sandbox. The
+  pinned Codex ACP 1.12.0 still advertises ACP MCP transport unsupported and HTTP supported, so the
+  gate stays closed.
 - **Semantic agent wake.** Mail and task activation use a short, host-generated `session/prompt`
   because ACP exposes no portable notification that wakes an idle model. Replace this bridge only
   if an adapter advertises a semantic wake capability; steering is not that capability.
@@ -144,15 +140,8 @@ capability; it is not by itself authority to remove the fallback or ship the def
   proven portable replacement.
 - **Codex executable authority.** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
   pinned private Codex executable and the assembled tree proves there is exactly one Codex at the
-  pinned compatible version. `adopt-modern-codex-acp-capabilities.md` moves the adapter/CLI pair to
-  1.12.0/0.154.0 without weakening that rule; explicit `CODEX_PATH` overrides remain supported.
-- **Reasoning, plans, fork, subagents and background tasks are not ACP-blocked.** Current Codex ACP
-  emits reasoning and plans, negotiates native child sessions, exposes background-task lifecycle and
-  targeted stop, and implements `session/fork`. `adopt-modern-codex-acp-capabilities.md` adopts
-  reasoning, child sessions, background tasks and fork through the normalized runtime. Plan updates
-  are intentionally deferred because they require non-free normalized state, retention and UI work,
-  not because ACP lacks them. AgentDeck's durable tasks and pipelines remain separate control planes.
-  Provider management, provider recommendations and session goals are outside that change.
+  pinned compatible version (currently adapter/CLI 1.12.0/0.154.0). Keep that rule on every bump;
+  explicit `CODEX_PATH` overrides remain supported.
 
 ## Known things to improve
 
@@ -160,15 +149,14 @@ These describe incomplete or deliberately limited shipped behavior. Their owning
 the authority; move an item to ready changes only after its exact requirements and acceptance checks
 are clear.
 
-- **Local API authentication.** The loopback API currently relies on same-machine trust. Revisit a
-  token or browser/UI handshake only if the security benefit outweighs its setup and compatibility
-  cost.
-- **Child-process environment.** Agent processes currently inherit the full environment except for
-  backend strip keys. Revisit an allowlist only if it can preserve required provider compatibility.
-- **Chat history fidelity.** Make replayed streaming deltas match live deltas; prevent overlapping
-  transcript reloads from winning out of order; show initial-load errors.
-- **Archive and tracking usability.** Add UI pagination; refresh visible files/commands without
-  stale-request overwrite; and let hook-only activity update recency.
+- **Same-machine trust boundary.** The loopback API relies on same-machine trust, and agent
+  processes inherit the full environment except for backend strip keys (TS-05 §5). Revisit loopback
+  authentication only with an explicit threat model and UI/CLI handshake design whose benefit
+  outweighs its setup and compatibility cost; remote-control device authentication (FS-20) is a
+  separate concern. Revisit an environment allowlist only if it preserves provider compatibility.
+- **Chat and tracking refresh fidelity.** Make replayed streaming deltas match live deltas; show
+  chat initial-load errors instead of a silent panel (FS-03 §6); refresh visible files/commands
+  without stale-request overwrite; and let hook-only activity update recency.
 - **Cross-turn transcript search.** Turn-document indexing intentionally chooses a small design over
   the more complete segmented model: all query terms and quoted phrases must occur within one turn,
   annotation flush, metadata document, or migrated legacy document. It does not combine a term from
@@ -178,24 +166,20 @@ are clear.
   individual turns or users repeatedly fail to find conversations because their query spans turns;
   those additions otherwise impose more schema, ranking, pagination, and phrase-boundary machinery
   than the observed long-session rewrite problem warrants.
-- **Coordination liveness.** Scope nudge cooldowns to a generation, limit repeated nudges, republish
-  unread counts after janitor expiry, notify only on the first budget breach, and remove duplicate
-  permission notices.
-- **Terminal capability honesty.** Codex works as a chat backend, but its terminal interface is
-  intentionally rejected until a Codex-specific interactive-CLI hook/flag path is verified; terminal
-  agents are not messageable for the same reason. Also either add an optional driver picker or stop
-  advertising unreachable drivers; implement or retire the planned tab cap; and bound aggregate
-  shutdown grace across multiple agents.
+- **Coordination notice hygiene.** Republish unread counts after janitor expiry, notify only on the
+  first budget breach, and remove the duplicate waiting-input/permission notices (FS-06 §6).
+- **Terminal and backend loose ends.** Either add an optional terminal driver picker or stop
+  advertising unreachable drivers; implement or retire the planned terminal tab cap (FS-07); make
+  OpenCode/OpenHands executable overrides actually launch and give them missing/old-CLI guidance
+  like Claude's (FS-09 §6). Codex terminal rejection is intentional (FS-07 §6), not a gap.
 - **Federation UI and watches.** Expose custom roots/profiles, refresh the effective view after
   source events, register prompt watches after binding, and clear preview consent on project change.
-- **Backend launch diagnostics.** Use executable overrides consistently, bound ACP readiness,
-  and provide provider-specific missing/old CLI guidance.
-- **HTTP compatibility.** Decide and specify how mixed legacy error envelopes should converge.
+- **HTTP API contract.** Decide how mixed legacy error envelopes converge, and define shared JSON
+  request-body limits with a structured over-limit error before enforcing them (TS-03 §5).
 - **Frontend state ownership.** Define Zustand/React Query ownership and mutation-error behavior
   before broad frontend refactors.
-- **Lifecycle and process hardening.** Corroborate process identity, scope crash cleanup by
-  generation, serialize concurrent events, and define/test detached-start pidfile races.
-- **Local filesystem hardening.** Decide whether startup repairs existing descendant modes and
-  whether valid-name role/project files may be symlinks; add adversarial tests for the chosen rules.
-- **HTTP request-size limits.** Define shared JSON request limits and the structured over-limit error
-  before enforcing them.
+- **Process and filesystem hardening.** Corroborate process identity, scope crash cleanup by
+  generation, serialize concurrent events, define/test detached-start pidfile races, and bound
+  aggregate shutdown grace across many agents (`StopAll` stops them sequentially). Decide whether
+  startup repairs existing descendant modes and whether valid-name role/project files may be
+  symlinks (TS-05 §5); add adversarial tests for the chosen rules.
