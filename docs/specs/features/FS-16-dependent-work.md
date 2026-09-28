@@ -357,8 +357,8 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   the agent id as provenance and, if it was still `running`, becomes `interrupted` under R16.
 - **R19** — **Existing lifecycle and archive gates still apply.** Starting a task obeys the
   same rules as any other start: an archived agent or archived project cannot be started into, a
-  stopped agent is resumed only when it satisfies FS-01.R33's wake gates, a pipeline-associated agent
-  is not woken for a task, and a task-started turn resets the messaging turn budget (FS-06.R11–R12)
+  stopped agent is resumed only when it satisfies FS-01.R33's wake gates, pipeline history alone
+  never blocks a task (FS-14.R74), and a task-started turn resets the messaging turn budget (FS-06.R11–R12)
   exactly as an activation turn does. A target that has become ineligible parks the task under R8
   rather than failing silently or retrying forever. Waiting for capacity (R7) is not a lifecycle gate:
   it delays a start, never fails one.

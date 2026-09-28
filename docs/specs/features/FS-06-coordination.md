@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -67,7 +67,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   agent turn gate, commits mail's attempted boundary and the new turn budget before the ACP prompt,
   and completes like an ordinary chat turn. A busy recipient — or one whose exclusive lifecycle
   transition is still in flight — leaves its pre-attempt activation pending; a recipient that now
-  durably fails the chat/interface, archive, project-archive, or pipeline gates retires its
+  durably fails the chat/interface, archive, or project-archive gates retires its
   pre-attempt opportunity; an attempted activation is never replayed.
 - **R11.** Each chat turn has a combined inbound-plus-outbound messaging budget of 15. Sending and
   reading consume it transactionally with the message mutation. The action that would exceed the
@@ -78,16 +78,8 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   also resets cleanly and retains only one current budget row per agent, so a stale higher turn id
   cannot make the first post-restart turn appear exhausted.
 
-- **R29** — A refusal names the real condition and the change that resolves
-  it. When `create_task` or `send_message` cannot reach a stopped agent because R22 holds
-  pipeline-associated agents out of the addressable set, the refusal says that — that the agent
-  exists but is held out while it is associated with a pipeline stage, and that resuming it makes
-  the same call succeed — instead of reporting that no agent matches. The exclusion itself, its
-  shared resolver, and the `after_change` retry class are unchanged; only the message is. The
-  current wording denies the existence of an agent the same caller can share context with in the
-  same turn (FS-15.R17), so a person has to diagnose the divergence and resume the session by hand.
-  How long the exclusion should last after a run ends is a separate, unresolved product decision
-  recorded in the handoff; this requirement does not change it.
+- **R29** — retired 2026-09-28: FS-14.R74 (shipped 2026-09-13) removed R22's pipeline-association
+  exclusion, so the refusal it reworded no longer describes a real condition; superseded by R37.
 
 - **R28** — The per-turn messaging budget is a configured value that defaults
   to 50, not the fixed 15 of R11. This supersedes only R11's number; every other obligation in R11
@@ -155,13 +147,13 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   budget while still updating unread/indicator state transactionally. Messages from the user sender
   follow the normal R6–R10 reading, nudging, indicator, and retention rules.
 - **R22** — **Stopped wakeable agents are addressable.** A stopped chat agent that
-  passes FS-01.R33's wake gates (which exclude archived agents/projects, snapshot-less agents, and
-  pipeline-associated agents) is a valid `send_message` recipient under the same R4 resolution
+  passes FS-01.R33's wake gates (which exclude archived agents/projects and snapshot-less agents)
+  is a valid `send_message` recipient under the same R4 resolution
   order, and `list_agents` includes it: every entry gains an additive `availability` field —
   `"running"` for today's live entries, `"stopped_wakeable"` for these — while the existing `state`
   field keeps the agent's latest durable status (`done` for a stopped agent), so a sender knows
-  delivery implies a wake and its latency. Terminal and pipeline-associated agents remain
-  unaddressable while stopped.
+  delivery implies a wake and its latency. Terminal agents remain unaddressable while stopped. An
+  agent that ran a pipeline stage is not excluded by that history (FS-14.R74).
 - **R23 — superseded 2026-08-21.** The delivery-marker wake policy is replaced by explicit mail
   activation in R24–R27. `delivered_via` remains readable message provenance; it no longer owns
   wake scheduling or retry semantics.
@@ -201,8 +193,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   wake gates, using the same exclusive lifecycle claim and frozen session snapshot as ordinary
   Resume. The durable agent, mailbox, and activation exist independently of a live process; the
   process is started because the claimed activation requires one reasoning turn, not merely because
-  the agent is stopped or has unread mail. Terminal and pipeline-associated stopped agents retain
-  their existing exclusions; an opportunity that becomes excluded after mail was inserted is retired
+  the agent is stopped or has unread mail. Terminal stopped agents retain their existing exclusion; an opportunity that becomes excluded after mail was inserted is retired
   without attempting a wake.
 
 ### 4.2 Durable waking and deferred mail
@@ -253,6 +244,15 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   A missing or failed FYI does not block the intervention or stage progression. Requests needing a
   response may explicitly use waking mail. No separate coordinator inbox/protocol, authority
   transfer, task reopening or acknowledgment gate is introduced.
+
+### 4.3 Pipeline history and recipients
+
+- **R37** (planned) — Historical pipeline association never shapes recipient resolution or its
+  refusals. A stopped agent that ran a pipeline stage resolves, lists and wakes under R22 exactly
+  like any other stopped chat agent. When `create_task` or `send_message` cannot reach such an agent
+  for another reason (no resumable snapshot, archived agent or project), the caller receives that
+  ordinary refusal; it never names a pipeline association or promises that Resume makes the call
+  succeed. Supersedes R29.
 
 ## 5. Acceptance criteria
 
@@ -323,10 +323,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   fails after crossing the attempt boundary retains the unread mail, leaves the agent stopped, and
   re-arms nothing — including after a dashboard restart and for mail inserted in the same second —
   until new mail creates the next opportunity. A stopped agent with a pipeline attempt association
-  is absent from `list_agents`, unresolvable as a recipient, and never woken. *Verify:*
+  resolves as a recipient and is woken like any other (FS-14.R74). *Verify:*
   `internal/server/wake_test.go::TestMailActivationWakesStoppedRecipient`,
   `TestFailedMailWakeRetainsMailAndStopsRetrying`, and
-  `TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
+  `TestStoppedPipelineAgentIsAddressableAndWoken`.
 - **A12** (R22, R24–R27) — A wake whose adapter completes its handshake and is then killed before it
   ever reads its mailbox leaves the mail unread while its attempted activation is retired, and no
   later sweep respawns it. Mail inserted while a wake is in flight gets its own pending activation
@@ -354,17 +354,16 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 - **A15** (R26–R27) — A stopped wakeable recipient is resumed once for a claimed mail
   opportunity and receives one activation; a lost lifecycle race remains pending, while a real wake,
   launch, or provider attempt that fails is not retried after restart. New mail re-arms a later
-  opportunity. Terminal and pipeline-associated stopped agents never start, and a **stopped**
-  recipient that has become terminal, archived, or pipeline-associated retires its already-pending
-  opportunity while retaining unread mail. *Verify:*
+  opportunity. Terminal stopped agents never start, and a **stopped** recipient that has become
+  terminal or archived retires its already-pending opportunity while retaining unread mail.
+  *Verify:*
   `internal/server/activation_test.go::TestStoppedMailActivationResumesOnceAndIsNeverReplayed`,
   `TestFailedStoppedActivationIsNotRetriedAfterRestart`,
-  `TestMailActivationDefersWhileLifecycleClaimIsHeld`,
-  `TestIneligibleMailActivationIsDiscarded`, and
-  `internal/server/wake_test.go::TestStoppedPipelineAgentIsNeverAddressableOrWoken`.
-- **A16** (R22, R24, R27) — The archived-agent, archived-project, and pipeline-association
-  exclusions are wake gates and do not apply to a **running** recipient: a running agent that has
-  run a pipeline stage stays in the addressable set (FS-01.R33) and one new message still produces
+  `TestMailActivationDefersWhileLifecycleClaimIsHeld`, and
+  `TestIneligibleMailActivationIsDiscarded`.
+- **A16** (R22, R24, R27) — The archived-agent and archived-project exclusions are wake gates and
+  do not apply to a **running** recipient, and pipeline history is no gate at all: a running agent
+  that has run a pipeline stage stays in the addressable set (FS-01.R33) and one new message still produces
   exactly one activation turn for it. Only the terminal-interface exclusion (FS-07 §6) discards a
   running recipient's opportunity. *Verify:*
   `internal/server/activation_test.go::TestRunningPipelineAgentStillActivatesForMail` and
@@ -376,12 +375,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   `internal/state/messages_test.go::TestPendingMailActivationsReadsABoundedOldestFirstBatch` and
   `internal/server/activation_test.go::TestMailActivationDefersWhenNoAdmissionSlotIsFree`.
 
-- **A19** (R29) — A `create_task` and a `send_message` aimed at a stopped
-  pipeline-associated agent are each refused with a message naming the pipeline association and the
-  resume that resolves it, keep the `after_change` class, and are accepted once that agent is
-  resumed; an ordinary unknown recipient still reports that no agent matches. —
-  `internal/messaging/pipeline_agent_task_target_test.go` (the committed skipped reproduction,
-  unskipped by the implementation) and `internal/messaging/task_tools_test.go`.
+- **A19** — retired 2026-09-28 with R29; superseded by A26.
 
 - **A18** (R28) — With no configured value, an agent's turn admits 50 combined
   sends and reads and refuses the 51st with the existing breach outcome, warning, and notification;
@@ -389,6 +383,12 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   and negative value each behave exactly as the default. A value changed between turns applies to
   the next turn and does not alter a turn already counting. — `internal/messaging/messaging_test.go`
   and `internal/state` budget tests.
+
+- **A26** (planned; R37) — `create_task` and `send_message` aimed at a stopped chat agent with a
+  pipeline attempt row are accepted, and mail wakes it. The same calls aimed at a stopped agent with
+  a pipeline attempt row but no resumable snapshot are refused with the ordinary no-match outcome,
+  whose message mentions neither a pipeline nor Resume. —
+  `internal/messaging/pipeline_agent_task_target_test.go`.
 
 ## 6. Deviations & open decisions
 
@@ -406,8 +406,10 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   standing owner through assignment or mail, with no automatic inbox/history transfer. No product
   decision remains open; the matching technical delivery contract is complete and planned.
 
-- **Pipeline replacement:** FS-14.R74 replaces R22's permanent exclusion of stopped agents with
-  pipeline history when shipped. A waiting assigned agent resumes its task through TS-10.R29 before
+- **Pipeline replacement:** FS-14.R74 (shipped 2026-09-13) replaced R22's permanent exclusion of
+  stopped agents with pipeline history; R10, R22, R27 and A11/A15/A16 were reconciled on
+  2026-09-28. The residual pipeline-association refusal in `create_task`/`send_message` is dead
+  except for a snapshot-less stage agent, where it wrongly promises Resume; R37 removes it. A waiting assigned agent resumes its task through TS-10.R29 before
   queued mail delivery, and a former run orchestrator becomes ordinarily wakeable after ownership
   ends. Delivery never bypasses an active task's capacity or run-closure boundary.
 
@@ -424,9 +426,9 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   MCP client and fake ACP sessions, but real Claude Code and Codex acceptance of the generated
   per-session HTTP registration and a live `ping`/tool call remains a manual gate. Do not claim
   compatibility for a CLI until that gate passes; implement a stdio proxy if either rejects HTTP.
-- **Confirmed refusal-wording boundary.** R29 changes what a refusal says and nothing about who is
-  addressable: no change to R22's exclusion, its resolver, retry classification, wake behavior, or
-  the context plane's deliberately looser set.
+- **Recipient refusal boundary.** R37 changes only refusal wording for stopped agents with
+  pipeline history: no change to R22's addressable set, its resolver, retry classification, wake
+  behavior, or the context plane's deliberately looser set (FS-15.R17).
 
 - **Confirmed budget boundary.** R28 raises and exposes the per-turn number and changes nothing
   else about coordination: no new tool, no change to recipient resolution, wake, retention,

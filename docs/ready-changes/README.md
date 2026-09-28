@@ -52,6 +52,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 - [`add-mobile-remote-control.md`](add-mobile-remote-control.md) — pair phones over the person's
   tailnet and supervise, answer, redirect and start work from an installable phone web app.
+- [`drop-pipeline-recipient-refusal.md`](drop-pipeline-recipient-refusal.md) — remove the stale
+  "held out while associated with pipeline stage" refusal now that stage agents stay addressable.
 
 ## Paused changes
 

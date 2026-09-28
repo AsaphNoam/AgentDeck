@@ -518,8 +518,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R19.** Empty or whitespace-only prompts are not sent. Invalid JSON or empty prompt bodies at
   the API boundary return `422 validation`; an agent FS-01.R33 cannot wake — an unknown id, a
-  terminal agent, an archived agent, an agent without a resumable snapshot, or a
-  pipeline-associated agent — returns the applicable `404`/typed runtime error.
+  terminal agent, an archived agent, or an agent without a resumable snapshot — returns the
+  applicable `404`/typed runtime error.
 - **R35** — The composer of a stopped chat agent remains an enabled **wake surface**:
   submitting sends the prompt, which wakes the agent per FS-01.R33, and the transcript shows the
   user message plus the ordinary busy progression while the runtime re-attaches (wake adds the

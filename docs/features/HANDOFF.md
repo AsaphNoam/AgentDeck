@@ -29,13 +29,15 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
 - **Work units:** `share-creative-workspace-layout.md` is in progress (see Active change).
-  `rename-product-to-deckhand.md` and `add-mobile-remote-control.md` are Waiting to
-  start. `migrate-internal-actions-from-mcp.md` stays
+  `rename-product-to-deckhand.md`, `add-mobile-remote-control.md` and
+  `drop-pipeline-recipient-refusal.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
-  entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
+  entries are available. The unaddressable-pipeline-agent idea was already shipped by FS-14.R74
+  (`8d8ca6e`); on 2026-09-28 its stale FS-01/03/06/14/16 and TS-04 text was reconciled and the
+  leftover refusal became `drop-pipeline-recipient-refusal.md` (FS-06.R37/A26, TS-04.R67).
   The shared creative-workspace scope was approved 2026-09-28 and promoted to
   `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. Implementation
   is now active; the design scope is settled.
@@ -100,7 +102,8 @@ unreviewed on the operator's explicit decision. Owed: the credentialed Claude an
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
 **Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
-`/work` may take `share-creative-workspace-layout`, `rename-product-to-deckhand` or `add-mobile-remote-control`;
+`/work` may take `share-creative-workspace-layout`, `rename-product-to-deckhand`, `add-mobile-remote-control`
+or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input

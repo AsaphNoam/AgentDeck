@@ -144,10 +144,8 @@ orphaned processes.
   live identity row, no `config_refresh` — and then delivers the prompt in the woken session,
   instead of returning the non-running error. The wake gates are exactly R10's shipped resume gates
   — the agent is not archived, its project is not archived (a missing project definition does not
-  block, matching FS-05.R34), a persisted session snapshot exists, and the interface is chat —
-  plus one wake-only exclusion: an agent with a pipeline attempt association (FS-14/TS-09) is never
-  woken by a message, because the pipeline state machine deliberately stopped it; the pipeline
-  itself and explicit Resume (R10, unchanged) remain the only ways to revive such an agent.
+  block, matching FS-05.R34), a persisted session snapshot exists, and the interface is chat. An
+  agent's pipeline history is not a wake gate (FS-14.R74).
   Explicit Stop (R6) therefore acts as a lightweight sleep for a chat conversation: any later
   message revives it, and Stop remains the way a person reclaims an idle agent's process memory. A
   failed wake surfaces the applicable typed resume error (R25), leaves the agent stopped, and tears
@@ -311,8 +309,9 @@ transitions:
   *Verify:* `CardContextMenu` component tests and the FS-12.A8 source guard.
 - **A17** (R33) — A launched-then-stopped fake-ACP chat agent receives a prompt: the
   agent resumes (running row restored, same `agent_id`, frozen snapshot values reapplied) and the
-  prompt's turn streams normally. An individually archived agent, an agent with no snapshot, and a
-  stopped agent with a pipeline attempt association keep their existing rejections; a wake whose
+  prompt's turn streams normally, including for a stopped agent with a pipeline attempt
+  association. An individually archived agent and an agent with no snapshot keep their existing
+  rejections; a wake whose
   resume stage fails returns the typed resume error with teardown of that wake's artifacts; and
   simultaneous prompt, mail, and explicit-resume wakes on one agent produce exactly one process,
   conflict errors for the losers, and an intact winner registration (working hook token, MCP
@@ -358,8 +357,9 @@ transitions:
 
 ## 6. Deviations & open decisions
 
-- **Pipeline replacement:** FS-14.R74 replaces R33's historical pipeline-association wake veto
-  with current ownership when the task-backed pipeline ships. TS-10.R28–R30 route waits and resumes
+- **Pipeline replacement:** FS-14.R74 (shipped 2026-09-13) replaced R33's historical
+  pipeline-association wake veto with current ownership; R33 and A17 were reconciled on
+  2026-09-28. TS-10.R28–R30 route waits and resumes
   through existing lifecycle seams; TS-10.R32 adds a generation/turn-guarded cancellation call for
   borrowed task turns. Normal identity, snapshot, archive, project and orphan checks remain.
 

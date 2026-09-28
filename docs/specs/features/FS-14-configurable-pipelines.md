@@ -1016,8 +1016,8 @@ The shipped first version deliberately keeps these product boundaries:
   across a Retry, no workspace isolation for a stage or its delegates, and no change to how a run's
   outcome is decided — those remain as §6 already records them. R54 covers only a wait AgentDeck is
   itself holding; detecting a stage agent that has gone quiet for any other reason stays an open
-  product decision, as does how long a stopped agent remains unaddressable after its stage
-  (FS-06.R29).
+  product decision. How long a stopped stage agent stays unaddressable was settled by R74: its
+  pipeline history never excludes it.
 
 - **Confirmed stage-permission boundary.** R52 states the FS-03.R40 carve-out in pipeline terms and
   adds nothing else: no per-template, per-run, or per-stage autonomy setting, no change to what a

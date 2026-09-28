@@ -402,8 +402,8 @@ contract (INV §11).
 
 **R26 — Messaging addresses and wakes stopped wakeable agents through one helper.**
 Recipient resolution and `list_agents` draw from a single shared addressable-set query: running
-chat agents plus stopped chat agents passing FS-01.R33's wake gates (which exclude any agent with
-a pipeline attempt association via the existing `PipelineAssociationForAgent` seam). "Single" is
+chat agents plus stopped chat agents passing FS-01.R33's wake gates (pipeline attempt history is
+not a gate, FS-14.R74). "Single" is
 literal — **one** statement over **one** SQLite snapshot, with each row carrying its own
 availability. Reading the two halves as two statements let a Stop landing between them return the
 agent as running and again as stopped-wakeable, duplicating it in `list_agents` and making
@@ -813,6 +813,13 @@ patches, line counts or completeness and never replaces ordinary ACP diffs. Dupl
 malformed, unavailable or unmatched reports are ignored with bounded diagnostics. The 1.11
 standalone MCP elicitation fix is consumed through the existing permission lifecycle; AgentDeck adds
 no provider-specific elicitation form.
+
+**R67 `(planned)` — Recipient refusals derive from the addressable-set resolver alone.** When
+`send_message` or `create_task` resolution against R26's addressable set returns not-found, the
+tool returns the ordinary `recipient_not_found` outcome and wording. The refusal path performs no
+pipeline-association lookup and no second resolution over the context-recipient set; the special
+pipeline-stage wording is removed (FS-06.R37). Ambiguity, retry classification and the context
+plane's resolver are unchanged.
 
 ## 3. Interfaces & data shapes
 
