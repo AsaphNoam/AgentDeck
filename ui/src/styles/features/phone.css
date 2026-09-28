@@ -1,4 +1,9 @@
 @layer ad-features {
+/* The phone has no desktop 1024px floor (TS-08.R73). */
+html {
+  min-width: 0;
+}
+
 body {
   min-height: 100dvh;
   -webkit-text-size-adjust: 100%;

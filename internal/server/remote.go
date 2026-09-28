@@ -16,6 +16,10 @@ import (
 // (FS-20.R1, FS-00.R16).
 const remoteHostname = "agentdeck"
 
+// devRemoteNodeFactory is set only by the dev-tagged remote_dev.go, to drive
+// the phone app locally without a tailnet.
+var devRemoteNodeFactory func() (remote.Node, error)
+
 // remoteView is the GET /api/remote and remote_update shape (TS-13 §3).
 type remoteView struct {
 	remote.Status

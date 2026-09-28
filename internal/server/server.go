@@ -310,6 +310,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	s.newRemoteNode = func() (remote.Node, error) {
 		return remote.NewTSNetNode(filepath.Join(cfgStore.Home(), "remote", "tailscale"), remoteHostname, log)
 	}
+	if devRemoteNodeFactory != nil {
+		s.newRemoteNode = devRemoteNodeFactory
+	}
 	s.remoteDevices = newRemoteDevices()
 	s.remotePairing = &remotePairing{failures: map[string]*peerFailures{}}
 	s.keepAwake = remote.NewKeepAwake(nil)
