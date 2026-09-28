@@ -797,7 +797,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
 
 ### 2.11 Shared creative-workspace layout and finish
 
-- **R74 (planned) — Shared composition has one owner, independent of appearance.** Promote the
+- **R74 — Shared composition has one owner, independent of appearance.** Promote the
   approved Studio composition into the appropriate `ad-features` styles and repeated construction
   into `ad-components`; shared semantic values remain in `tokens.css`. Core renders the complete
   upgraded layout with no skin marker. Remove superseded layout/type-scale/radius overrides from
@@ -808,7 +808,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   components on appearance. This supersedes R65's instruction to keep the other layouts intact and
   R66's unchanged-Core/Sky-geometry clause, not R9's extensible future-skin seam (FS-12.R52/R56–R57;
   INV §2/§10/§13).
-- **R75 (planned) — Card and composer geometry is content-driven inside existing bounds.** The
+- **R75 — Card and composer geometry is content-driven inside existing bounds.** The
   expanded card explicitly allocates a content-sized header and `minmax(0, 1fr)` conversation
   region within its existing fixed height; spare height never stretches implicit header rows.
   Preserve R41/R45's one-track grid, persisted columns/gap, scroll ownership and neighbors.
@@ -818,7 +818,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   are owned by the existing card/primitive styles. Remove empty decorative indicator space without
   removing real mail/sent content or handlers. All reusable values use existing semantic tokens,
   extending the public token contract only for a genuinely missing role (FS-12.R53; INV §2/§13).
-- **R76 (planned) — Agent and Tasks polish uses existing feature composition, not replacements.**
+- **R76 — Agent and Tasks polish uses existing feature composition, not replacements.**
   `agent.css` owns the compact identity/runtime/context header, tabs, prose measure and aligned
   composer. Technical blocks, file-viewer expansion and container-query annotation docking retain
   R53/R57's layout/scroll behavior. Unsupported live-settings content leaves no decorative frame;
@@ -829,13 +829,13 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   rather than restoring prototype fields or inventing task semantics. Base feature selectors may
   address their owned classes; skin selectors continue to use only public hooks. Register/version
   a new hook only if an actual skin consumer needs it (FS-12.R54–R55; INV §8/§13).
-- **R77 (planned) — Project tabs keep one navigation projection and construction.** Refine existing
+- **R77 — Project tabs keep one navigation projection and construction.** Refine existing
   `ActiveProjectNav`/`shell.css`, using the shared text font, restrained tab geometry and accessible
   selected/hover/focus treatments. Retain R44's catalog/store projection, alphabetical order,
   five-link/current-project rule, overflow disclosure and single-row desktop fit. Project RGB stays
   the existing exact inline-data exception; no independent query, browser measurement algorithm,
   route, state, storage or overflow implementation is added (FS-12.R58; INV §2/§8/§13).
-- **R78 (planned) — Badge motion is state-driven CSS, not lifecycle bookkeeping.** Use the existing
+- **R78 — Badge motion is state-driven CSS, not lifecycle bookkeeping.** Use the existing
   `StateBadge`/`Badge` construction, semantic state colors and indicator. Busy receives approximately
   2.4s smooth cycles; error and `waiting_input` approximately 1.2s. Animate indicator/emphasis
   opacity without hiding text, changing layout or moving the card. Scope this recurring effect to
@@ -849,7 +849,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   This is explicitly sustained state indication under FS-12.R59, not the workflow's transition-only
   lifecycle celebration; reload in a live state may pulse. Add no motion dependency. Existing busy
   indicator animation is replaced, not stacked with a second pulse (INV §8/§13).
-- **R79 (planned) — Completion proves shared geometry and finish, not just recoloring.** Extend the
+- **R79 — Completion proves shared geometry and finish, not just recoloring.** Extend the
   existing deterministic matrix only for missing FS-12.A26–A31 cases. Matched content and confirmed
   1024px/wider viewports must show the common layout and palette-specific appearance; compare
   desaturated geometry plus normal-color depth/status legibility. Record revision, actual viewport,

@@ -1,6 +1,6 @@
 # Finish and share the creative-workspace layout
 
-**State:** In progress
+**State:** Finished
 **Why:** Operator requested Figma/Studio parity and the improved layout across all appearances on
 2026-09-28, added active-project tabs and prominent paced status badges, then approved the scope.
 **Relevant requirements:** FS-12.R52–R59/A26–A31; TS-08.R74–R79; INV §2/§8/§10/§13/§17.
@@ -53,7 +53,7 @@ revision, viewport and route/state context.
 
 ## Waiting on
 
-Implementation and automated closure are committed. The operator approved the remaining checks;
-browser Send/Cancel now passes in all appearances. Reduced-motion verification needs the Mac
-unlocked for System Settings because macOS refused the direct preference write. See the live handoff and the
-[checkpoint evidence](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).
+Nothing. Implementation and closure finished 2026-09-28. Browser Send/Cancel passes in all
+appearances. Actual system Reduce Motion exposed a fallback specificity defect; the corrected
+fallback passes in all appearances and the system setting was restored off. See the live handoff and the
+[implementation evidence](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).

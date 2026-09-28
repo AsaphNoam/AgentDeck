@@ -18,7 +18,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `share-creative-workspace-layout` — in progress.
+- **Active change:** `add-mobile-remote-control` — in progress (slice plan under Active change).
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -26,10 +26,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `add-studio-skin` against `e474d8a..1d78e1d` and `complete-studio-composition` against
   `9ae10ee..4bb5b2e`; `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
+  `share-creative-workspace-layout` finished 2026-09-28 and awaits `/review`; its substantive
+  commits are `0b31c9a`, `ddab692` and the closure commit named
+  `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
+  Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `share-creative-workspace-layout.md` is in progress (see Active change).
-  `rename-product-to-deckhand.md`, `add-mobile-remote-control.md` and
+- **Work units:** `add-mobile-remote-control.md` is in progress (see Active change).
+  `share-creative-workspace-layout.md` is Finished. `rename-product-to-deckhand.md` and
   `drop-pipeline-recipient-refusal.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -40,9 +44,6 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-  The shared creative-workspace scope was approved 2026-09-28 and promoted to
-  `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. Implementation
-  is now active; the design scope is settled.
 - **Open findings:** BR-6's investigation unit (four findings), in
   **Review findings**. The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
@@ -54,31 +55,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `share-creative-workspace-layout` — in progress (2026-09-28).
-
-Implementation is committed in `f79fb97..ddab692`; generated embed is current. Shared
-composition, content-sized card headers/actions, bounded prose, Tasks rhythm, project tabs
-and state pulses are implemented. Full UI suite passes (482 passed/3 existing skips),
-style contract and both `make test` variants pass, and final `make dist` passes.
-Matched matrix geometry is identical in all three appearances at confirmed 1024×900 and
-1440×1000. Populated built dashboard, active/archive chat, Tasks, Pipelines and Settings
-were compared in all appearances at both sizes; no horizontal page overflow or material
-static visual issue was found. File viewer/annotation docking and staged incapable runtime
-controls were also inspected. Density extremes, pointer drag, Collapse, project overflow
-keyboard focus, paced pulses and waiting→idle transitions were exercised.
-Approved follow-up: real-browser Send/Cancel passes in all three appearances on the isolated
-fake diagram session at 1280×720; both action heights remain 36px and each turn settles.
-Remaining closure: reduced-motion verification. The operator approved both checks, but macOS
-refuses the direct preference write and Computer Use reports the Mac locked. An unlock request
-is pending. The Reduce Motion preference remains absent and unchanged. Keep this change in
-progress; acceptance remains planned.
-Detailed evidence and remaining gates:
-[`implementation-share-creative-workspace-2026-09-28.md`](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).
-Isolated app home `/private/tmp/agentdeck-render-share-creative-20260928`, loopback 4528;
-matrix dev server 5181. Final build is running, Core preference restored. Resume with the
-pending Mac unlock below, finish reduced motion, then reconcile FS-12.R52–R59/A26–A31 and
-TS-08.R74–R79, finish the ready change and add this substantive range to review without
-replacing the older units. No older Studio acceptance debt is closed by this work.
+**Change:** `add-mobile-remote-control` — in progress (2026-09-28). Slice plan and progress live in
+the change file's **Progress** section. Current slice: 1 (persistence + subsystem skeleton).
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -104,8 +82,9 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/review` may take `add-studio-skin` or `complete-studio-composition`.
-`/work` may take `share-creative-workspace-layout`, `rename-product-to-deckhand`, `add-mobile-remote-control`
+**Available by role:** `/review` may take `add-studio-skin`, `complete-studio-composition` or
+`share-creative-workspace-layout`.
+`/work` may take `rename-product-to-deckhand`, `add-mobile-remote-control`
 or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -119,10 +98,8 @@ or `drop-pipeline-recipient-refusal`;
 
 ## Blocked on human
 
-- Shared creative-workspace closure: unlock the Mac for the approved temporary Reduce Motion
-  System Settings check and restoration. Authorization was given; direct `defaults write` fails
-  with “Could not write domain”, while Computer Use reports the Mac locked. Preference remains
-  originally absent. Approved fake-session Send/Cancel checks pass in all appearances.
+None for shared creative-workspace implementation. Its approved system check passed after
+correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 

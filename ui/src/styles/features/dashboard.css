@@ -440,7 +440,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-card .state-badge .ad-badge-indicator {
+  .agent-card[data-state="busy"] .state-badge.busy .ad-badge-indicator,
+  .agent-card[data-state="error"] .state-badge.error .ad-badge-indicator,
+  .agent-card[data-state="waiting_input"] .state-badge.waiting_input .ad-badge-indicator {
     animation: none;
   }
 }

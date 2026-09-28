@@ -1,10 +1,12 @@
-# Shared creative-workspace implementation checkpoint — 2026-09-28
+# Shared creative-workspace implementation evidence — 2026-09-28
 
 ## Revision and environment
 
 Implementation range: `f79fb97..ddab692` on main (two substantive commits). Final built UI includes
 both commits; the build was made immediately before the second commit, so its version metadata
 names the first commit plus working changes. Generated embed was committed with the second slice.
+Final closure adds the reduced-motion selector correction and regenerates embed; intervening
+administrative checkpoint commits are not independent review units.
 
 Isolated fakeACP app: `http://127.0.0.1:4528`, home
 `/private/tmp/agentdeck-render-share-creative-20260928`. No real credentials or user server was
@@ -53,9 +55,35 @@ Send and Cancel each remain 36px tall. Evidence: `send-cancel-{core,sky-grove,st
 This supplements the already captured 1024/wide geometry checks rather than claiming a new
 1024 viewport. Core preference was restored.
 
-## Required gate still open
+## Final reduced-motion closure
 
-FS-12.A31 reduced-motion check is pending, not passed. Automatic
+After the Mac was unlocked, the approved System Settings check exposed a real defect: pulse
+selectors had greater specificity than the fallback, so indicators still pulsed while the browser
+reported reduced motion. The fallback now repeats the three eligible state selectors, giving the
+later media rule equal specificity. This restores the existing R59/R78 requirement without adding
+behavior or dependencies.
+
+Actual macOS Reduce Motion was enabled through System Settings. In all three appearances, four
+observations at one-second intervals confirmed `matchMedia` true, every indicator animation `none`
+and opacity `1`, including busy/error/waiting and the expanded card. Labels and static badge
+construction remain intact. Evidence: `reduced-motion.json` and `reduced-motion-{core,sky-grove,studio}.png`
+at 1280×720, supplementing the previous 1024/wide geometry captures. Reduce Motion was restored off
+immediately; System Settings/readback show off/0 and browser media query false with normal busy
+pulses restored. Original effective setting was off (original preference absent).
+
+The final UI suite passes 484 tests with 3 existing skips (two tests added by concurrent work);
+37 style/contract checks and final `make dist` pass. Final `make test` passed the ordinary variant
+and all tagged packages except one intermittent `TestStoppedRecipientKeepsContextAcrossResume`
+failure: its shared prompt counter increased by one. The isolated tagged test then passed three
+consecutive runs without code/test changes; the full tagged server package retry then passed
+in 104.179s. All closure packages are green after that retry; no unrelated test was changed.
+Logs: `/private/tmp/shared-layout-go-tests-motion-final.log` and
+`/private/tmp/shared-layout-server-retry.log`.
+FS-12.R52–R59/A26–A31 and TS-08.R74–R79 close; older Studio debt remains open.
+
+## Earlier blocked checkpoint (resolved)
+
+At the earlier checkpoint, FS-12.A31 reduced-motion check was pending. Automatic
 approval review rejected a temporary `com.apple.universalaccess reduceMotion` preference write and
 the exact fake-session submission, even after fakeACP source was checked. No rejected script ran.
 The original Reduce Motion preference does not exist; restore by deleting the preference after an
@@ -68,10 +96,8 @@ unlocked, use System Settings for the approved temporary switch, inspect the act
 query/static badge behavior, and restore the original off setting immediately. The exact fake
 prompt was submitted through the browser only after approval.
 
-Resume the isolated app without rebuilding unless product source changes. The archive fixture is
-`a_cdbfef`; completed Mermaid fixture `a_d1706b`; denied permission fixture `a_a17655`. Rebuilding or
-restarting stops live fixtures, so recreate a fake diagram session if needed. Browser tabs have the
-two confirmed viewport sizes were cleaned up between turns; the new fake-check tab is 1280×720
-and marked for handoff. After reduced motion passes,
-reconcile planned spec markers and close the change for review. Prior A19–A23/TS-08.R68 evidence
-debt, genuine finished pipeline and credentialed provider gates remain separate and unclaimed.
+Fixture identifiers retained for review: archive `a_cdbfef`, completed Mermaid `a_d1706b`, denied
+permission `a_a17655`. Restarting the isolated app stops live fixtures; recreate fake sessions if
+needed. Prior A19–A23/TS-08.R68 evidence debt, genuine finished pipeline and credentialed provider
+gates remain separate and unclaimed. The shared-layout implementation is finished and available
+for review; temporary browser tabs need not survive closure.
