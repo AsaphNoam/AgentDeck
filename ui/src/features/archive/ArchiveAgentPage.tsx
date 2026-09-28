@@ -67,7 +67,6 @@ export function ArchiveAgentPage() {
         <div data-slot="identity">
           <h1>{archivedName}</h1>
           {(project || backend || model || effort) && <span>{[project, [backend, model, effort, fast ? "Fast mode" : "Normal speed"].filter(Boolean).join(" · ")].filter(Boolean).join(" · ")}</span>}
-          {(project || backend || model || effort) && <br />}
           <span className="archive-readonly-label">
             Archived · read-only{createdAt && <> · <time dateTime={createdAt}>{formatTimestamp(createdAt)}</time></>}
           </span>

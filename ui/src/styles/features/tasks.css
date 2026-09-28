@@ -44,7 +44,14 @@
 
 .task-create,
 .task-signal {
+  display: grid;
+  gap: var(--ad-space-4);
   padding: var(--ad-space-6);
+}
+
+.task-signal {
+  max-width: 28rem;
+  width: 100%;
 }
 
 .task-create h2,

@@ -59,6 +59,7 @@
   }
 
   .visual-matrix-agent-grid {
+    align-items: start;
     display: grid;
     gap: var(--ad-space-3);
     grid-template-columns: repeat(3, minmax(0, 1fr));

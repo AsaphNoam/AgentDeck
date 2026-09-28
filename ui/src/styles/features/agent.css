@@ -51,6 +51,15 @@
   overflow-wrap: anywhere;
 }
 
+.chat-panel[data-state="archived"] .chat-header [data-slot="identity"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ad-space-1);
+}
+
+.chat-header .resume-btn {
+  justify-self: end;
+}
+
 .chat-header span:not(.context-bar span) {
   color: var(--ad-text-muted);
   font-family: var(--ad-font-mono);
@@ -349,8 +358,18 @@
 .message {
   font-size: 0.98rem;
   line-height: 1.65;
-  max-width: 76ch;
+  max-width: 52rem;
   width: min(100%, 52rem);
+  margin-inline: auto;
+}
+
+.assistant-message:has(pre) {
+  max-width: none;
+  width: 100%;
+}
+
+.assistant-message > :is(p, ul, ol, h1, h2, h3, h4, blockquote) {
+  max-width: 52rem;
   margin-inline: auto;
 }
 
@@ -988,9 +1007,9 @@
 
 /* Send stays the primary action; the situational ones read as secondary so the
    safe default is not visually outranked by them. */
-.composer-steer,
-.composer-withdraw,
-.composer-cancel {
+.composer .composer-steer,
+.composer .composer-withdraw,
+.composer .composer-cancel {
   background: var(--ad-surface-raised);
 }
 

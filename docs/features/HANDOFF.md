@@ -28,8 +28,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `share-creative-workspace-layout.md`, `rename-product-to-deckhand.md` and
-  `add-mobile-remote-control.md` are Waiting to
+- **Work units:** `share-creative-workspace-layout.md` is in progress (see Active change).
+  `rename-product-to-deckhand.md` and `add-mobile-remote-control.md` are Waiting to
   start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker. Queue hygiene: `bump-pinned-acp-adapters.md` reads
   `State: Finished` but is still in `docs/ready-changes/`; left in place rather than deleted unasked.
@@ -37,8 +37,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available; the permanently unaddressable pipeline agent needs `/design-feature`.
   The shared creative-workspace scope was approved 2026-09-28 and promoted to
-  `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. It is Waiting
-  to start, not active; no product code changed during design.
+  `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. Implementation
+  is now active; the design scope is settled.
 - **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -68,6 +68,13 @@ Final populated built-route, wide, density/motion/reduced-motion gates remain ac
 Evidence: `/private/tmp/shared-layout-evidence/`; isolated app home
 `/private/tmp/agentdeck-render-share-creative-20260928`, loopback port 4528. UI dev
 matrix at 5181. `make dist` is rebuilding; source checkpoint precedes rendered closure.
+Final rendered corrections: prefix-preserving project title truncation, content-sized
+secondary composer actions, 24px Tasks inset/heading rhythm with subordinate signal form,
+technical blocks outside the prose cap, stacked controls at the narrowest density, and
+no empty archived-header line. Final `make dist` and UI suite pass (482 passed/3 existing
+skips); `make test` passed both Go variants. Populated final-build route checks remain
+active. Reduce-motion gate awaits the explicit system-setting approval requested after
+automatic approval review rejected the temporary preference change.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating

@@ -143,6 +143,11 @@
   white-space: nowrap;
 }
 
+.project-nav > a > span {
+  display: block;
+  line-height: 30px;
+}
+
 .project-nav > a:hover > span,
 .project-nav > a.active > span,
 .project-nav-overflow > button:hover,

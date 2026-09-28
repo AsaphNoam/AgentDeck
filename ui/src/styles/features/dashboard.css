@@ -201,6 +201,17 @@
   }
 }
 
+@container agent-card (max-width: 180px) {
+  .agent-card-header-actions {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  .agent-card-header-actions > [data-slot="context"] {
+    justify-self: stretch;
+  }
+}
+
 .dashboard-chat-pane {
   background: var(--ad-surface-raised);
   border-top: var(--ad-border-thin) solid var(--ad-border-default);
