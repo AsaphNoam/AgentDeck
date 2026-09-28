@@ -41,7 +41,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 investigated; findings await `/fix`.
+- **Bug reports:** BR-6 investigated; findings await `/fix`. BR-7 (dashboard dead in the
+  operator's normal Chrome profile with "cannot read properties of undefined (reading
+  'startTime')"; incognito works; recurs about a minute after an empty-cache hard reload) is open,
+  cause undetermined. No AgentDeck UI source reads `startTime`; a three-minute clean-profile
+  watch of live pages on 4317/4405/4417 raised no error. Blocked on the full stack (below).
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -87,7 +91,9 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 
 ## Blocked on human
 
-- None.
+- BR-7: the full console stack from the failing normal-profile tab (its file URLs show whether
+  the throw is in `/assets/…` or a `chrome-extension://` script), the page URL, and whether it
+  still fails with extensions disabled.
 
 ## Review findings
 
