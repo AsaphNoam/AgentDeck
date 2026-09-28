@@ -53,4 +53,7 @@ revision, viewport and route/state context.
 
 ## Waiting on
 
-Nothing. Scope approved; implementation started 2026-09-28.
+Implementation and automated closure are committed. Required browser Send/Cancel and reduced-motion
+checks await explicit approval after automatic approval review rejected the fake-session submission
+and temporary system preference change. See the live handoff and the
+[checkpoint evidence](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).

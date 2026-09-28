@@ -54,27 +54,26 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 **Change:** `share-creative-workspace-layout` — in progress (2026-09-28).
 
-Plan: (1) promote shared shell/route composition and skin palette-only geometry;
-(2) finish card/header/composer, agent reading measure and Tasks rhythm; (3) inspect
-matched three-appearance fixtures and populated built routes at confirmed 1024px/wide,
-then run TS-06 closure, generate embed and close for review. Independent source audit
-and shared shell/route styling are delegated; parent owns integration and rendered gates.
-Tree was clean at start. No older Studio acceptance debt is closed by this work.
-Checkpoint: shared styles and card/composer/Tasks implementation are complete; focused
-card/grid/nav/matrix and chat/composer/Tasks checks pass, including missing/staged live
-settings. Style contract passes. Matched matrix shells/cards have identical geometry in
-all three appearances at confirmed 1024×900; expanded long-name fixture header is 98px.
-Final populated built-route, wide, density/motion/reduced-motion gates remain active.
-Evidence: `/private/tmp/shared-layout-evidence/`; isolated app home
-`/private/tmp/agentdeck-render-share-creative-20260928`, loopback port 4528. UI dev
-matrix at 5181. `make dist` is rebuilding; source checkpoint precedes rendered closure.
-Final rendered corrections: prefix-preserving project title truncation, content-sized
-secondary composer actions, 24px Tasks inset/heading rhythm with subordinate signal form,
-technical blocks outside the prose cap, stacked controls at the narrowest density, and
-no empty archived-header line. Final `make dist` and UI suite pass (482 passed/3 existing
-skips); `make test` passed both Go variants. Populated final-build route checks remain
-active. Reduce-motion gate awaits the explicit system-setting approval requested after
-automatic approval review rejected the temporary preference change.
+Implementation is committed in `f79fb97..ddab692`; generated embed is current. Shared
+composition, content-sized card headers/actions, bounded prose, Tasks rhythm, project tabs
+and state pulses are implemented. Full UI suite passes (482 passed/3 existing skips),
+style contract and both `make test` variants pass, and final `make dist` passes.
+Matched matrix geometry is identical in all three appearances at confirmed 1024×900 and
+1440×1000. Populated built dashboard, active/archive chat, Tasks, Pipelines and Settings
+were compared in all appearances at both sizes; no horizontal page overflow or material
+static visual issue was found. File viewer/annotation docking and staged incapable runtime
+controls were also inspected. Density extremes, pointer drag, Collapse, project overflow
+keyboard focus, paced pulses and waiting→idle transitions were exercised.
+Remaining closure: real-browser Send/Cancel and reduced-motion verification await explicit
+approval after automatic approval review rejected those actions. No system preference or
+rejected submission was executed. Keep this change in progress; acceptance remains planned.
+Detailed evidence and remaining gates:
+[`implementation-share-creative-workspace-2026-09-28.md`](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).
+Isolated app home `/private/tmp/agentdeck-render-share-creative-20260928`, loopback 4528;
+matrix dev server 5181. Final build is running, Core preference restored. Resume with the
+pending approvals below, finish the two checks, then reconcile FS-12.R52–R59/A26–A31 and
+TS-08.R74–R79, finish the ready change and add this substantive range to review without
+replacing the older units. No older Studio acceptance debt is closed by this work.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -114,6 +113,11 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 
 ## Blocked on human
 
+- Shared creative-workspace closure: approve temporarily enabling macOS Reduce Motion and
+  restoring its originally absent preference, and sending exactly “Show the fixture diagram.”
+  to the isolated fake session on localhost:4528 with Cancel. Automatic approval review rejected
+  the system preference change and the fake-session submission as lacking explicit authorization.
+  These are required browser gates; all unaffected checks and implementation are complete.
 - BR-7: the full console stack from the failing normal-profile tab (its file URLs show whether
   the throw is in `/assets/…` or a `chrome-extension://` script), the page URL, and whether it
   still fails with extensions disabled.
