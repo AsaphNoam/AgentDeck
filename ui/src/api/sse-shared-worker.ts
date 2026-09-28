@@ -25,6 +25,7 @@ const eventTypes = [
   "pipeline_proposal_update",
   "task_update",
   "config_source_update",
+  "remote_update",
   "ping",
 ];
 

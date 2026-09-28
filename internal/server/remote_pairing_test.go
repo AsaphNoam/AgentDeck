@@ -301,3 +301,10 @@ func (l *lockedWriter) Write(p []byte) (int, error) {
 	defer l.mu.Unlock()
 	return l.w.Write(p)
 }
+
+func TestQRSVGIsSelfContained(t *testing.T) {
+	svg := qrSVG("https://" + testDomain + "/pair#ABCD2345")
+	if !strings.HasPrefix(svg, "<svg ") || !strings.HasSuffix(svg, "</svg>") || !strings.Contains(svg, `d="M`) || strings.Contains(svg, "ABCD2345") {
+		t.Fatalf("qr svg = %.120s…", svg)
+	}
+}

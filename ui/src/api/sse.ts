@@ -1,5 +1,6 @@
 import { getTranscript } from "./client";
 import { QUERY_KEYS, queryClient } from "./config";
+import { REMOTE_QUERY_KEY } from "./remote";
 import { PIPELINE_QUERY_KEYS } from "./pipelines";
 import { TASK_QUERY_KEYS } from "./tasks";
 import type { Config } from "../schemas/config";
@@ -60,6 +61,7 @@ class SseClient {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: REMOTE_QUERY_KEY });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
     this.es.addEventListener("state_update", (event) => this.onStateUpdate(event as MessageEvent<string>));
@@ -75,6 +77,8 @@ class SseClient {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runDetails });
     });
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
+    // Remote-control state is refetched, never trusted from the event (TS-13.R3).
+    this.es.addEventListener("remote_update", () => queryClient.invalidateQueries({ queryKey: REMOTE_QUERY_KEY }));
     this.es.addEventListener("ping", () => {
       this.lastPing = Date.now();
     });

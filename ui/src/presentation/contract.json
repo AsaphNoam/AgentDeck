@@ -445,7 +445,8 @@
         "projects",
         "backends",
         "notifications",
-        "appearance"
+        "appearance",
+        "remote"
       ]
     },
     "config-source": {

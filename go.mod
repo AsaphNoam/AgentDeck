@@ -11,6 +11,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/spf13/cobra v1.10.2
+	rsc.io/qr v0.2.0
 	tailscale.com v1.102.5
 )
 

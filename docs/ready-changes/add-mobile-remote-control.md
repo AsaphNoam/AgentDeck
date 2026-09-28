@@ -127,4 +127,11 @@ Done:
   nudges from `PUT /api/remote`, and a 15 s tick; released on shutdown. Off macOS it never runs
   (`keep_awake_available` false). `pmset -g assertions` manual check still owed.
 
-Next: slice 6 (desktop Remote settings section).
+- **Slice 6** (2026-09-28) — Settings **Remote** tab (`ui/src/features/settings/RemoteEditor.tsx`,
+  `ui/src/api/remote.ts`): disclosure, on/off, each state and repair, pair-a-phone code + QR,
+  allow/decline, device rename/revoke, keep-awake. The QR is rendered server-side as SVG
+  (`qrSVG`, `rsc.io/qr` v0.2.0) and returned as `qr_svg` — no UI QR dependency. `remote_update`
+  joins the shared-worker event allowlist and invalidates `["remote"]`. Embed not yet
+  refreshed (closure `make dist`).
+
+Next: slice 7 (phone app shell).

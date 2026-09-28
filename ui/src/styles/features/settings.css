@@ -598,4 +598,50 @@
   color: var(--ad-text-muted);
   line-height: 1.45;
 }
+
+.remote-status,
+.remote-pairing {
+  display: grid;
+  gap: var(--ad-space-2);
+  margin: 0;
+}
+
+.remote-status code {
+  user-select: all;
+}
+
+.remote-code {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-4);
+}
+
+.remote-qr {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  flex: 0 0 auto;
+  height: 176px;
+  image-rendering: pixelated;
+  width: 176px;
+}
+
+.remote-code-value {
+  font-family: var(--ad-font-mono);
+  font-size: 1.6rem;
+  letter-spacing: 0.2em;
+  margin: 0;
+  user-select: all;
+}
+
+.remote-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--ad-space-2);
+}
+
+.remote-device-meta {
+  color: var(--ad-text-muted);
+  font-size: 0.74rem;
+  margin: 0;
+}
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/agentdeck/agentdeck/internal/remote"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/state"
+	"rsc.io/qr"
 )
 
 // Pairing is a desktop-issued, single-use code claimed atomically; codes and
@@ -187,11 +189,35 @@ func (s *Server) handleCreatePairing(w http.ResponseWriter, _ *http.Request) {
 	s.remotePairing.mu.Lock()
 	s.remotePairing.code = pc
 	s.remotePairing.mu.Unlock()
+	// The code rides in the fragment so it never reaches request logs.
+	qrURL := st.Address + "/pair#" + pc.code
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": pc.id, "code": pc.code, "expires_at": pc.expires.UTC(),
-		// The code rides in the fragment so it never reaches request logs.
-		"qr_url": st.Address + "/pair#" + pc.code,
+		"qr_url": qrURL, "qr_svg": qrSVG(qrURL),
 	})
+}
+
+// qrSVG renders text as a self-contained SVG QR code with a quiet zone, so the
+// desktop needs no QR library. It returns "" if encoding fails.
+func qrSVG(text string) string {
+	code, err := qr.Encode(text, qr.M)
+	if err != nil {
+		return ""
+	}
+	const quiet = 4
+	size := code.Size + 2*quiet
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" shape-rendering="crispEdges">`, size, size)
+	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="#fff"/><path fill="#000" d="`, size, size)
+	for y := 0; y < code.Size; y++ {
+		for x := 0; x < code.Size; x++ {
+			if code.Black(x, y) {
+				fmt.Fprintf(&b, "M%d %dh1v1h-1z", x+quiet, y+quiet)
+			}
+		}
+	}
+	b.WriteString(`"/></svg>`)
+	return b.String()
 }
 
 type pairClaimBody struct {

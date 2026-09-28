@@ -5,6 +5,7 @@ import { BackendsEditor } from "./BackendsEditor";
 import { NotificationsEditor } from "./NotificationsEditor";
 import { AppearanceEditor } from "./AppearanceEditor";
 import { TaskConcurrencyEditor } from "./TaskConcurrencyEditor";
+import { RemoteEditor } from "./RemoteEditor";
 
 export function SettingsPage() {
   return (
@@ -18,6 +19,7 @@ export function SettingsPage() {
           <Tabs.Trigger value="notifications">Notifications</Tabs.Trigger>
           <Tabs.Trigger value="appearance">Appearance</Tabs.Trigger>
           <Tabs.Trigger value="tasks">Tasks</Tabs.Trigger>
+          <Tabs.Trigger value="remote">Remote</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="roles" className="settings-tab-content" data-slot="content">
           <RolesEditor />
@@ -36,6 +38,9 @@ export function SettingsPage() {
         </Tabs.Content>
         <Tabs.Content value="tasks" className="settings-tab-content" data-slot="content">
           <TaskConcurrencyEditor />
+        </Tabs.Content>
+        <Tabs.Content value="remote" className="settings-tab-content" data-slot="content">
+          <RemoteEditor />
         </Tabs.Content>
       </Tabs.Root>
     </div>
