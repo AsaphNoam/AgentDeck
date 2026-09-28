@@ -39,14 +39,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   The shared creative-workspace scope was approved 2026-09-28 and promoted to
   `share-creative-workspace-layout.md`: FS-12.R52–R59/A26–A31 and TS-08.R74–R79. Implementation
   is now active; the design scope is settled.
-- **Open findings:** BR-6's investigation unit (four findings, **Review findings**). The injected-steer lifetime edge case is still named in prose
+- **Open findings:** BR-6's investigation unit (four findings) and BR-7's (one), both in
+  **Review findings**. The injected-steer lifetime edge case is still named in prose
   but was never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
-- **Bug reports:** BR-6 investigated; findings await `/fix`. BR-7 (dashboard dead in the
-  operator's normal Chrome profile with "cannot read properties of undefined (reading
-  'startTime')"; incognito works; recurs about a minute after an empty-cache hard reload) is open,
-  cause undetermined. No AgentDeck UI source reads `startTime`; a three-minute clean-profile
-  watch of live pages on 4317/4405/4417 raised no error. Blocked on the full stack (below).
+- **Bug reports:** BR-6 and BR-7 investigated; findings await `/fix` (**Review findings**).
 - **State:** Automated MCP contract verification is green.
 - **Branch:** `main`.
 
@@ -120,9 +117,6 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
   System Settings check and restoration. Authorization was given; direct `defaults write` fails
   with “Could not write domain”, while Computer Use reports the Mac locked. Preference remains
   originally absent. Approved fake-session Send/Cancel checks pass in all appearances.
-- BR-7: the full console stack from the failing normal-profile tab (its file URLs show whether
-  the throw is in `/assets/…` or a `chrome-extension://` script), the page URL, and whether it
-  still fails with extensions disabled.
 
 ## Review findings
 
@@ -168,6 +162,31 @@ absolute in-directory paths read correctly, so the failures are in which path re
   without the query and the status without the refusal code, so this report could not be tied to a
   link form. Log the refusal code and the requested `path` at `handleFileRead` (local-only log), so
   the next report answers "which link, which boundary".
+
+### BR-7 investigation unit (2026-09-28) — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Report, verbatim: "nothing loads, opening any page does nothing" — began after installing the
+latest release; fine in incognito; clearing site storage did not help; an empty-cache hard reload
+helped for about a minute. Resolved by closing all of the operator's ~5 AgentDeck tabs (separate
+windows). A console error accompanying it came from injected extension code (absent from every
+served AgentDeck asset) and is unrelated. Nothing was logged. Governing items: TS-03.R7, FS-02.A27.
+
+- **Must fix** — confirmed (reproduced); spec defect plus code; INV §1, §16. TS-03.R7's third
+  fallback ("whose shared stream never opens within the liveness window falls back to its own
+  direct `/api/events` connection for the rest of the session") cannot tell a dead worker from a
+  live worker whose server is down. Any AgentDeck restart longer than ~25–30s — an install or
+  upgrade — makes the watchdog (`ui/src/api/sse.ts` `startWatchdog`: `!opened &&
+  !sharedStreamUnavailable`) permanently demote every open tab, since `connect()` reset `opened`
+  on the reap. Five demoted tabs hold five direct streams; with the worker's own stream (restarted
+  by any freshly loaded tab) Chrome's six-per-origin HTTP/1.1 pool is exhausted and every REST
+  request queues forever — the exact failure R7's sharing exists to prevent. Fix: demote only on
+  evidence the worker itself is dead — a live worker reports each failed retry as a port `error`
+  message (`sse-shared-worker.ts` `onerror` broadcast), so any port message proves it alive;
+  keep reconnecting through it through an outage. Amend R7's third fallback to "a worker that sends
+  nothing within the liveness window"; the existing test "demotes a shared worker that never opens
+  instead of reconnecting into it" still holds (silent worker). Regression: the skipped BR-7 test
+  "keeps a live shared worker through a server outage instead of demoting" in
+  `ui/src/api/sse.test.ts` (fails today: two direct streams after a 90s outage).
 
 ## Design consistency notes
 
