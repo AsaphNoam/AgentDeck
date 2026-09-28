@@ -18,7 +18,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `add-mobile-remote-control` — in progress (slice plan under Active change).
+- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28 (see Review units).
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -30,10 +30,12 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   commits are `0b31c9a`, `ddab692` and the closure commit named
   `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
   Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
-  `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
+  `add-mobile-remote-control` finished 2026-09-28 and awaits `/review`: `db23ca9^..HEAD` minus
+  `36e656f` (another unit) and handoff-only commits. Review notes for reversible choices: backend
+  catalog denied on the tailnet (runtime resolved server-side); Tailscale no-logs mode; VAPID
+  `sub` is the project URL; pairing limits 5/code, 10/node/5 min. `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit
   2026-09-10 instruction; it can be added later.
-- **Work units:** `add-mobile-remote-control.md` is in progress (see Active change).
-  `share-creative-workspace-layout.md` is Finished. `rename-product-to-deckhand.md` and
+- **Work units:** `rename-product-to-deckhand.md` and
   `drop-pipeline-recipient-refusal.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
   paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -55,8 +57,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** `add-mobile-remote-control` — in progress (2026-09-28). Slice plan and progress live in
-the change file's **Progress** section. Slices 1–10 committed; next: closure (specs, dist, browser pass).
+None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
+real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
+Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
+./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5).
+Observed pre-existing flake: `TestContextSharingStartsNoModelTurn` under full `go test ./...` load.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -82,10 +87,9 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/review` may take `add-studio-skin`, `complete-studio-composition` or
-`share-creative-workspace-layout`.
-`/work` may take `rename-product-to-deckhand`, `add-mobile-remote-control`
-or `drop-pipeline-recipient-refusal`;
+**Available by role:** `/review` may take `add-studio-skin`, `complete-studio-composition`,
+`share-creative-workspace-layout` or `add-mobile-remote-control`.
+`/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -156,6 +160,14 @@ absolute in-directory paths read correctly, so the failures are in which path re
 
 ## Changelog
 
+- **2026-09-28 — Finish add-mobile-remote-control (INV §2, §4, §5, §8, §10, §14, §15, §16).**
+  Embedded `tsnet` node (Go 1.26.6, `tailscale.com` v1.102.5), tailnet chain with allowlist
+  inventory test, node-bound cookie pairing, shared attention helper for Home and Web Push,
+  keep-awake, desktop Remote tab, and the installable phone app. FS-20 R1–R29/A2–A4/A7 and TS-13
+  (now Current), TS-02.R37, TS-03.R46, TS-05.R23, TS-06.R27, TS-08.R73, FS-00.R18 reconciled.
+  `make test` (both variants), `make dist`, UI 510 passed/3 skipped, focused `-race` on remote
+  paths, and a 390×844 fakeACP browser pass (found and fixed the desktop 1024px floor on the
+  phone) pass. Real-device gates stay owed.
 - **2026-09-28 — Fix BR-7 (INV §1 boundary-derived state; §16 bounded streams).** A worker port
   message now proves worker liveness for the current connection, preventing server outages from
   permanently multiplying per-tab streams. TS-03.R7 reconciled; silent-worker and failed-load

@@ -22,7 +22,12 @@ names; the `DECKHAND_*` environment; a one-time state-directory migration on fir
 `operating-deckhand` skill and retirement of the previously published `operating-agentdeck`
 directory; seeded prompts, tool descriptions, the backend-switch primer and rendered-context error
 strings; UI branding, browser storage keys and the SharedWorker name; README and the non-archived
-documentation set.
+documentation set. Mobile remote control shipped first (2026-09-28), so this also renames its
+surfaces: the tailnet node hostname (`remoteHostname`), the phone app's title, manifest, icon and
+`agentdeck.*` localStorage keys, the **Ask AgentDecker** label and `agentdecker` lookup in
+`ui/src/remote/NewWorkScreen.tsx`, the VAPID `sub` URL, and the Remote settings copy (FS-00.R16,
+FS-18.R14). A renamed node hostname gives the phone a new address, so paired phones re-pair; state
+that in the release notes.
 
 Excluded: any behavior, API shape, schema, or permission change; an `agentdeck` alias or dual-name
 runtime; an in-place `agentdeck update` path onto Deckhand; rewriting historical records under

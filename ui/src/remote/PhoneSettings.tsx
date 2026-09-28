@@ -12,9 +12,12 @@ interface Self {
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-function keyBytes(base64url: string): Uint8Array {
+function keyBytes(base64url: string) {
   const padded = (base64url + "===".slice((base64url.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+  const raw = atob(padded);
+  const bytes = new Uint8Array(new ArrayBuffer(raw.length));
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
 }
 
 const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;

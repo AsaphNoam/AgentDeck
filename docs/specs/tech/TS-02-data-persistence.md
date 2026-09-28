@@ -259,7 +259,7 @@ Core is never inserted into the manifest as if it were a skin id.
 second preference, schema version, SQLite row, launch snapshot, project/session field, or retained
 visual data is introduced (FS-12.R42, TS-08.R61).
 
-**R37 (planned) — Remote control persists paired devices, two preferences, and owned secrets.**
+**R37 — Remote control persists paired devices, two preferences, and owned secrets.**
 A forward-only migration adds `remote_devices`: text `id` primary key, `name`, unique `token_hash`
 (SHA-256), `node_stable_id`, `node_login`, `paired_at`, `last_seen_at`, and nullable
 `push_endpoint`, `push_p256dh`, `push_auth`, integer `push_enabled`, and `push_state`

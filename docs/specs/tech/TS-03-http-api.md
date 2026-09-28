@@ -280,11 +280,11 @@ unreadable-config, or error-envelope semantics. No new route, response field, SS
 asset response is added. The Go/frontend/manifest lockstep regression includes all three
 effective appearances (FS-12.R42/A18, TS-08.R61).
 
-**R46 (planned) — Remote control adds a route family and one SSE event.** A **Remote** family joins
+**R46 — Remote control adds a route family and one SSE event.** A **Remote** family joins
 R5's inventory: loopback-only `GET/PUT /api/remote`, `POST /api/remote/pairings`,
 `POST /api/remote/pairings/{id}/allow|decline`, `GET /api/remote/devices`, and
 `PATCH|DELETE /api/remote/devices/{id}`; tailnet-only `POST /api/remote/pair`,
-`GET /api/remote/pair/{pending_id}`, `GET /api/remote/home`, `PATCH|DELETE /api/remote/self`, and
+`GET /api/remote/pair/{pending_id}`, `GET /api/remote/home`, `GET|PATCH|DELETE /api/remote/self`, and
 `PUT|DELETE /api/remote/self/push`. The loopback stream gains `remote_update` (TS-13.R3); the
 tailnet stream never emits it. On the tailnet listener every existing route is subject to
 TS-13.R5's allowlist and answers `404 remote_route_not_available` when absent from it. All new

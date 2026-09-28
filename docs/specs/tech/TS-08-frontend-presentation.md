@@ -786,7 +786,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   choices stay frontend drafts until the existing start operation freezes them; no template,
   pipeline state machine, run-detail, retention, or transport change is introduced. Focused component
   tests cover request equivalence and recovery; FS-12.A24 owns the rendered gate for R69–R72.
-- **R73 (planned) — The phone app is a separate, phone-first entry.** `ui/remote.html` with
+- **R73 — The phone app is a separate, phone-first entry.** `ui/remote.html` with
   `ui/src/remote/` is a second Vite entry in the same build and embed (TS-13.R14). It has its own
   compact shell designed for phone widths (360–430px), not the desktop shell, skins, or the 1024px
   desktop floor, and it renders with Core tokens only. It reuses `ui/src/api` and the existing

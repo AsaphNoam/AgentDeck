@@ -184,10 +184,13 @@ MCP, steer idle fallback, thought delivery, one native subagent, one background 
 stop, clone/fork with multi-page history, canonical tool name, file report, stop/resume and load. It
 records the exact adapter/CLI versions and cannot be replaced by fake-ACP success (INV §12/§17).
 
-**R27 (planned) — Remote control pins its Tailscale dependency and toolchain.** `tailscale.com` is
+**R27 — Remote control pins its Tailscale dependency and toolchain.** `tailscale.com` is
 required at one exact version, and `go.mod`'s `go` directive rises to that module's minimum (≥ 1.26.6
-as of v1.102.5); CI, release, and documented source toolchains move together. The release binary's
-growth (about 15–22 MiB measured) is accepted. A bump re-verifies the TS-13 evidence surface —
+as of v1.102.5); CI, release, and documented source toolchains move together (CI and release read
+`go-version-file: go.mod`; an older local toolchain switches through `GOTOOLCHAIN=auto`). The
+release binary's growth is accepted: the stripped `sqlite_fts5` build measured 15.9 MB before and
+39.8 MB after (+22.8 MiB, 2026-09-28, with `webpush-go` v1.4.0 and `rsc.io/qr` v0.2.0 also
+pinned). A bump re-verifies the TS-13 evidence surface —
 `ListenTLS` prerequisites, `WhoIs` fields, `StatusWithoutPeers` auth URL, and `Close` behavior —
 before landing. Automated tests exercise the remote chain through a fake listener and fake `WhoIs`
 and never contact a real tailnet or push service; FS-20's manual gates own those.

@@ -95,7 +95,7 @@ export function TaskScreen({ taskId }: { taskId: string }) {
         )}
         {t.state === "dependency_failed" && (
           <>
-            <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: t.arms.map(armInput) }))}>
+            <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: (t.arms ?? []).map(armInput) }))}>
               Re-arm with its prerequisites
             </button>
             <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: [] }))}>
