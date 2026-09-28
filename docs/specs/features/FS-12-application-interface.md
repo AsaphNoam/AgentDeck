@@ -313,6 +313,61 @@ Requirements are user-observable.
   the existing pointer-menu construction across Core, Sky & Grove, and Studio; no new motion,
   context-menu language, route, or transcript behavior is introduced (FS-03.R62–R63).
 
+### 2.12 Shared creative-workspace composition
+
+- **R52 (planned)** — Core, Sky & Grove and Studio share the upgraded creative-workspace
+  composition throughout the shell, Dashboard/project views, agent workspaces, Tasks, Pipelines,
+  Archive, Settings, onboarding and overlays. Switching appearance changes its palette, semantic
+  colors and canvas ornament, not page measures, spacing, hierarchy, card geometry or control
+  alignment. Each retains its recognizable existing color scheme and background treatment;
+  Studio retains its restrained blue/forest-green palette and consistent dots. Route and agent
+  headings use the friendly readable hierarchy of R46 rather than oversized condensed or uppercase
+  technical headings; mono remains available for technical values. This supersedes the old-layout
+  preservation clauses in R42/R46, R2's crisp/asymmetric geometry where inconsistent with this
+  common composition, and A21's requirement that Studio alone be recognizable by layout. It does
+  not remove the appearance system or prevent a future explicitly designed skin from differing.
+- **R53 (planned)** — Agent cards have perceptible but subtle soft depth at rest, a restrained
+  keyline and bounded project/state accents, rather than a nearly flat border or hard offset slab.
+  Name and state lead, preview follows, and metadata remains subordinate without empty indicator
+  bands adding conspicuous gaps. The drag grip reads as a quiet grip, not a dark app-icon button.
+  Collapse and composer actions have intentional compact sizing and alignment: Send/Cancel do not
+  stretch to textarea height. Expanded headers size to their content, not to spare fixed-card
+  height: a short-name ordinary header fits within 112px at the supported desktop floor, leaving
+  the rest for real conversation and its anchored composer. Long names and additional real controls
+  may wrap without clipping. Grid tracks, fixed expanded-card height, density, ordering, drag,
+  expansion/collapse, context, lifecycle actions and focus behavior remain authoritative.
+- **R54 (planned)** — Full active and archived agent pages finish the same chat composition:
+  compact identity/runtime/context header, quiet tabs, a clear conversation reading region and an
+  aligned anchored composer. Runtime controls have legible grouping without oversized nested boxes;
+  an unsupported/empty live-settings group does not leave an empty framed band. Ordinary prose has
+  a comfortable bounded reading measure (roughly 680–840px on wide desktop), not wall-to-wall text;
+  technical output, file/diff views and the annotation tray retain their needed space and existing
+  scrolling. The composer belongs to that reading region without becoming an enormous full-width
+  utility form. Real chronological messages, tool disclosure, permissions, annotations, errors,
+  model switching/apply semantics, Files, Commands, conditional Terminal and read-only archive
+  behavior remain unchanged. The Figma study's static log pane is never a substitute for real chat.
+- **R55 (planned)** — Tasks has consistent inset padding (normally 20–24px) around authoring
+  content, deliberate label/field/group spacing and bounded form measures, rather than headings
+  and inputs touching panel edges. Related short fields may share a row where they fit; Instruction
+  and prerequisites have clear full-row hierarchy. Fire a signal stays a smaller supporting form;
+  Fire/Create actions are content-sized and aligned with their form rather than stretched across
+  it. Project/attention controls remain compact and the task ledger has clear row/action spacing,
+  including attention, waiting, running, finished, empty and error states. At 1024px, forms reflow
+  without clipping or changing reading/keyboard order. The actual feature-owned fields, compact
+  setup disclosures, prerequisites, validation and Re-arm semantics remain authoritative, not the
+  mockup's invented selectors, labels or actions.
+- **R56 (planned)** — Remaining routes receive the shared R46–R49 hierarchy, with content-specific
+  measures rather than one global card grid: quiet compact navigation, operational run ledger and
+  timeline, template authoring, search-first Archive, readable Settings and clear dialog/onboarding
+  actions. Existing selected, hover, focus, disabled, busy, error, destructive, permission and
+  success states remain visible in all three palettes. No new motion or behavior is introduced.
+- **R57 (planned)** — This is a presentation upgrade to existing appearances, not a fourth skin,
+  replacement appearance preference, migration or legacy-layout toggle. It changes no route, data,
+  persistence, API, retention, lifecycle, action, shortcut or supported viewport policy. Figma
+  provides composition and finish, not a pixel-exact product specification: prototype-only menus,
+  density controls, synthetic transcripts and task flows are excluded. Existing FS-02 grid and
+  FS-03 chat contracts take precedence over mockup anatomy.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -478,7 +533,41 @@ Requirements are user-observable.
   Core, Sky & Grove, and Studio retain their existing hierarchy and the shared pointer menu remains
   inside the viewport. *Verify:* focused component/style tests plus a real-browser comparison.
 
+- **A26 (planned)** (R52, R56–R57) — Render matched real content in all three appearances at
+  confirmed 1024px and a wider desktop viewport. Shell, dashboard, agent pages, Tasks, Pipelines,
+  Archive, Settings, onboarding and overlays share composition, spacing and control geometry while
+  retaining each palette and ornament. A geometry/desaturated comparison confirms common layout,
+  not Studio-only layout distinction. Verify appearance selection/reload/fallback still works.
+  *Verify:* matched deterministic fixtures, real-browser route comparison and existing appearance
+  contract tests; record actual viewport, revision, route/state and screenshot evidence.
+- **A27 (planned)** (R53) — Short/long names, collapsed/expanded cards, all density extremes,
+  waiting/error/stopped/terminal states and empty/populated chat demonstrate a quiet grip, readable
+  metadata, visible soft resting depth, content-sized header and compact Send/Cancel. A short-name
+  expanded header is at most 112px; its transcript receives remaining space. Growing a textarea
+  does not grow the action button. Exercise drag, Collapse, send/cancel, permissions and keyboard
+  focus with neighboring cards remaining stable. *Verify:* focused existing card/composer tests,
+  rendered geometry checks and real-browser FS-02 grid/chat journeys in all appearances.
+- **A28 (planned)** (R54) — Active and archived agent views with short/long identities, staged
+  runtime edits, available/unavailable live settings, prose, code/diff/tool output, permission,
+  annotation tray and file viewer demonstrate compact complete chrome, readable chat measure and
+  aligned composer without empty boxes, clipped controls or scroll regressions. Empty chat alone
+  is insufficient evidence. *Verify:* real-browser populated active/archive checks and affected
+  chat/composer tests in all appearances; compare with the approved Figma reading hierarchy, not
+  its synthetic content.
+- **A29 (planned)** (R55–R57) — At 1024px and wide desktop, Tasks authoring has visible inset
+  padding, consistent field/group rhythm, content-sized actions and a subordinate signal form.
+  Long names/instructions, prerequisites, expanded detail, validation, attention/waiting/running/
+  finished rows and empty/error states remain readable. *Verify:* deterministic task fixtures,
+  existing task behavior tests and real-browser keyboard/form review across appearances. Review
+  the Figma comparison for spacing and hierarchy without copying its task interaction changes.
+
 ## 6. Deviations & open decisions
+
+- R52–R57/A26–A29 are the 2026-09-28 proposed cross-appearance upgrade. Product scope awaits
+  the operator's confirmation before technical design and creation of a ready change. Older
+  shipped Studio behavior remains the incumbent until implementation; previous A19–A23/TS-08.R68
+  evidence debt is not closed by this draft. A21's Studio-only layout oracle will be superseded
+  by A26 when this upgrade ships, not silently treated as passed.
 
 - The previous Field Atlas proposal was rejected because it made the default design a conceptual
   skin. This revision defines a product-native core interface and removes the proposed expedition,

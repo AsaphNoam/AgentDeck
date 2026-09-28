@@ -57,6 +57,13 @@ the relevant feature and technical specifications; it does not change product co
   full agent pages and Tasks spacing; specify the remaining presentation polish, then make the
   improved layout common to Core, Sky & Grove and Studio while preserving each color scheme.
   Existing product behavior, density, grid stability and real chat remain authoritative.
+  Feature draft: FS-12.R52–R57/A26–A29. Awaiting scope confirmation before technical design;
+  not ready for implementation. Browser comparison: expanded 640px cards had ~253px headers,
+  Send ~78px tall, Tasks authoring surfaces zero inset padding; full agent runtime fieldsets
+  remained boxed with an empty live-settings band. Source inspection confirms these composition
+  seams, despite a compact full-header improvement already shipped. Figma reference:
+  https://www.figma.com/make/OykxmXqZnnyA67QA1lv3AU/AgentDeck-%25E2%2580%2594-Theme-Exploration
+  Reference remains directional: do not copy static logs or prototype-only controls.
 
 - **Read files from configured additional project directories.** Let an operator open files under
   explicitly configured project `add_dirs`, not arbitrary host paths. Define whether the readable
