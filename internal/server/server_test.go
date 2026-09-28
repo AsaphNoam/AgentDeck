@@ -49,6 +49,9 @@ func testServer(t *testing.T, seed bool) *Server {
 	s := New(cfgStore, stateStore, registry, config.DefaultConfig(), log)
 	// No suite contacts a real tailnet (TS-06.R27); remote tests inject a fake.
 	s.newRemoteNode = func() (remote.Node, error) { return nil, errNoTailnetInTests }
+	s.pushSend = func(context.Context, remote.VAPIDKeys, remote.PushSubscription, []byte, string) (int, error) {
+		return 0, errNoTailnetInTests
+	}
 	return s
 }
 

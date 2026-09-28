@@ -145,4 +145,16 @@ Done:
   `styles/features/phone.css`; checker permits the one new entry import. Test:
   `npx vitest run src/remote`.
 
-Next: slice 8 (phone actions: cards, conversation, task/run actions, New work).
+- **Slice 9, server** (2026-09-28) — `remote/push.go`: `webpush-go` v1.4.0 verified (RFC 8291
+  aes128gcm, ES256 VAPID with `aud`/`exp` 12 h/`sub`, TTL/Urgency/Topic, injectable client);
+  `sub` is the project https URL (Apple needs mailto/https; avoids exposing the tailnet name).
+  VAPID keys in `remote/vapid.json` 0600; endpoint allowlist (FCM, Apple, Mozilla, WNS); RFC 8030
+  Topic from the tag. `remote_push.go`: new tailnet `GET /api/remote/self` (id, name,
+  notifications, VAPID public key — not in TS-13 §3 yet), `PUT|DELETE /api/remote/self/push`,
+  `runPushSender` diffs Needs-you keys from `attention()` (first pass seeds silently; only when
+  remote is on), desktop mutes, first item per tag immediately then one summary per 10 s window,
+  bounded queue of 64 with one worker, 404/410 expires (guarded by endpoint), retries
+  2/4/8 s, logs never carry endpoint or payload. Phone UI toggle ships with slice 8.
+
+Next: slice 8 (phone actions: cards, conversation, task/run actions, New work, "This phone"
+settings with notifications and unpair).

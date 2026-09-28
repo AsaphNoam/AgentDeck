@@ -53,3 +53,35 @@ func TestRemoteDevicesLifecycle(t *testing.T) {
 		t.Fatal("deleted device must not authenticate")
 	}
 }
+
+func TestRemoteDevicePushSubscription(t *testing.T) {
+	st, _ := newTestStore(t)
+	if err := st.InsertRemoteDevice(RemoteDevice{ID: "d1", Name: "p", TokenHash: "h", NodeStableID: "n"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetRemoteDevicePush("d1", "https://fcm.googleapis.com/a", "k", "s"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := st.RemoteDeviceByTokenHash("h")
+	if !d.PushEnabled || d.PushEndpoint != "https://fcm.googleapis.com/a" || d.PushState != "active" {
+		t.Fatalf("after set = %+v", d)
+	}
+	// A stale endpoint's rejection does not expire a replacement subscription.
+	if err := st.ExpireRemoteDevicePush("d1", "https://fcm.googleapis.com/old"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("stale expire err = %v", err)
+	}
+	if err := st.ExpireRemoteDevicePush("d1", "https://fcm.googleapis.com/a"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = st.RemoteDeviceByTokenHash("h")
+	if d.PushState != "expired" {
+		t.Fatalf("state = %q", d.PushState)
+	}
+	if err := st.ClearRemoteDevicePush("d1"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = st.RemoteDeviceByTokenHash("h")
+	if d.PushEnabled || d.PushEndpoint != "" || d.PushState != "active" {
+		t.Fatalf("after clear = %+v", d)
+	}
+}

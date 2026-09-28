@@ -186,6 +186,8 @@ type Server struct {
 	// keepAwake is the idle-sleep assertion owned by runKeepAwake (TS-13.R13).
 	keepAwake      *remote.KeepAwake
 	keepAwakeNudge chan struct{}
+	// pushSend delivers one Web Push; tests inject a fake push service.
+	pushSend pushSendFunc
 }
 
 type taskStartLock struct {
@@ -312,6 +314,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	s.remotePairing = &remotePairing{failures: map[string]*peerFailures{}}
 	s.keepAwake = remote.NewKeepAwake(nil)
 	s.keepAwakeNudge = make(chan struct{}, 1)
+	s.pushSend = remote.SendPush
 	s.remote = s.newRemoteManager()
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)
@@ -497,6 +500,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.startTaskDispatcher(sweepCtx)
 	go s.runKeepAwake(sweepCtx)
+	go s.runPushSender(sweepCtx)
 	defer s.keepAwake.Close()
 	if s.sourceMgr != nil {
 		// Hydrate persisted bindings so the watcher detects external edits (invariant §1).

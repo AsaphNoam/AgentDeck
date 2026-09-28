@@ -109,6 +109,26 @@ func (s *Store) TouchRemoteDevice(id string, at time.Time) error {
 	return s.updateRemoteDevice(`UPDATE remote_devices SET last_seen_at = ? WHERE id = ?`, formatTime(at), id)
 }
 
+// SetRemoteDevicePush stores a phone's push subscription and turns its
+// notifications on (FS-20.R18).
+func (s *Store) SetRemoteDevicePush(id, endpoint, p256dh, auth string) error {
+	return s.updateRemoteDevice(`UPDATE remote_devices SET push_endpoint = ?, push_p256dh = ?, push_auth = ?,
+		push_enabled = 1, push_state = 'active' WHERE id = ?`, endpoint, p256dh, auth, id)
+}
+
+// ClearRemoteDevicePush turns a phone's notifications off and forgets its
+// subscription.
+func (s *Store) ClearRemoteDevicePush(id string) error {
+	return s.updateRemoteDevice(`UPDATE remote_devices SET push_endpoint = NULL, push_p256dh = NULL, push_auth = NULL,
+		push_enabled = 0, push_state = 'active' WHERE id = ?`, id)
+}
+
+// ExpireRemoteDevicePush records that the push service rejected the
+// subscription, unless the phone has since replaced it (FS-20.R28).
+func (s *Store) ExpireRemoteDevicePush(id, endpoint string) error {
+	return s.updateRemoteDevice(`UPDATE remote_devices SET push_state = 'expired' WHERE id = ? AND push_endpoint = ?`, id, endpoint)
+}
+
 // DeleteRemoteDevice hard-deletes a revoked or unpaired phone (TS-02.R37).
 func (s *Store) DeleteRemoteDevice(id string) error {
 	return s.updateRemoteDevice(`DELETE FROM remote_devices WHERE id = ?`, id)
