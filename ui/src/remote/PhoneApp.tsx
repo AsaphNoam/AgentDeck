@@ -2,7 +2,8 @@ import { useEffect, type ReactNode } from "react";
 import { classify, connect, useConnection, wasPaired } from "./connection";
 import { HomeScreen } from "./HomeScreen";
 import { PairScreen, UnpairedScreen } from "./PairScreen";
-import { navigate, usePath } from "./router";
+import { match, navigate, usePath } from "./router";
+import { AgentScreen } from "./AgentScreen";
 
 function Banner() {
   const link = useConnection((state) => state.link);
@@ -63,9 +64,10 @@ export function PhoneApp() {
     return <PairScreen onPaired={paired} />;
   }
   if (link === "checking") return <main className="phone-screen phone-center">Connecting to your Mac…</main>;
+  const agentId = match(path, "agent");
   return (
     <Shell back={path !== "/"}>
-      <HomeScreen />
+      {agentId ? <AgentScreen agentId={agentId} /> : <HomeScreen />}
     </Shell>
   );
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { AgentState } from "../api/types";
 import { checkPaired, MacUnreachableError, PhoneAPIError } from "./api";
 
 // The phone's view of its link to the Mac (FS-20 §3). A plain EventSource with
@@ -12,6 +13,10 @@ interface ConnectionState {
   unreachableSince: number | null;
   /** Bumped on every event that can change Home, for debounced refetches. */
   revision: number;
+  /** Every agent, hydrated from the stream's state_update snapshot. */
+  agents: Record<string, AgentState>;
+  /** Per-agent counter bumped when its transcript grows. */
+  transcriptRev: Record<string, number>;
   setLink: (link: PhoneLink) => void;
   bump: () => void;
 }
@@ -20,6 +25,8 @@ export const useConnection = create<ConnectionState>((set) => ({
   link: "checking",
   unreachableSince: null,
   revision: 0,
+  agents: {},
+  transcriptRev: {},
   setLink: (link) =>
     set((state) => ({
       link,
@@ -82,6 +89,30 @@ export function connect() {
     }
   };
   for (const type of homeEvents) source.addEventListener(type, () => bump());
+  source.addEventListener("state_update", (event) => {
+    const envelope = parse(event);
+    const agent = envelope?.data as AgentState | undefined;
+    if (!agent?.agent_id || agent.agent_id === "__hydrated__") return;
+    useConnection.setState((state) => {
+      const agents = { ...state.agents };
+      if (agent.removed) delete agents[agent.agent_id];
+      else agents[agent.agent_id] = agent;
+      return { agents };
+    });
+  });
+  source.addEventListener("new_message", (event) => {
+    const id = parse(event)?.agent_id;
+    if (!id) return;
+    useConnection.setState((state) => ({ transcriptRev: { ...state.transcriptRev, [id]: (state.transcriptRev[id] ?? 0) + 1 } }));
+  });
+}
+
+function parse(event: Event): { agent_id?: string; data?: unknown } | null {
+  try {
+    return JSON.parse((event as MessageEvent<string>).data) as { agent_id?: string; data?: unknown };
+  } catch {
+    return null;
+  }
 }
 
 export function disconnect() {

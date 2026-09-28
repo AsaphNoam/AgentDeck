@@ -195,4 +195,123 @@ body {
   font-size: 0.8rem;
   margin: 0;
 }
+
+.phone-meta {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.phone-agent,
+.phone-composer,
+.phone-transcript {
+  display: grid;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
+.phone-agent-header h1 {
+  font-size: 1.35rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.phone-transcript {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.phone-transcript > li {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.phone-user {
+  background: var(--ad-surface-emphasis);
+  border-radius: var(--ad-radius-medium);
+  margin: 0;
+  padding: var(--ad-space-2) var(--ad-space-3);
+  white-space: pre-wrap;
+}
+
+.phone-card {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-large);
+  display: grid;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-4);
+}
+
+.phone-card h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.phone-card p {
+  margin: 0;
+}
+
+.phone-decision {
+  border: var(--ad-border-thick) solid var(--ad-state-waiting);
+}
+
+.phone-card-kicker {
+  color: var(--ad-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.phone-pre {
+  background: var(--ad-surface-subtle);
+  border-radius: var(--ad-radius-small);
+  font-family: var(--ad-font-mono);
+  font-size: 0.8rem;
+  margin: 0;
+  max-height: 40vh;
+  overflow: auto;
+  padding: var(--ad-space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.phone-quote {
+  border-left: var(--ad-border-thick) solid var(--ad-border-strong);
+  color: var(--ad-text-secondary);
+  display: grid;
+  gap: var(--ad-space-1);
+  margin: 0;
+  padding-left: var(--ad-space-3);
+  white-space: pre-wrap;
+}
+
+.phone-quote span {
+  color: var(--ad-text-muted);
+  font-size: 0.75rem;
+}
+
+.phone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+.phone-actions > button {
+  flex: 1 1 120px;
+  min-height: 44px;
+}
+
+.phone-controls {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  padding-top: var(--ad-space-3);
+}
+
+.phone-danger {
+  border-color: var(--ad-state-error);
+  color: var(--ad-state-error);
+}
 }

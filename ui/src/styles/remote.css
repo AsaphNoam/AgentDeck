@@ -6,4 +6,7 @@
 @import "./tokens.css";
 @import "./base.css";
 @import "./components/primitives.css";
+/* Transcript, tool, and diff renderers are shared with the desktop. */
+@import "./features/agent.css";
+@import "./integrations.css";
 @import "./features/phone.css";
