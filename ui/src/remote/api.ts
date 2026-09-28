@@ -46,7 +46,8 @@ export interface AttentionItem {
   state: string;
   reason: string;
   agent_id?: string;
-  stage?: string;
+  stage_number?: number;
+  stage_count?: number;
   outcome?: string;
   since: string;
 }

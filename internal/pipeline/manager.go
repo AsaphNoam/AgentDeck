@@ -436,8 +436,22 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]RunSummary, 0, len(page.Runs))
-	for _, run := range page.Runs {
+	return m.summarizeRuns(page.Runs), page.Total, nil
+}
+
+// ListAttention returns independently bounded Home/push rows so terminal
+// history cannot displace an older live or paused run.
+func (m *Manager) ListAttention(since time.Time, limit int) ([]RunSummary, error) {
+	runs, err := m.store.ListAttentionPipelineRuns(since, limit)
+	if err != nil {
+		return nil, err
+	}
+	return m.summarizeRuns(runs), nil
+}
+
+func (m *Manager) summarizeRuns(runs []state.PipelineRunRecord) []RunSummary {
+	out := make([]RunSummary, 0, len(runs))
+	for _, run := range runs {
 		if m.hasPendingPermission(run.RunID, run.CurrentAgentID) {
 			run.AttentionReason = "awaiting permission approval"
 		}
@@ -476,7 +490,7 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 			Diagnostics: diagnostics,
 		})
 	}
-	return out, page.Total, nil
+	return out
 }
 
 func (m *Manager) hasPendingPermission(runID, agentID string) bool {

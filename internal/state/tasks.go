@@ -716,25 +716,33 @@ func (s *Store) ListTasks(project string) ([]Task, error) {
 // show: those needing a person or in motion, plus those finished after since.
 // It is bounded and unhydrated — Home needs only the row (TS-13.R10, INV §16).
 func (s *Store) ListAttentionTasks(since time.Time, limit int) ([]Task, error) {
-	rows, err := s.db.Query(taskSelect+`
-WHERE state IN (?, ?, ?, ?, ?) OR (state = ? AND updated_at > ?)
-ORDER BY updated_at DESC, task_id LIMIT ?`,
-		TaskInterrupted, TaskDependencyFailed, TaskStarting, TaskRunning, TaskWaiting,
-		TaskFinished, formatTime(since), limit)
-	if err != nil {
-		return nil, fmt.Errorf("state: list attention tasks: %w", err)
-	}
-	defer rows.Close()
 	tasks := []Task{}
-	for rows.Next() {
-		task, err := scanTask(rows)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, task)
+	queries := []struct {
+		where string
+		args  []any
+	}{
+		{`state IN (?, ?) ORDER BY updated_at ASC, task_id LIMIT ?`, []any{TaskInterrupted, TaskDependencyFailed, limit}},
+		{`state IN (?, ?, ?) ORDER BY updated_at DESC, task_id LIMIT ?`, []any{TaskStarting, TaskRunning, TaskWaiting, limit}},
+		{`state = ? AND updated_at > ? ORDER BY updated_at DESC, task_id LIMIT ?`, []any{TaskFinished, formatTime(since), limit}},
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("state: iterate attention tasks: %w", err)
+	for _, query := range queries {
+		rows, err := s.db.Query(taskSelect+` WHERE `+query.where, query.args...)
+		if err != nil {
+			return nil, fmt.Errorf("state: list attention tasks: %w", err)
+		}
+		for rows.Next() {
+			task, err := scanTask(rows)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			tasks = append(tasks, task)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("state: iterate attention tasks: %w", err)
+		}
 	}
 	return tasks, nil
 }

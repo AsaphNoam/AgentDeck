@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -35,12 +36,19 @@ type VAPIDKeys struct {
 	Private string `json:"private"`
 }
 
+var vapidMu sync.Mutex
+
 // LoadOrCreateVAPID reads the key pair, generating it owner-only on first need.
 func LoadOrCreateVAPID(path string) (VAPIDKeys, error) {
+	vapidMu.Lock()
+	defer vapidMu.Unlock()
 	var keys VAPIDKeys
 	data, err := os.ReadFile(path)
 	if err == nil {
 		if err := json.Unmarshal(data, &keys); err == nil && keys.Public != "" && keys.Private != "" {
+			if err := os.Chmod(path, 0o600); err != nil {
+				return VAPIDKeys{}, err
+			}
 			return keys, nil
 		}
 		return VAPIDKeys{}, fmt.Errorf("remote: %s is unreadable", filepath.Base(path))
@@ -57,11 +65,37 @@ func LoadOrCreateVAPID(path string) (VAPIDKeys, error) {
 	}
 	keys = VAPIDKeys{Public: public, Private: private}
 	data, _ = json.Marshal(keys)
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".vapid-*.tmp")
+	if err != nil {
 		return VAPIDKeys{}, err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return VAPIDKeys{}, err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return VAPIDKeys{}, err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return VAPIDKeys{}, err
+	}
+	if err := tmp.Close(); err != nil {
+		return VAPIDKeys{}, err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return VAPIDKeys{}, err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return VAPIDKeys{}, err
+	}
+	err = dir.Sync()
+	dir.Close()
+	if err != nil {
 		return VAPIDKeys{}, err
 	}
 	return keys, nil

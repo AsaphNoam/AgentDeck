@@ -32,7 +32,7 @@ var remoteAllowed = map[string][]string{
 	"GET /api/pipelines/{id}": nil,
 
 	"GET /api/sessions":                  nil,
-	"POST /api/sessions":                 {"role", "project", "backend", "model", "effort", "fast"},
+	"POST /api/sessions":                 {"role", "project"},
 	"GET /api/sessions/{id}":             nil,
 	"GET /api/sessions/{id}/transcript":  nil,
 	"POST /api/sessions/{id}/prompt":     nil,
@@ -45,7 +45,7 @@ var remoteAllowed = map[string][]string{
 	"POST /api/sessions/{id}/permission": nil,
 
 	"GET /api/tasks":              nil,
-	"POST /api/tasks":             {"project", "display_name", "instruction", "target_kind", "role", "backend", "model", "effort", "fast"},
+	"POST /api/tasks":             {"project", "display_name", "instruction", "target_kind", "role"},
 	"GET /api/tasks/{id}":         nil,
 	"POST /api/tasks/{id}/cancel": nil,
 	"POST /api/tasks/{id}/result": nil,
@@ -53,7 +53,7 @@ var remoteAllowed = map[string][]string{
 	"POST /api/tasks/{id}/rearm":  nil,
 
 	"GET /api/pipeline-runs":                      nil,
-	"POST /api/pipeline-runs":                     nil,
+	"POST /api/pipeline-runs":                     {"request_id", "template_id", "display_name", "project", "goal", "inputs", "orchestrator", "dedicated_assignments", "acknowledge_shared_workspace"},
 	"GET /api/pipeline-runs/{id}":                 nil,
 	"POST /api/pipeline-runs/{id}/continue":       nil,
 	"POST /api/pipeline-runs/{id}/retry":          nil,
@@ -156,16 +156,21 @@ func newRemoteDevices() *remoteDevices {
 	}
 }
 
-// track derives a request context the device registry can cancel.
-func (d *remoteDevices) track(ctx context.Context, id string) (context.Context, func()) {
+// admit registers a request while holding the same boundary used by end, then
+// revalidates the credential. A revoke that deleted the row before admission is
+// observed by valid; a revoke after admission finds and cancels the request.
+func (d *remoteDevices) admit(ctx context.Context, id string, valid func() error) (context.Context, func(), error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if err := valid(); err != nil {
+		return ctx, func() {}, err
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	key := new(int)
-	d.mu.Lock()
 	if d.open[id] == nil {
 		d.open[id] = map[*int]context.CancelFunc{}
 	}
 	d.open[id][key] = cancel
-	d.mu.Unlock()
 	return ctx, func() {
 		cancel()
 		d.mu.Lock()
@@ -174,7 +179,7 @@ func (d *remoteDevices) track(ctx context.Context, id string) (context.Context, 
 			delete(d.open, id)
 		}
 		d.mu.Unlock()
-	}
+	}, nil
 }
 
 // end cancels every open request of a removed device and drops its throttles.
@@ -237,6 +242,9 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 			continue
 		}
 		var h http.Handler = e.handler
+		if e.pattern == "POST /api/pipeline-runs" {
+			h = remotePipelineRuntimeFilter(h)
+		}
 		if fields != nil {
 			h = remoteFieldFilter(fields, h)
 		}
@@ -357,7 +365,25 @@ func (s *Server) remoteAuth(next http.Handler) http.Handler {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			s.log.Info("remote: mutation", "device_id", device.ID, "method", r.Method, "path", r.URL.Path)
 		}
-		ctx, done := s.remoteDevices.track(r.Context(), device.ID)
+		ctx, done, err := s.remoteDevices.admit(r.Context(), device.ID, func() error {
+			current, err := s.stateStore.RemoteDeviceByTokenHash(hashRemoteToken(c.Value))
+			if err != nil {
+				return err
+			}
+			if current.ID != device.ID || current.NodeStableID != rr.peer.StableID {
+				return state.ErrNotFound
+			}
+			return nil
+		})
+		if errors.Is(err, state.ErrNotFound) {
+			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from AgentDeck on your Mac")
+			return
+		}
+		if err != nil {
+			s.log.Error("remote: revalidate device", "err", err)
+			writeRemoteError(w, http.StatusInternalServerError, "internal", "internal error")
+			return
+		}
 		defer done()
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -384,6 +410,63 @@ func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 		for name := range fields {
 			if !ok[name] {
 				writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "field not allowed from a phone: "+name)
+				return
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		next.ServeHTTP(w, r)
+	})
+}
+
+// remotePipelineRuntimeFilter keeps the desktop-owned runtime assignments at
+// their empty/default phone representation (TS-13.R5/R6, FS-20.R15).
+func remotePipelineRuntimeFilter(next http.Handler) http.Handler {
+	type assignment struct {
+		Backend string `json:"backend"`
+		Model   string `json:"model"`
+		Effort  string `json:"effort"`
+		Fast    bool   `json:"fast"`
+	}
+	empty := func(a assignment) bool {
+		return a.Backend == "" && a.Model == "" && a.Effort == "" && !a.Fast
+	}
+	allowedAssignment := func(raw json.RawMessage) bool {
+		if len(raw) == 0 || string(raw) == "null" {
+			return true
+		}
+		fields := map[string]json.RawMessage{}
+		if json.Unmarshal(raw, &fields) != nil {
+			return false
+		}
+		for name := range fields {
+			if name != "backend" && name != "model" && name != "effort" && name != "fast" {
+				return false
+			}
+		}
+		var value assignment
+		return json.Unmarshal(raw, &value) == nil && empty(value)
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(io.LimitReader(r.Body, remoteBodyLimit+1))
+		if err != nil || len(body) > remoteBodyLimit {
+			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "request body too large")
+			return
+		}
+		var request struct {
+			Orchestrator         json.RawMessage            `json:"orchestrator"`
+			DedicatedAssignments map[string]json.RawMessage `json:"dedicated_assignments"`
+		}
+		if err := json.Unmarshal(body, &request); err != nil {
+			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "invalid JSON body")
+			return
+		}
+		if !allowedAssignment(request.Orchestrator) {
+			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "runtime assignment not allowed from a phone")
+			return
+		}
+		for _, raw := range request.DedicatedAssignments {
+			if !allowedAssignment(raw) {
+				writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "runtime assignment not allowed from a phone")
 				return
 			}
 		}

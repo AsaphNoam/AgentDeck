@@ -17,9 +17,16 @@ class FakeEventSource {
   constructor(public url: string) {
     FakeEventSource.last = this;
   }
-  addEventListener() {}
+  private listeners = new Map<string, Array<(event: Event) => void>>();
+  addEventListener(type: string, listener: (event: Event) => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+  }
   removeEventListener() {}
   close() {}
+  emit(type: string, body: unknown) {
+    const event = { data: JSON.stringify(body) } as MessageEvent<string>;
+    for (const listener of this.listeners.get(type) ?? []) listener(event);
+  }
 }
 
 let paired = true;
@@ -30,7 +37,7 @@ const home: HomeLists = {
     { kind: "agent", id: "a1", title: "implementer@my-app", project: "my-app", state: "waiting_input", reason: "needs permission", agent_id: "a1", since: new Date().toISOString() },
   ],
   moving: [
-    { kind: "run", id: "r1", title: "Ship it", project: "my-app", state: "running", reason: "running", stage: "Stage 2 of 4", since: new Date().toISOString() },
+    { kind: "run", id: "r1", title: "Ship it", project: "my-app", state: "running", reason: "running", stage_number: 2, stage_count: 4, since: new Date().toISOString() },
   ],
   since_last: [],
 };
@@ -64,7 +71,7 @@ beforeEach(() => {
   waits = 0;
   localStorage.clear();
   window.history.replaceState(null, "", "/");
-  useConnection.setState({ link: "checking", unreachableSince: null, revision: 0 });
+  useConnection.setState({ link: "checking", unreachableSince: null, revision: 0, agents: {}, transcriptRev: {} });
 });
 afterEach(() => {
   cleanup();
@@ -130,6 +137,26 @@ describe("PhoneApp", () => {
     expect(document.querySelector("main")?.getAttribute("data-stale")).toBe("true");
     act(() => useConnection.getState().setLink("connected"));
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+
+  it("replaces stale agents only after reconnect hydration completes", async () => {
+    renderApp();
+    await screen.findByText("implementer@my-app");
+    const stream = FakeEventSource.last!;
+    act(() => {
+      useConnection.setState({
+        agents: { stale: { agent_id: "stale", role: "agentdecker", project: "old", state: "busy" } as never },
+        transcriptRev: { stale: 3 },
+      });
+      stream.onopen?.();
+      stream.emit("state_update", { data: { agent_id: "fresh", role: "agentdecker", project: "new", state: "idle" } });
+    });
+    expect(useConnection.getState().link).toBe("reconnecting");
+    expect(useConnection.getState().agents.stale).toBeDefined();
+    act(() => stream.emit("state_update", { data: { agent_id: "__hydrated__" } }));
+    expect(useConnection.getState().link).toBe("connected");
+    expect(Object.keys(useConnection.getState().agents)).toEqual(["fresh"]);
+    expect(useConnection.getState().transcriptRev).toEqual({});
   });
 });
 

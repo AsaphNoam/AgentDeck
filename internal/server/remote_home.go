@@ -1,13 +1,11 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
@@ -15,16 +13,17 @@ import (
 // attentionItem is one row of the phone's Home (FS-20.R11). Reason is a short,
 // in-vocabulary line; message, command, and diff text never appear here.
 type attentionItem struct {
-	Kind    string    `json:"kind"` // agent | task | run
-	ID      string    `json:"id"`
-	Title   string    `json:"title"`
-	Project string    `json:"project"`
-	State   string    `json:"state"`
-	Reason  string    `json:"reason"`
-	AgentID string    `json:"agent_id,omitempty"` // the conversation to open
-	Stage   string    `json:"stage,omitempty"`    // "Stage 2 of 4"
-	Outcome string    `json:"outcome,omitempty"`
-	Since   time.Time `json:"since"`
+	Kind        string    `json:"kind"` // agent | task | run
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Project     string    `json:"project"`
+	State       string    `json:"state"`
+	Reason      string    `json:"reason"`
+	AgentID     string    `json:"agent_id,omitempty"` // the conversation to open
+	StageNumber int       `json:"stage_number,omitempty"`
+	StageCount  int       `json:"stage_count,omitempty"`
+	Outcome     string    `json:"outcome,omitempty"`
+	Since       time.Time `json:"since"`
 }
 
 // Attention reasons. Push notifications reuse them, so Home and push cannot
@@ -45,7 +44,6 @@ type attentionLists struct {
 }
 
 const (
-	attentionTaskLimit = 200
 	attentionListLimit = 100
 )
 
@@ -95,7 +93,7 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 		}
 	}
 
-	tasks, err := s.stateStore.ListAttentionTasks(since, attentionTaskLimit)
+	tasks, err := s.stateStore.ListAttentionTasks(since, attentionListLimit)
 	if err != nil {
 		return out, err
 	}
@@ -118,16 +116,14 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 	}
 
 	if s.pipelineMgr != nil {
-		runs, _, err := s.pipelineMgr.ListPage(pipeline.MaxListPage, 0)
+		runs, err := s.pipelineMgr.ListAttention(since, attentionListLimit)
 		if err != nil {
 			return out, err
 		}
 		for _, r := range runs {
 			updated, _ := time.Parse(time.RFC3339Nano, r.UpdatedAt)
 			item := attentionItem{Kind: "run", ID: r.RunID, Title: r.DisplayName, Project: r.Project, State: r.State, AgentID: r.CurrentAgentID, Since: updated.UTC()}
-			if r.StageNumber > 0 && r.StageCount > 0 {
-				item.Stage = fmt.Sprintf("Stage %d of %d", r.StageNumber, r.StageCount)
-			}
+			item.StageNumber, item.StageCount = r.StageNumber, r.StageCount
 			switch {
 			case r.State == "completed" || r.State == "stopped":
 				if updated.After(since) {

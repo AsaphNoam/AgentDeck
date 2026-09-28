@@ -72,12 +72,13 @@ export async function classify(): Promise<PhoneLink> {
 export function connect() {
   if (source) return;
   const { setLink, bump } = useConnection.getState();
+  let hydratingAgents: Record<string, AgentState> | null = {};
   source = new EventSource("/api/events", { withCredentials: true });
   source.onopen = () => {
     window.clearTimeout(unreachableTimer);
     unreachableTimer = undefined;
-    setLink("connected");
-    bump(); // catch up after reconnecting (FS-20.R17)
+    hydratingAgents = {};
+    setLink("reconnecting");
   };
   source.onerror = () => {
     if (useConnection.getState().link === "connected") setLink("reconnecting");
@@ -92,7 +93,23 @@ export function connect() {
   source.addEventListener("state_update", (event) => {
     const envelope = parse(event);
     const agent = envelope?.data as AgentState | undefined;
-    if (!agent?.agent_id || agent.agent_id === "__hydrated__") return;
+    if (!agent?.agent_id) return;
+    if (agent.agent_id === "__hydrated__") {
+      const agents = hydratingAgents ?? {};
+      hydratingAgents = null;
+      useConnection.setState((state) => ({
+        agents,
+        transcriptRev: Object.fromEntries(Object.entries(state.transcriptRev).filter(([id]) => agents[id])),
+      }));
+      setLink("connected");
+      bump(); // catch up only after the authoritative snapshot is complete.
+      return;
+    }
+    if (hydratingAgents) {
+      if (agent.removed) delete hydratingAgents[agent.agent_id];
+      else hydratingAgents[agent.agent_id] = agent;
+      return;
+    }
     useConnection.setState((state) => {
       const agents = { ...state.agents };
       if (agent.removed) delete agents[agent.agent_id];
@@ -101,6 +118,7 @@ export function connect() {
     });
   });
   source.addEventListener("new_message", (event) => {
+    if (hydratingAgents) return;
     const id = parse(event)?.agent_id;
     if (!id) return;
     useConnection.setState((state) => ({ transcriptRev: { ...state.transcriptRev, [id]: (state.transcriptRev[id] ?? 0) + 1 } }));

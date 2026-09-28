@@ -638,6 +638,40 @@ FROM pipeline_runs ORDER BY updated_at DESC, run_id LIMIT ? OFFSET ?`, limit, of
 	return PipelineRunPage{Runs: out, Total: total}, nil
 }
 
+// ListAttentionPipelineRuns returns independently bounded attention, active,
+// and recent terminal rows so retained history cannot hide live work.
+func (s *Store) ListAttentionPipelineRuns(since time.Time, limit int) ([]PipelineRunRecord, error) {
+	queries := []struct {
+		where string
+		args  []any
+	}{
+		{`(state = 'paused' OR attention_reason <> '') ORDER BY updated_at ASC, run_id LIMIT ?`, []any{limit}},
+		{`state NOT IN ('paused', 'completed', 'stopped') AND attention_reason = '' ORDER BY updated_at DESC, run_id LIMIT ?`, []any{limit}},
+		{`state IN ('completed', 'stopped') AND updated_at > ? ORDER BY updated_at DESC, run_id LIMIT ?`, []any{formatTime(since), limit}},
+	}
+	out := []PipelineRunRecord{}
+	for _, query := range queries {
+		rows, err := s.db.Query(`SELECT `+pipelineRunColumns+` FROM pipeline_runs WHERE `+query.where, query.args...)
+		if err != nil {
+			return nil, fmt.Errorf("state: list attention pipeline runs: %w", err)
+		}
+		for rows.Next() {
+			run, err := scanPipelineRun(rows)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out = append(out, run)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("state: iterate attention pipeline runs: %w", err)
+		}
+	}
+	return out, nil
+}
+
 // ListActivePipelineRuns returns every non-terminal run for startup recovery
 // and shared-workspace checks. Those correctness paths must not silently stop
 // at the first UI page when more than MaxListPage historical rows exist.

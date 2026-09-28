@@ -173,8 +173,20 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	for _, c := range []struct{ path, body string }{
 		{"/api/sessions", `{"role":"agentdecker","project":"my-app","interface":"terminal"}`},
 		{"/api/sessions", `{"role":"agentdecker","project":"my-app","group":"g"}`},
+		{"/api/sessions", `{"role":"agentdecker","project":"my-app","backend":"codex"}`},
+		{"/api/sessions", `{"role":"agentdecker","project":"my-app","model":"gpt"}`},
+		{"/api/sessions", `{"role":"agentdecker","project":"my-app","effort":"high"}`},
+		{"/api/sessions", `{"role":"agentdecker","project":"my-app","fast":true}`},
 		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","arms":[]}`},
 		{"/api/tasks", `{"project":"my-app","target_kind":"agent","target_agent_id":"a"}`},
+		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","backend":"codex"}`},
+		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","model":"gpt"}`},
+		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","effort":"high"}`},
+		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","fast":true}`},
+		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","assignments":{"standing":{"backend":"codex"}}}`},
+		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","orchestrator":{"backend":"codex"}}`},
+		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","orchestrator":{"backend":"","surprise":"codex"}}`},
+		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","dedicated_assignments":{"stage":{"model":"gpt"}}}`},
 		{"/api/sessions", `not json`},
 	} {
 		rec := httptest.NewRecorder()
@@ -195,6 +207,48 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/projects", "", token))
 	if rec.Code != 200 {
 		t.Fatalf("GET /api/projects = %d", rec.Code)
+	}
+}
+
+func TestRemoteAdmissionCannotOutliveRevoke(t *testing.T) {
+	devices := newRemoteDevices()
+	validated := make(chan struct{})
+	release := make(chan struct{})
+	admitted := make(chan context.Context, 1)
+	go func() {
+		ctx, done, err := devices.admit(context.Background(), "d1", func() error {
+			close(validated)
+			<-release
+			return nil
+		})
+		if err != nil {
+			admitted <- nil
+			return
+		}
+		defer done()
+		admitted <- ctx
+		<-ctx.Done()
+	}()
+	<-validated
+	revoked := make(chan struct{})
+	go func() {
+		devices.end("d1")
+		close(revoked)
+	}()
+	close(release)
+	ctx := <-admitted
+	if ctx == nil {
+		t.Fatal("request was not admitted")
+	}
+	select {
+	case <-revoked:
+	case <-time.After(time.Second):
+		t.Fatal("revoke did not cross the admission boundary")
+	}
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("request admitted during revoke survived")
 	}
 }
 

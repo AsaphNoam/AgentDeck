@@ -2,11 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
 
@@ -82,6 +84,65 @@ func TestRemoteHomeClassifiesAttention(t *testing.T) {
 	if rec := doGET(t, s.routes(), "/api/remote/home"); rec.Code != 404 {
 		t.Fatalf("loopback home = %d", rec.Code)
 	}
+}
+
+func TestRemoteHomeKeepsOlderAttentionBehindTerminalHistory(t *testing.T) {
+	s := testServer(t, true)
+	now := time.Now().UTC()
+	old := now.Add(-2 * time.Hour)
+	if _, err := s.stateStore.CreateTask(state.Task{TaskID: "older-interrupted", Project: "my-app", DisplayName: "older", Instruction: "x", TargetKind: state.TargetLaunch, Role: "implementer", CreatedByKind: "person"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.stateStore.DB().Exec(`UPDATE tasks SET state = ?, updated_at = ? WHERE task_id = ?`, state.TaskInterrupted, old.Format(time.RFC3339Nano), "older-interrupted"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 201; i++ {
+		id := fmt.Sprintf("new-finished-%03d", i)
+		if _, err := s.stateStore.CreateTask(state.Task{TaskID: id, Project: "my-app", DisplayName: id, Instruction: "x", TargetKind: state.TargetLaunch, Role: "implementer", CreatedByKind: "person"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.stateStore.DB().Exec(`UPDATE tasks SET state = ?, updated_at = ? WHERE task_id = ?`, state.TaskFinished, now.Format(time.RFC3339Nano), id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "Two", OrchestratorRole: "implementer", Stages: []pipeline.Stage{{ID: "one", Title: "One"}, {ID: "two", Title: "Two"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	createRun := func(id, stateName string, at time.Time) {
+		t.Helper()
+		if _, _, err := s.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+			RunID: id, TemplateID: "two", TemplateSnapshot: snapshot, DisplayName: id, Project: "my-app", Goal: "x",
+			State: stateName, CurrentStageID: "two", CreatedAt: at, UpdatedAt: at,
+		}, RequestID: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	createRun("older-paused", "paused", old)
+	for i := 0; i < 101; i++ {
+		createRun(fmt.Sprintf("new-completed-%03d", i), "completed", now)
+	}
+	home, err := s.attention(old.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsAttention(home.NeedsYou, "older-interrupted") || !containsAttention(home.NeedsYou, "older-paused") {
+		t.Fatalf("older attention missing: %+v", home.NeedsYou)
+	}
+	for _, item := range home.NeedsYou {
+		if item.ID == "older-paused" && (item.StageNumber != 2 || item.StageCount != 2) {
+			t.Fatalf("run stage fields = %d/%d", item.StageNumber, item.StageCount)
+		}
+	}
+}
+
+func containsAttention(items []attentionItem, id string) bool {
+	for _, item := range items {
+		if item.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func equalStrings(a, b []string) bool {

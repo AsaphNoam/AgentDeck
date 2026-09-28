@@ -23,13 +23,14 @@ function relative(iso: string): string {
 }
 
 function Row({ item }: { item: AttentionItem }) {
+  const stage = item.stage_number && item.stage_count ? `Stage ${item.stage_number} of ${item.stage_count}` : "";
   return (
     <li>
       <button type="button" className="phone-row" onClick={() => navigate(itemPath(item))}>
         <span className="phone-row-title">{item.title}</span>
         <span className="phone-row-reason">
           {item.reason}
-          {item.stage ? ` · ${item.stage}` : ""}
+          {stage ? ` · ${stage}` : ""}
           {item.outcome ? ` · ${item.outcome}` : ""}
         </span>
         <span className="phone-row-meta">

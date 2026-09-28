@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io/fs"
 	"net/http"
 	"path"
@@ -43,6 +44,7 @@ func spaHandler(fsys fs.FS) http.Handler {
 // phone entry for every app route, and the service worker at /sw.js so it can
 // control the whole origin. The desktop entry is never served.
 func phoneSPAHandler(fsys fs.FS) http.Handler {
+	assets := phoneAssetGraph(fsys)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqPath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		switch {
@@ -52,7 +54,10 @@ func phoneSPAHandler(fsys fs.FS) http.Handler {
 		case reqPath == "" || strings.HasPrefix(reqPath, "..") || reqPath == "index.html":
 			reqPath = "remote.html"
 		}
-		if st, err := fs.Stat(fsys, reqPath); err != nil || st.IsDir() {
+		if st, err := fs.Stat(fsys, reqPath); err == nil && !st.IsDir() && !assets[reqPath] {
+			writeRemoteError(w, http.StatusNotFound, codeRemoteRouteNotAvailable, "this file is only available on the Mac")
+			return
+		} else if err != nil || st.IsDir() {
 			reqPath = "remote.html"
 		}
 		if reqPath == "remote.html" {
@@ -68,4 +73,53 @@ func phoneSPAHandler(fsys fs.FS) http.Handler {
 		r2.URL.Path = "/" + reqPath
 		http.ServeFileFS(w, r2, fsys, reqPath)
 	})
+}
+
+type viteManifestEntry struct {
+	File           string   `json:"file"`
+	CSS            []string `json:"css"`
+	Assets         []string `json:"assets"`
+	Imports        []string `json:"imports"`
+	DynamicImports []string `json:"dynamicImports"`
+}
+
+// phoneAssetGraph resolves the phone entry through Vite's build manifest.
+// Files outside this graph may exist in the shared dist but never cross the
+// unauthenticated tailnet static surface (TS-13.R14).
+func phoneAssetGraph(fsys fs.FS) map[string]bool {
+	allowed := map[string]bool{}
+	for name := range phoneFiles {
+		allowed[name] = true
+	}
+	allowed["sw.js"] = true
+	data, err := fs.ReadFile(fsys, ".vite/manifest.json")
+	if err != nil {
+		return allowed
+	}
+	manifest := map[string]viteManifestEntry{}
+	if json.Unmarshal(data, &manifest) != nil {
+		return allowed
+	}
+	seen := map[string]bool{}
+	var visit func(string)
+	visit = func(key string) {
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		entry, ok := manifest[key]
+		if !ok {
+			return
+		}
+		for _, name := range append(append([]string{entry.File}, entry.CSS...), entry.Assets...) {
+			if name != "" {
+				allowed[name] = true
+			}
+		}
+		for _, child := range append(entry.Imports, entry.DynamicImports...) {
+			visit(child)
+		}
+	}
+	visit("remote.html")
+	return allowed
 }

@@ -11,6 +11,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    manifest: true,
     // Two entries share one build and embed: the desktop app and the phone app
     // the tailnet listener serves (TS-08.R73, TS-13.R14).
     rollupOptions: {

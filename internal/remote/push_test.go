@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -48,6 +49,40 @@ func TestVAPIDKeysPersistOwnerOnly(t *testing.T) {
 	}
 	if len(PushTopic("run:r1")) != 32 || strings.ContainsAny(PushTopic("x"), "+/=") {
 		t.Fatal("topic must be 32 URL-safe characters")
+	}
+}
+
+func TestVAPIDKeysConcurrentFirstUseAndModeRepair(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "remote", "vapid.json")
+	const callers = 32
+	results := make([]VAPIDKeys, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := range results {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = LoadOrCreateVAPID(path)
+		}(i)
+	}
+	wg.Wait()
+	for i := range results {
+		if errs[i] != nil || results[i] != results[0] {
+			t.Fatalf("caller %d = %+v, %v; first = %+v", i, results[i], errs[i], results[0])
+		}
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadOrCreateVAPID(path); err != nil {
+		t.Fatal(err)
+	}
+	st, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Mode().Perm() != 0o600 {
+		t.Fatalf("repaired mode = %v", st.Mode())
 	}
 }
 
