@@ -97,4 +97,11 @@ Done:
   catalog carries backend/model env that may hold keys; slice 8 must resolve the New-work
   runtime preselection server-side or via a redacted read, and TS-13.R5 must record it.
 
-Next: slice 3 (pairing + devices).
+- **Slice 3** (2026-09-28) — `remote_pairing.go`: one outstanding code, one pending request
+  (a newer claim declines the older), constant-time compare, five failures burn a code, ten per
+  node per five minutes rate-limit (429 `remote_rate_limited`), desktop allow commits the device
+  row before the phone's 20 s long-poll wait collects the cookie once. `remoteView` now also
+  carries `pending_pairing` and `devices` (TS-13 §3 to be reconciled). Tailnet request log
+  redacts the wait token. Disable resets pairing.
+
+Next: slice 4 (real `tsnet` node).

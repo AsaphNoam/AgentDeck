@@ -70,6 +70,9 @@ var remoteDenied = map[string]bool{
 	// The backend catalog carries backend and model env, which may hold keys.
 	"GET /api/backends": true, "POST /api/backends": true, "PUT /api/backends": true,
 	"PUT /api/config": true, "GET /api/remote": true, "PUT /api/remote": true,
+	"POST /api/remote/pairings": true, "POST /api/remote/pairings/{id}/allow": true,
+	"POST /api/remote/pairings/{id}/decline": true, "GET /api/remote/devices": true,
+	"PATCH /api/remote/devices/{id}": true, "DELETE /api/remote/devices/{id}": true,
 	"GET /api/layout": true, "PUT /api/layout": true,
 	"POST /api/directory-picker": true, "POST /api/hook": true,
 	"GET /api/archive": true, "GET /api/archive/projects/{project}": true,
@@ -239,10 +242,35 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		}
 		authed.Handle(e.pattern, h)
 	}
+	// Tailnet-only phone routes (TS-03.R46).
+	authed.HandleFunc("PATCH /api/remote/self", s.handleRenameSelf)
+	authed.HandleFunc("DELETE /api/remote/self", s.handleUnpairSelf)
 	authed.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeRemoteError(w, http.StatusNotFound, codeRemoteRouteNotAvailable, "this action is only available on the Mac")
 	})
-	return requestLog(s.log, s.remoteGuard(domain, whois, s.remoteAuth(authed)))
+
+	// Pairing is the only unauthenticated non-static surface (TS-13.R8).
+	outer := http.NewServeMux()
+	outer.HandleFunc("POST /api/remote/pair", s.handlePairClaim)
+	outer.HandleFunc("GET /api/remote/pair/{pending_id}", s.handlePairWait)
+	outer.Handle("/", s.remoteAuth(authed))
+	return s.remoteRequestLog(s.remoteGuard(domain, whois, outer))
+}
+
+// remoteRequestLog is requestLog with the pairing wait token redacted from the
+// path (TS-13.R12).
+func (s *Server) remoteRequestLog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/api/remote/pair/") {
+			path = "/api/remote/pair/{pending_id}"
+		}
+		s.log.Info("remote request", "method", r.Method, "path", path, "status", rec.status,
+			"dur_ms", time.Since(start).Milliseconds())
+	})
 }
 
 // remoteGuard pins Host and Origin to the node's certificate domain and

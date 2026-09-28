@@ -180,6 +180,7 @@ type Server struct {
 	remote        *remote.Manager
 	newRemoteNode func() (remote.Node, error)
 	remoteDevices *remoteDevices
+	remotePairing *remotePairing
 }
 
 type taskStartLock struct {
@@ -301,6 +302,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	}
 	s.newRemoteNode = func() (remote.Node, error) { return nil, errRemoteUnsupported }
 	s.remoteDevices = newRemoteDevices()
+	s.remotePairing = &remotePairing{failures: map[string]*peerFailures{}}
 	s.remote = s.newRemoteManager()
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)

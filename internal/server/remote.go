@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	goruntime "runtime"
+	"time"
 
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/remote"
@@ -18,8 +19,10 @@ var errRemoteUnsupported = errors.New("remote control is not available in this b
 // remoteView is the GET /api/remote and remote_update shape (TS-13 §3).
 type remoteView struct {
 	remote.Status
-	KeepAwake          bool `json:"keep_awake"`
-	KeepAwakeAvailable bool `json:"keep_awake_available"`
+	KeepAwake          bool                `json:"keep_awake"`
+	KeepAwakeAvailable bool                `json:"keep_awake_available"`
+	PendingPairing     *pendingPairingView `json:"pending_pairing,omitempty"`
+	Devices            []remoteDeviceView  `json:"devices"`
 }
 
 // newRemoteManager wires the remote subsystem to the server. The node factory
@@ -38,7 +41,10 @@ func (s *Server) remoteViewFor(st remote.Status) remoteView {
 	if cfg, err := s.configStore.ReadConfig(); err == nil {
 		keepAwake = cfg.KeepAwake
 	}
-	return remoteView{Status: st, KeepAwake: keepAwake, KeepAwakeAvailable: goruntime.GOOS == "darwin"}
+	return remoteView{
+		Status: st, KeepAwake: keepAwake, KeepAwakeAvailable: goruntime.GOOS == "darwin",
+		PendingPairing: s.remotePairing.pendingView(time.Now()), Devices: s.remoteDevicesView(),
+	}
 }
 
 // handleGetRemote implements loopback-only GET /api/remote.
@@ -88,6 +94,7 @@ func (s *Server) handlePutRemote(w http.ResponseWriter, r *http.Request) {
 			s.remote.Enable()
 		} else {
 			s.remote.Disable()
+			s.remotePairing.reset()
 		}
 	}
 	// Preference changes move no node state, so the manager may not publish.
