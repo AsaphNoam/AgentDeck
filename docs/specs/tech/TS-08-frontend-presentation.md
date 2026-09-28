@@ -795,6 +795,72 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   display, notification click routing, and caching the app shell; it never caches API responses.
   The desktop bundle does not import `ui/src/remote/`.
 
+### 2.11 Shared creative-workspace layout and finish
+
+- **R74 (planned) — Shared composition has one owner, independent of appearance.** Promote the
+  approved Studio composition into the appropriate `ad-features` styles and repeated construction
+  into `ad-components`; shared semantic values remain in `tokens.css`. Core renders the complete
+  upgraded layout with no skin marker. Remove superseded layout/type-scale/radius overrides from
+  both production skin sheets so the three current appearances share geometry, measures and
+  hierarchy; retain their private palettes, semantic color mappings and canvas ornament. Depth uses
+  shared shadow geometry with palette-derived color, not per-skin offset/blur differences. Do not
+  copy Studio selectors into a second stylesheet, introduce a theme provider/layout mode or branch
+  components on appearance. This supersedes R65's instruction to keep the other layouts intact and
+  R66's unchanged-Core/Sky-geometry clause, not R9's extensible future-skin seam (FS-12.R52/R56–R57;
+  INV §2/§10/§13).
+- **R75 (planned) — Card and composer geometry is content-driven inside existing bounds.** The
+  expanded card explicitly allocates a content-sized header and `minmax(0, 1fr)` conversation
+  region within its existing fixed height; spare height never stretches implicit header rows.
+  Preserve R41/R45's one-track grid, persisted columns/gap, scroll ownership and neighbors.
+  Apply the same compact action construction to the real shared `Composer` in dashboard and
+  full-agent contexts: actions align within their own content-sized region rather than inheriting
+  textarea stretch. Card identity/metadata/preview spacing, quiet drag grip and soft resting depth
+  are owned by the existing card/primitive styles. Remove empty decorative indicator space without
+  removing real mail/sent content or handlers. All reusable values use existing semantic tokens,
+  extending the public token contract only for a genuinely missing role (FS-12.R53; INV §2/§13).
+- **R76 (planned) — Agent and Tasks polish uses existing feature composition, not replacements.**
+  `agent.css` owns the compact identity/runtime/context header, tabs, prose measure and aligned
+  composer. Technical blocks, file-viewer expansion and container-query annotation docking retain
+  R53/R57's layout/scroll behavior. Unsupported live-settings content leaves no decorative frame;
+  capability ownership and staged/live apply semantics remain in the existing feature. `tasks.css`
+  owns inset authoring padding, bounded form measures, field grouping, content-sized actions and
+  ledger row rhythm; narrowly necessary wrappers remain in `TasksPage` with unchanged semantic
+  reading order, draft ownership and submitted payload. Preserve R69–R72's compact setup contracts
+  rather than restoring prototype fields or inventing task semantics. Base feature selectors may
+  address their owned classes; skin selectors continue to use only public hooks. Register/version
+  a new hook only if an actual skin consumer needs it (FS-12.R54–R55; INV §8/§13).
+- **R77 (planned) — Project tabs keep one navigation projection and construction.** Refine existing
+  `ActiveProjectNav`/`shell.css`, using the shared text font, restrained tab geometry and accessible
+  selected/hover/focus treatments. Retain R44's catalog/store projection, alphabetical order,
+  five-link/current-project rule, overflow disclosure and single-row desktop fit. Project RGB stays
+  the existing exact inline-data exception; no independent query, browser measurement algorithm,
+  route, state, storage or overflow implementation is added (FS-12.R58; INV §2/§8/§13).
+- **R78 (planned) — Badge motion is state-driven CSS, not lifecycle bookkeeping.** Use the existing
+  `StateBadge`/`Badge` construction, semantic state colors and indicator. Busy receives approximately
+  2.4s smooth cycles; error and `waiting_input` approximately 1.2s. Animate indicator/emphasis
+  opacity without hiding text, changing layout or moving the card. Scope this recurring effect to
+  live running agent cards, excluding stopped/archived/read-only cards even if their last state was
+  busy/error/waiting. Keep the existing badge status/label contract; the owning card's existing
+  effective `data-state="stopped"` suppresses pulse rather than inventing a stopped badge status.
+  Existing feature-owned `running`/archive values determine eligibility; do not
+  add a status enum, permission subscription, synthetic pipeline-to-agent mapping, timer, persisted
+  animation flag or transition observer. State changes cancel the prior CSS animation naturally.
+  `prefers-reduced-motion: reduce` removes the pulse but keeps the strong static state treatment.
+  This is explicitly sustained state indication under FS-12.R59, not the workflow's transition-only
+  lifecycle celebration; reload in a live state may pulse. Add no motion dependency. Existing busy
+  indicator animation is replaced, not stacked with a second pulse (INV §8/§13).
+- **R79 (planned) — Completion proves shared geometry and finish, not just recoloring.** Extend the
+  existing deterministic matrix only for missing FS-12.A26–A31 cases. Matched content and confirmed
+  1024px/wider viewports must show the common layout and palette-specific appearance; compare
+  desaturated geometry plus normal-color depth/status legibility. Record revision, actual viewport,
+  route/state and rendered evidence; timed observation and reduced-motion checks are required for
+  pulse cadence. Focused regressions protect navigation/card/composer/task behavior and missing/live
+  capability cases; style-contract checks protect selectors/tokens/hooks, followed by the applicable
+  TS-06 closure matrix and generated embed, never a hand edit to `dist`. No pixel-baseline framework
+  or duplicate feature fixtures are added. This supersedes R68/A21's Studio-only compositional
+  distinction when the shared upgrade ships; other existing acceptance debt remains independently
+  open until its evidence exists (INV §10/§13/§17).
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract
@@ -968,6 +1034,11 @@ boundary; the manifest remains the visual contract and arbitrary ids never becom
   explicitly identified as a browser-only visual check.
 
 ## 5. Deviations & open decisions
+
+- FS-12.R52–R59/A26–A31 and R74–R79 define the approved 2026-09-28 shared-layout upgrade.
+  Implementation has not started; all remain planned. The earlier Studio-specific architecture
+  stays incumbent until rollout, with the superseded preservation/oracle clauses explicitly scoped
+  above. No persistence, protocol, security, retention or external-skin decision is changed.
 
 - **Selected architecture: layered plain CSS.** CSS Modules plus a React provider were rejected
   because hashed implementation classes weaken rich skin overrides and a provider makes the core

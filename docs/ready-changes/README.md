@@ -43,6 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`share-creative-workspace-layout.md`](share-creative-workspace-layout.md) — finish Figma-directed
+  composition, project tabs and status badges, then share the layout across all three palettes.
+
 - [`simplify-agent-and-automation-setup.md`](simplify-agent-and-automation-setup.md) — reduce setup
   overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
 - [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand

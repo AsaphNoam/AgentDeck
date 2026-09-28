@@ -600,9 +600,9 @@ Requirements are user-observable.
 
 ## 6. Deviations & open decisions
 
-- R52–R59/A26–A31 are the 2026-09-28 proposed cross-appearance upgrade, including the operator's
-  follow-up for project tabs and stronger pulsing badges. Product scope awaits
-  the operator's confirmation before technical design and creation of a ready change. Older
+- R52–R59/A26–A31 are the 2026-09-28 approved cross-appearance upgrade, including the operator's
+  follow-up for project tabs and stronger pulsing badges. The operator approved this scope on
+  2026-09-28; TS-08.R74–R79 specify its architecture and the ready change is Waiting to start. Older
   shipped Studio behavior remains the incumbent until implementation; previous A19–A23/TS-08.R68
   evidence debt is not closed by this draft. A21's Studio-only layout oracle will be superseded
   by A26 when this upgrade ships, not silently treated as passed.
