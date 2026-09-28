@@ -3,7 +3,7 @@ import { getFileContent } from "../../api/client";
 import type { FileContent } from "../../api/types";
 import { CodeBlock } from "./renderers/CodeBlock";
 import { SanitizedMarkdown } from "./renderers/SanitizedMarkdown";
-import type { FileLink } from "./renderers/filePath";
+import { resolveFromFile, type FileLink } from "./renderers/filePath";
 
 // The read-only, one-file viewer that opens beside the transcript (FS-03.R52).
 // It holds no durable state: `?file=`/`?fileLine=` on the route are the open
@@ -62,6 +62,11 @@ export function FileViewer({ agentId, link, onClose, onOpenFile }: {
 
   const isMarkdown = view.status === "loaded" && MARKDOWN_LANGUAGES.has(view.file.language);
   const showRendered = isMarkdown && rendered;
+  // A rendered file's own links are relative to that file, not to the working
+  // directory the server resolves against (FS-03.R52).
+  const openFromFile = onOpenFile && view.status === "loaded"
+    ? (target: FileLink) => onOpenFile({ ...target, path: resolveFromFile(view.file.path, target.path) })
+    : onOpenFile;
 
   return (
     <aside className="file-viewer" data-ui="file-viewer" data-state={view.status}>
@@ -92,7 +97,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile }: {
         {view.status === "error" && <p className="file-viewer-error" role="alert">{view.reason}</p>}
         {view.status === "loaded" && (showRendered ? (
           <div className="file-viewer-rendered">
-            <SanitizedMarkdown text={view.file.content} onOpenFile={onOpenFile} />
+            <SanitizedMarkdown text={view.file.content} onOpenFile={openFromFile} />
           </div>
         ) : (
           <CodeBlock language={view.file.language || "text"} showLineNumbers markedLine={link.line}>

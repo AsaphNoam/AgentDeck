@@ -11,8 +11,13 @@ export type FileLink = { path: string; line?: number };
 // (`vscode:`, `slack:`) out of the viewer instead of feeding it a nonsense path.
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
-// A trailing `:12` or `:12:3` cites a line (and column, which the viewer ignores).
-const LINE_SUFFIX = /:(\d+)(?::\d+)?$/;
+// A trailing `:12`, `:12:3`, or Codex's `:12-40` cites a line; the column or range
+// end is ignored and the viewer marks the first cited line.
+const LINE_SUFFIX = /:(\d+)(?:[:-]\d+)?$/;
+
+// `README.md:12` matches the scheme grammar, but a "scheme" followed only by a line
+// suffix is a bare file name citing a line, not a URL.
+const LINE_ONLY = /^\d+(?:[:-]\d+)?$/;
 
 // classifyFileLink returns the file the link names, or null when the link is not
 // a local path and must keep its ordinary browser behavior.
@@ -23,7 +28,8 @@ export function classifyFileLink(href: string | undefined): FileLink | null {
   if (raw.startsWith("#") || raw.startsWith("//")) return null;
 
   let target = raw;
-  if (SCHEME.test(target)) {
+  const scheme = SCHEME.exec(target);
+  if (scheme && !LINE_ONLY.test(target.slice(scheme[0].length))) {
     if (!/^file:/i.test(target)) return null;
     target = fromFileURL(target);
     if (!target) return null;
@@ -51,6 +57,22 @@ function fromFileURL(url: string): string {
   } catch {
     return "";
   }
+}
+
+// resolveFromFile resolves a link found inside a rendered file against that file's
+// own directory, as Markdown does (FS-03.R52). `fromFile` is the viewer's
+// working-directory-relative path. An absolute target passes through; a target
+// that climbs above the working directory keeps its leading `..` so the server
+// still refuses it rather than the client silently clamping it.
+export function resolveFromFile(fromFile: string, target: string): string {
+  if (target.startsWith("/")) return target;
+  const parts = fromFile.split("/").slice(0, -1);
+  for (const segment of target.split("/")) {
+    if (segment === "" || segment === ".") continue;
+    if (segment === ".." && parts.length > 0 && parts[parts.length - 1] !== "..") parts.pop();
+    else parts.push(segment);
+  }
+  return parts.join("/");
 }
 
 // formatFileLabel renders the path with its cited line, which is how a link and

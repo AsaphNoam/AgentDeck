@@ -68,19 +68,27 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
+	// The request log records neither the query nor the refusal code, so each
+	// refusal is logged here: a report of a link that would not open can then be
+	// tied to the path that reached the server and the boundary it hit (INV §8).
+	requested := r.URL.Query().Get("path")
+	refuse := func(apiErr *runtime.APIError) {
+		s.log.Info("file read refused", "agent_id", id, "path", requested, "code", apiErr.Code)
+		writeAPIError(w, apiErr)
+	}
 	root, apiErr := resolveWorkspaceRoot(snap.Cwd)
 	if apiErr != nil {
-		writeAPIError(w, apiErr)
+		refuse(apiErr)
 		return
 	}
-	rel, apiErr := relativeReadPath(snap.Cwd, root, r.URL.Query().Get("path"))
+	rel, apiErr := relativeReadPath(snap.Cwd, root, requested)
 	if apiErr != nil {
-		writeAPIError(w, apiErr)
+		refuse(apiErr)
 		return
 	}
 	out, apiErr := readWorkspaceFile(root, rel)
 	if apiErr != nil {
-		writeAPIError(w, apiErr)
+		refuse(apiErr)
 		return
 	}
 	out.AgentID = id
@@ -138,12 +146,42 @@ func rebaseAbsolute(cwd, root, abs string) (string, bool) {
 			continue
 		}
 		rel, err := filepath.Rel(base, abs)
-		if err != nil || escapesRoot(rel) {
-			continue
+		if err == nil && !escapesRoot(rel) {
+			return rel, true
 		}
-		return rel, true
+		if rel, ok := rebaseCaseVariant(base, abs); ok {
+			return rel, true
+		}
 	}
 	return "", false
+}
+
+// rebaseCaseVariant accepts an absolute path whose leading components spell the
+// base in another case (`/users/me/proj/a.md` against `/Users/me/proj`), as an
+// agent that took its root from git or realpath may write on macOS's
+// case-insensitive disk. The variant is accepted only when it names the same
+// directory on disk as the base; only that case-variant of the working directory
+// is ever stat'ed, never the requested target, so a refusal still says nothing
+// about what exists elsewhere (TS-05.R21).
+func rebaseCaseVariant(base, abs string) (string, bool) {
+	sep := string(filepath.Separator)
+	if len(abs) <= len(base) || !strings.EqualFold(abs[:len(base)], base) ||
+		!strings.HasPrefix(abs[len(base):], sep) {
+		return "", false
+	}
+	variant, err := os.Stat(abs[:len(base)])
+	if err != nil {
+		return "", false
+	}
+	recorded, err := os.Stat(base)
+	if err != nil || !os.SameFile(variant, recorded) {
+		return "", false
+	}
+	rel := filepath.Clean(strings.TrimPrefix(abs[len(base):], sep))
+	if escapesRoot(rel) {
+		return "", false
+	}
+	return rel, true
 }
 
 // escapesRoot reports whether a cleaned relative path leaves its root.

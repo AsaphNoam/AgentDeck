@@ -388,8 +388,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R51** — **A file link an agent wrote opens the file.** In assistant
   Markdown, a link whose target is a local filesystem path — relative
-  (`internal/state/messages.go`), absolute, or `file://`, optionally suffixed `:line` or
-  `:line:col` — opens that file in AgentDeck's file viewer (R52) instead of navigating the browser.
+  (`internal/state/messages.go`), absolute, or `file://`, optionally suffixed `:line`,
+  `:line:col`, or a `:start-end` range cited by its start line — opens that file in AgentDeck's file viewer (R52) instead of navigating the browser.
   Today such a link is an ordinary relative anchor, so activating it leaves the agent screen, fails
   to resolve as an application route, and lands on the dashboard after a full reload, losing the
   reader's place in the conversation; that is the defect this closes. `http`, `https`, and `mailto`
@@ -404,7 +404,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   transcript applies to fenced code (R2). A link carrying a line anchor scrolls that line into view
   and marks it, so a cited line is found rather than hunted for. A Markdown file additionally offers
   **Rendered** and **Source**; the rendered form uses the same sanitized Markdown and diagram
-  rendering an assistant message uses (R20, R37, R38) and gains no capability beyond it. Opening
+  rendering an assistant message uses (R20, R37, R38) and gains no capability beyond it; a relative
+  link inside a rendered file is relative to that file's own directory, as in ordinary Markdown, and
+  a link that climbs above the working directory still reaches R55's refusal. Opening
   another file replaces the open one: there is one panel, with no tabs and no history. Content is
   read when the file is opened and when **Reload** is chosen — AgentDeck does not watch or poll the
   file — so the panel states when its content was read, and a file the agent rewrites afterwards
@@ -767,13 +769,17 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **A34** (R51) — In an assistant message, a link whose target is a
   relative path, an absolute path, and a `file://` path each open the viewer with no browser
-  navigation and no route change, a `:line` suffix is carried through to the viewer, an `https:`
-  link keeps its ordinary behavior, and a bare path written in prose renders as text with no link.
-  *Verify by* `ui/src/components/chat/renderers/AssistantText.test.tsx`.
+  navigation and no route change, a `:line` suffix is carried through to the viewer, a bare file
+  name with a line suffix (`README.md:12`) is a file link rather than a URL scheme, a `:start-end`
+  range cites its start line, an `https:` link keeps its ordinary behavior, and a bare path written
+  in prose renders as text with no link. *Verify by*
+  `ui/src/components/chat/renderers/AssistantText.test.tsx` and
+  `ui/src/components/chat/renderers/filePath.test.ts`.
 - **A35** (R52) — Opening a file renders its text with line numbers,
   scrolls to and marks a cited line, replaces the open file when a second is opened, re-reads on
   **Reload**, and offers **Rendered**/**Source** only for a Markdown file with the rendered form
-  going through the sanitized renderer. *Verify by* `ui/src/components/chat/FileViewer.test.tsx`.
+  going through the sanitized renderer, whose relative links resolve against the viewed file's
+  directory. *Verify by* `ui/src/components/chat/FileViewer.test.tsx`.
 - **A36** (R53, R54) — With a file open, a wide transcript region renders
   the viewer as a docked left column beside a reflowed transcript and a narrow one takes the width
   from the transcript, with the conversation's own content unchanged in both; a file link inside an

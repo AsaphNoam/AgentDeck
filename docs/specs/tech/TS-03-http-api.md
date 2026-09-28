@@ -553,7 +553,10 @@ reloads the collections through this route rather than reconstructing them from 
   `GET /api/sessions/{id}/file?path=<p>` beside the shipped `.../files`, `.../commands`, and
   `.../file-search` reads (FS-05.R15, FS-03.R30). `path` is interpreted relative to the working
   directory recorded on that agent's session; an absolute path is accepted only when it resolves
-  inside that directory. The caller supplies a path, never a root. Success is `200` with
+  inside that directory, including one that spells the directory in another case when that
+  spelling names the same directory on disk (macOS's case-insensitive volumes); only that
+  case-variant of the directory is examined, never the requested target. Each refusal is logged
+  locally with the requested `path` and its code. The caller supplies a path, never a root. Success is `200` with
   `{agent_id, path, size, mod_time, line_count, content, truncated, language}`, where `path` is the
   relative form the viewer displays, `content` is UTF-8 text, `truncated` marks a bounded partial
   read of a larger file, and `language` is a highlighting hint derived from the file extension —

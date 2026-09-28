@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -141,6 +143,47 @@ func TestFileReadAcceptsAbsolutePathInsideRoot(t *testing.T) {
 	got := readFileOK(t, h, "a_abs", filepath.Join(root, "main.go"))
 	if got.Path != "main.go" {
 		t.Fatalf("path = %q, want the relative form", got.Path)
+	}
+}
+
+// TestFileReadAcceptsCaseVariantOfRoot covers BR-6: on a case-insensitive
+// volume an absolute link spelling the working directory in another case names a
+// file inside it and must read, while a case variant that is a different
+// directory stays refused (TS-05.R21).
+func TestFileReadAcceptsCaseVariantOfRoot(t *testing.T) {
+	srv := testServer(t, false)
+	root := seedReadableWorkspace(t, srv, "a_case")
+	variant := strings.ToUpper(root)
+	if variant == root {
+		t.Skip("temp directory has no letters to vary")
+	}
+	if _, err := os.Stat(variant); err != nil {
+		t.Skip("temp volume is case-sensitive")
+	}
+	h := srv.routes()
+
+	got := readFileOK(t, h, "a_case", filepath.Join(variant, "internal", "state", "messages.go"))
+	if got.Path != "internal/state/messages.go" {
+		t.Fatalf("path = %q, want the relative form", got.Path)
+	}
+	readFileRefused(t, h, "a_case", filepath.Join(variant, "..", "x"), runtime.CodePathRefused, http.StatusUnprocessableEntity)
+	readFileRefused(t, h, "a_case", filepath.Join(variant+"x", "main.go"), runtime.CodePathRefused, http.StatusUnprocessableEntity)
+}
+
+// TestFileReadLogsRefusal proves a refused read leaves the requested path and
+// the refusal code in the local log (INV §8), so a report can name the boundary.
+func TestFileReadLogsRefusal(t *testing.T) {
+	srv := testServer(t, false)
+	seedReadableWorkspace(t, srv, "a_log")
+	var buf bytes.Buffer
+	srv.log = slog.New(slog.NewTextHandler(&buf, nil))
+	h := srv.routes()
+
+	readFileRefused(t, h, "a_log", "../escape.md", runtime.CodePathRefused, http.StatusUnprocessableEntity)
+	logs := buf.String()
+	if !strings.Contains(logs, "file read refused") || !strings.Contains(logs, "path=../escape.md") ||
+		!strings.Contains(logs, "code="+runtime.CodePathRefused) {
+		t.Fatalf("refusal not logged with path and code: %s", logs)
 	}
 }
 

@@ -101,13 +101,16 @@ describe("FileViewer", () => {
   });
 
   it("offers Rendered/Source for Markdown only, with the rendered form going through the sanitized renderer", async () => {
-    render(<FileViewer agentId="a_1" link={{ path: "docs/notes.md" }} onClose={vi.fn()} onOpenFile={vi.fn()} />);
+    const onOpenFile = vi.fn();
+    render(<FileViewer agentId="a_1" link={{ path: "docs/notes.md" }} onClose={vi.fn()} onOpenFile={onOpenFile} />);
 
     // Rendered is the default: the heading is a heading, not literal `# Title`.
     expect(await screen.findByRole("heading", { name: "Title" })).toBeInTheDocument();
     // The rendered form gains no capability beyond an assistant message: its own
-    // file link is the same upgraded control, not a browser navigation.
-    expect(screen.getByRole("button", { name: "other" })).toHaveAttribute("data-file-path", "other.go");
+    // file link is the same upgraded control, not a browser navigation, and it
+    // resolves against the viewed file's directory.
+    fireEvent.click(screen.getByRole("button", { name: "other" }));
+    expect(onOpenFile).toHaveBeenCalledWith({ path: "docs/other.go" });
 
     fireEvent.click(screen.getByRole("button", { name: "Source" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Title" })).not.toBeInTheDocument());
@@ -119,11 +122,10 @@ describe("FileViewer", () => {
     expect(screen.queryByRole("button", { name: "Rendered" })).not.toBeInTheDocument();
   });
 
-  // BR-6 reproduction, skipped until /fix: a link inside a rendered Markdown file is handed on
-  // verbatim, so the server resolves it against the working directory instead of the file's own
-  // directory. `../archive/x.md` from `docs/features/notes.md` is refused as outside the working
-  // directory, and a sibling link reads the wrong file or none.
-  it.skip("resolves a rendered file's own links against that file's directory (BR-6)", async () => {
+  // BR-6: a link inside a rendered Markdown file resolves against that file's own directory, so
+  // `../archive/x.md` from `docs/features/notes.md` is not refused as outside the working
+  // directory and a sibling link reads the sibling.
+  it("resolves a rendered file's own links against that file's directory (BR-6)", async () => {
     server.use(http.get("/api/sessions/:id/file", ({ request }) => {
       const requested = new URL(request.url).searchParams.get("path") ?? "";
       return HttpResponse.json(fileBody({ path: requested, content: "See [up](../archive/x.md) and [side](sibling.md).\n", language: "markdown", line_count: 1 }));

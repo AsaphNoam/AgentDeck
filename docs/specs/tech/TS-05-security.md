@@ -158,7 +158,10 @@ sensitive-context sharing is a practical problem.
   inherits nothing and needs its own policy, which is this. The only readable root is the working
   directory recorded on that agent's own session snapshot, read from server-side state; the request
   supplies a path and can never supply or influence a root. That path is cleaned and refused before
-  any filesystem access when it escapes the root, cannot be expressed inside it, or names `.git`.
+  any filesystem access when it escapes the root, cannot be expressed inside it, or names `.git`;
+  the one exception is an absolute path whose leading components spell the recorded directory in
+  another case, where that case-variant of the directory alone is stat'ed to confirm it is the same
+  directory, so the verdict still reveals nothing about the requested target or anything else.
   The candidate is then classified through an `os.Root` handle on that directory and opened through
   the same handle: `Root.Stat` decides the target's kind before anything is opened, and `Root.Open`
   returns the descriptor. Every resolution is root-confined, so a symlink inside the directory
