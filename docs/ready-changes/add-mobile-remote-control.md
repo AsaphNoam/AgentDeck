@@ -115,4 +115,10 @@ Done:
   `TestContextSharingStartsNoModelTurn` (baseline sampled before the held turn's prompt lands);
   passes alone and in the server package.
 
-Next: slice 5 (attention helper + `GET /api/remote/home`).
+- **Slice 5** (2026-09-28) — `remote_home.go`: `Server.attention(since)` classifies the bus
+  agent snapshot (permission vs question via `permissionTools`), `ListAttentionTasks` (new
+  bounded query) and the latest `pipelineMgr.ListPage` runs into Needs you (oldest first) /
+  Moving (by project) / Since last; reasons are fixed constants push will reuse. `RunSummary`
+  gained `stage_number`/`stage_count`. Tailnet-only `GET /api/remote/home?since=`.
+
+Next: slice 6 (desktop Remote settings section).

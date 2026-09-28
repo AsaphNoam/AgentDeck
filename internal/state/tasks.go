@@ -712,6 +712,33 @@ func (s *Store) ListTasks(project string) ([]Task, error) {
 	return tasks, nil
 }
 
+// ListAttentionTasks returns, across projects, the tasks the phone's Home can
+// show: those needing a person or in motion, plus those finished after since.
+// It is bounded and unhydrated — Home needs only the row (TS-13.R10, INV §16).
+func (s *Store) ListAttentionTasks(since time.Time, limit int) ([]Task, error) {
+	rows, err := s.db.Query(taskSelect+`
+WHERE state IN (?, ?, ?, ?, ?) OR (state = ? AND updated_at > ?)
+ORDER BY updated_at DESC, task_id LIMIT ?`,
+		TaskInterrupted, TaskDependencyFailed, TaskStarting, TaskRunning, TaskWaiting,
+		TaskFinished, formatTime(since), limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list attention tasks: %w", err)
+	}
+	defer rows.Close()
+	tasks := []Task{}
+	for rows.Next() {
+		task, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate attention tasks: %w", err)
+	}
+	return tasks, nil
+}
+
 // ListTasksForPipelineRun follows durable lineage rather than creator identity,
 // so a reused orchestrator cannot pull unrelated work into run cleanup.
 // ListPipelineCleanupMembers returns one bounded page of the tasks a cleanup

@@ -243,6 +243,7 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		authed.Handle(e.pattern, h)
 	}
 	// Tailnet-only phone routes (TS-03.R46).
+	authed.HandleFunc("GET /api/remote/home", s.handleRemoteHome)
 	authed.HandleFunc("PATCH /api/remote/self", s.handleRenameSelf)
 	authed.HandleFunc("DELETE /api/remote/self", s.handleUnpairSelf)
 	authed.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {

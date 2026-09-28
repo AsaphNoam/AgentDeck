@@ -105,20 +105,24 @@ type RunDetail struct {
 // attempt history is malformed. Detail reads remain strict so controls cannot
 // operate on a partially decoded state machine.
 type RunSummary struct {
-	RunID             string       `json:"run_id"`
-	TemplateID        string       `json:"template_id"`
-	DisplayName       string       `json:"display_name"`
-	Project           string       `json:"project"`
-	State             string       `json:"state"`
-	Revision          int64        `json:"revision"`
-	PendingAction     string       `json:"pending_action"`
-	CurrentStageID    string       `json:"current_stage_id"`
-	CurrentStageTitle string       `json:"current_stage_title"`
-	CurrentAgentID    string       `json:"current_agent_id"`
-	AttentionReason   string       `json:"attention_reason"`
-	FinalOutcome      string       `json:"final_outcome"`
-	UpdatedAt         string       `json:"updated_at"`
-	Diagnostics       []Diagnostic `json:"diagnostics"`
+	RunID             string `json:"run_id"`
+	TemplateID        string `json:"template_id"`
+	DisplayName       string `json:"display_name"`
+	Project           string `json:"project"`
+	State             string `json:"state"`
+	Revision          int64  `json:"revision"`
+	PendingAction     string `json:"pending_action"`
+	CurrentStageID    string `json:"current_stage_id"`
+	CurrentStageTitle string `json:"current_stage_title"`
+	// StageNumber (1-based) and StageCount give the phone's "Stage 2 of 4"
+	// (FS-20.R11); zero when the frozen snapshot cannot say.
+	StageNumber     int          `json:"stage_number"`
+	StageCount      int          `json:"stage_count"`
+	CurrentAgentID  string       `json:"current_agent_id"`
+	AttentionReason string       `json:"attention_reason"`
+	FinalOutcome    string       `json:"final_outcome"`
+	UpdatedAt       string       `json:"updated_at"`
+	Diagnostics     []Diagnostic `json:"diagnostics"`
 }
 
 type ControlError struct {

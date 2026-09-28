@@ -443,6 +443,7 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 		}
 		diagnostics := []Diagnostic{}
 		stageTitle := run.CurrentStageID
+		stageNumber, stageCount := 0, 0
 		var snapshot Template
 		if err := json.Unmarshal(run.TemplateSnapshot, &snapshot); err != nil {
 			// Only the frozen snapshot failed to decode: this projection never
@@ -450,7 +451,11 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 			diagnostics = appendBounded(diagnostics, Diagnostic{Field: "current_stage_title", Code: "frozen_stage_title_unavailable", Message: "frozen template snapshot could not be decoded"})
 		} else {
 			foundTitle := false
-			for _, stage := range snapshot.Stages {
+			stageCount = len(snapshot.Stages)
+			for i, stage := range snapshot.Stages {
+				if stage.ID == run.CurrentStageID {
+					stageNumber = i + 1
+				}
 				if stage.ID == run.CurrentStageID && stage.Title != "" {
 					stageTitle = stage.Title
 					foundTitle = true
@@ -465,8 +470,8 @@ func (m *Manager) ListPage(limit, offset int) ([]RunSummary, int, error) {
 			RunID: run.RunID, TemplateID: run.TemplateID, DisplayName: run.DisplayName,
 			Project: run.Project, State: run.State, Revision: run.Revision,
 			PendingAction: run.PendingAction, CurrentStageID: run.CurrentStageID,
-			CurrentStageTitle: stageTitle,
-			CurrentAgentID:    run.CurrentAgentID, AttentionReason: run.AttentionReason,
+			CurrentStageTitle: stageTitle, StageNumber: stageNumber, StageCount: stageCount,
+			CurrentAgentID: run.CurrentAgentID, AttentionReason: run.AttentionReason,
 			FinalOutcome: run.FinalOutcome, UpdatedAt: run.UpdatedAt.Format(time.RFC3339Nano),
 			Diagnostics: diagnostics,
 		})
