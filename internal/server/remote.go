@@ -97,6 +97,9 @@ func (s *Server) handlePutRemote(w http.ResponseWriter, r *http.Request) {
 			s.remotePairing.reset()
 		}
 	}
+	if body.KeepAwake != nil {
+		s.nudgeKeepAwake()
+	}
 	// Preference changes move no node state, so the manager may not publish.
 	view := s.remoteViewFor(s.remote.Status())
 	s.eventBus.Publish("remote_update", nil, view)

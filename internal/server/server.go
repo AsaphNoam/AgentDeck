@@ -182,6 +182,10 @@ type Server struct {
 	newRemoteNode func() (remote.Node, error)
 	remoteDevices *remoteDevices
 	remotePairing *remotePairing
+
+	// keepAwake is the idle-sleep assertion owned by runKeepAwake (TS-13.R13).
+	keepAwake      *remote.KeepAwake
+	keepAwakeNudge chan struct{}
 }
 
 type taskStartLock struct {
@@ -306,6 +310,8 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 	}
 	s.remoteDevices = newRemoteDevices()
 	s.remotePairing = &remotePairing{failures: map[string]*peerFailures{}}
+	s.keepAwake = remote.NewKeepAwake(nil)
+	s.keepAwakeNudge = make(chan struct{}, 1)
 	s.remote = s.newRemoteManager()
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)
@@ -490,6 +496,8 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("recover dependent work: %w", err)
 	}
 	s.startTaskDispatcher(sweepCtx)
+	go s.runKeepAwake(sweepCtx)
+	defer s.keepAwake.Close()
 	if s.sourceMgr != nil {
 		// Hydrate persisted bindings so the watcher detects external edits (invariant §1).
 		projects, _ := s.configStore.ListProjects()

@@ -121,4 +121,10 @@ Done:
   Moving (by project) / Since last; reasons are fixed constants push will reuse. `RunSummary`
   gained `stage_number`/`stage_count`. Tailnet-only `GET /api/remote/home?since=`.
 
+- **Slice 10** (2026-09-28, taken early; server-only) — `remote.KeepAwake` serializes one
+  `/usr/bin/caffeinate -i -w <pid>` assertion; `Server.runKeepAwake` owns it, re-evaluating
+  `workActive()` (busy agent, pending permission, queued/running run) on debounced bus events,
+  nudges from `PUT /api/remote`, and a 15 s tick; released on shutdown. Off macOS it never runs
+  (`keep_awake_available` false). `pmset -g assertions` manual check still owed.
+
 Next: slice 6 (desktop Remote settings section).
