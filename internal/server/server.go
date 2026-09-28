@@ -179,6 +179,7 @@ type Server struct {
 	// is its node factory seam; tests inject a fake tailnet node.
 	remote        *remote.Manager
 	newRemoteNode func() (remote.Node, error)
+	remoteDevices *remoteDevices
 }
 
 type taskStartLock struct {
@@ -299,6 +300,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		repoBackedCache:           map[string]repoBackedEntry{},
 	}
 	s.newRemoteNode = func() (remote.Node, error) { return nil, errRemoteUnsupported }
+	s.remoteDevices = newRemoteDevices()
 	s.remote = s.newRemoteManager()
 	s.pipelineTemplates = pipeline.NewTemplateStore(cfgStore)
 	s.pipelineMgr = pipeline.NewManager(stateStore, s.pipelineTemplates, s, s)

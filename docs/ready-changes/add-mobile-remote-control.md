@@ -89,4 +89,12 @@ Done:
   `(planned)` until their user-visible surface lands. Test: `go test -race ./internal/remote
   ./internal/server -run Remote`.
 
-Next: slice 2 (tailnet chain).
+- **Slice 2** (2026-09-28) — `routeTable()` feeds both muxes; `remote_routes.go` holds
+  `remoteAllowed` (with per-route body field lists, TS-13.R6) and `remoteDenied`, guard, cookie
+  auth (hash lookup, node binding, daily re-issue, minute-throttled `last_seen_at`), per-device
+  request registry (`remoteDevices.end/endAll`), and `serveRemote`. The phone SSE drops
+  `remote_update`. Review note (reversible choice): `GET /api/backends` is denied because the
+  catalog carries backend/model env that may hold keys; slice 8 must resolve the New-work
+  runtime preselection server-side or via a redacted read, and TS-13.R5 must record it.
+
+Next: slice 3 (pairing + devices).

@@ -2,17 +2,45 @@ package server
 
 import "net/http"
 
-// routes builds the Go 1.22 ServeMux with all Phase 0 GET routes. Method+path
-// patterns mean a non-GET request to a registered route yields 405 automatically,
-// and an unmatched /api/* path falls to the explicit 404-JSON catch-all.
+// routeEntry is one loopback route. raw routes skip the API middleware.
+type routeEntry struct {
+	pattern string
+	handler http.Handler
+	raw     bool
+}
+
+// routes builds the loopback Go 1.22 ServeMux from routeTable. Method+path
+// patterns mean a non-GET request to a registered route yields 405
+// automatically, and an unmatched /api/* path falls to the explicit 404-JSON
+// catch-all.
 //
 // API handlers are wrapped with CORS + request-logging middleware. The static UI
 // handler is mounted at "/" with SPA fallback.
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
+	for _, e := range s.routeTable() {
+		if e.raw {
+			mux.Handle(e.pattern, e.handler)
+		} else {
+			mux.Handle(e.pattern, withMiddleware(s.log, e.handler))
+		}
+	}
+	// The localOnly guard (security.go) wraps the WHOLE mux — including the
+	// raw-mounted /mcp and terminal-WS routes — so Host-header (DNS rebinding)
+	// and Origin (cross-site WS / simple-request CSRF) enforcement cannot be
+	// bypassed by a route that skips the per-route API middleware.
+	return localOnly(mux)
+}
 
+// routeTable is the loopback route inventory. The tailnet listener registers
+// the subset its allowlist names, with the same handlers (TS-13.R4/R5, INV §2).
+func (s *Server) routeTable() []routeEntry {
+	var table []routeEntry
 	api := func(pattern string, h http.HandlerFunc) {
-		mux.Handle(pattern, withMiddleware(s.log, h))
+		table = append(table, routeEntry{pattern: pattern, handler: h})
+	}
+	raw := func(pattern string, h http.Handler) {
+		table = append(table, routeEntry{pattern: pattern, handler: h, raw: true})
 	}
 
 	api("GET /api/health", s.handleHealth)
@@ -121,7 +149,7 @@ func (s *Server) routes() http.Handler {
 	api("PUT /api/config-sources/{backend_id}", s.handleBindConfigSource)
 	api("POST /api/config-sources/{backend_id}/refresh", s.handleRefreshConfigSource)
 	api("DELETE /api/config-sources/{backend_id}", s.handleDeleteConfigSource)
-	mux.Handle("GET /api/sessions/{id}/terminal/ws", http.HandlerFunc(s.handleTerminalWS))
+	raw("GET /api/sessions/{id}/terminal/ws", http.HandlerFunc(s.handleTerminalWS))
 
 	// Catch-all for any other /api/* path → 404 JSON (more specific GET routes
 	// above win via the 1.22 mux precedence rules). Registered GET-only on
@@ -135,7 +163,7 @@ func (s *Server) routes() http.Handler {
 	// 405 before the CORS middleware (which answers OPTIONS with 204) is reached.
 	// The wrapped handler body never runs — cors() short-circuits OPTIONS. A
 	// method-specific "OPTIONS /" does not conflict with "GET /..." patterns.
-	mux.Handle("OPTIONS /", withMiddleware(s.log, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})))
+	api("OPTIONS /", func(http.ResponseWriter, *http.Request) {})
 
 	// In-process MCP messaging server (Phase 5, techspec §2.2 (A)): the go-sdk
 	// streamable HTTP transport. Registered for the explicit methods the
@@ -144,9 +172,9 @@ func (s *Server) routes() http.Handler {
 	// API middleware): the transport speaks its own protocol, not the JSON API.
 	if s.messaging != nil {
 		h := s.messaging.Handler()
-		mux.Handle("POST /mcp", h)
-		mux.Handle("GET /mcp", h)
-		mux.Handle("DELETE /mcp", h)
+		raw("POST /mcp", h)
+		raw("GET /mcp", h)
+		raw("DELETE /mcp", h)
 	}
 
 	// Everything else is the embedded UI with SPA fallback. Registered for GET
@@ -154,11 +182,6 @@ func (s *Server) routes() http.Handler {
 	// requests to /api/* routes, and silently serve the SPA (200) instead of
 	// letting the mux return 405 for a wrong method. (A GET-only "/" does not
 	// conflict with "GET /api/"; a HEAD "/" would, per the mux precedence rules.)
-	mux.Handle("GET /", withMiddleware(s.log, s.staticHandler()))
-
-	// The localOnly guard (security.go) wraps the WHOLE mux — including the
-	// raw-mounted /mcp and terminal-WS routes above — so Host-header (DNS
-	// rebinding) and Origin (cross-site WS / simple-request CSRF) enforcement
-	// cannot be bypassed by a route that skips the per-route API middleware.
-	return localOnly(mux)
+	table = append(table, routeEntry{pattern: "GET /", handler: s.staticHandler()})
+	return table
 }

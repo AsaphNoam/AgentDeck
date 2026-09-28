@@ -27,7 +27,7 @@ type remoteView struct {
 func (s *Server) newRemoteManager() *remote.Manager {
 	return remote.NewManager(
 		func() (remote.Node, error) { return s.newRemoteNode() },
-		nil,
+		s.serveRemote,
 		func(st remote.Status) { s.eventBus.Publish("remote_update", nil, s.remoteViewFor(st)) },
 		s.log,
 	)

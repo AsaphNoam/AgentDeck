@@ -44,6 +44,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 
 	ctx := r.Context()
+	// The desktop-only remote state (including the sign-in URL) never reaches a
+	// phone's stream (TS-03.R46, TS-13.R3).
+	phone := remoteFrom(ctx) != nil
 	for {
 		select {
 		case <-ctx.Done():
@@ -51,6 +54,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		case ev, open := <-ch:
 			if !open {
 				return
+			}
+			if phone && ev.Type == "remote_update" {
+				continue
 			}
 			writeBusSSE(w, ev)
 			flusher.Flush()
