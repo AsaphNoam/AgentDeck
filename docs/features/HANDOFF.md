@@ -180,6 +180,15 @@ example an unguarded diagram or runtime-activity payload), a skipped-version upg
 tab left open from the old version remain possible and untested. This Mac's installed release is still
 `0.1.2`, so the reporter's install is elsewhere and its prior version is unknown.
 
+Follow-up (2026-09-28): the reporter's incognito window works; clearing cookies, local storage and
+session storage in the normal profile did not help. The UI registers no service worker and uses no
+IndexedDB or Cache Storage (only `localStorage` for drafts, annotations and the builder ID), so the
+remaining normal-vs-incognito differences are extensions (off in incognito by default) and the
+HTTP cache, which clearing storage does not empty. The server sends no `Cache-Control`, `ETag` or
+`Last-Modified` and asset names are content-hashed, so a stale cache is unlikely. Root cause
+**probable**: a browser extension in the normal profile. Not a code defect unless the extension
+bisection points at AgentDeck behavior; the observability finding stands either way.
+
 - **Worth fixing** — observability plus spec gap, confirmed from the code path; INV §8, §14, §16.
   A browser-side failure leaves no trace the operator can send: `ErrorBoundary.componentDidCatch`
   (`ui/src/components/ErrorBoundary.tsx:22`) only `console.error`s, its fallback shows no error

@@ -52,6 +52,12 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Finish the creative-workspace layout and share it across appearances.** Requested 2026-09-28:
+  compare Studio with the approved Figma Make exploration, especially agent-card buttons/depth,
+  full agent pages and Tasks spacing; specify the remaining presentation polish, then make the
+  improved layout common to Core, Sky & Grove and Studio while preserving each color scheme.
+  Existing product behavior, density, grid stability and real chat remain authoritative.
+
 - **Read files from configured additional project directories.** Let an operator open files under
   explicitly configured project `add_dirs`, not arbitrary host paths. Define whether the readable
   roots come from the frozen session snapshot, how symlinks and `.git` paths are handled, and how
