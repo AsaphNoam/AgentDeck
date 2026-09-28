@@ -4,6 +4,9 @@ import { HomeScreen } from "./HomeScreen";
 import { PairScreen, UnpairedScreen } from "./PairScreen";
 import { match, navigate, usePath } from "./router";
 import { AgentScreen } from "./AgentScreen";
+import { NewWorkScreen } from "./NewWorkScreen";
+import { PhoneSettings } from "./PhoneSettings";
+import { RunScreen, TaskScreen } from "./WorkScreens";
 
 function Banner() {
   const link = useConnection((state) => state.link);
@@ -30,7 +33,17 @@ function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
             ‹ Home
           </button>
         ) : (
-          <span className="phone-brand">AgentDeck</span>
+          <>
+            <span className="phone-brand">AgentDeck</span>
+            <span className="phone-header-actions">
+              <button type="button" onClick={() => navigate("/new")}>
+                New work
+              </button>
+              <button type="button" aria-label="This phone" onClick={() => navigate("/phone")}>
+                ⚙
+              </button>
+            </span>
+          </>
         )}
       </header>
       <Banner />
@@ -64,10 +77,17 @@ export function PhoneApp() {
     return <PairScreen onPaired={paired} />;
   }
   if (link === "checking") return <main className="phone-screen phone-center">Connecting to your Mac…</main>;
+  return <Shell back={path !== "/"}>{screenFor(path)}</Shell>;
+}
+
+function screenFor(path: string) {
   const agentId = match(path, "agent");
-  return (
-    <Shell back={path !== "/"}>
-      {agentId ? <AgentScreen agentId={agentId} /> : <HomeScreen />}
-    </Shell>
-  );
+  if (agentId) return <AgentScreen agentId={agentId} />;
+  const taskId = match(path, "task");
+  if (taskId) return <TaskScreen taskId={taskId} />;
+  const runId = match(path, "run");
+  if (runId) return <RunScreen runId={runId} />;
+  if (path === "/new") return <NewWorkScreen />;
+  if (path === "/phone") return <PhoneSettings />;
+  return <HomeScreen />;
 }

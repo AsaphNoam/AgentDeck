@@ -310,6 +310,27 @@ body {
   padding-top: var(--ad-space-3);
 }
 
+.phone-header-actions {
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.phone-header-actions > button {
+  min-height: 40px;
+  min-width: 40px;
+}
+
+.phone-link {
+  background: transparent;
+  border-color: transparent;
+  justify-self: start;
+  min-height: 44px;
+  padding-inline: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--ad-action-primary);
+  text-decoration-thickness: var(--ad-border-thick);
+}
+
 .phone-danger {
   border-color: var(--ad-state-error);
   color: var(--ad-state-error);

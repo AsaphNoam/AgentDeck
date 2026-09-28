@@ -156,5 +156,18 @@ Done:
   bounded queue of 64 with one worker, 404/410 expires (guarded by endpoint), retries
   2/4/8 s, logs never carry endpoint or payload. Phone UI toggle ships with slice 8.
 
-Next: slice 8 (phone actions: cards, conversation, task/run actions, New work, "This phone"
-settings with notifications and unpair).
+- **Slice 8** (2026-09-28) — phone screens reuse `api/client`, `api/pipelines`, `normalizeEvent`
+  and the transcript renderers (desktop `features/agent.css` + `integrations.css` imported into
+  the phone stylesheet). Agents hydrate from the stream's `state_update` snapshot (`GET
+  /api/sessions` lists only running agents). `AgentScreen`: decision card (command/file summary,
+  latest message, first-decision-wins text), transcript tail of 150, Send/held/Steer/Withdraw,
+  Cancel/Stop/Resume, terminal agents status-only. `WorkScreens`: task Retry
+  (`retry_eligible`), Re-arm with/without prerequisites, Record result, Cancel; run controls
+  from `detail.controls` with `run.revision`. `NewWorkScreen`: Ask AgentDecker (reuse running
+  resident or launch with only role+project), New task, Start pipeline — runtime fields omitted
+  so the Mac resolves the desktop defaults (so `GET /api/backends` stays denied; resolves the
+  slice-2 review note). `PhoneSettings`: name, notifications on/off/back-on, unpair.
+
+Next: closure — spec reconciliation (TS-13 §3 additions: `GET /api/remote/self`,
+`qr_svg`, `devices`/`pending_pairing` in the view, `stage_number`/`stage_count`; TS-06.R27
+measured growth; TS-13.R5 backends denial), `make dist`, full matrix, 390px fakeACP browser pass.
