@@ -64,14 +64,17 @@ were compared in all appearances at both sizes; no horizontal page overflow or m
 static visual issue was found. File viewer/annotation docking and staged incapable runtime
 controls were also inspected. Density extremes, pointer drag, Collapse, project overflow
 keyboard focus, paced pulses and waiting→idle transitions were exercised.
-Remaining closure: real-browser Send/Cancel and reduced-motion verification await explicit
-approval after automatic approval review rejected those actions. No system preference or
-rejected submission was executed. Keep this change in progress; acceptance remains planned.
+Approved follow-up: real-browser Send/Cancel passes in all three appearances on the isolated
+fake diagram session at 1280×720; both action heights remain 36px and each turn settles.
+Remaining closure: reduced-motion verification. The operator approved both checks, but macOS
+refuses the direct preference write and Computer Use reports the Mac locked. An unlock request
+is pending. The Reduce Motion preference remains absent and unchanged. Keep this change in
+progress; acceptance remains planned.
 Detailed evidence and remaining gates:
 [`implementation-share-creative-workspace-2026-09-28.md`](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).
 Isolated app home `/private/tmp/agentdeck-render-share-creative-20260928`, loopback 4528;
 matrix dev server 5181. Final build is running, Core preference restored. Resume with the
-pending approvals below, finish the two checks, then reconcile FS-12.R52–R59/A26–A31 and
+pending Mac unlock below, finish reduced motion, then reconcile FS-12.R52–R59/A26–A31 and
 TS-08.R74–R79, finish the ready change and add this substantive range to review without
 replacing the older units. No older Studio acceptance debt is closed by this work.
 
@@ -113,11 +116,10 @@ login/chat gates (TS-06.R21) and every real-browser journey; none may be describ
 
 ## Blocked on human
 
-- Shared creative-workspace closure: approve temporarily enabling macOS Reduce Motion and
-  restoring its originally absent preference, and sending exactly “Show the fixture diagram.”
-  to the isolated fake session on localhost:4528 with Cancel. Automatic approval review rejected
-  the system preference change and the fake-session submission as lacking explicit authorization.
-  These are required browser gates; all unaffected checks and implementation are complete.
+- Shared creative-workspace closure: unlock the Mac for the approved temporary Reduce Motion
+  System Settings check and restoration. Authorization was given; direct `defaults write` fails
+  with “Could not write domain”, while Computer Use reports the Mac locked. Preference remains
+  originally absent. Approved fake-session Send/Cancel checks pass in all appearances.
 - BR-7: the full console stack from the failing normal-profile tab (its file URLs show whether
   the throw is in `/assets/…` or a `chrome-extension://` script), the page URL, and whether it
   still fails with extensions disabled.

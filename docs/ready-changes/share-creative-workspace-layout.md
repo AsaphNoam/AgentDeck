@@ -53,7 +53,7 @@ revision, viewport and route/state context.
 
 ## Waiting on
 
-Implementation and automated closure are committed. Required browser Send/Cancel and reduced-motion
-checks await explicit approval after automatic approval review rejected the fake-session submission
-and temporary system preference change. See the live handoff and the
+Implementation and automated closure are committed. The operator approved the remaining checks;
+browser Send/Cancel now passes in all appearances. Reduced-motion verification needs the Mac
+unlocked for System Settings because macOS refused the direct preference write. See the live handoff and the
 [checkpoint evidence](../archive/reviews/implementation-share-creative-workspace-2026-09-28.md).

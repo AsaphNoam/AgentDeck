@@ -603,7 +603,7 @@ Requirements are user-observable.
 - R52–R59/A26–A31 are the 2026-09-28 approved cross-appearance upgrade, including the operator's
   follow-up for project tabs and stronger pulsing badges. The operator approved this scope on
   2026-09-28; TS-08.R74–R79 specify its architecture. Implementation is committed, with the ready
-  change still in progress pending browser Send/Cancel and reduced-motion approval. Planned markers
+  change still in progress pending browser reduced-motion verification. Planned markers
   remain until closure; previous A19–A23/TS-08.R68 evidence debt is not closed by this work.
   A21's Studio-only layout oracle will be superseded
   by A26 when this upgrade ships, not silently treated as passed.

@@ -44,21 +44,34 @@ measurements: `/private/tmp/shared-layout-evidence/`. Core restored after appear
   cancel animation. Real isolated permission Deny preserves its receipt and transitions to idle.
   Reloaded live-state fixtures pulse. Timing evidence: `pulse-samples.json`.
 
-## Required gates still open
+## Approved follow-up
 
-FS-12.A27 real-browser Send/Cancel and A31 reduced-motion check are pending, not passed. Automatic
+The operator approved both checks. Browser Send/Cancel was exercised on `a_ec51e5` in Core,
+Sky & Grove and Studio with the exact prompt “Show the fixture diagram.” at confirmed 1280×720.
+Each turn showed streamed prose/diagram output and Cancel, then settled with Cancel removed.
+Send and Cancel each remain 36px tall. Evidence: `send-cancel-{core,sky-grove,studio}.png`.
+This supplements the already captured 1024/wide geometry checks rather than claiming a new
+1024 viewport. Core preference was restored.
+
+## Required gate still open
+
+FS-12.A31 reduced-motion check is pending, not passed. Automatic
 approval review rejected a temporary `com.apple.universalaccess reduceMotion` preference write and
 the exact fake-session submission, even after fakeACP source was checked. No rejected script ran.
 The original Reduce Motion preference does not exist; restore by deleting the preference after an
 approved temporary check. The browser adapter has no media-emulation capability.
 
-Pending requested authorization: enable Reduce Motion briefly and restore it; submit exactly
-“Show the fixture diagram.” to fake diagram session `a_ec51e5` and exercise Cancel. The fake backend
-only emits fixed text. Do not bypass the rejected browser submission through API/CLI.
+After approval, macOS refused the direct preference write (“Could not write domain”). Computer
+Use then reported the Mac locked on two attempts. The operator was asked to unlock it. Readback
+still confirms the preference absent: no setting was changed or needs restoration yet. Once
+unlocked, use System Settings for the approved temporary switch, inspect the actual browser media
+query/static badge behavior, and restore the original off setting immediately. The exact fake
+prompt was submitted through the browser only after approval.
 
 Resume the isolated app without rebuilding unless product source changes. The archive fixture is
 `a_cdbfef`; completed Mermaid fixture `a_d1706b`; denied permission fixture `a_a17655`. Rebuilding or
 restarting stops live fixtures, so recreate a fake diagram session if needed. Browser tabs have the
-two confirmed viewport sizes and remain available for continuation. After approved gates pass,
+two confirmed viewport sizes were cleaned up between turns; the new fake-check tab is 1280×720
+and marked for handoff. After reduced motion passes,
 reconcile planned spec markers and close the change for review. Prior A19–A23/TS-08.R68 evidence
 debt, genuine finished pipeline and credentialed provider gates remain separate and unclaimed.
