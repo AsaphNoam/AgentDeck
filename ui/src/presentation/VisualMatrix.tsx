@@ -8,6 +8,7 @@ import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
+import { Composer } from "../components/chat/Composer";
 import type { AgentStatus } from "../api/types";
 import { applyAppearance, effectiveAppearance, type EffectiveAppearance } from "../features/appearance/appearance";
 import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
@@ -19,6 +20,7 @@ const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "er
 export function VisualMatrix() {
   const [highVariance, setHighVariance] = useState(false);
   const [appearance, setAppearance] = useState<EffectiveAppearance>("core");
+  const [liveState, setLiveState] = useState<AgentStatus | "stopped">("busy");
   const initialSkin = useRef(document.documentElement.getAttribute("data-skin"));
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export function VisualMatrix() {
         <div className="visual-matrix-shell-row">
           <ShellNavFixture visible={[]} overflow={[]} />
           <ShellNavFixture visible={fixtureProjects.slice(0, 1)} overflow={[]} currentProjectID="alpha" />
+          <ShellNavFixture visible={fixtureProjects.slice(0, 5)} overflow={[]} currentProjectID="alpha" />
           <ShellNavFixture visible={[...fixtureProjects.slice(0, 4), fixtureProjects[5]]} overflow={[fixtureProjects[4]]} currentProjectID="foxtrot" />
         </div>
       </section>
@@ -160,24 +163,38 @@ export function VisualMatrix() {
             <div className="agent-card-top" data-slot="header">
               <button className="drag-handle" aria-label="Reorder stopped" type="button">::</button>
               <strong data-slot="identity">Stopped agent</strong>
-              <StateBadge state="done" />
+              <StateBadge state="busy" />
             </div>
             <p className="agent-subtitle" data-slot="metadata">reviewer · AgentDeck demo</p>
             <span className="terminal-pill">terminal · xterm</span>
             <small className="stopped-label">stopped</small>
           </article>
-          <article className="agent-card" data-ui="agent-card" data-state="busy" data-variant="expanded" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[1].color.join(",")})` } as React.CSSProperties}>
+          <article className="agent-card" data-ui="agent-card" data-state={liveState} data-variant="expanded" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[1].color.join(",")})` } as React.CSSProperties}>
             <div className="agent-card-top" data-slot="header">
               <a className="agent-card-name-link" data-slot="identity" href="/agent/expanded-fixture">Expanded long-name agent fixture</a>
               <div className="agent-card-header-actions">
                 <div data-slot="context"><ContextBar value={0.74} compact /></div>
-                <StateBadge state="busy" />
+                <StateBadge state={liveState === "stopped" ? "busy" : liveState} />
                 <Button data-slot="collapse-control" size="small">Collapse</Button>
               </div>
             </div>
-            <div className="dashboard-chat-pane" data-slot="chat-pane">Expanded pane fixture</div>
+            <div className="dashboard-chat-pane" data-slot="chat-pane">
+              <div className="transcript-wrap">
+                <div className="transcript-view" data-ui="transcript" data-slot="list">
+                  <AssistantText event={{ kind: "assistant_text", text: "A populated conversation keeps the remaining card height.\n\n```ts\nconst result = await verify();\n```" }} />
+                </div>
+              </div>
+              <div className="dashboard-chat-composer">
+                <Composer agentId="expanded-fixture" busy={liveState === "busy"} running={liveState !== "stopped"} variant="dashboard" />
+              </div>
+            </div>
           </article>
         </div>
+        <label className="visual-matrix-toggle">Expanded card state
+          <select aria-label="Expanded card state" value={liveState} onChange={(event) => setLiveState(event.target.value as AgentStatus | "stopped")}>
+            {[...agentStates, "stopped"].map((state) => <option key={state} value={state}>{state}</option>)}
+          </select>
+        </label>
         <EmptyState onNewAgent={() => undefined} />
         <div className="context-menu" data-ui="context-menu" role="menu">
           <div className="context-menu-color" role="menuitem">
@@ -286,7 +303,7 @@ export function VisualMatrix() {
   );
 }
 
-const fixtureProjects = ["Alpha", "Bravo workspace", "Charlie", "Delta", "Echo", "Foxtrot"].map((title, index) => ({
+const fixtureProjects = ["Alpha", "Bravo workspace with a long title", "Charlie", "Delta", "Echo", "Foxtrot"].map((title, index) => ({
   id: title.split(" ")[0].toLowerCase(),
   title,
   color: PROJECT_COLOR_PRESETS[index].color,

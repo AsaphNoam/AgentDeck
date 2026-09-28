@@ -37,12 +37,12 @@
   border: var(--ad-border-thin) solid var(--ad-border-default);
   border-radius: var(--ad-radius-small);
   color: var(--ad-text-muted);
-  font-family: var(--ad-font-mono);
+  font-family: var(--ad-font-text);
   font-size: 0.64rem;
   font-weight: 600;
   padding: var(--ad-space-2);
   text-align: center;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .wizard-step-indicator.active {
@@ -65,8 +65,8 @@
 
 .wizard-step h3,
 .onboarding-step h3 {
-  font-size: 2.5rem;
-  line-height: 0.95;
+  font-size: 1.75rem;
+  line-height: 1;
 }
 
 .wizard-step-desc {

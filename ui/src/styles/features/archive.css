@@ -8,7 +8,7 @@
 
 .archive-header {
   align-items: end;
-  border-bottom: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   display: flex;
   gap: var(--ad-space-4);
   justify-content: space-between;
@@ -16,15 +16,15 @@
 }
 
 .archive-header h1 {
-  font-size: clamp(2.8rem, 5vw, 5.4rem);
-  line-height: 0.84;
+  font-size: 1.875rem;
+  line-height: 1;
 }
 
 .archive-search {
   align-items: center;
-  background: var(--ad-highlight);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
   display: flex;
   gap: var(--ad-space-3);
   padding: var(--ad-space-3);
@@ -45,7 +45,7 @@
 }
 
 .archive-list {
-  border-top: var(--ad-border-thin) solid var(--ad-border-strong);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
   display: grid;
   list-style: none;
   margin: 0;
@@ -53,12 +53,12 @@
 }
 
 .archive-row {
-  background: var(--ad-surface-panel);
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-strong);
+  background: transparent;
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   cursor: pointer;
   display: grid;
   gap: var(--ad-space-2);
-  padding: var(--ad-space-4);
+  padding: var(--ad-space-4) 0;
   position: relative;
   transition: background-color 120ms ease, padding-left 120ms ease;
 }
@@ -79,7 +79,7 @@
 .archive-row:hover,
 .archive-row:focus-visible {
   background: var(--ad-surface-emphasis);
-  padding-left: var(--ad-space-6);
+  padding-inline: var(--ad-space-4);
 }
 
 .archive-row:hover::before,

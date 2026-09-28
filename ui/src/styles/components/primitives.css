@@ -38,7 +38,7 @@ button:disabled {
 
 .ad-button-primary {
   background: var(--ad-action-primary);
-  color: var(--ad-action-primary-ink);
+  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
 }
 
 .ad-button-secondary {
@@ -257,7 +257,7 @@ input[type="radio"] {
 
 .ad-page-header {
   align-items: end;
-  border-bottom: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   display: flex;
   gap: var(--ad-space-6);
   justify-content: space-between;
@@ -279,8 +279,8 @@ input[type="radio"] {
 }
 
 .ad-page-header h1 {
-  font-size: clamp(2.1rem, 4vw, 4.4rem);
-  line-height: 0.88;
+  font-size: 1.875rem;
+  line-height: 1;
 }
 
 .ad-page-header [data-slot="description"] {
@@ -301,7 +301,7 @@ input[type="radio"] {
 .ad-surface {
   background: var(--ad-surface-panel);
   border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
+  border-radius: var(--ad-radius-large);
 }
 
 .ad-surface-default {
@@ -338,8 +338,8 @@ input[type="radio"] {
 
 .dialog-content {
   background: var(--ad-surface-panel);
-  border: var(--ad-border-thick) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
   box-shadow: var(--ad-shadow-offset);
   left: 50%;
   max-height: calc(100vh - var(--ad-space-12));

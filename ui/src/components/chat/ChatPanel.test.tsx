@@ -113,6 +113,21 @@ const backends = {
   },
 };
 
+// FS-12.A28: unsupported live controls leave no empty settings band, while a
+// staged target with effort controls still exposes its existing settings.
+it("omits empty session settings and shows them for a capable staged model", async () => {
+  const agent = liveAgent("a_settings");
+  useAgentStore.setState({ agents: { a_settings: agent }, order: ["a_settings"], hydrated: true, hydrating: false });
+  mocks.useBackends.mockReturnValue({ data: backends });
+  renderPanel("a_settings");
+
+  expect(screen.getByRole("group", { name: "Runtime" })).toBeInTheDocument();
+  expect(screen.queryByRole("group", { name: "Session settings" })).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+  expect(await screen.findByRole("group", { name: "Session settings" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Effort")).toBeInTheDocument();
+});
+
 // FS-13.R16/A8: the missing-source recovery is destructive, so it may only claim
 // a source is gone once agent hydration has actually looked for it.
 describe("ChatPanel missing-agent recovery", () => {

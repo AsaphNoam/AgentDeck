@@ -69,12 +69,12 @@ describe("VisualMatrix", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Runtime switch failed; current settings were restored.");
   });
 
-  it("renders zero, one, and overflowing active-project navigation fixtures", () => {
+  it("renders zero, one, five and overflowing active-project navigation fixtures", () => {
     render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const fixture = screen.getByRole("heading", { name: "Active-project shell navigation" }).parentElement!;
-    expect(fixture.querySelectorAll('nav[aria-label="Active projects"]')).toHaveLength(2);
+    expect(fixture.querySelectorAll('nav[aria-label="Active projects"]')).toHaveLength(3);
     expect(fixture.querySelectorAll('button[aria-label="1 more active project"]')).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Alpha" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Alpha" })).toHaveLength(3);
   });
 
   it("renders the timeline-first Pipelines contract fixture", () => {

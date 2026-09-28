@@ -42,7 +42,6 @@ h2,
 h3,
 h4 {
   font-family: var(--ad-font-display);
-  font-variation-settings: "wdth" 82;
   letter-spacing: -0.035em;
 }
 

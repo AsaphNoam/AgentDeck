@@ -4,13 +4,17 @@
   gap: var(--ad-space-8);
   margin: 0 auto;
   max-width: 1680px;
+  padding: 0 var(--ad-space-6) var(--ad-space-6);
 }
 
 .tasks-toolbar {
   align-items: end;
+  background: var(--ad-surface-subtle);
+  border-inline-start: 3px solid var(--ad-action-primary);
   display: flex;
   gap: var(--ad-space-4);
   justify-content: space-between;
+  padding: var(--ad-space-3) var(--ad-space-4);
 }
 
 .tasks-toolbar label,
@@ -26,8 +30,9 @@
 
 .tasks-attention-count {
   color: var(--ad-state-busy);
-  font-family: var(--ad-font-mono);
-  font-size: 0.8rem;
+  font-family: var(--ad-font-text);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .tasks-authoring-grid {
@@ -37,10 +42,34 @@
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
 }
 
+.task-create,
+.task-signal {
+  padding: var(--ad-space-6);
+}
+
+.task-create h2,
+.task-signal h2 {
+  margin: 0;
+}
+
+.task-create form,
+.task-signal form,
+.task-rearm,
+.task-row-actions > form {
+  max-width: 52rem;
+}
+
 .task-create form,
 .task-signal form {
   display: grid;
   gap: var(--ad-space-3);
+}
+
+.task-create form > button,
+.task-signal form > button,
+.task-row-actions button {
+  justify-self: start;
+  width: fit-content;
 }
 
 .task-prerequisite {
@@ -122,20 +151,33 @@
 }
 
 .task-list {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
   display: grid;
-  gap: var(--ad-space-4);
+  gap: 0;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .task-row {
-  background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: 0;
   display: grid;
   gap: var(--ad-space-2);
-  padding: var(--ad-space-4);
+  padding: var(--ad-space-4) 0;
+}
+
+.task-row[data-state="interrupted"],
+.task-row[data-state="dependency_failed"] {
+  background: var(--ad-surface-emphasis);
+  border-inline-start: 3px solid var(--ad-state-busy);
+  padding-inline: var(--ad-space-4);
+}
+
+.task-row[data-state="finished"] {
+  opacity: 0.78;
 }
 
 .task-row-top {
@@ -178,7 +220,20 @@
 
 .task-row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ad-space-2);
+}
+
+.task-row-actions > form {
+  display: grid;
+  gap: var(--ad-space-2);
+  width: 100%;
+}
+
+.task-row-actions > form label {
+  display: grid;
+  gap: var(--ad-space-1);
+  max-width: 36rem;
 }
 
 .task-rearm {

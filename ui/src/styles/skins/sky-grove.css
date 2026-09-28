@@ -21,9 +21,6 @@
   --ad-sky-grove-tech-surface: #183734;
   --ad-sky-grove-tech-text: #eff8f6;
   --ad-sky-grove-tech-muted: #abc5c0;
-  --ad-sky-grove-radius-small: 4px;
-  --ad-sky-grove-radius-medium: 9px;
-  --ad-sky-grove-radius-large: 14px;
 }
 
 :root[data-skin="sky-grove"] {
@@ -52,11 +49,6 @@
   --ad-technical-surface: var(--ad-sky-grove-tech-surface);
   --ad-technical-text: var(--ad-sky-grove-tech-text);
   --ad-technical-muted: var(--ad-sky-grove-tech-muted);
-  --ad-radius-small: var(--ad-sky-grove-radius-small);
-  --ad-radius-medium: var(--ad-sky-grove-radius-medium);
-  --ad-radius-large: var(--ad-sky-grove-radius-large);
-  --ad-shadow-keyline: 0 1px 2px color-mix(in srgb, var(--ad-sky-grove-line-strong) 18%, transparent);
-  --ad-shadow-offset: 0 14px 34px color-mix(in srgb, var(--ad-sky-grove-line-strong) 14%, transparent);
 }
 
 :root[data-skin="sky-grove"] body::before {
@@ -72,21 +64,6 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--ad-surface-raised) 42%, transparent), transparent 30rem);
 }
 
-:root[data-skin="sky-grove"] [data-ui="agent-card"] {
-  border-radius: var(--ad-radius-large);
-  overflow: hidden;
-}
-
-:root[data-skin="sky-grove"] [data-ui="surface"],
-:root[data-skin="sky-grove"] [data-ui="dialog"][data-slot="content"],
-:root[data-skin="sky-grove"] [data-ui="config-editor"] [data-slot="item"] {
-  border-radius: var(--ad-radius-large);
-}
-
-:root[data-skin="sky-grove"] [data-ui="button"] {
-  border-radius: var(--ad-radius-medium);
-}
-
 :root[data-skin="sky-grove"] [data-ui="transcript"] [data-variant="user"] {
   background: color-mix(in srgb, var(--ad-action-secondary) 8%, var(--ad-surface-raised));
 }
@@ -94,23 +71,23 @@
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] {
   background: var(--ad-sky-grove-canvas);
   border-color: var(--ad-sky-grove-line);
-  border-radius: var(--ad-sky-grove-radius-medium);
+  border-radius: var(--ad-radius-medium);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-sky"] {
   background: var(--ad-sky-grove-canvas);
-  border-radius: var(--ad-sky-grove-radius-small);
+  border-radius: var(--ad-radius-small);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-surface"] {
   background: var(--ad-sky-grove-panel);
   border-color: var(--ad-sky-grove-line);
-  border-radius: var(--ad-sky-grove-radius-medium);
+  border-radius: var(--ad-radius-medium);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-action"] {
   background: var(--ad-sky-grove-primary);
-  border-radius: var(--ad-sky-grove-radius-medium);
+  border-radius: var(--ad-radius-medium);
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="sky-grove"] [data-slot="preview-signal"] {

@@ -89,6 +89,20 @@
     gap: var(--ad-space-3);
   }
 
+  .visual-matrix-columns > .dialog-content {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .visual-matrix-section > .context-menu {
+    position: relative;
+    width: fit-content;
+  }
+
   .visual-matrix-overlay-sample {
     background: color-mix(in srgb, var(--ad-text-primary) 45%, var(--ad-surface-canvas));
     border: var(--ad-border-thin) solid var(--ad-border-strong);

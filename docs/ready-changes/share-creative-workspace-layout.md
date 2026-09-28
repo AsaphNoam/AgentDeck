@@ -1,6 +1,6 @@
 # Finish and share the creative-workspace layout
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Operator requested Figma/Studio parity and the improved layout across all appearances on
 2026-09-28, added active-project tabs and prominent paced status badges, then approved the scope.
 **Relevant requirements:** FS-12.R52–R59/A26–A31; TS-08.R74–R79; INV §2/§8/§10/§13/§17.
@@ -53,4 +53,4 @@ revision, viewport and route/state context.
 
 ## Waiting on
 
-Nothing. Scope approved; implementation has not started.
+Nothing. Scope approved; implementation started 2026-09-28.

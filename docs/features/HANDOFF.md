@@ -18,7 +18,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** None.
+- **Active change:** `share-creative-workspace-layout` — in progress.
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -52,7 +52,22 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**Change:** None.
+**Change:** `share-creative-workspace-layout` — in progress (2026-09-28).
+
+Plan: (1) promote shared shell/route composition and skin palette-only geometry;
+(2) finish card/header/composer, agent reading measure and Tasks rhythm; (3) inspect
+matched three-appearance fixtures and populated built routes at confirmed 1024px/wide,
+then run TS-06 closure, generate embed and close for review. Independent source audit
+and shared shell/route styling are delegated; parent owns integration and rendered gates.
+Tree was clean at start. No older Studio acceptance debt is closed by this work.
+Checkpoint: shared styles and card/composer/Tasks implementation are complete; focused
+card/grid/nav/matrix and chat/composer/Tasks checks pass, including missing/staged live
+settings. Style contract passes. Matched matrix shells/cards have identical geometry in
+all three appearances at confirmed 1024×900; expanded long-name fixture header is 98px.
+Final populated built-route, wide, density/motion/reduced-motion gates remain active.
+Evidence: `/private/tmp/shared-layout-evidence/`; isolated app home
+`/private/tmp/agentdeck-render-share-creative-20260928`, loopback port 4528. UI dev
+matrix at 5181. `make dist` is rebuilding; source checkpoint precedes rendered closure.
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating

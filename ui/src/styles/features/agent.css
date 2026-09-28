@@ -1,11 +1,15 @@
 @layer ad-features {
 .chat-panel {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
   display: grid;
-  gap: var(--ad-space-3);
+  gap: 0;
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: calc(100vh - 140px);
   margin: 0 auto;
   max-width: 1440px;
+  overflow: hidden;
 }
 
 /* The one thing a container query cannot express: this cap is set outside the
@@ -20,9 +24,9 @@
 .chat-header {
   align-items: center;
   background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-left: 8px solid var(--ad-action-primary);
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small);
+  border: 0;
+  border-inline-start: 3px solid var(--ad-action-primary);
+  border-radius: 0;
   display: grid;
   gap: var(--ad-space-4);
   grid-template-columns: auto minmax(0, 1fr) minmax(160px, 240px);
@@ -58,19 +62,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2);
+  max-width: 840px;
   margin-top: 0;
 }
 
 .chat-runtime-staged,
 .chat-session-settings {
   align-items: end;
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-small);
+  border: 0;
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2);
   margin: 0;
-  padding: var(--ad-space-1) var(--ad-space-2);
+  min-width: 0;
+  padding: 0;
 }
 
 .chat-runtime-staged {
@@ -156,6 +161,8 @@
 }
 
 .chat-tabs {
+  background: var(--ad-surface-raised);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
@@ -163,7 +170,7 @@
 
 .chat-tabs-list {
   align-items: end;
-  border-bottom: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   display: flex;
   gap: var(--ad-space-1);
   padding: 0 var(--ad-space-2);
@@ -175,12 +182,12 @@
   border-bottom: 0;
   border-radius: var(--ad-radius-medium) var(--ad-radius-medium) 0 0;
   color: var(--ad-text-muted);
-  font-family: var(--ad-font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.05em;
+  font-family: var(--ad-font-text);
+  font-size: 0.85rem;
+  letter-spacing: normal;
   min-height: 34px;
   padding: var(--ad-space-2) var(--ad-space-3);
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .chat-tabs-list button:hover:not(:disabled) {
@@ -189,8 +196,9 @@
 }
 
 .chat-tabs-list button[data-state="active"] {
-  background: var(--ad-surface-raised);
-  border-color: var(--ad-border-strong);
+  background: transparent;
+  border-color: transparent;
+  border-bottom: var(--ad-border-thick) solid var(--ad-action-primary);
   color: var(--ad-text-primary);
   margin-bottom: calc(var(--ad-border-thick) * -1);
 }
@@ -229,11 +237,11 @@
 .transcript-view {
   background: var(--ad-surface-raised);
   grid-column: 2;
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: 0 0 var(--ad-radius-large) var(--ad-radius-large);
+  border: 0;
+  border-radius: 0;
   height: 100%;
   overflow: auto;
-  padding: var(--ad-space-6) max(var(--ad-space-6), 10vw);
+  padding: var(--ad-space-6) max(var(--ad-space-6), 6vw);
   scroll-padding: var(--ad-space-6);
   /* Keep transcript text selectable so people can mark, copy, and reuse it. */
   user-select: text;
@@ -342,6 +350,8 @@
   font-size: 0.98rem;
   line-height: 1.65;
   max-width: 76ch;
+  width: min(100%, 52rem);
+  margin-inline: auto;
 }
 
 .assistant-message {
@@ -878,6 +888,21 @@
   padding: var(--ad-space-2);
 }
 
+.chat-panel > [data-slot="composer"] {
+  background: var(--ad-surface-raised);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  margin-inline: auto;
+  width: 100%;
+}
+
+.chat-panel > [data-slot="composer"] .composer {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin-inline: auto;
+  width: min(100%, 52rem);
+}
+
 .composer-input {
   position: relative;
 }
@@ -952,10 +977,11 @@
 .composer-actions {
   display: grid;
   gap: var(--ad-space-1);
+  align-content: start;
 }
 
 .composer button {
-  align-self: stretch;
+  align-self: start;
   background: var(--ad-action-primary);
   min-width: 100px;
 }

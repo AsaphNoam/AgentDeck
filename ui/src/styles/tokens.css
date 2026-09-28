@@ -60,14 +60,14 @@
   --ad-space-8: 32px;
   --ad-space-12: 48px;
 
-  --ad-radius-small: 2px;
-  --ad-radius-medium: 6px;
-  --ad-radius-large: 10px;
+  --ad-radius-small: 5px;
+  --ad-radius-medium: 10px;
+  --ad-radius-large: 16px;
   --ad-radius-round: 999px;
   --ad-border-thin: 1px;
   --ad-border-thick: 2px;
-  --ad-shadow-keyline: 1px 1px 0 var(--ad-border-strong);
-  --ad-shadow-offset: 4px 4px 0 var(--ad-border-strong);
+  --ad-shadow-keyline: 0 1px 2px color-mix(in srgb, var(--ad-border-strong) 12%, transparent);
+  --ad-shadow-offset: 0 12px 30px color-mix(in srgb, var(--ad-border-strong) 12%, transparent);
   --ad-shadow-project-edge: inset 7px 0 0 var(--ad-project-accent);
   --ad-project-fallback: var(--ad-state-unknown);
   --ad-project-accent: var(--ad-project-fallback);
