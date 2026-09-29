@@ -125,12 +125,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   annotation endpoint. Implement the approved phone-sized diff annotation-and-assignment flow,
   allowlist its bounded shared mutation, and test successful delivery plus preserved drafts on
   failure.
-- **Must fix** — confirmed send-time notification-policy defect; TS-13.R11, INV §1/§15.
-  `internal/server/remote_push.go:180-212,259-320` checks remote enablement and notification mutes
-  only before enqueue. A queued notification, including a retry, can still send after Remote is
-  disabled or its type is muted because `pushNote` loses the classification and delivery rereads
-  only devices. Preserve the classification, revalidate global and type policy before every send
-  attempt, and test disable/mute while queued and during retry.
 - **Must fix** — confirmed stale-request side-effect race; FS-20.R14/R24/A7, INV §5/§15.
   `internal/server/pipeline_handlers.go:309-335` repairs task cleanup and invokes external cleanup
   effects before `internal/pipeline/actions.go:322-339` checks the submitted run revision. Two
@@ -143,17 +137,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   catalog from which to choose them. Add the secret-free runtime-options projection and visible
   replacement controls, retain shared current-configuration validation, and test a valid changed
   assignment plus rejected stale/unsupported choices without exposing backend secrets.
-- **Worth fixing** — confirmed request-bound gap; TS-13.R5/R6, INV §16.
-  `internal/server/remote_routes.go:24-62,392-418` bounds only routes with a field list (plus
-  pipeline start); prompt, steer, permission, task controls, and pipeline controls use unbounded
-  shared decoders. An authenticated buggy or crafted phone can make these tailnet endpoints retain
-  arbitrarily large JSON bodies. Apply one uniform remote mutation-body limit before route-specific
-  filters and add oversized-body coverage for an otherwise unfiltered action.
-- **Worth fixing** — confirmed unbounded adversarial-state path; TS-13.R8, INV §16.
-  `internal/server/remote_pairing.go:64-69,244-269` removes an expired failure entry only when that
-  same peer retries. Failed claims from distinct tailnet peers can therefore grow `failures`
-  without bound despite the code's bounded comment. Prune expired entries and impose a hard cap or
-  bounded eviction policy; test more unique failing peers than the cap.
 
 ## Design consistency notes
 
@@ -168,7 +151,10 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 - **2026-09-29 — Fix add-mobile-remote-control second-pass review (in progress).** Task controls
   now come from one shared FS-16.R22/R23 eligibility helper on desktop and phone (INV §2/§8/§10).
   The phone Re-arm editor (FS-20.R30, TS-13.R17) edits task, run, outcome and signal prerequisites,
-  keeps its draft on refusal, and the tailnet route accepts only `arms` (INV §8/§10).
+  keeps its draft on refusal, and the tailnet route accepts only `arms` (INV §8/§10). Push rereads
+  Remote enablement, type mutes and the device switch before every attempt, including retries
+  (INV §1/§15). Every tailnet mutation body is capped at 1 MiB (`413 remote_body_too_large`), and
+  pairing-failure tracking prunes expired windows and caps at 256 peers (INV §16).
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from

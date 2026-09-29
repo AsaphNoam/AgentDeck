@@ -74,7 +74,9 @@ the installed app on iOS.
 - **R6 — Remote requests cannot widen permission policy.** A launch or task-creation body
   arriving on the tailnet listener may not carry a per-launch permission-bypass override or any
   field the phone's FS-20.R15 forms do not set; such a body is rejected with
-  `remote_field_not_allowed` before any process work. Effective permission policy still composes
+  `remote_field_not_allowed` before any process work. Every authenticated non-GET tailnet body is
+  buffered to at most 1 MiB before any route filter or handler runs; a larger one is
+  `413 remote_body_too_large` (INV §16). Effective permission policy still composes
   global and role policy exactly as TS-05.R9 defines. Every accepted remote mutation is attributed to
   its device id in the server log.
 - **R7 — A device credential is a hashed, sliding, node-bound cookie.** Pairing mints a
@@ -94,7 +96,9 @@ the installed app on iOS.
   non-static tailnet route); a match atomically claims the code (INV §5) and creates a pending
   request surfaced to the desktop through `remote_update`; at most one request waits, and a newer
   claim declines an older one. Five failed attempts invalidate the current code, and ten failures
-  from one peer node within five minutes answer `429 remote_rate_limited`. The desktop answers
+  from one peer node within five minutes answer `429 remote_rate_limited`. Failure tracking prunes
+  expired windows on every claim and remembers at most 256 peer nodes, evicting the oldest window
+  when full. The desktop answers
   through loopback-only `POST /api/remote/pairings/{id}/allow|decline`; allow commits the device row
   first (INV §15). The phone long-polls `GET /api/remote/pair/{pending_id}` (up to 20 seconds per
   request) with the pending id as its bearer of that wait, from the same peer node; the response
@@ -124,7 +128,9 @@ the installed app on iOS.
   `Topic`. The first new item for a tag sends at once and opens a 10-second window; items arriving
   inside it send once as a summary when it closes. Only transitions notify: the first evaluation
   after start records what already needs the person without sending, and nothing sends while remote
-  control is off. Mutes (FS-02.R24) and the per-device switch are read at send time. A queue of 64
+  control is off. Remote enablement, mutes (FS-02.R24), and the per-device switch are reread before
+  every send attempt, including each retry; a queued note keeps its items' mute types for that check,
+  and a summary is dropped only when every item it covers is muted. A queue of 64
   with one worker sends; a `404`/`410` marks that endpoint's subscription expired (FS-20.R28), other
   failures retry after 2, 4, and 8 seconds and are then dropped and logged without payload or
   endpoint. The VAPID `sub` claim is the project's https URL, which Apple requires and which does
