@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { launchAgent, sendPrompt } from "../api/client";
-import { listPipelineTemplates, sharedWorkspaceConflicts, startPipelineRun } from "../api/pipelines";
+import { listPipelineTemplates, pipelineDiagnostics, sharedWorkspaceConflicts, startPipelineRun } from "../api/pipelines";
 import { phoneFetch } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
@@ -12,7 +12,8 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 
 /** New work starts only against projects, roles, and templates already
  *  configured on the desktop, with the runtime the desktop would preselect —
- *  the phone omits runtime fields and the Mac resolves its defaults (FS-20.R15). */
+ *  the phone omits runtime fields and the Mac resolves its defaults (FS-20.R15);
+ *  for a pipeline run the tailnet filter fills every empty assignment. */
 export function NewWorkScreen() {
   const offline = useConnection((state) => state.link !== "connected");
   const agents = useConnection((state) => state.agents);
@@ -81,7 +82,10 @@ export function NewWorkScreen() {
     } catch (err) {
       const shared = sharedWorkspaceConflicts(err);
       if (shared.length > 0) setConflicts(shared);
-      else setError(errorText(err));
+      else {
+        const reasons = pipelineDiagnostics(err).map((diagnostic) => diagnostic.message);
+        setError(reasons.length > 0 ? `${errorText(err)}: ${reasons.join("; ")}` : errorText(err));
+      }
     } finally {
       setBusy(false);
     }

@@ -109,17 +109,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 Results are in the **Second pass** section of
 [`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
 
-- **Must fix** (FS-20.R15/A4, FS-14.R80; INV §2/§17) — J-FS20 phone **Start pipeline** never
-  starts a run: `ui/src/remote/NewWorkScreen.tsx` submits an empty `orchestrator`
-  (`backend:""`, `model:""`), and the Mac refuses with 422 "the standing orchestrator requires a
-  configured backend and model". The phone shows only "run cannot start", including after **Start
-  anyway**. Reproduced on a conflict-free project. Evidence:
-  `docs/archive/reviews/usability-review-2026-09-29-evidence/r2-14-start-pipeline-refused.png`.
-  *Fix:* resolve the standing owner and dedicated coordinators to their configured defaults the
-  way `ui/src/features/pipelines/RunStartForm.tsx` does, preferably through one shared helper, and
-  show the refusal's diagnostic. *Verify:* at 390px against the dev fixture, a template with a
-  required input starts and opens its run page; a UI test asserts the submitted assignments are
-  non-empty.
 - **Worth fixing** (FS-20.R13; INV §2) — J-FS20 phone transcript: each tool result renders
   expanded raw JSON under the collapsed tool line (`EventRow` in `ui/src/remote/AgentScreen.tsx`
   renders `tool_result` on its own row), repeating every diff and lengthening the phone view.
@@ -151,6 +140,16 @@ Results are in the **Second pass** section of
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix: phone Start pipeline always refused (FS-20.R15/A4, FS-14.R80, TS-13.R5;
+  INV §2 parallel paths share one helper / §17 tests prove their contract).** The tailnet filter
+  requires the phone's runtime assignments to be empty, but nothing filled them. It now fills the
+  standing owner and every dedicated coordinator from `selectLaunchTarget`'s default (the same one
+  a launch with nothing chosen uses) before the shared handler runs; loopback starts are
+  unchanged. The finding's suggested client-side fill would have been refused by that filter, so
+  its "UI test asserts non-empty assignments" check became `TestRemotePipelineStartUsesMacDefaults`
+  (phone body → 201 with default assignments; 422 on the old code). The phone now appends the
+  refusal's diagnostics to its error. The 390px browser re-check was not run.
 
 - **2026-09-29 — Usability review, second phone pass (after the hydration fix).** At 390px against
   the dev fixture: decisions, conversation controls, Show earlier, Ask AgentDecker, New task, task

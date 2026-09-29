@@ -283,4 +283,31 @@ describe("New work", () => {
     await waitFor(() => expect(calls.some((c) => c.startsWith("start ") && c.includes('"inputs":{"ticket":"T-1"}') && c.includes('"goal":"Release 2"'))).toBe(true));
     expect(window.location.pathname).toBe("/run/r1");
   });
+
+  it("shows why the Mac refused a pipeline start", async () => {
+    server.use(
+      http.post("/api/pipeline-runs", () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: "validation",
+              message: "run cannot start",
+              details: {
+                pipeline_code: "validation_failed",
+                diagnostics: [{ field: "assignments.standing", code: "unavailable", message: "backend claude is not signed in" }],
+              },
+            },
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderWith(<NewWorkScreen />);
+    fireEvent.click(await screen.findByRole("radio", { name: "Start pipeline" }));
+    fireEvent.change(await screen.findByLabelText("Run goal"), { target: { value: "Release 2" } });
+    fireEvent.change(screen.getByLabelText("ticket"), { target: { value: "T-1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    expect(await screen.findByText("run cannot start: backend claude is not signed in")).toBeInTheDocument();
+    expect(screen.getByLabelText("Run goal")).toHaveValue("Release 2");
+  });
 });

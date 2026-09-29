@@ -214,6 +214,59 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	}
 }
 
+// The phone sends empty runtime assignments (it may not choose them), so the
+// Mac fills the standing owner and each dedicated coordinator with its
+// configured default and the run starts (FS-20.R15/A4, FS-14.R80). The body is
+// the one ui/src/remote/NewWorkScreen.tsx submits.
+func TestRemotePipelineStartUsesMacDefaults(t *testing.T) {
+	s := testServer(t, true)
+	t.Cleanup(func() { s.registry.Shutdown(context.Background()) })
+	s.registry.Chat().SetCommand(buildFakeACP(t))
+	if err := s.configStore.WriteProject("phone-run", config.Project{Title: "Phone run", Cwd: t.TempDir(), AddDirs: []string{}}); err != nil {
+		t.Fatal(err)
+	}
+	template := apiTemplate()
+	template.Stages = append(template.Stages, pipeline.Stage{
+		ID: "review", Title: "Review", Objective: "Review it.", Coordination: "dedicated", DedicatedRole: "implementer",
+		Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{},
+	})
+	if _, err := s.pipelineTemplates.Create("two-stage", template); err != nil {
+		t.Fatal(err)
+	}
+	backends, err := s.configStore.ReadBackends()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want pipeline.RuntimeAssignment
+	for id, backend := range backends.Backends {
+		if backend.Default {
+			want = pipeline.RuntimeAssignment{Backend: id, Model: backend.DefaultModel, Effort: backend.Models[backend.DefaultModel].DefaultEffort}
+		}
+	}
+	if want.Backend == "" {
+		t.Fatal("seeded backends have no default")
+	}
+
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/pipeline-runs", `{"request_id":"phone-1","template_id":"two-stage","display_name":"","project":"phone-run","goal":"Ship it","inputs":{},"orchestrator":{"backend":"","model":"","effort":"","fast":false},"dedicated_assignments":{}}`, token))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("phone start = %d %s", rec.Code, rec.Body)
+	}
+	var started struct {
+		Run pipeline.RunDetail `json:"run"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &started); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"standing", "review"} {
+		if got := started.Run.Assignments[key]; got != want {
+			t.Errorf("assignment %s = %+v, want %+v", key, got, want)
+		}
+	}
+}
+
 // Every tailnet mutation body is bounded before its handler runs, including
 // actions with no field filter (TS-13.R5/R6, INV §16).
 func TestRemoteMutationBodyIsBounded(t *testing.T) {

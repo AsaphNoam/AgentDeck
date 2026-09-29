@@ -66,7 +66,9 @@ the installed app on iOS.
   directory picker, any config or federation write, archive, annotations, clone, switch runtime,
   rename, identity, group release, signals, layout, worktrees, any `/api/remote` management route,
   or the backend catalog (its backend and model `env` may hold keys): the phone omits runtime fields
-  and the Mac resolves the defaults the desktop New Agent form preselects. A test enumerates the
+  and the Mac resolves the defaults the desktop New Agent form preselects; for a pipeline start the
+  tailnet listener fills the standing owner and every dedicated coordinator with that default
+  before the shared handler validates the run. A test enumerates the
   loopback route inventory and fails when a route is neither allowlisted nor explicitly denied
   (INV §10). Unauthenticated GETs outside `/api/` reach only the phone app's static files (R14).
   R15–R17 supersede only the annotation, pipeline-replacement-runtime, and re-arm-value
@@ -228,7 +230,8 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 - Node and state: `internal/remote/remote.go`, `tsnet.go` (fake-node tests in `remote_test.go`,
   including rapid-toggle `-race`).
 - Listener chain and allowlist: `internal/server/remote_routes.go`, `routes.go` (`routeTable`),
-  `spa.go`; tests `remote_routes_test.go`, `spa_test.go`.
+  `spa.go`; tests `remote_routes_test.go`, `spa_test.go`. Pipeline-start defaults (R5):
+  `withDefaultPipelineRuntimes`; test `TestRemotePipelineStartUsesMacDefaults`.
 - Pairing and devices: `internal/server/remote_pairing.go`, `internal/state/remote_devices.go`.
 - Attention and Home: `internal/server/remote_home.go`, `state.ListAttentionTasks`.
 - Runtime options (R15): `handleRemoteRuntimeOptions` in `internal/server/remote_home.go`; tests

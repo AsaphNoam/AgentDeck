@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/remote"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -247,7 +248,7 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		}
 		var h http.Handler = e.handler
 		if e.pattern == "POST /api/pipeline-runs" {
-			h = remotePipelineRuntimeFilter(h)
+			h = s.remotePipelineRuntimeFilter(h)
 		}
 		if fields != nil {
 			h = remoteFieldFilter(fields, h)
@@ -446,9 +447,10 @@ func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 }
 
 // remotePipelineRuntimeFilter keeps the desktop-owned runtime assignments at
-// their empty/default phone representation (TS-13.R5/R6, FS-20.R15).
+// their empty/default phone representation (TS-13.R5/R6, FS-20.R15), then
+// fills them with the Mac's defaults so the phone never needs the catalog.
 // remoteBodyFilter has bounded the body.
-func remotePipelineRuntimeFilter(next http.Handler) http.Handler {
+func (s *Server) remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 	type assignment struct {
 		Backend string `json:"backend"`
 		Model   string `json:"model"`
@@ -497,9 +499,48 @@ func remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 				return
 			}
 		}
-		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.Body = io.NopCloser(bytes.NewReader(s.withDefaultPipelineRuntimes(body)))
 		next.ServeHTTP(w, r)
 	})
+}
+
+// withDefaultPipelineRuntimes gives the standing owner and every dedicated
+// coordinator the backend/model/effort a launch with nothing chosen would use
+// (selectLaunchTarget, INV §2) — the same default the desktop start form
+// preselects (FS-14.R80). An unknown template or unresolvable default leaves the
+// body as sent, so the start handler reports its own diagnostic.
+func (s *Server) withDefaultPipelineRuntimes(body []byte) []byte {
+	fields := map[string]json.RawMessage{}
+	var templateID string
+	if json.Unmarshal(body, &fields) != nil || json.Unmarshal(fields["template_id"], &templateID) != nil {
+		return body
+	}
+	record, err := s.pipelineTemplates.Read(templateID)
+	if err != nil {
+		return body
+	}
+	backends, err := s.readBackendsOrDefault()
+	if err != nil {
+		return body
+	}
+	target, effort, ae := resolveLaunchSpec(backends, "", "", "")
+	if ae != nil {
+		return body
+	}
+	assignment := pipeline.RuntimeAssignment{Backend: target.BackendID, Model: target.ModelID, Effort: effort}
+	dedicated := map[string]pipeline.RuntimeAssignment{}
+	for _, stage := range record.Template.Stages {
+		if stage.Coordination == "dedicated" {
+			dedicated[stage.ID] = assignment
+		}
+	}
+	fields["orchestrator"], _ = json.Marshal(assignment)
+	fields["dedicated_assignments"], _ = json.Marshal(dedicated)
+	filled, err := json.Marshal(fields)
+	if err != nil {
+		return body
+	}
+	return filled
 }
 
 // serveRemote serves a ready tailnet listener until its stop function runs,
