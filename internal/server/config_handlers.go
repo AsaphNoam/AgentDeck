@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/runtime"
@@ -536,11 +537,34 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 
 // ---- Backends PUT handler ----
 
-// backendsResponse is the §5.3 200 body: normalized doc + cred results.
+// backendsResponse is the §5.3 200 body: normalized doc + cred results, plus
+// the read-only adapter launch support (TS-03.R47). BackendSupport lives on the
+// response wrapper only, so it is never persisted, validated or hashed into
+// the catalog ETag; a client echoing it on PUT is ignored by the decoder.
 type backendsResponse struct {
 	config.BackendsConfig
-	Credentials  map[string]credcheck.CredResult `json:"credentials,omitempty"`
-	CodexRuntime config.CodexRuntime             `json:"codex_runtime"`
+	Credentials    map[string]credcheck.CredResult             `json:"credentials,omitempty"`
+	CodexRuntime   config.CodexRuntime                         `json:"codex_runtime"`
+	BackendSupport map[string]map[string]backend.LaunchSupport `json:"backend_support"`
+}
+
+// newBackendsResponse is the one builder for every GET (normal and fallback)
+// and successful PUT backends body, so the support projection cannot drift.
+func newBackendsResponse(b config.BackendsConfig, credentials map[string]credcheck.CredResult) backendsResponse {
+	support := make(map[string]map[string]backend.LaunchSupport, len(backend.Types()))
+	for _, typ := range backend.Types() {
+		byInterface := make(map[string]backend.LaunchSupport, len(backend.Interfaces))
+		for _, agentInterface := range backend.Interfaces {
+			byInterface[agentInterface] = backend.Support(typ, agentInterface)
+		}
+		support[typ] = byInterface
+	}
+	return backendsResponse{
+		BackendsConfig: b,
+		Credentials:    credentials,
+		CodexRuntime:   config.CurrentCodexRuntime(),
+		BackendSupport: support,
+	}
 }
 
 // handlePutBackends implements PUT /api/backends (§5.3).
@@ -622,11 +646,7 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("ETag", backendCatalogETag(body))
-	writeJSON(w, http.StatusOK, backendsResponse{
-		BackendsConfig: body,
-		Credentials:    credentials,
-		CodexRuntime:   config.CurrentCodexRuntime(),
-	})
+	writeJSON(w, http.StatusOK, newBackendsResponse(body, credentials))
 }
 
 // ---- Config GET/PUT handlers + onboarding gate ----

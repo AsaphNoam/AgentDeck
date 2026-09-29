@@ -170,3 +170,47 @@ func TestResolveResumeID(t *testing.T) {
 		}
 	}
 }
+
+// FS-09.A30 / TS-01.R36: the launch-support matrix, stated independently of
+// the adapter declarations it checks. Every registered type must appear here so
+// a new adapter cannot ship without an explicit row (INV §17).
+func TestLaunchSupportMatrix(t *testing.T) {
+	none := LaunchSupport{}
+	want := map[string]map[string]LaunchSupport{
+		"claude-acp": {
+			"chat":     {Available: true, Effort: true, Fast: true},
+			"terminal": {Available: true, Effort: true},
+		},
+		"codex-acp": {
+			"chat":     {Available: true, Effort: true, Fast: true},
+			"terminal": none,
+		},
+		"opencode-acp":  {"chat": {Available: true}, "terminal": none},
+		"openhands-acp": {"chat": {Available: true}, "terminal": none},
+	}
+	for _, typ := range Types() {
+		rows, ok := want[typ]
+		if !ok {
+			t.Fatalf("registered type %q has no expected launch-support row", typ)
+		}
+		for _, iface := range []string{"chat", "terminal"} {
+			if got := Support(typ, iface); got != rows[iface] {
+				t.Errorf("Support(%q, %q) = %+v, want %+v", typ, iface, got, rows[iface])
+			}
+		}
+		if got, want := SupportsTerminal(typ), rows["terminal"].Available; got != want {
+			t.Errorf("SupportsTerminal(%q) = %v, want %v", typ, got, want)
+		}
+		if got, want := SupportsEffort(typ), rows["chat"].Effort || rows["terminal"].Effort; got != want {
+			t.Errorf("SupportsEffort(%q) = %v, want %v", typ, got, want)
+		}
+	}
+	if len(want) != len(Types()) {
+		t.Fatalf("matrix has %d rows, registry has %d types", len(want), len(Types()))
+	}
+	for _, c := range [][2]string{{"openai-direct", "chat"}, {"claude-acp", "phone"}, {"claude-acp", ""}} {
+		if got := Support(c[0], c[1]); got != none {
+			t.Errorf("Support(%q, %q) = %+v, want all false", c[0], c[1], got)
+		}
+	}
+}

@@ -58,7 +58,62 @@ export const backendsResponseSchema = backendsConfigSchema.extend({
   }).optional(),
 });
 
-export type BackendsResponse = z.infer<typeof backendsResponseSchema>;
+// Read-only adapter launch support (TS-03.R47). It is parsed separately from
+// the editable catalog: a bad entry for one type/interface is dropped on its
+// own, so it can neither fail the catalog nor erase another entry's support.
+// An absent entry means "unknown" (offer retry), which differs from a parsed
+// all-false value (known unsupported).
+export const launchSupportSchema = z.object({
+  available: z.boolean(),
+  effort: z.boolean(),
+  fast: z.boolean(),
+});
+
+export type LaunchSupport = z.infer<typeof launchSupportSchema>;
+export type AgentInterface = "chat" | "terminal";
+export type BackendSupport = Partial<Record<BackendType, Partial<Record<AgentInterface, LaunchSupport>>>>;
+
+const AGENT_INTERFACES: AgentInterface[] = ["chat", "terminal"];
+
+export function parseBackendSupport(raw: unknown): BackendSupport {
+  const out: BackendSupport = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const type of backendTypeSchema.options) {
+    const entry = (raw as Record<string, unknown>)[type];
+    if (!entry || typeof entry !== "object") continue;
+    for (const iface of AGENT_INTERFACES) {
+      const parsed = launchSupportSchema.safeParse((entry as Record<string, unknown>)[iface]);
+      if (parsed.success) (out[type] ??= {})[iface] = parsed.data;
+    }
+  }
+  return out;
+}
+
+// launchSupportFor returns the parsed support for one backend type/interface,
+// or undefined when that metadata is missing or unusable.
+export function launchSupportFor(
+  support: BackendSupport | undefined,
+  type: BackendType | undefined,
+  iface: AgentInterface,
+): LaunchSupport | undefined {
+  return type ? support?.[type]?.[iface] : undefined;
+}
+
+export type BackendsResponse = z.infer<typeof backendsResponseSchema> & {
+  backend_support: BackendSupport;
+};
+
+// withBackendSupport replaces the wire backend_support with its tolerant parse,
+// leaving the editable catalog exactly as the server sent it.
+export function withBackendSupport<T extends object>(res: T): T & { backend_support: BackendSupport } {
+  return { ...res, backend_support: parseBackendSupport((res as { backend_support?: unknown }).backend_support) };
+}
+
+// editableBackendsConfig is the explicit PUT projection: only the editable
+// catalog fields, never a spread of a response carrying read-only metadata.
+export function editableBackendsConfig(doc: BackendsConfig): BackendsConfig {
+  return { version: doc.version, backends: doc.backends };
+}
 
 // Item-scoped create (TS-03.R23). `connection` is present only when the request
 // asked to connect native configuration; a failure reports "unbound" beside the

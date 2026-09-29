@@ -12,6 +12,7 @@ import type {
   BackendType,
   CreateBackendResponse,
 } from "../schemas/backends";
+import { editableBackendsConfig, withBackendSupport } from "../schemas/backends";
 import type { Config } from "../schemas/config";
 
 // Query keys — used for cache invalidation.
@@ -201,7 +202,7 @@ export function useDeleteProject() {
 export function useBackends() {
   return useQuery({
     queryKey: QUERY_KEYS.backends,
-    queryFn: () => jsonWithCatalogETag<BackendsResponse>("/api/backends"),
+    queryFn: async () => withBackendSupport(await jsonWithCatalogETag<BackendsResponse>("/api/backends")),
   });
 }
 
@@ -242,12 +243,12 @@ export function useCreateBackend() {
 export function usePutBackends() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ catalogEtag, ...data }: CatalogETagged<BackendsConfig>) =>
-      jsonWithCatalogETag<BackendsResponse>("/api/backends", {
+    mutationFn: async ({ catalogEtag, ...data }: CatalogETagged<BackendsConfig>) =>
+      withBackendSupport(await jsonWithCatalogETag<BackendsResponse>("/api/backends", {
         method: "PUT",
         headers: { "Content-Type": "application/json", "If-Match": catalogEtag ?? "" },
-        body: JSON.stringify(data),
-      }),
+        body: JSON.stringify(editableBackendsConfig(data)),
+      })),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.backends }),
   });
 }

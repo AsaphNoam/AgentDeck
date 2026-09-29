@@ -18,8 +18,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28; its first and
-  second-pass reviews both closed 2026-09-29.
+- **Active change:** `centralize-launch-support` (in progress since 2026-09-29; see **Active
+  change**). `add-mobile-remote-control` finished 2026-09-28; its reviews closed 2026-09-29.
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -30,7 +30,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later. **Available:** `drop-pipeline-recipient-refusal`
   (finished 2026-09-29; `create_task`/`send_message` refusal path in `internal/messaging`).
-- **Work units:** `rename-product-to-deckhand.md` and `centralize-launch-support.md` are Waiting to start.
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start; `centralize-launch-support.md`
+  is in progress.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
@@ -55,7 +56,20 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
+**`centralize-launch-support`** ([change](../ready-changes/centralize-launch-support.md);
+FS-09.R60–R63/A30–A32, TS-01.R36, TS-03.R47). Plan: (1) `internal/backend` `LaunchSupport` +
+per-adapter interface declaration; server Terminal gate and `SupportsEffort`/`SupportsFast` derive
+from it; (2) `backend_support` on GET/PUT `/api/backends` via one builder + tolerant browser parse;
+(3) New Agent + CardContextMenu Switch runtime consume it, `lib/backendTypes.terminalSupported`
+removed; (4) Settings ModelRow repair path; (5) rendered journeys + closure matrix.
+Done: slices 1–2 — `backend.Support`/`Implements`/`SupportsTerminal`, `newBackendsResponse` (all
+three GET/PUT paths), `ui/src/schemas/backends.ts` `parseBackendSupport`/`launchSupportFor`/
+`withBackendSupport`/`editableBackendsConfig` (PUT body), MSW wire fixture
+`ui/src/test/backendSupport.ts`. Tests: `TestLaunchSupportMatrix`,
+`TestGetBackendsReportsLaunchSupport`, `TestPutBackendsIgnoresEchoedLaunchSupport`,
+`schemas/backends.test.ts`. Specs stay `(planned)` until consumers ship. Next: slice 3.
+
+**Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
 The fakeACP phone-size browser pass (A3/A4/A7/A9) ran at 390px on 2026-09-29; its four findings
 were fixed the same day and re-checked at 390px in a third pass. The fast-mode picker and Continue on an
@@ -86,7 +100,7 @@ unreviewed on the operator's explicit decision. Owed: the credentialed Claude an
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
 **Available by role:** `/fix` has no recorded findings; `/review` may take
-`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand` or
+`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand` or resume
 `centralize-launch-support`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 

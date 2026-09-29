@@ -1,6 +1,6 @@
 # Share adapter launch support with desktop controls
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** The operator accepted the 2026-09-29
 [runtime capability assessment](../plans/runtime-capability-assessment.md) and requested the design
 specifications. The original AI suggestion proposed a broader runtime/model capability layer;

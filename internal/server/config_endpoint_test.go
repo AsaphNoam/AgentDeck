@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
@@ -530,5 +532,106 @@ func TestPutConfigWriteFailurePreservesAppearanceChoice(t *testing.T) {
 	}
 	if got.AppearanceSkin != config.AppearanceSkinSkyGrove {
 		t.Fatalf("appearance after failed Core write = %q, want %q", got.AppearanceSkin, config.AppearanceSkinSkyGrove)
+	}
+}
+
+// wantBackendSupportJSON is FS-09.A30's matrix spelled on the wire, independent
+// of the adapter declarations and projection builder under test (INV §17).
+const wantBackendSupportJSON = `{
+	"claude-acp":    {"chat": {"available": true, "effort": true, "fast": true},  "terminal": {"available": true,  "effort": true,  "fast": false}},
+	"codex-acp":     {"chat": {"available": true, "effort": true, "fast": true},  "terminal": {"available": false, "effort": false, "fast": false}},
+	"opencode-acp":  {"chat": {"available": true, "effort": false, "fast": false}, "terminal": {"available": false, "effort": false, "fast": false}},
+	"openhands-acp": {"chat": {"available": true, "effort": false, "fast": false}, "terminal": {"available": false, "effort": false, "fast": false}}
+}`
+
+func assertBackendSupportJSON(t *testing.T, body []byte) {
+	t.Helper()
+	var raw struct {
+		BackendSupport json.RawMessage `json:"backend_support"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		t.Fatal(err)
+	}
+	var got, want any
+	if err := json.Unmarshal(raw.BackendSupport, &got); err != nil {
+		t.Fatalf("backend_support = %s: %v", raw.BackendSupport, err)
+	}
+	if err := json.Unmarshal([]byte(wantBackendSupportJSON), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("backend_support = %s, want %s", raw.BackendSupport, wantBackendSupportJSON)
+	}
+}
+
+// FS-09.A30 / TS-03.R47: every GET variant reports support for every registered
+// type, independently of which backends are configured.
+func TestGetBackendsReportsLaunchSupport(t *testing.T) {
+	for name, file := range map[string]string{
+		"empty catalog": `{"version":2,"backends":{}}`,
+		"fallback":      `{"version":2}`,
+		"missing":       "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := testServer(t, false)
+			if file != "" {
+				if err := os.WriteFile(filepath.Join(srv.configStore.Home(), "backends.json"), []byte(file), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			rec := doGET(t, srv.routes(), "/api/backends")
+			if rec.Code != http.StatusOK {
+				t.Fatalf("GET /api/backends = %d body=%s", rec.Code, rec.Body)
+			}
+			assertBackendSupportJSON(t, rec.Body.Bytes())
+		})
+	}
+}
+
+// FS-09.A30 / TS-03.R47: an echoed backend_support gains no authority — it is
+// neither persisted nor used for validation, and the catalog ETag covers only
+// editable data.
+func TestPutBackendsIgnoresEchoedLaunchSupport(t *testing.T) {
+	srv := testServerWithOkCreds(t)
+	h := srv.routes()
+	body := validBackendsBody()
+	body["backend_support"] = map[string]any{
+		"opencode-acp": map[string]any{"chat": map[string]any{"available": true, "effort": true, "fast": true}},
+	}
+	rec := doBackendsPut(t, h, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/backends = %d body=%s", rec.Code, rec.Body)
+	}
+	assertBackendSupportJSON(t, rec.Body.Bytes())
+
+	stored, err := os.ReadFile(filepath.Join(srv.configStore.Home(), "backends.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(stored), "backend_support") {
+		t.Fatalf("stored catalog persisted response-only metadata: %s", stored)
+	}
+	plain := testServerWithOkCreds(t)
+	plainRec := doBackendsPut(t, plain.routes(), validBackendsBody())
+	if got, want := rec.Header().Get("ETag"), plainRec.Header().Get("ETag"); got == "" || got != want {
+		t.Fatalf("ETag with echoed support = %q, without = %q", got, want)
+	}
+
+	// An echoed claim of OpenCode effort support does not let an effort
+	// declaration through validation (FS-09.R39).
+	bad := map[string]any{
+		"version": 2,
+		"backend_support": map[string]any{
+			"opencode-acp": map[string]any{"chat": map[string]any{"available": true, "effort": true}},
+		},
+		"backends": map[string]any{
+			"oc": map[string]any{
+				"name": "OpenCode", "type": "opencode-acp", "default": true, "default_model": "m",
+				"models": map[string]any{"m": map[string]any{"name": "M", "model": "p/m", "efforts": []string{"high"}}},
+			},
+		},
+	}
+	if rec := doBackendsPut(t, h, bad); rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT with echoed support and OpenCode efforts = %d body=%s, want 400", rec.Code, rec.Body)
 	}
 }

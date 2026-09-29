@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/agentdeck/agentdeck/internal/backend"
 	"github.com/agentdeck/agentdeck/internal/runtime"
 	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
 	"github.com/coder/websocket"
@@ -12,10 +13,11 @@ import (
 // interface. Only claude-acp has a verified interactive-CLI hook-registration
 // path; codex/opencode/openhands would launch a statusless terminal agent that
 // silently drops the composed spec, so the launch/resume/switch composers reject
-// terminal for them with 422 terminal_unavailable (§6 capability honesty). This
-// is the single source of that gate — all three composers call it.
+// terminal for them with 422 terminal_unavailable (§6 capability honesty). All
+// three composers call this gate, which delegates to the adapter launch-support
+// owner (TS-01.R36).
 func terminalSupported(backendType string) bool {
-	return backendType == "claude-acp"
+	return backend.SupportsTerminal(backendType)
 }
 
 // terminalUnsupportedReason is the UI-facing reason a backend type cannot run in

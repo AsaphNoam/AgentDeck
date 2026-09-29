@@ -65,6 +65,40 @@ type BackendAdapter interface {
 	// SessionConfigIDs declares post-session option identifiers. Empty values
 	// mean the adapter does not support that setting through live ACP config.
 	SessionConfigIDs() (model, effort, fast string)
+
+	// Implements declares whether AgentDeck has a verified integration for the
+	// given interface ("chat" | "terminal") on this backend. It is the only
+	// evidence of interface support: a hook map or installed executable is not.
+	Implements(agentInterface string) bool
+}
+
+// Interfaces lists the AgentDeck agent interfaces launch support reports on.
+var Interfaces = []string{"chat", "terminal"}
+
+// LaunchSupport is AgentDeck's static integration support for one backend type
+// and interface (TS-01.R36). It is not a live session capability, executable
+// probe, or model declaration.
+type LaunchSupport struct {
+	Available bool `json:"available"`
+	Effort    bool `json:"effort"`
+	Fast      bool `json:"fast"`
+}
+
+// Support derives launch support from the adapter's interface declaration and
+// its existing effort/fast delivery contracts. Unknown types or interfaces, and
+// interfaces the adapter does not implement, yield all false.
+func Support(backendType, agentInterface string) LaunchSupport {
+	adapter, ok := For(backendType)
+	if !ok || !adapter.Implements(agentInterface) {
+		return LaunchSupport{}
+	}
+	mode, _ := adapter.EffortDelivery(agentInterface)
+	_, _, fast := adapter.SessionConfigIDs()
+	return LaunchSupport{
+		Available: true,
+		Effort:    mode != EffortNone,
+		Fast:      agentInterface == "chat" && fast != "",
+	}
 }
 
 const (
@@ -117,16 +151,11 @@ func Types() []string {
 	return types
 }
 
-// SupportsEffort derives catalog capability from the adapter delivery contract
-// rather than maintaining a second backend-type allowlist in config validation.
+// SupportsEffort reports catalog effort capability: effort on any implemented
+// interface, derived from Support rather than a second backend-type allowlist.
 func SupportsEffort(backendType string) bool {
-	adapter, ok := For(backendType)
-	if !ok {
-		return false
-	}
-	for _, agentInterface := range []string{"chat", "terminal"} {
-		mode, _ := adapter.EffortDelivery(agentInterface)
-		if mode != EffortNone {
+	for _, agentInterface := range Interfaces {
+		if Support(backendType, agentInterface).Effort {
 			return true
 		}
 	}
@@ -134,12 +163,13 @@ func SupportsEffort(backendType string) bool {
 }
 
 func SupportsFast(backendType, agentInterface string) bool {
-	adapter, ok := For(backendType)
-	if !ok || agentInterface != "chat" {
-		return false
-	}
-	_, _, fast := adapter.SessionConfigIDs()
-	return fast != ""
+	return Support(backendType, agentInterface).Fast
+}
+
+// SupportsTerminal reports whether AgentDeck can launch, resume or switch this
+// backend type under the terminal interface.
+func SupportsTerminal(backendType string) bool {
+	return Support(backendType, "terminal").Available
 }
 
 // claudeACP is the adapter for the official claude-agent-acp package.
@@ -163,6 +193,12 @@ func (claudeACP) ResolveResumeID(prevSessionID string, sameBackend bool) string 
 }
 
 func (claudeACP) CanSwitchModelOnResume() bool { return true }
+
+// Claude is the only backend with a verified interactive-CLI hook-registration
+// path, so it alone implements the terminal interface (FS-09.R13).
+func (claudeACP) Implements(agentInterface string) bool {
+	return agentInterface == "chat" || agentInterface == "terminal"
+}
 
 func (claudeACP) HookMap() map[string]string {
 	// Claude Code exposes a 1:1 hook for every AgentDeck lifecycle event.
@@ -214,7 +250,8 @@ func (codexACP) ResolveResumeID(prevSessionID string, sameBackend bool) string {
 	return prevSessionID
 }
 
-func (codexACP) CanSwitchModelOnResume() bool { return true }
+func (codexACP) CanSwitchModelOnResume() bool          { return true }
+func (codexACP) Implements(agentInterface string) bool { return agentInterface == "chat" }
 
 func (codexACP) HookMap() map[string]string {
 	// NOTE (gated): the real codex-acp hook surface has not been confirmed against
@@ -271,7 +308,8 @@ func (opencodeACP) ResolveResumeID(prevSessionID string, sameBackend bool) strin
 	return prevSessionID
 }
 
-func (opencodeACP) CanSwitchModelOnResume() bool { return true }
+func (opencodeACP) CanSwitchModelOnResume() bool          { return true }
+func (opencodeACP) Implements(agentInterface string) bool { return agentInterface == "chat" }
 
 // OpenCode has no AgentDeck hook surface; chat status derives from the ACP
 // stream like every chat agent.
@@ -317,7 +355,8 @@ func (openhandsACP) ResolveResumeID(prevSessionID string, sameBackend bool) stri
 	return prevSessionID
 }
 
-func (openhandsACP) CanSwitchModelOnResume() bool { return true }
+func (openhandsACP) CanSwitchModelOnResume() bool          { return true }
+func (openhandsACP) Implements(agentInterface string) bool { return agentInterface == "chat" }
 
 func (openhandsACP) HookMap() map[string]string                 { return nil }
 func (openhandsACP) UnsupportedHookEvents() []string            { return unsupported(nil) }
