@@ -25,9 +25,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
   (finished 2026-09-25) were reviewed and fixed together on 2026-09-29; the combined unit is
   closed. Evidence: `docs/archive/reviews/implementation-studio-acceptance-2026-09-29.md`.
-  `share-creative-workspace-layout` finished 2026-09-28 and awaits `/review`; its substantive
-  commits are `0b31c9a`, `ddab692` and the closure commit named
-  `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
+  `share-creative-workspace-layout` finished 2026-09-28 and was reviewed 2026-09-29; it stays
+  open for `/fix` with the findings below. Its substantive commits on `main` are `1998a49`,
+  `1810360` and `36e656f` (base `f79fb97`; `0b31c9a`/`ddab692` are off-main rehash twins).
   Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later.
@@ -42,7 +42,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** the injected-steer lifetime
+- **Open findings:** `share-creative-workspace-layout` has one Must-fix and one Worth-fixing
+  finding below. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -79,7 +80,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/review` may take `share-creative-workspace-layout`.
+**Available by role:** `/fix` may take `share-creative-workspace-layout`; no `/review` unit is
+pending.
 `/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -98,6 +100,25 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
+### share-creative-workspace-layout (2026-09-29) — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+- **Must fix** — finished task rows are no longer readable; FS-12.A29/R56, INV §8.
+  `ui/src/styles/features/tasks.css:186-188` promotes Studio's `opacity: 0.78` on
+  `.task-row[data-state="finished"]` to every appearance. Muted row text then composites to about
+  3.05:1 (Core), 3.02:1 (Studio) and 2.70:1 (Sky & Grove) against the canvas, below 4.5:1, and the
+  row's Re-arm/actions fade with it. Any operator scanning a ledger with finished tasks hits this.
+  Replace whole-row opacity with a quieter non-alpha treatment (muted surface or state emphasis)
+  and pin finished-row text contrast in the existing style-contract check.
+- **Worth fixing** — the promotion left superseded geometry behind; FS-12.R52/R56, TS-08.R74,
+  INV §10. Studio's softened toast and permission-prompt frames and its Settings content measure
+  were deleted from `studio.css` instead of promoted, so every appearance still renders the old
+  crisp asymmetric radius with 8px/thick frames on the toast (`shell.css:288-293`), permission
+  prompt (`agent.css:496-499`), context menu (`dashboard.css:529-531`) and user message
+  (`agent.css:404-407`), while the pipeline run title keeps an oversized condensed
+  `clamp(2.2rem, 5vw, 4.5rem)`/`0.9` heading (`pipelines.css:320`) that R52 replaces with the
+  readable R46 hierarchy. Move these to the shared `--ad-radius-large`/thin-keyline construction
+  and the route heading scale, then re-check the matched 1024px overlay/pipeline screenshots.
+
 ## Design consistency notes
 
 - The paused direct-action change cites `TS-04.R32–R40`, while TS-01.R25 and TS-03.R32 cite
@@ -107,6 +128,15 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Review shared creative-workspace layout (FS-12.R52–R59/A26–A31,
+  TS-08.R74–R79; INV §1–§17).** One Must-fix finished-row contrast regression and one
+  Worth-fixing incomplete geometry promotion keep the unit open. Shared tokens, skin-sheet
+  pruning, content-sized card header and composer actions, empty live-settings omission, project
+  tabs and live-state-scoped badge pulse with reduced-motion fallback otherwise match the
+  requirements; no local-choice notes were pending. INV §2, §13 and §17 had applicable surfaces
+  and no finding (`npm run check:styles` and the focused matrix/grid/chat/tasks suites pass);
+  §1, §3–§7, §9, §11–§12 and §14–§16 had no applicable surface.
 
 - **2026-09-29 — Fix combined Studio review findings (FS-12.R43/A19–A23, TS-08.R62/R68;
   INV §10/§17).** Closed the grouped unit. Studio's open-canvas dots now render at the specified
