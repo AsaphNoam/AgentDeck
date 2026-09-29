@@ -43,7 +43,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   [assessment](../plans/runtime-capability-assessment.md) recommends only a bounded projection of
   adapter launch support for New Agent/Settings; scope confirmation is pending before FS/TS promotion.
 - **Open findings:** none recorded. The 2026-09-29 usability review's phone findings (both passes)
-  closed the same day; a 390px browser re-check of the second pass's four fixes is owed. The injected-steer lifetime
+  closed the same day and a third pass re-checked the second pass's four fixes at 390px. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -58,7 +58,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
 The fakeACP phone-size browser pass (A3/A4/A7/A9) ran at 390px on 2026-09-29; its four findings
-were fixed the same day without a browser re-check. The fast-mode picker and Continue on an
+were fixed the same day and re-checked at 390px in a third pass. The fast-mode picker and Continue on an
 approval pause stay unexercised.
 Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
 ./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5). Allow
@@ -105,7 +105,7 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 ## Review findings
 
 None open. The 2026-09-29 usability review's second phone pass closed 2026-09-29; its 390px
-browser re-check of the four fixes was not run.
+browser re-check of the four fixes passed the same day (third pass).
 
 ## Design consistency notes
 
@@ -121,6 +121,15 @@ browser re-check of the four fixes was not run.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Usability review, third phone pass (390px re-check of the four fixes).** Against
+  the dev fixture at `367a433`: a stopped task's agent is listed once on Home; Re-arm confirms the
+  applied set and refuses no-outcome and cyclic sets in plain language without mutating; Start
+  pipeline starts on the Mac's default runtimes; tool calls and results fold into one collapsed
+  line. No new finding. Two notes in the run file (expanded run leaves the call collapsed beside
+  its result; Moving shows a task and its own agent as two rows). Unexercised: fast-mode picker,
+  Continue on an approval pause, real-device gates. Report:
+  `docs/archive/reviews/usability-review-run-2026-09-29.md`.
 
 - **2026-09-29 — Design assessment: runtime/model capability ownership.** Inspected adapters,
   Codex/Claude catalog import, live session negotiation and desktop/phone/pipeline consumers.

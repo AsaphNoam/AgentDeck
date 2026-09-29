@@ -148,3 +148,32 @@ EVIDENCE: usability-review-2026-09-29-evidence/r2-16-home-mixed.png
   words it; the project appears on the Home card. This may be specification drift.
 - FS-20.A9's fakeACP phone-size browser pass has now run. Only the fast-mode picker and Continue on
   an approval pause stay unexercised.
+
+---
+
+## Third pass — 390px re-check of the second pass's four fixes
+
+- **Baseline:** `367a433` on `main`; `make embed`, then the same dev-tagged stress fixture (port 4612,
+  fake tailnet `localhost:4529`), remote control on, extra fakeACP models `toolflow`, `perm`, `hold`
+  (the backend default was set to `hold` so launched tasks stay running). Headless Chrome for
+  Testing over CDP at 390 × 844 with touch emulation, browser rung 1. Zero console errors and zero
+  horizontal overflow on every screen driven.
+- **Outcome:** all four fixes hold in the running app. No new finding.
+
+| Fix | Result | Observed | Evidence |
+|---|---|---|---|
+| Home lists a stopped task's agent once (R11) | PASS | Stopping a running task's agent left one **Runner one — was interrupted** row under Needs you and nothing under Since you last looked. | [home](usability-review-2026-09-29-evidence/r3-01-home-stopped.png) |
+| Re-arm confirms and explains (R30) | PASS | Changing a prerequisite to another task and submitting showed "Re-armed. It now waits for Runner two (success)." and the Mac held exactly that arm. An unticked outcome set reads "Choose at least one outcome for prerequisite 1." before anything is sent; a cycle reads "That would make these tasks wait on each other in a loop. Choose a different prerequisite." The Mac's arms were unchanged after both, and the draft stayed. | [done](usability-review-2026-09-29-evidence/r3-04-rearm-done.png), [no outcome](usability-review-2026-09-29-evidence/r3-05-rearm-empty.png), [cycle](usability-review-2026-09-29-evidence/r3-06-rearm-cycle.png) |
+| Start pipeline fills the Mac's runtimes (R15/A4) | PASS | A conflict-free path is untested here (every project shares the fixture repo), but **Start anyway** on the shared-workspace conflict now starts the run and lands on its page ("Stage 1 of 2 · Plan"); the orchestrator carries the Mac default (`claude`/`hold`/`medium`). A project whose directory is missing is refused with "run cannot start: project directory does not exist". | [refused](usability-review-2026-09-29-evidence/r3-08-pipeline-started.png), [started](usability-review-2026-09-29-evidence/r3-09-pipeline-started.png) |
+| Transcript folds tool results (R13) | PASS | Each turn's tool call and result show as one collapsed **Ran 1 tool** line; the diff stays viewable below it. Expanding the run shows the call line, input and result. | [collapsed](usability-review-2026-09-29-evidence/r3-10-toolflow.png), [expanded](usability-review-2026-09-29-evidence/r3-11-toolflow-expanded.png) |
+
+### Notes (not findings)
+
+- With the run expanded, the call line itself still starts collapsed while its raw JSON result is
+  already visible beneath it; expanding the call adds the input. The default view is clean and the
+  desktop shares this component, so it is recorded as a possible polish item only.
+- **Moving** lists a running task and its own working agent as two rows ("Runner one working",
+  "Runner one running"). FS-20.R11 names busy agents and running tasks separately and does not
+  say to fold them, so this may be a specification gap, in the same family as the fixed MINOR 3.
+- Still unexercised: the replacement fast-mode picker, Continue on an approval pause, and the
+  manual real-device gates (A1/A5/A6/A8).
