@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -556,6 +557,138 @@ func TestPipelineRunDetailProjectsRetainedStageCleanup(t *testing.T) {
 	}
 	if !body.Controls.RepairCleanup.Eligible {
 		t.Fatal("a finishing run holding unsafe cleanup offered no repair control")
+	}
+}
+
+// stoppingRunWithUnsafeCleanup seeds a stopping run whose one finished member
+// holds an unsafe retained release, the state the repair control acts on.
+func stoppingRunWithUnsafeCleanup(t *testing.T, srv *Server, runID string) (string, int64) {
+	t.Helper()
+	now := time.Now().UTC()
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "One", OrchestratorRole: "implementer", Stages: []pipeline.Stage{
+		{ID: "work", Title: "Work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: runID, TemplateID: "one", TemplateSnapshot: snapshot, DisplayName: "One", Project: "my-app",
+		Goal: "goal", State: "queued", Revision: 1, PendingAction: "dispatch_stage_task",
+		CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: runID, RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "work",
+		Task: state.Task{TaskID: taskID, Project: "my-app", DisplayName: "Work", Instruction: "work",
+			TargetKind: state.TargetLaunch, Role: "implementer", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ?, pending_release = 1, cleanup_phase = 'release', cleanup_unsafe = 1, cleanup_last_error = 'permission denied stopping the runtime' WHERE task_id = ?`,
+		state.TaskFinished, taskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE pipeline_runs SET state = 'stopping', pending_action = 'cleanup_run' WHERE run_id = ?`, runID); err != nil {
+		t.Fatal(err)
+	}
+	run, err := srv.stateStore.ReadPipelineRun(runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return taskID, run.Revision
+}
+
+func repairCleanupPipelineCode(t *testing.T, rec *httptest.ResponseRecorder) string {
+	t.Helper()
+	var body struct {
+		Error struct {
+			Details struct {
+				PipelineCode string `json:"pipeline_code"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode refusal: %v (%s)", err, rec.Body.String())
+	}
+	return body.Error.Details.PipelineCode
+}
+
+// FS-20.R24/A7, INV §5/§15 — repair ran the member cleanup effects before the
+// run revision was checked, so a stale phone request re-armed and released
+// retained cleanup and only then answered revision_conflict. A stale request
+// must now be refused with every member untouched.
+func TestRepairCleanupStaleRevisionPerformsNoEffects(t *testing.T) {
+	srv := testServer(t, true)
+	taskID, revision := stoppingRunWithUnsafeCleanup(t, srv, "pr_stale_repair")
+	before, err := srv.stateStore.ReadTask(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := doJSON(t, srv.routes(), http.MethodPost, "/api/pipeline-runs/pr_stale_repair/repair-cleanup", fmt.Sprintf(`{"revision":%d}`, revision-1))
+	if rec.Code != http.StatusConflict || repairCleanupPipelineCode(t, rec) != "revision_conflict" {
+		t.Fatalf("stale repair = %d %s, want revision_conflict", rec.Code, rec.Body.String())
+	}
+	after, err := srv.stateStore.ReadTask(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Revision != before.Revision || !after.CleanupUnsafe || !after.PendingRelease {
+		t.Fatalf("member after stale repair = %+v, want it untouched", after)
+	}
+	run, err := srv.stateStore.ReadPipelineRun("pr_stale_repair")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Revision != revision || run.State != "stopping" {
+		t.Fatalf("run after stale repair = %+v, want it untouched", run)
+	}
+}
+
+// FS-20.R24, INV §5 — the desktop and a phone repairing the same run at the
+// same revision: exactly one is accepted and the other sees revision_conflict.
+func TestRepairCleanupConcurrentSameRevisionAcceptsOne(t *testing.T) {
+	srv := testServer(t, true)
+	taskID, revision := stoppingRunWithUnsafeCleanup(t, srv, "pr_race_repair")
+	h := srv.routes()
+	body := fmt.Sprintf(`{"revision":%d}`, revision)
+
+	start := make(chan struct{})
+	recs := make([]*httptest.ResponseRecorder, 2)
+	var wg sync.WaitGroup
+	for i := range recs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			recs[i] = doJSON(t, h, http.MethodPost, "/api/pipeline-runs/pr_race_repair/repair-cleanup", body)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	accepted, conflicted := 0, 0
+	for _, rec := range recs {
+		switch {
+		case rec.Code == http.StatusOK:
+			accepted++
+		case rec.Code == http.StatusConflict && repairCleanupPipelineCode(t, rec) == "revision_conflict":
+			conflicted++
+		default:
+			t.Fatalf("repair = %d %s, want one accepted and one revision_conflict", rec.Code, rec.Body.String())
+		}
+	}
+	if accepted != 1 || conflicted != 1 {
+		t.Fatalf("accepted=%d conflicted=%d, want exactly one of each", accepted, conflicted)
+	}
+	task, err := srv.stateStore.ReadTask(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.CleanupUnsafe || task.PendingRelease {
+		t.Fatalf("member after repair = %+v, want the retained release settled", task)
 	}
 }
 

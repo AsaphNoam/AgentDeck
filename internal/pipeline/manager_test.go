@@ -476,6 +476,69 @@ func TestFailedStartupRecoveryRetainsTheStopFence(t *testing.T) {
 	}
 }
 
+// FS-20.R24, INV §5/§15 — cleanup repair ran its member effects before the run
+// revision was checked. The revision is now claimed first: of two simultaneous
+// repairs at one revision exactly one runs the effects, the loser and any stale
+// request see revision_conflict having run none.
+func TestRepairCleanupClaimsTheRevisionBeforeEffects(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	detail, _ := startStagePipeline(t, manager, "repair-claim", "a_owner", "gen-1")
+	if _, err := manager.store.DB().Exec(`UPDATE pipeline_runs SET state = 'stopping', pending_action = 'cleanup_run' WHERE run_id = ?`, detail.Run.RunID); err != nil {
+		t.Fatal(err)
+	}
+	run, err := manager.store.ReadPipelineRun(detail.Run.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	effects := 0
+	repair := func() error {
+		mu.Lock()
+		effects++
+		mu.Unlock()
+		return nil
+	}
+	isConflict := func(err error) bool {
+		var controlled *ControlError
+		return errors.As(err, &controlled) && controlled.Code == "revision_conflict"
+	}
+
+	if _, err := manager.RepairCleanup(context.Background(), run.RunID, run.Revision-1, repair); !isConflict(err) {
+		t.Fatalf("stale repair err = %v, want revision_conflict", err)
+	}
+	if effects != 0 {
+		t.Fatalf("stale repair ran %d effects, want none", effects)
+	}
+
+	start := make(chan struct{})
+	errs := make([]error, 2)
+	var wg sync.WaitGroup
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, errs[i] = manager.RepairCleanup(context.Background(), run.RunID, run.Revision, repair)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	accepted, conflicted := 0, 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			accepted++
+		case isConflict(err):
+			conflicted++
+		default:
+			t.Fatalf("repair err = %v", err)
+		}
+	}
+	if accepted != 1 || conflicted != 1 || effects != 1 {
+		t.Fatalf("accepted=%d conflicted=%d effects=%d, want one winner running the effects once", accepted, conflicted, effects)
+	}
+}
+
 // FS-14.A1 / INV §2: run assignments use configured catalog ids rather than
 // the role/project filename slug rule. The seeded Codex id contains dots.
 func TestStartAcceptsSeededCodexModelID(t *testing.T) {

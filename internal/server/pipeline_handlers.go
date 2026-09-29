@@ -313,21 +313,19 @@ func (s *Server) handleRepairPipelineCleanup(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	runID := r.PathValue("id")
-	if err := s.eachPipelineCleanupMember(runID, func(task state.Task) error {
-		if !task.CleanupUnsafe {
+	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), runID, request.Revision, func() error {
+		return s.eachPipelineCleanupMember(runID, func(task state.Task) error {
+			if !task.CleanupUnsafe {
+				return nil
+			}
+			repaired, repairErr := s.stateStore.RepairTaskCleanup(task.TaskID)
+			if repairErr != nil {
+				return repairErr
+			}
+			s.finishTaskCleanup(r.Context(), repaired)
 			return nil
-		}
-		repaired, repairErr := s.stateStore.RepairTaskCleanup(task.TaskID)
-		if repairErr != nil {
-			return repairErr
-		}
-		s.finishTaskCleanup(r.Context(), repaired)
-		return nil
-	}); err != nil {
-		writePipelineError(w, err)
-		return
-	}
-	detail, err := s.pipelineMgr.RepairCleanup(r.Context(), runID, request.Revision)
+		})
+	})
 	if err != nil {
 		writePipelineError(w, err)
 		return

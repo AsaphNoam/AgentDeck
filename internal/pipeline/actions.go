@@ -319,19 +319,43 @@ func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDe
 	return m.Detail(runID)
 }
 
-func (m *Manager) RepairCleanup(ctx context.Context, runID string, expectedRevision int64) (RunDetail, error) {
+// RepairCleanup claims the submitted run revision before repair runs the
+// member cleanup effects, so of two concurrent or stale requests only the one
+// holding the current revision performs any effect; the other sees
+// revision_conflict having touched nothing (FS-20.R24, INV §5/§15).
+func (m *Manager) RepairCleanup(ctx context.Context, runID string, expectedRevision int64, repair func() error) (RunDetail, error) {
+	unlock := m.lockRun(runID)
 	run, err := m.store.ReadPipelineRun(runID)
 	if err != nil {
+		unlock()
 		return RunDetail{}, err
 	}
 	if run.Revision != expectedRevision {
+		unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before repairing cleanup")
 	}
 	// Stage completion retains cleanup exactly as Stop does, so `finishing` needs
 	// the same repair route: without it a stage whose cleanup failed persistently
 	// had no operator action at all (TS-09.R42).
 	if !cleanupRepairable(run) {
+		unlock()
 		return RunDetail{}, controlError("invalid_state", "cleanup repair is not valid for the current run state")
+	}
+	claimed, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
+		State: run.State, PendingAction: run.PendingAction, CurrentStageID: run.CurrentStageID,
+		CurrentAttemptID: run.CurrentAttemptID, CurrentAgentID: run.CurrentAgentID,
+		AttentionReason: run.AttentionReason, FinalOutcome: run.FinalOutcome,
+	})
+	unlock()
+	if errors.Is(err, state.ErrPipelineConflict) {
+		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before repairing cleanup")
+	}
+	if err != nil {
+		return RunDetail{}, err
+	}
+	m.publish(claimed)
+	if err := repair(); err != nil {
+		return RunDetail{}, err
 	}
 	if err := m.Reconcile(ctx, runID); err != nil {
 		return RunDetail{}, err
