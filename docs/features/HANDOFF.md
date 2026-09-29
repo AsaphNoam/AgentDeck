@@ -39,7 +39,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   leftover refusal shipped 2026-09-29 as `drop-pipeline-recipient-refusal` (FS-06.R37/A26, TS-04.R67).
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
-  entries were merged.
+  entries were merged. The 2026-09-29 runtime/model capability
+  [assessment](../plans/runtime-capability-assessment.md) recommends only a bounded projection of
+  adapter launch support for New Agent/Settings; scope confirmation is pending before FS/TS promotion.
 - **Open findings:** none recorded. The 2026-09-29 usability review's phone findings (both passes)
   closed the same day; a 390px browser re-check of the second pass's four fixes is owed. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
@@ -119,6 +121,15 @@ browser re-check of the four fixes was not run.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Design assessment: runtime/model capability ownership.** Inspected adapters,
+  Codex/Claude catalog import, live session negotiation and desktop/phone/pipeline consumers.
+  Existing architecture is largely capability-driven; recommend a small shared launch-support
+  projection, not a broad refactor. Evidence, migration boundaries, risks and validation plan are in
+  `docs/plans/runtime-capability-assessment.md`; idea remains being defined pending scope confirmation.
+  No FS/TS promotion, ready change or product-code edits. Repository inspection only; no live
+  provider/browser verification. `make check-specs`, design-feature/UX twin comparisons and
+  `git diff --check` pass. Pre-existing `internal/server/ui/dist/index.html` edits preserved.
 
 - **2026-09-29 — Fix: phone Home listed a task's stopped agent twice (FS-20.R11; INV §8
   user-facing surfaces).** A `done` agent that owns a task or run under Needs you is no longer
