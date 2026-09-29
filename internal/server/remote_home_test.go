@@ -46,6 +46,12 @@ func TestRemoteHomeClassifiesAttention(t *testing.T) {
 	task("t-fin", state.TaskFinished, now)
 	task("t-fin-old", state.TaskFinished, old.Add(-time.Hour))
 	task("t-armed", state.TaskArmed, now)
+	// The interrupted task's own agent stopped: it is the task's conversation,
+	// not a separate "finished" entry (FS-20.R11).
+	agent("a-owned", "done", now)
+	if _, err := s.stateStore.DB().Exec(`UPDATE tasks SET assigned_agent_id = 'a-owned' WHERE task_id = 't-int'`); err != nil {
+		t.Fatal(err)
+	}
 
 	r := phoneRequest(http.MethodGet, "/api/remote/home?since="+old.Format(time.RFC3339), "", token)
 	rec := httptest.NewRecorder()

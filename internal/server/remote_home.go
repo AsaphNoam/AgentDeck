@@ -146,6 +146,19 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 		}
 	}
 
+	// A finished agent whose task or run needs the person is that item's
+	// conversation, not separate news: listing it as "finished" beside
+	// "was interrupted" contradicts the entry that needs action (FS-20.R11).
+	owned := map[string]bool{}
+	for _, item := range out.NeedsYou {
+		if item.Kind != "agent" && item.AgentID != "" {
+			owned[item.AgentID] = true
+		}
+	}
+	out.SinceLast = slices.DeleteFunc(out.SinceLast, func(item attentionItem) bool {
+		return item.Kind == "agent" && owned[item.AgentID]
+	})
+
 	// Needs you is oldest first; the other lists show the newest first.
 	sort.SliceStable(out.NeedsYou, func(i, j int) bool { return out.NeedsYou[i].Since.Before(out.NeedsYou[j].Since) })
 	sort.SliceStable(out.Moving, func(i, j int) bool {

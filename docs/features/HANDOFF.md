@@ -40,9 +40,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** the 2026-09-29 usability review's second phone pass records one **Must fix**
-  (phone Start pipeline always refused) and three **Worth fixing** under **Review findings**; its
-  phone-hydration blocker closed the same day. The injected-steer lifetime
+- **Open findings:** none recorded. The 2026-09-29 usability review's phone findings (both passes)
+  closed the same day; a 390px browser re-check of the second pass's four fixes is owed. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -56,9 +55,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
-The fakeACP phone-size browser pass (A3/A4/A7/A9) ran at 390px on 2026-09-29 and passed except the
-findings below; only the fast-mode picker and Continue on an approval pause stay unexercised.
-FS-20 §6's "A9 browser pass is owed" line is now stale.
+The fakeACP phone-size browser pass (A3/A4/A7/A9) ran at 390px on 2026-09-29; its four findings
+were fixed the same day without a browser re-check. The fast-mode picker and Continue on an
+approval pause stay unexercised.
 Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
 ./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5). Allow
 uses `pending_pairing.id` from `GET /api/remote`, not the code's id. For a permission card, set the
@@ -84,8 +83,7 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take the phone findings from the
-[2026-09-29 usability review](../archive/reviews/usability-review-run-2026-09-29.md); `/review` may take
+**Available by role:** `/fix` has no recorded findings; `/review` may take
 `drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -104,16 +102,8 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-### usability-review-run-2026-09-29 (second pass) — **Fix model:** medium — Codex Terra or Claude Opus.
-
-Results are in the **Second pass** section of
-[`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
-
-- **Worth fixing** (FS-20.R11; INV §8) — J-FS20 phone Home: after a running task's agent is
-  stopped, the task sits under **Needs you** as "was interrupted" while its same-named agent is
-  under **Since you last looked** as "finished" (`/api/remote/home` reports the agent `done`).
-  Evidence: `r2-16-home-mixed.png`. *Fix:* skip, or label, task-owned agents whose task is in
-  Needs you. *Verify:* stopping a task's agent yields one consistent entry.
+None open. The 2026-09-29 usability review's second phone pass closed 2026-09-29; its 390px
+browser re-check of the four fixes was not run.
 
 ## Design consistency notes
 
@@ -129,6 +119,12 @@ Results are in the **Second pass** section of
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix: phone Home listed a task's stopped agent twice (FS-20.R11; INV §8
+  user-facing surfaces).** A `done` agent that owns a task or run under Needs you is no longer
+  also listed as "finished" under Since you last looked; FS-20.R11 now says so.
+  `TestRemoteHomeClassifiesAttention` covers it and fails on the old code. Closes the 2026-09-29
+  usability review's second phone pass; `make test`, the UI suite and `make build` pass.
 
 - **2026-09-29 — Fix: phone Re-arm feedback (FS-20.R30, TS-10; INV §8 user-facing surfaces get
   in-vocabulary data).** A successful Re-arm now shows a status line naming what the task waits

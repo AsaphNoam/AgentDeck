@@ -85,7 +85,8 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   - **Moving** — busy agents, running tasks, and active pipeline runs, grouped by project; a run
     shows its stage position (for example "Stage 2 of 4").
   - **Since you last looked** — agents that became `done`, tasks that finished, and runs that reached
-    a terminal state since this phone last opened Home, with their outcome.
+    a terminal state since this phone last opened Home, with their outcome. An agent whose task or
+    run is under **Needs you** is not listed again here; that entry opens its conversation.
 - **R12 — A decision carries its context.** A permission request opens as a card showing
   the agent (`role@project`), the tool and its command or a diff summary, and the agent's latest
   message, with **Approve** and **Deny** exactly as on the desktop (FS-03.R15/R21). A `waiting_input`
@@ -252,7 +253,8 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or
   `pmset -g assertions` check has run. Their automated halves pass.
-- A9's server and UI halves pass; its fakeACP browser pass at phone size is owed.
+- A9's server and UI halves pass; its fakeACP browser pass at phone size ran 2026-09-29, leaving
+  only the replacement fast-mode picker unexercised.
 
 ## 7. Traceability
 
