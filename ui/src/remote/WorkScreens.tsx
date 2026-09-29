@@ -11,7 +11,8 @@ import {
   stopPipelineRun,
 } from "../api/pipelines";
 import { WORK_RESULT_OUTCOMES, taskActions, type Task, type TaskArm } from "../schemas/task";
-import { phoneFetch } from "./api";
+import type { PipelineRuntimeAssignment as RuntimeAssignment } from "../schemas/pipeline";
+import { getRuntimeOptions, phoneFetch } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
 
@@ -247,6 +248,88 @@ export function TaskScreen({ taskId }: { taskId: string }) {
   );
 }
 
+/** ReplaceForm offers the Mac's configured runtime choices, preselected to the
+ *  run's standing assignment; the Mac revalidates the submitted assignment
+ *  against its current configuration before launching it (FS-20.R31). */
+function ReplaceForm({ standing, reason, disabled, onSubmit }: {
+  standing: RuntimeAssignment;
+  reason: string;
+  disabled: boolean;
+  onSubmit: (runtime: RuntimeAssignment) => void;
+}) {
+  const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
+  const [runtime, setRuntime] = useState<RuntimeAssignment>(standing);
+  const backends = options.data?.backends ?? [];
+  const backend = backends.find((item) => item.id === runtime.backend);
+  const model = backend?.models.find((item) => item.id === runtime.model);
+  const chooseModel = (backendID: string, modelID: string) => {
+    const next = backends.find((item) => item.id === backendID)?.models.find((item) => item.id === modelID);
+    setRuntime({ backend: backendID, model: modelID, effort: next?.default_effort ?? "", fast: false });
+  };
+
+  return (
+    <form
+      className="phone-card phone-form"
+      aria-label="Replace orchestrator"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(runtime);
+      }}
+    >
+      <p className="phone-card-kicker">Replace orchestrator</p>
+      <p className="phone-meta">{reason || "Cancels the unfinished assignment and retains stage work for the replacement."}</p>
+      {options.isError && <p className="phone-error">{errorText(options.error)}</p>}
+      <label className="phone-field">
+        Backend
+        <select value={runtime.backend} onChange={(event) => chooseModel(event.target.value, "")}>
+          <option value="">Choose…</option>
+          {runtime.backend && !backend && <option value={runtime.backend}>{runtime.backend} (not configured)</option>}
+          {backends.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name || item.id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="phone-field">
+        Model
+        <select value={runtime.model} onChange={(event) => chooseModel(runtime.backend, event.target.value)}>
+          <option value="">Choose…</option>
+          {runtime.model && !model && <option value={runtime.model}>{runtime.model} (not configured)</option>}
+          {(backend?.models ?? []).map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name || item.id}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(model?.efforts.length || runtime.effort) ? (
+        <label className="phone-field">
+          Effort
+          <select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}>
+            <option value="">Model default</option>
+            {runtime.effort && !model?.efforts.includes(runtime.effort) && <option value={runtime.effort}>{runtime.effort} (not available)</option>}
+            {(model?.efforts ?? []).map((effort) => (
+              <option key={effort} value={effort}>
+                {effort}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      {(model?.fast || runtime.fast) && (
+        <label className="phone-check">
+          <input type="checkbox" checked={runtime.fast} onChange={(event) => setRuntime({ ...runtime, fast: event.target.checked })} />
+          Fast mode
+        </label>
+      )}
+      <button type="submit" disabled={disabled || !runtime.backend || !runtime.model}>
+        Replace orchestrator
+      </button>
+    </form>
+  );
+}
+
 export function RunScreen({ runId }: { runId: string }) {
   const offline = useConnection((state) => state.link !== "connected");
   const revision = useConnection((state) => state.revision);
@@ -302,11 +385,6 @@ export function RunScreen({ runId }: { runId: string }) {
             Retry stage
           </button>
         )}
-        {controls.replace.eligible && d.orchestrator && (
-          <button type="button" disabled={disabled} onClick={() => void run(() => replacePipelineOrchestrator(runId, rev, d.orchestrator!))}>
-            Replace orchestrator
-          </button>
-        )}
         {controls.repair_cleanup.eligible && (
           <button type="button" disabled={disabled} onClick={() => void run(() => repairPipelineCleanup(runId, rev))}>
             Retry cleanup
@@ -318,6 +396,15 @@ export function RunScreen({ runId }: { runId: string }) {
           </button>
         )}
       </div>
+      {controls.replace.eligible && (
+        <ReplaceForm
+          key={rev}
+          standing={d.orchestrator ?? s.orchestrator}
+          reason={controls.replace.reason}
+          disabled={disabled}
+          onSubmit={(runtime) => void run(() => replacePipelineOrchestrator(runId, rev, runtime))}
+        />
+      )}
     </div>
   );
 }

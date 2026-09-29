@@ -3,12 +3,16 @@ package server
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/agentdeck/agentdeck/internal/pipeline"
 	"github.com/agentdeck/agentdeck/internal/remote"
 	"github.com/agentdeck/agentdeck/internal/state"
 )
@@ -406,5 +410,123 @@ func TestRemoteRearmHasDesktopValueAuthority(t *testing.T) {
 	unchanged, err := srv.stateStore.ReadTask(second.TaskID)
 	if err != nil || unchanged.Revision != second.Revision || len(unchanged.Arms) != 1 || unchanged.Arms[0].SignalName != "later" {
 		t.Fatalf("refused Re-arm mutated the task: %+v, %v", unchanged, err)
+	}
+}
+
+// A phone replaces an interrupted orchestrator with a changed runtime; the
+// shared validator rejects a stale or unsupported choice without touching the
+// run (FS-20.R31, TS-13.R15).
+func TestRemoteReplaceValidatesChosenRuntime(t *testing.T) {
+	srv, _ := wakeTestServer(t)
+	h := srv.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, srv, "d1", "n")
+	now := time.Now().UTC()
+	snapshot, err := json.Marshal(pipeline.Template{Version: 2, Title: "One", OrchestratorRole: "impl", Stages: []pipeline.Stage{
+		{ID: "work", Title: "Work", Objective: "Work", Coordination: "standing", Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	taskID, err := srv.stateStore.NewTaskID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{Run: state.PipelineRunRecord{
+		RunID: "pr_replace", TemplateID: "one", TemplateSnapshot: snapshot, DisplayName: "One", Project: "tmpproj",
+		Goal: "goal", State: "queued", Revision: 1, PendingAction: "dispatch_stage_task",
+		CurrentStageID: "work", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "pr_replace", RequestHash: "hash", InitialStageTask: &state.CreatePipelineStageTaskParams{
+		RunID: "pr_replace", ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "work",
+		Task: state.Task{TaskID: taskID, Project: "tmpproj", DisplayName: "Work", Instruction: "work",
+			TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE tasks SET state = ? WHERE task_id = ?`, state.TaskInterrupted, taskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE pipeline_runs SET state = 'paused', pending_action = '' WHERE run_id = 'pr_replace'`); err != nil {
+		t.Fatal(err)
+	}
+	run, err := srv.stateStore.ReadPipelineRun("pr_replace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	replace := func(orchestrator string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		body := fmt.Sprintf(`{"revision":%d,"orchestrator":%s}`, run.Revision, orchestrator)
+		h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/pipeline-runs/pr_replace/replace", body, token))
+		return rec
+	}
+
+	for _, stale := range []string{
+		`{"backend":"claude","model":"retired-model"}`,
+		`{"backend":"claude","model":"sonnet","effort":"ultra"}`,
+		`{"backend":"claude","model":"sonnet","fast":true}`,
+	} {
+		if rec := replace(stale); rec.Code < 400 {
+			t.Fatalf("replace with %s = %d %s", stale, rec.Code, rec.Body)
+		}
+		if after, err := srv.stateStore.ReadPipelineRun("pr_replace"); err != nil || after.Revision != run.Revision || after.State != "paused" {
+			t.Fatalf("refused replacement changed the run: %+v, %v", after, err)
+		}
+	}
+	if rec := replace(`{"backend":"claude","model":"sonnet","effort":"high"}`); rec.Code != http.StatusOK {
+		t.Fatalf("replace with a changed runtime = %d %s", rec.Code, rec.Body)
+	}
+	stages, err := srv.stateStore.ListPipelineStageTasks("pr_replace")
+	if err != nil || len(stages) != 2 {
+		t.Fatalf("stages = %+v, %v", stages, err)
+	}
+	replacement, err := srv.stateStore.ReadTask(stages[1].TaskID)
+	if err != nil || replacement.Backend != "claude" || replacement.Model != "sonnet" || replacement.Effort != "high" {
+		t.Fatalf("replacement task = %+v, %v", replacement, err)
+	}
+}
+
+// The phone's runtime catalog carries ids, names, efforts, and fast support
+// only; backend type, env, and credentials never reach it (TS-13.R15).
+func TestRemoteRuntimeOptionsAreSecretFree(t *testing.T) {
+	s := testServer(t, true)
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+	backends := config.DefaultBackends()
+	claude := backends.Backends["claude"]
+	claude.Env = map[string]string{"ANTHROPIC_API_KEY": "sk-backend-secret"}
+	sonnet := claude.Models["sonnet"]
+	sonnet.Env = map[string]string{"ANTHROPIC_BASE_URL": "https://model-secret.example"}
+	claude.Models["sonnet"] = sonnet
+	backends.Backends["claude"] = claude
+	if err := s.configStore.WriteBackends(backends); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/remote/runtime-options", "", token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("runtime options = %d %s", rec.Code, rec.Body)
+	}
+	body := rec.Body.String()
+	for _, leak := range []string{"sk-backend-secret", "model-secret", "env", "claude-acp", `"type"`} {
+		if strings.Contains(body, leak) {
+			t.Fatalf("runtime options leak %q: %s", leak, body)
+		}
+	}
+	var got struct {
+		Backends []remoteRuntimeBackend `json:"backends"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	var found *remoteRuntimeModel
+	for _, b := range got.Backends {
+		for i, m := range b.Models {
+			if b.ID == "claude" && m.ID == "sonnet" {
+				found = &b.Models[i]
+			}
+		}
+	}
+	if found == nil || len(found.Efforts) == 0 || found.DefaultEffort != sonnet.DefaultEffort {
+		t.Fatalf("claude/sonnet missing or incomplete: %+v", got.Backends)
 	}
 }

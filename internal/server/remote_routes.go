@@ -60,7 +60,7 @@ var remoteAllowed = map[string][]string{
 	"GET /api/pipeline-runs/{id}":                 nil,
 	"POST /api/pipeline-runs/{id}/continue":       nil,
 	"POST /api/pipeline-runs/{id}/retry":          nil,
-	"POST /api/pipeline-runs/{id}/replace":        nil,
+	"POST /api/pipeline-runs/{id}/replace":        {"revision", "orchestrator"},
 	"POST /api/pipeline-runs/{id}/repair-cleanup": nil,
 	"POST /api/pipeline-runs/{id}/stop":           nil,
 }
@@ -256,6 +256,7 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 	}
 	// Tailnet-only phone routes (TS-03.R46).
 	authed.HandleFunc("GET /api/remote/home", s.handleRemoteHome)
+	authed.HandleFunc("GET /api/remote/runtime-options", s.handleRemoteRuntimeOptions)
 	authed.HandleFunc("GET /api/remote/self", s.handleGetSelf)
 	authed.HandleFunc("PUT /api/remote/self/push", s.handlePutSelfPush)
 	authed.HandleFunc("DELETE /api/remote/self/push", s.handleDeleteSelfPush)

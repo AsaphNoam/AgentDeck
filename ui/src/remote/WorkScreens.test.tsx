@@ -13,6 +13,7 @@ const calls: string[] = [];
 let taskState = "interrupted";
 let taskArms: unknown[] = [];
 let rearmRefusal: string | null = null;
+let replaceRefusal: string | null = null;
 
 const task = () => ({
   task_id: "t1", project: "my-app", display_name: "Fix login", instruction: "x", target_kind: "launch", role: "implementer",
@@ -39,6 +40,7 @@ const runDetail = {
     current_attempt_id: "at1", current_agent_id: "", attention_reason: "Waiting for approval", final_outcome: "",
   },
   template, inputs: {}, stage_tasks: [], values: [], diagnostics: [],
+  orchestrator: { backend: "claude", model: "sonnet", effort: "medium", fast: false },
   controls: {
     continue: { eligible: true }, retry: { eligible: false }, replace: { eligible: false }, stop: { eligible: true }, repair_cleanup: { eligible: false },
   },
@@ -59,6 +61,19 @@ const server = setupServer(
     calls.push(`continue ${await request.text()}`);
     return HttpResponse.json(runDetail);
   }),
+  http.post("/api/pipeline-runs/r1/replace", async ({ request }) => {
+    calls.push(`replace ${await request.text()}`);
+    if (replaceRefusal) return HttpResponse.json({ error: { code: "validation", message: replaceRefusal } }, { status: 422 });
+    return HttpResponse.json(runDetail);
+  }),
+  http.get("/api/remote/runtime-options", () =>
+    HttpResponse.json({
+      backends: [
+        { id: "claude", name: "Claude", models: [{ id: "sonnet", name: "Claude Sonnet", efforts: ["low", "medium", "high"], default_effort: "medium", fast: false }] },
+        { id: "codex", name: "Codex", models: [{ id: "gpt", name: "GPT", efforts: ["low", "high"], default_effort: "low", fast: true }] },
+      ],
+    }),
+  ),
   http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My app" }, old: { title: "Old", archived: true } })),
   http.get("/api/roles", () => HttpResponse.json({ implementer: { title: "Implementer" }, agentdecker: { title: "AgentDecker" } })),
   http.get("/api/pipelines", () => HttpResponse.json([{ id: "ship", template, valid: true, diagnostics: [] }])),
@@ -91,6 +106,8 @@ beforeEach(() => {
   taskState = "interrupted";
   taskArms = [];
   rearmRefusal = null;
+  replaceRefusal = null;
+  runDetail.controls.replace.eligible = false;
   useConnection.setState({ link: "connected", agents: {}, revision: 0 });
   window.history.replaceState(null, "", "/");
 });
@@ -188,6 +205,40 @@ describe("phone task and run actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(calls).toContain('continue {"revision":7,"input":"approved"}'));
     expect(screen.queryByRole("button", { name: "Retry stage" })).toBeNull();
+  });
+});
+
+describe("phone orchestrator replacement", () => {
+  it("replaces with a changed runtime chosen from the Mac's catalog", async () => {
+    runDetail.controls.replace.eligible = true;
+    renderWith(<RunScreen runId="r1" />);
+    const form = await screen.findByRole("form", { name: "Replace orchestrator" });
+    await waitFor(() => expect(within(form).getByLabelText("Backend")).toHaveValue("claude"));
+    expect(within(form).getByLabelText("Model")).toHaveValue("sonnet");
+    expect(within(form).getByLabelText("Effort")).toHaveValue("medium");
+    expect(within(form).queryByLabelText("Fast mode")).toBeNull();
+
+    fireEvent.change(within(form).getByLabelText("Backend"), { target: { value: "codex" } });
+    expect(within(form).getByRole("button", { name: "Replace orchestrator" })).toBeDisabled();
+    fireEvent.change(within(form).getByLabelText("Model"), { target: { value: "gpt" } });
+    expect(within(form).getByLabelText("Effort")).toHaveValue("low");
+    fireEvent.change(within(form).getByLabelText("Effort"), { target: { value: "high" } });
+    fireEvent.click(within(form).getByLabelText("Fast mode"));
+    fireEvent.click(within(form).getByRole("button", { name: "Replace orchestrator" }));
+    await waitFor(() =>
+      expect(calls).toContain('replace {"revision":7,"orchestrator":{"backend":"codex","model":"gpt","effort":"high","fast":true}}'),
+    );
+  });
+
+  it("shows the Mac's refusal of a stale choice and keeps it selected", async () => {
+    runDetail.controls.replace.eligible = true;
+    replaceRefusal = 'unknown model "sonnet"';
+    renderWith(<RunScreen runId="r1" />);
+    const form = await screen.findByRole("form", { name: "Replace orchestrator" });
+    await waitFor(() => expect(within(form).getByLabelText("Backend")).toHaveValue("claude"));
+    fireEvent.click(within(form).getByRole("button", { name: "Replace orchestrator" }));
+    expect(await screen.findByText('unknown model "sonnet"')).toBeInTheDocument();
+    expect(within(screen.getByRole("form", { name: "Replace orchestrator" })).getByLabelText("Model")).toHaveValue("sonnet");
   });
 });
 

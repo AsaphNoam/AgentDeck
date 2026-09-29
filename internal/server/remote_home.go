@@ -1,11 +1,14 @@
 package server
 
 import (
+	"maps"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
@@ -189,4 +192,48 @@ func (s *Server) handleRemoteHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, lists)
+}
+
+// remoteRuntimeModel and remoteRuntimeBackend are the phone's secret-free view
+// of the backend catalog (TS-13.R15): ids, names, and each model's allowed
+// effort and fast values. Backend type, env, credentials, and executable paths
+// never leave the Mac.
+type remoteRuntimeModel struct {
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Efforts       []string `json:"efforts"`
+	DefaultEffort string   `json:"default_effort,omitempty"`
+	Fast          bool     `json:"fast"`
+}
+
+type remoteRuntimeBackend struct {
+	ID     string               `json:"id"`
+	Name   string               `json:"name"`
+	Models []remoteRuntimeModel `json:"models"`
+}
+
+// handleRemoteRuntimeOptions implements tailnet-only GET
+// /api/remote/runtime-options for Replace orchestrator (FS-20.R31). Fast is
+// offered only where the shared launch validator would accept it.
+func (s *Server) handleRemoteRuntimeOptions(w http.ResponseWriter, _ *http.Request) {
+	backends, err := s.readBackendsOrDefault()
+	if err != nil {
+		s.log.Error("remote: runtime options", "err", err)
+		writeRemoteError(w, http.StatusInternalServerError, "internal", "internal error")
+		return
+	}
+	out := make([]remoteRuntimeBackend, 0, len(backends.Backends))
+	for _, id := range slices.Sorted(maps.Keys(backends.Backends)) {
+		backend := backends.Backends[id]
+		entry := remoteRuntimeBackend{ID: id, Name: backend.Name, Models: []remoteRuntimeModel{}}
+		for _, modelID := range slices.Sorted(maps.Keys(backend.Models)) {
+			model := backend.Models[modelID]
+			entry.Models = append(entry.Models, remoteRuntimeModel{
+				ID: modelID, Name: model.Name, Efforts: append([]string{}, model.Efforts...), DefaultEffort: model.DefaultEffort,
+				Fast: config.ValidateModelFast(backend, model, true) == nil,
+			})
+		}
+		out = append(out, entry)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"backends": out})
 }

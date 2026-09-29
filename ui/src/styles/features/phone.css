@@ -330,7 +330,8 @@ body {
   gap: var(--ad-space-2) var(--ad-space-4);
 }
 
-.phone-arm-outcomes label {
+.phone-arm-outcomes label,
+.phone-check {
   align-items: center;
   display: flex;
   gap: var(--ad-space-2);

@@ -114,7 +114,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 - **R16 — Desktop-only surfaces stay on the desktop.** The phone offers no terminal,
   Settings, roles/projects/backends editing, federation, annotate-and-assign, worktree creation or
   cleanup, clone, switch runtime, rename, archive search, dashboard layout, skins, or onboarding.
-  Planned R30–R32 supersede this restriction only for task-prerequisite editing, pipeline
+  R30–R32 supersede this restriction only for task-prerequisite editing, pipeline
   replacement runtime choices, and diff annotation-and-assignment; the other listed surfaces stay
   desktop-only.
 - **R17 — The app is live while open.** Every view updates without refreshing while the
@@ -126,7 +126,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   validation as the desktop under FS-16.R5/R15/R23; the phone receives the same typed refusal and
   preserves the draft when validation fails. This supersedes R14's former reuse-or-remove-only
   mobile restriction.
-- **R31 (planned) — Replacing an orchestrator can choose its runtime.** The phone's Replace
+- **R31 — Replacing an orchestrator can choose its runtime.** The phone's Replace
   orchestrator flow shows the Mac's configured backend/model choices and each model's allowed
   effort and fast-mode values, preselected to the run's standing assignment. The person may change
   those values for the replacement; the Mac validates the submitted assignment against its current
@@ -249,8 +249,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or
   `pmset -g assertions` check has run. Their automated halves pass.
-- R31 and A9 are approved but unshipped. The current phone has no replacement-runtime picker or
-  safe runtime catalog.
+- A9's server and UI halves pass; its fakeACP browser pass at phone size is owed.
 
 ## 7. Traceability
 
@@ -264,3 +263,8 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - A7: `ui/src/remote/PhoneApp.test.tsx`, `AgentScreen.test.tsx` (unreachable, stale, disabled,
   first decision wins).
 - Settings: `ui/src/features/settings/RemoteEditor.test.tsx`.
+- A9 (automated half): `ui/src/remote/WorkScreens.test.tsx` (task-control matrix, Re-arm editor,
+  orchestrator replacement), `AgentScreen.test.tsx` (diff annotation);
+  `internal/server/remote_routes_test.go` (`TestRemoteRearmHasDesktopValueAuthority`,
+  `TestRemoteReplaceValidatesChosenRuntime`, `TestRemoteRuntimeOptionsAreSecretFree`),
+  `annotations_test.go` (`TestRemoteAnnotationUsesSharedDelivery`).

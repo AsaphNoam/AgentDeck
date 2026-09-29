@@ -136,12 +136,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   memory. Give the remote transcript surface a byte/event-bounded window with continuation, keep
   permission/latest-message derivation correct at the boundary, and cover a transcript larger than
   the window.
-- **Must fix** — confirmed partial planned capability; FS-20.R31, TS-13.R15, INV §8/§14.
-  `internal/server/pipeline_handlers.go:262-279` already accepts a replacement orchestrator's
-  backend, model, effort, and fast values, but the phone has neither a runtime picker nor a safe
-  catalog from which to choose them. Add the secret-free runtime-options projection and visible
-  replacement controls, retain shared current-configuration validation, and test a valid changed
-  assignment plus rejected stale/unsupported choices without exposing backend secrets.
 
 ## Design consistency notes
 
@@ -174,6 +168,11 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   claims the run revision under the run lock before any member mutation or cleanup effect, so a
   stale or losing request does nothing (INV §5/§15). The phone annotates diff lines through the
   shared FS-13 drafts, batch builder and allowlisted handler (FS-20.R32, TS-13.R16; INV §2/§8/§10).
+  The phone Replace orchestrator form chooses from the secret-free `GET /api/remote/runtime-options`
+  catalog and the shared validator rejects stale or unsupported choices (FS-20.R31, TS-13.R15, now
+  Current; INV §8/§14). Next: the transcript-window finding is implemented but unverified in
+  `.claude/worktrees/agent-ac206cab6badccde4`; review, verify and bring it over, then run the
+  closure matrix and close the unit.
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from

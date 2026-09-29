@@ -58,6 +58,16 @@ export interface HomeLists {
   since_last: AttentionItem[];
 }
 
+/** The Mac's secret-free runtime catalog for Replace orchestrator (TS-13.R15). */
+export interface RuntimeOptions {
+  backends: {
+    id: string;
+    name: string;
+    models: { id: string; name: string; efforts: string[]; default_effort?: string; fast: boolean }[];
+  }[];
+}
+
+export const getRuntimeOptions = () => phoneFetch<RuntimeOptions>("/api/remote/runtime-options");
 export const getHome = (since: string) => phoneFetch<HomeLists>(`/api/remote/home?since=${encodeURIComponent(since)}`);
 export const checkPaired = () => phoneFetch<unknown>("/api/health");
 export const claimPairing = (code: string, name: string) =>

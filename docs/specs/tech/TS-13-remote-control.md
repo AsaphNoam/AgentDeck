@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -69,7 +69,7 @@ the installed app on iOS.
   and the Mac resolves the defaults the desktop New Agent form preselects. A test enumerates the
   loopback route inventory and fails when a route is neither allowlisted nor explicitly denied
   (INV §10). Unauthenticated GETs outside `/api/` reach only the phone app's static files (R14).
-  Planned R15–R17 supersede only the annotation, pipeline-replacement-runtime, and re-arm-value
+  R15–R17 supersede only the annotation, pipeline-replacement-runtime, and re-arm-value
   restrictions in this item; the full backend catalog and its secrets remain denied.
 - **R6 — Remote requests cannot widen permission policy.** A launch or task-creation body
   arriving on the tailnet listener may not carry a per-launch permission-bypass override or any
@@ -151,13 +151,15 @@ the installed app on iOS.
   phone's files. The phone
   app reuses `ui/src/api` schemas and client (TS-02.R11 lockstep) and uses a plain `EventSource`
   with its cookie; it does not use the desktop SharedWorker.
-- **R15 (planned) — Runtime choices use a secret-free phone projection.** A paired phone may read
+- **R15 — Runtime choices use a secret-free phone projection.** A paired phone may read
   `GET /api/remote/runtime-options`, which projects only configured backend ids/names and model
-  ids/names with their allowed efforts, default effort, and fast-mode support. It never projects
+  ids/names with their allowed efforts, default effort, and fast-mode support (true only where the
+  shared fast validator would accept it). It never projects
   backend type, environment, credentials, executable paths, credential-check detail, or federation
   configuration. The phone may submit one of those assignments to pipeline orchestrator
-  replacement; the shared launch validator re-reads current configuration and rejects an unknown or
-  unsupported backend/model/effort/fast combination before changing the run (FS-20.R31).
+  replacement, whose tailnet body admits only `revision` and `orchestrator`; the shared launch
+  validator re-reads current configuration and rejects an unknown or unsupported
+  backend/model/effort/fast combination before changing the run (FS-20.R31).
 - **R16 — Annotation delivery is allowlisted for paired phones.** The tailnet route table
   includes the existing `POST /api/sessions/{id}/annotations` handler for FS-20.R32. The remote
   chain bounds its body and admits only the shared request's top-level fields (`annotations`,
@@ -174,7 +176,8 @@ the installed app on iOS.
 Loopback-only: `GET /api/remote`, `PUT /api/remote` `{enabled, keep_awake}`, `POST
 /api/remote/pairings`, `POST /api/remote/pairings/{id}/allow|decline`, `GET /api/remote/devices`,
 `PATCH|DELETE /api/remote/devices/{id}`. Tailnet-only: `POST /api/remote/pair`, `GET
-/api/remote/pair/{pending_id}`, `GET /api/remote/home`, `GET|PATCH|DELETE /api/remote/self`,
+/api/remote/pair/{pending_id}`, `GET /api/remote/home`, `GET /api/remote/runtime-options`,
+`GET|PATCH|DELETE /api/remote/self`,
 `PUT|DELETE /api/remote/self/push`. SSE `remote_update` (loopback) signals a change to the
 `GET /api/remote` view; the desktop refetches it.
 
@@ -187,8 +190,8 @@ agent|task|run, id, title, project, state, reason, agent_id?, stage?, outcome?, 
 summaries carry `stage_number`/`stage_count` for the stage position. `GET /api/remote/self` →
 `{id, name, notifications, vapid_public_key}`.
 
-Planned phone capability additions: `GET /api/remote/runtime-options` → `{backends: [{id, name,
-models: [{id, name, efforts, default_effort?, fast}]}]}`; the existing annotation, task Re-arm, and
+`GET /api/remote/runtime-options` → `{backends: [{id, name,
+models: [{id, name, efforts, default_effort?, fast}]}]}`, sorted by id; the existing annotation, task Re-arm, and
 pipeline Replace request/response shapes remain shared with loopback and gain only the R4 guard,
 device authentication, allowlist, and bounded-body enforcement on the tailnet listener.
 
@@ -205,9 +208,6 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
 
-- R15 is approved but unshipped. Until it lands, no secret-free runtime-options route exists, and
-  the phone UI does not expose the broader Replace choices even though its shared handler already
-  accepts those request values.
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.
 - Face ID or fingerprint app lock and native apps are out of scope (FS-20 §6).
@@ -223,6 +223,10 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
   `spa.go`; tests `remote_routes_test.go`, `spa_test.go`.
 - Pairing and devices: `internal/server/remote_pairing.go`, `internal/state/remote_devices.go`.
 - Attention and Home: `internal/server/remote_home.go`, `state.ListAttentionTasks`.
+- Runtime options (R15): `handleRemoteRuntimeOptions` in `internal/server/remote_home.go`; tests
+  `TestRemoteRuntimeOptionsAreSecretFree`, `TestRemoteReplaceValidatesChosenRuntime`. Annotation
+  (R16): `TestRemoteAnnotationUsesSharedDelivery`. Re-arm (R17):
+  `TestRemoteRearmHasDesktopValueAuthority`.
 - Push: `internal/remote/push.go`, `internal/server/remote_push.go`.
 - Keep-awake: `internal/remote/keepawake.go`, `internal/server/keepawake.go`.
 - Phone app: `ui/remote.html`, `ui/public/remote-*`, `ui/src/remote/`, `ui/src/styles/remote.css`.
