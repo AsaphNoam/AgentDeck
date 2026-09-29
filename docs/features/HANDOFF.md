@@ -125,11 +125,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   annotation endpoint. Implement the approved phone-sized diff annotation-and-assignment flow,
   allowlist its bounded shared mutation, and test successful delivery plus preserved drafts on
   failure.
-- **Must fix** — confirmed task-state contract defect; FS-20.R14, FS-16.R22/R23, INV §8/§10.
-  `ui/src/remote/WorkScreens.tsx:71-138` offers **Record result** for every unfinished task although
-  only `running` and `interrupted` accept it, and offers **Re-arm** only for `dependency_failed`
-  although `armed` and `ready` accept it too. Render task controls from the specified eligibility
-  matrix and test every relevant state.
 - **Must fix** — confirmed send-time notification-policy defect; TS-13.R11, INV §1/§15.
   `internal/server/remote_push.go:180-212,259-320` checks remote enablement and notification mutes
   only before enqueue. A queued notification, including a retry, can still send after Remote is
@@ -175,6 +170,9 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix add-mobile-remote-control second-pass review (in progress).** Task controls
+  now come from one shared FS-16.R22/R23 eligibility helper on desktop and phone (INV §2/§8/§10).
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from

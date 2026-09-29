@@ -18,7 +18,7 @@ import { usePipelineRuns } from "../../api/pipelines";
 import type { PipelineRunSummary } from "../../schemas/pipeline";
 import type { Task, TaskArm } from "../../schemas/task";
 import { useAgentStore } from "../../store/agentStore";
-import { TASK_ATTENTION_STATES } from "../../schemas/task";
+import { TASK_ATTENTION_STATES, taskActions } from "../../schemas/task";
 
 /** needsAttention is the one definition the page and the dashboard count share:
  *  parked work and work whose agent went away without a result (FS-02.R44). */
@@ -291,14 +291,13 @@ function TaskRow({ task, project, taskNames, tasksQuery, runsQuery }: { task: Ta
 	const [outcome, setOutcome] = useState("success");
 	const [summary, setSummary] = useState("");
 	const [details, setDetails] = useState("");
-  const repairable = task.state === "armed" || task.state === "ready" || task.state === "dependency_failed";
-
-  const arms = task.arms ?? [];
-  const waiting = waitingOn(arms, taskNames);
   // The server is the one authority for retry eligibility (FS-16.R23/R25,
   // INV §2): `retry_eligible` is computed by RetryTask's own switch and
   // projected onto the task JSON, so the view never restates the condition.
-  const retryable = task.retry_eligible;
+  const actions = taskActions(task);
+
+  const arms = task.arms ?? [];
+  const waiting = waitingOn(arms, taskNames);
   const assignedID = task.assigned_agent_id || (task.target_kind === "agent" ? task.target_agent_id : "");
   const assignedName = useAgentStore((state) => assignedID ? state.agents[assignedID]?.name : undefined);
   // Present segments only, joined rather than each prefixed with its own
@@ -349,13 +348,13 @@ function TaskRow({ task, project, taskNames, tasksQuery, runsQuery }: { task: Ta
         <span>created by {task.created_by_kind}</span>
       </div>
       <div className="task-row-actions" data-slot="actions">
-        {task.state !== "finished" && (
+        {actions.cancel && (
           <Button size="small" onClick={() => act(() => cancel.mutateAsync(task.task_id))}>Cancel</Button>
         )}
-        {retryable && (
+        {actions.retry && (
           <Button size="small" onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>
         )}
-		{(task.state === "running" || task.state === "interrupted") && <form onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
+		{actions.recordResult && <form onSubmit={(event) => { event.preventDefault(); act(() => record.mutateAsync({ taskID: task.task_id, outcome, summary, details })); }}>
 			<label>Result<select aria-label="Result outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}><option value="success">Success</option><option value="failure">Failure</option><option value="blocked">Blocked</option></select></label>
 			<label>Summary<input aria-label="Result summary" value={summary} onChange={(e) => setSummary(e.target.value)} required /></label>
 			<label>Details<textarea aria-label="Result details" value={details} onChange={(e) => setDetails(e.target.value)} /></label>
@@ -363,7 +362,7 @@ function TaskRow({ task, project, taskNames, tasksQuery, runsQuery }: { task: Ta
 		</form>}
         <Button size="small" variant="ghost" onClick={() => act(() => remove.mutateAsync(task.task_id))}>Delete</Button>
       </div>
-      {repairable && <RearmForm task={task} project={project} onError={setError} tasksQuery={tasksQuery} runsQuery={runsQuery} />}
+      {actions.rearm && <RearmForm task={task} project={project} onError={setError} tasksQuery={tasksQuery} runsQuery={runsQuery} />}
       {error && <p className="form-error" role="alert">{error}</p>}
     </li>
   );

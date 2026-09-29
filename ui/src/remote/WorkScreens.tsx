@@ -8,7 +8,7 @@ import {
   retryPipelineRun,
   stopPipelineRun,
 } from "../api/pipelines";
-import type { Task, TaskArm } from "../schemas/task";
+import { taskActions, type Task, type TaskArm } from "../schemas/task";
 import { phoneFetch } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
@@ -71,7 +71,7 @@ export function TaskScreen({ taskId }: { taskId: string }) {
   const t = task.data;
   if (!t) return <p className="phone-empty">{task.isError ? errorText(task.error) : "Loading…"}</p>;
   const id = encodeURIComponent(taskId);
-  const open = t.state !== "finished";
+  const actions = taskActions(t);
   const disabled = offline || busy;
 
   return (
@@ -88,12 +88,12 @@ export function TaskScreen({ taskId }: { taskId: string }) {
       <OpenConversation agentId={t.assigned_agent_id} />
       {error && <p className="phone-error">{error}</p>}
       <div className="phone-actions">
-        {t.retry_eligible && (
+        {actions.retry && (
           <button type="button" className="phone-primary" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/retry`))}>
             Retry
           </button>
         )}
-        {t.state === "dependency_failed" && (
+        {actions.rearm && (
           <>
             <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: (t.arms ?? []).map(armInput) }))}>
               Re-arm with its prerequisites
@@ -103,13 +103,13 @@ export function TaskScreen({ taskId }: { taskId: string }) {
             </button>
           </>
         )}
-        {open && (
+        {actions.cancel && (
           <button type="button" className="phone-danger" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/cancel`))}>
             Cancel task
           </button>
         )}
       </div>
-      {open && (
+      {actions.recordResult && (
         <form
           className="phone-card phone-form"
           aria-label="Record result"

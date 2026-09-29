@@ -110,6 +110,25 @@ describe("phone task and run actions", () => {
     await waitFor(() => expect(calls).toContain('task rearm {"arms":[]}'));
   });
 
+  // FS-16.R22/R23: Record result only on running/interrupted; Re-arm only on
+  // armed/ready/dependency_failed; Cancel on everything unfinished.
+  it.each([
+    ["armed", { rearm: true, record: false, cancel: true }],
+    ["ready", { rearm: true, record: false, cancel: true }],
+    ["starting", { rearm: false, record: false, cancel: true }],
+    ["running", { rearm: false, record: true, cancel: true }],
+    ["interrupted", { rearm: false, record: true, cancel: true }],
+    ["dependency_failed", { rearm: true, record: false, cancel: true }],
+    ["finished", { rearm: false, record: false, cancel: false }],
+  ])("offers only the controls a %s task accepts", async (state, expected) => {
+    taskState = state;
+    renderWith(<TaskScreen taskId="t1" />);
+    await screen.findByRole("heading", { name: "Fix login" });
+    expect(!!screen.queryByRole("button", { name: "Re-arm with its prerequisites" })).toBe(expected.rearm);
+    expect(!!screen.queryByRole("form", { name: "Record result" })).toBe(expected.record);
+    expect(!!screen.queryByRole("button", { name: "Cancel task" })).toBe(expected.cancel);
+  });
+
   it("continues a paused run with input at its stage position", async () => {
     renderWith(<RunScreen runId="r1" />);
     expect(await screen.findByText(/Stage 2 of 2/)).toBeInTheDocument();

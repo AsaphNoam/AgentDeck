@@ -67,3 +67,15 @@ export const taskListSchema = z.object({ tasks: z.array(taskSchema) });
 
 export type Task = z.output<typeof taskSchema>;
 export type TaskArm = z.output<typeof taskArmSchema>;
+
+/** taskActions is the one FS-16.R22/R23 eligibility matrix the desktop Tasks
+ *  view and the phone render controls from (INV §2). Retry eligibility is the
+ *  server's own projection. */
+export function taskActions(task: Pick<Task, "state" | "retry_eligible">) {
+  return {
+    cancel: task.state !== "finished",
+    retry: task.retry_eligible,
+    recordResult: task.state === "running" || task.state === "interrupted",
+    rearm: task.state === "armed" || task.state === "ready" || task.state === "dependency_failed",
+  };
+}
