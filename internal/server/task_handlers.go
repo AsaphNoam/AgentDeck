@@ -366,7 +366,9 @@ func (s *Server) writeTaskError(w http.ResponseWriter, err error) {
 		ae.Details = map[string]any{"code": "dependency_cycle"}
 		writeAPIError(w, ae)
 	case errors.Is(err, state.ErrTaskArmSource):
-		writeAPIError(w, apiError(runtime.CodeValidation, err.Error()))
+		ae := apiError(runtime.CodeValidation, err.Error())
+		ae.Details = map[string]any{"code": "unusable_source"}
+		writeAPIError(w, ae)
 	case errors.Is(err, state.ErrTaskAttachmentReference):
 		ae := apiError(runtime.CodeValidation, "unknown context reference")
 		ae.Details = map[string]any{"code": "context_not_found"}

@@ -12,7 +12,7 @@ import {
 } from "../api/pipelines";
 import { WORK_RESULT_OUTCOMES, taskActions, type Task, type TaskArm } from "../schemas/task";
 import type { PipelineRuntimeAssignment as RuntimeAssignment } from "../schemas/pipeline";
-import { getRuntimeOptions, phoneFetch } from "./api";
+import { getRuntimeOptions, phoneFetch, PhoneAPIError } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
 
@@ -21,16 +21,19 @@ const post = (url: string, body?: unknown) =>
   phoneFetch<unknown>(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
 
 /** useAction runs one mutation at a time, reports the Mac's refusal verbatim
- *  (FS-20.R27), and refreshes the screen either way. */
+ *  (FS-20.R27), and refreshes the screen either way. `after` may return a
+ *  confirmation, which the screen keeps showing after the form remounts. */
 function useAction(refresh: () => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = async (fn: () => Promise<unknown>, after?: () => void) => {
+  const [notice, setNotice] = useState<string | null>(null);
+  const run = async (fn: () => Promise<unknown>, after?: () => string | void) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await fn();
-      after?.();
+      setNotice(after?.() || null);
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -38,7 +41,7 @@ function useAction(refresh: () => void) {
       refresh();
     }
   };
-  return { busy, error, run };
+  return { busy, error, notice, run };
 }
 
 function OpenConversation({ agentId }: { agentId?: string }) {
@@ -67,6 +70,29 @@ const armInput = (arm: ArmDraft): TaskArmInput =>
     ? { kind: "signal", signal_name: arm.signal_name.trim() }
     : { kind: "work_result", source_kind: arm.source_kind, source_id: arm.source_id, satisfying_outcomes: arm.satisfying_outcomes };
 
+/** The first incomplete prerequisite, named in the editor's own words, so a
+ *  shape refusal never reaches the person as a server field name. */
+function armProblem(arms: ArmDraft[]): string | null {
+  for (const [index, arm] of arms.entries()) {
+    const n = index + 1;
+    if (arm.kind === "signal" && !arm.signal_name.trim()) return `Name the signal for prerequisite ${n}.`;
+    if (arm.kind === "work_result" && !arm.source_id) return `Choose the ${arm.source_kind === "task" ? "task" : "pipeline run"} for prerequisite ${n}.`;
+    if (arm.kind === "work_result" && arm.satisfying_outcomes.length === 0) return `Choose at least one outcome for prerequisite ${n}.`;
+  }
+  return null;
+}
+
+/** Plain language for the Mac's typed Re-arm refusals (FS-20.R30, INV §8). */
+function rearmRefusal(err: unknown): string {
+  if (err instanceof PhoneAPIError) {
+    if (err.detailCode === "dependency_cycle") return "That would make these tasks wait on each other in a loop. Choose a different prerequisite.";
+    if (err.detailCode === "unusable_source") return "A prerequisite names a task or run that can't be waited on here. Choose a different one.";
+    if (err.detailCode === "invalid_state") return "This task can no longer be re-armed. It has moved on since you opened it.";
+    if (err.code === "conflict") return "The task changed on the Mac. Check it and try again.";
+  }
+  return errorText(err);
+}
+
 /** RearmEditor starts from the task's current prerequisites and submits the
  *  complete replacement set; the Mac is the one graph/state validator, and a
  *  refusal keeps the draft (FS-20.R30, FS-16.R23). */
@@ -82,6 +108,17 @@ function RearmEditor({ task, disabled, run }: { task: Task; disabled: boolean; r
     pipeline_run: (runs.data?.runs ?? []).filter((item) => item.project === task.project).map((item) => ({ id: item.run_id, label: `${item.display_name || item.template_id} · ${item.state}` })),
   };
   const update = (key: number, change: Partial<ArmDraft>) => setArms((current) => current.map((arm) => (arm.key === key ? { ...arm, ...change } : arm)));
+  const [problem, setProblem] = useState<string | null>(null);
+  // The confirmation names what now gates the task, in the editor's labels.
+  const applied = () => {
+    if (arms.length === 0) return "Re-armed with no prerequisites.";
+    const names = arms.map((arm) =>
+      arm.kind === "signal"
+        ? `signal “${arm.signal_name.trim()}”`
+        : `${sources[arm.source_kind].find((option) => option.id === arm.source_id)?.label.split(" · ")[0] ?? arm.source_id} (${arm.satisfying_outcomes.join(" or ")})`,
+    );
+    return `Re-armed. It now waits for ${names.join(", ")}.`;
+  };
 
   return (
     <form
@@ -89,7 +126,16 @@ function RearmEditor({ task, disabled, run }: { task: Task; disabled: boolean; r
       aria-label="Re-arm"
       onSubmit={(event) => {
         event.preventDefault();
-        void run(() => post(`/api/tasks/${encodeURIComponent(task.task_id)}/rearm`, { arms: arms.map(armInput) }));
+        const incomplete = armProblem(arms);
+        setProblem(incomplete);
+        if (incomplete) return;
+        void run(async () => {
+          try {
+            await post(`/api/tasks/${encodeURIComponent(task.task_id)}/rearm`, { arms: arms.map(armInput) });
+          } catch (err) {
+            throw new Error(rearmRefusal(err));
+          }
+        }, applied);
       }}
     >
       <p className="phone-card-kicker">Re-arm</p>
@@ -163,6 +209,7 @@ function RearmEditor({ task, disabled, run }: { task: Task; disabled: boolean; r
       <button type="button" onClick={() => setArms((current) => [...current, armDraft()])}>
         Add prerequisite
       </button>
+      {problem && <p className="phone-error">{problem}</p>}
       <button type="submit" className="phone-primary" disabled={disabled}>
         Re-arm
       </button>
@@ -179,7 +226,7 @@ export function TaskScreen({ taskId }: { taskId: string }) {
     queryFn: () => phoneFetch<Task>(`/api/tasks/${encodeURIComponent(taskId)}`),
     placeholderData: (prev) => prev,
   });
-  const { busy, error, run } = useAction(() => void client.invalidateQueries({ queryKey: ["task", taskId] }));
+  const { busy, error, notice, run } = useAction(() => void client.invalidateQueries({ queryKey: ["task", taskId] }));
   const [outcome, setOutcome] = useState("success");
   const [summary, setSummary] = useState("");
 
@@ -202,6 +249,11 @@ export function TaskScreen({ taskId }: { taskId: string }) {
       {t.outcome_summary && <p className="phone-quote">{t.outcome_summary}</p>}
       <OpenConversation agentId={t.assigned_agent_id} />
       {error && <p className="phone-error">{error}</p>}
+      {notice && (
+        <p className="phone-card" role="status">
+          {notice}
+        </p>
+      )}
       <div className="phone-actions">
         {actions.retry && (
           <button type="button" className="phone-primary" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/retry`))}>

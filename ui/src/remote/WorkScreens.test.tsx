@@ -12,7 +12,7 @@ import type { AgentState } from "../api/types";
 const calls: string[] = [];
 let taskState = "interrupted";
 let taskArms: unknown[] = [];
-let rearmRefusal: string | null = null;
+let rearmRefusal: { message: string; details?: { code: string } } | null = null;
 let replaceRefusal: string | null = null;
 
 const task = () => ({
@@ -53,7 +53,8 @@ const server = setupServer(
   http.post("/api/tasks/t1/:action", async ({ params, request }) => {
     calls.push(`task ${String(params.action)} ${await request.text()}`);
     if (params.action === "cancel") return HttpResponse.json({ error: { code: "task_not_cancellable", message: "a finished task cannot be cancelled" } }, { status: 409 });
-    if (params.action === "rearm" && rearmRefusal) return HttpResponse.json({ error: { code: "task_arm_cycle", message: rearmRefusal } }, { status: 409 });
+    // The Mac's writeTaskError envelope: validation plus a typed details code.
+    if (params.action === "rearm" && rearmRefusal) return HttpResponse.json({ error: { code: "validation", ...rearmRefusal } }, { status: 422 });
     return HttpResponse.json(task());
   }),
   http.get("/api/pipeline-runs/r1", () => HttpResponse.json(runDetail)),
@@ -156,6 +157,19 @@ describe("phone task and run actions", () => {
         'task rearm {"arms":[{"kind":"work_result","source_kind":"task","source_id":"t0","satisfying_outcomes":["failure"]},{"kind":"work_result","source_kind":"pipeline_run","source_id":"r0","satisfying_outcomes":["success"]},{"kind":"signal","signal_name":"ci-green"}]}',
       ),
     );
+    expect(await screen.findByRole("status")).toHaveTextContent("Re-armed. It now waits for Build API (failure), Nightly (success), signal “ci-green”.");
+  });
+
+  it("names an incomplete prerequisite instead of sending it", async () => {
+    taskState = "ready";
+    renderWith(<TaskScreen taskId="t1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add prerequisite" }));
+    const arm = screen.getByRole("group", { name: "Prerequisite 1" });
+    fireEvent.change(await within(arm).findByLabelText("Task"), { target: { value: "t0" } });
+    fireEvent.click(within(arm).getByLabelText("Success"));
+    fireEvent.click(screen.getByRole("button", { name: "Re-arm" }));
+    expect(await screen.findByText("Choose at least one outcome for prerequisite 1.")).toBeInTheDocument();
+    expect(calls.some((c) => c.startsWith("task rearm"))).toBe(false);
   });
 
   it("removes every prerequisite on an armed task", async () => {
@@ -169,13 +183,14 @@ describe("phone task and run actions", () => {
 
   it("keeps the draft and shows the Mac's reason when a replacement set is refused", async () => {
     taskState = "ready";
-    rearmRefusal = "this prerequisite would create a cycle";
+    rearmRefusal = { message: "state: task arms would create a cycle", details: { code: "dependency_cycle" } };
     renderWith(<TaskScreen taskId="t1" />);
     fireEvent.click(await screen.findByRole("button", { name: "Add prerequisite" }));
     const arm = screen.getByRole("group", { name: "Prerequisite 1" });
     fireEvent.change(await within(arm).findByLabelText("Task"), { target: { value: "t0" } });
     fireEvent.click(screen.getByRole("button", { name: "Re-arm" }));
-    expect(await screen.findByText("this prerequisite would create a cycle")).toBeInTheDocument();
+    expect(await screen.findByText("That would make these tasks wait on each other in a loop. Choose a different prerequisite.")).toBeInTheDocument();
+    expect(screen.queryByText(/state: task arms/)).toBeNull();
     expect(within(screen.getByRole("group", { name: "Prerequisite 1" })).getByLabelText("Task")).toHaveValue("t0");
   });
 

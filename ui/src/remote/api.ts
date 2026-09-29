@@ -5,11 +5,14 @@
 export class PhoneAPIError extends Error {
   status: number;
   code: string;
+  /** The typed refusal in `error.details.code`, when the Mac sends one. */
+  detailCode: string;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, detailCode = "") {
     super(message);
     this.status = status;
     this.code = code;
+    this.detailCode = detailCode;
   }
 }
 
@@ -24,9 +27,10 @@ export async function phoneFetch<T>(url: string, init?: RequestInit): Promise<T>
     throw new MacUnreachableError("The Mac is unreachable.");
   }
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: { code?: string; message?: string } };
+    const body = (await response.json().catch(() => ({}))) as { error?: { code?: string; message?: string; details?: { code?: unknown } } };
     if (response.status >= 502 && !body.error) throw new MacUnreachableError("The Mac is unreachable.");
-    throw new PhoneAPIError(response.status, body.error?.code || "error", body.error?.message || `${response.status} ${response.statusText}`);
+    const detailCode = typeof body.error?.details?.code === "string" ? body.error.details.code : "";
+    throw new PhoneAPIError(response.status, body.error?.code || "error", body.error?.message || `${response.status} ${response.statusText}`, detailCode);
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

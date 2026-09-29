@@ -447,7 +447,9 @@ unauthorized task and an unknown task are indistinguishable.
 
 **HTTP** (added to the TS-03 route inventory): create, list, and read tasks; record a person result
 (FS-16.R22); cancel, retry, re-arm, and delete a task; and fire a project-scoped signal. Every task
-object carries the derived boolean `retry_eligible` (R22) beside its stored fields.
+object carries the derived boolean `retry_eligible` (R22) beside its stored fields. A refused arm
+graph or task state carries a typed `error.details.code` — `dependency_cycle`, `unusable_source`,
+`invalid_state`, or `retry_requires_rearm` — that clients translate rather than showing the message.
 
 **SSE**: `task_update` with `{task_id, revision, state, outcome, attention_reason}`.
 

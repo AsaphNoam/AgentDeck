@@ -450,10 +450,25 @@ func TestRemoteRearmHasDesktopValueAuthority(t *testing.T) {
 		t.Fatalf("rearmed task = %+v, %v", changed.Arms, err)
 	}
 
-	// A cycle is refused by the shared validator and changes nothing.
+	// A cycle or an unusable source is refused by the shared validator with the
+	// typed code the phone turns into plain language, and changes nothing.
+	detailCode := func(rec *httptest.ResponseRecorder) string {
+		var envelope struct {
+			Error struct {
+				Details map[string]any `json:"details"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(rec.Body.Bytes(), &envelope)
+		code, _ := envelope.Error.Details["code"].(string)
+		return code
+	}
 	rec = rearm(second.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"`+first.TaskID+`","satisfying_outcomes":["success"]}]}`)
-	if rec.Code < 400 || errorCode(t, rec) == codeRemoteFieldNotAllowed {
+	if rec.Code < 400 || detailCode(rec) != "dependency_cycle" {
 		t.Fatalf("cyclic arm set from a phone = %d %s", rec.Code, rec.Body)
+	}
+	rec = rearm(second.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"no-such-task","satisfying_outcomes":["success"]}]}`)
+	if rec.Code < 400 || detailCode(rec) != "unusable_source" {
+		t.Fatalf("unusable source from a phone = %d %s", rec.Code, rec.Body)
 	}
 	// So is a body carrying anything but the arm set.
 	rec = rearm(second.TaskID, `{"arms":[],"state":"ready"}`)

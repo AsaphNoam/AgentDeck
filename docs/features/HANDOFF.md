@@ -109,11 +109,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 Results are in the **Second pass** section of
 [`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
 
-- **Worth fixing** (FS-20.R30; INV §8) — J-FS20 phone Re-arm: a successful re-arm shows no
-  confirmation, and refusals show raw server text ("satisfying_outcomes is required", "state: task
-  arms would create a cycle"). Evidence: `r2-10-rearm-done.png`, `r2-11-rearm-invalid.png`.
-  *Fix:* confirm the applied set and map the typed refusal codes to plain language. *Verify:*
-  success and both refusals read clearly at 390px.
 - **Worth fixing** (FS-20.R11; INV §8) — J-FS20 phone Home: after a running task's agent is
   stopped, the task sits under **Needs you** as "was interrupted" while its same-named agent is
   under **Since you last looked** as "finished" (`/api/remote/home` reports the agent `done`).
@@ -134,6 +129,14 @@ Results are in the **Second pass** section of
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix: phone Re-arm feedback (FS-20.R30, TS-10; INV §8 user-facing surfaces get
+  in-vocabulary data).** A successful Re-arm now shows a status line naming what the task waits
+  for, kept on the task screen across the editor's remount. An incomplete prerequisite (no source,
+  no outcome, blank signal) is named before anything is sent, and the Mac's typed refusals
+  (`dependency_cycle`, new `unusable_source`, `invalid_state`, conflict) read as plain language.
+  `PhoneAPIError` keeps `details.code`; the test double now sends the Mac's real envelope, and
+  `TestRemoteRearmHasDesktopValueAuthority` pins both typed codes. The 390px re-check was not run.
 
 - **2026-09-29 — Fix: phone transcript showed raw tool results (FS-20.R13; INV §2 parallel paths
   share one helper).** The desktop's tool-run grouping moved from `TranscriptView.tsx` into
