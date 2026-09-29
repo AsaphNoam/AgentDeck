@@ -40,7 +40,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** none recorded. The injected-steer lifetime
+- **Open findings:** the 2026-09-29 usability review records one **Must fix** blocker: the phone
+  app never finishes connecting, so no phone decision or conversation works (see **Review
+  findings**). The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -77,7 +79,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** no `/fix` findings are pending; `/review` may take
+**Available by role:** `/fix` may take the phone-hydration finding from the
+[2026-09-29 usability review](../archive/reviews/usability-review-run-2026-09-29.md); `/review` may take
 `drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -96,7 +99,22 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-None open.
+### usability-review-run-2026-09-29 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+J1 and the FS-20 phone-size pass are in
+[`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
+
+- **Must fix** (FS-20.R12/R13/R17, A3; INV §11/§17) — J-FS20 phone app: after pairing, the phone stays on
+  **Reconnecting…** forever and opening any agent, including one waiting on permission, says "This
+  agent is not on the Mac any more", so no decision, reply, stop, Re-arm, annotation or Show earlier
+  is possible from a phone. `ui/src/remote/connection.ts` detects the hydration marker by
+  `data.agent_id === "__hydrated__"`, but `internal/bus/bus.go` `HydratedMarker` puts that id on the
+  envelope and sends `data: {"hydrated":true}`; the early return leaves `hydratingAgents` buffering
+  forever. Regressed in `680775d`; `PhoneApp.test.tsx:156` mocks a marker shape the server never
+  sends. Evidence: `docs/archive/reviews/usability-review-2026-09-29-evidence/04-permission-card.png`.
+  *Fix:* recognise the marker by the envelope's `agent_id` (or `data.hydrated`), and make the test
+  emit the real envelope. *Verify:* at 390px against the dev fixture, the banner clears, the waiting
+  agent's decision card shows Approve/Deny, then rerun the owed A9 pass.
 
 ## Design consistency notes
 
@@ -113,6 +131,11 @@ None open.
 
 ## Changelog
 
+- **2026-09-29 — Usability review: first paint and phone-size remote pass.** J1 passed on a fresh
+  home. The FS-20 phone pass (headless Chromium at 390px against the dev fixture) found one blocker:
+  the phone never leaves Reconnecting and shows no agents, blocking A3/A4/A9. FS-20.A9's browser
+  pass stays owed. The matrix has no FS-20 phone charter yet. Report:
+  `docs/archive/reviews/usability-review-run-2026-09-29.md`.
 - **2026-09-29 — Drop the stale pipeline-stage recipient refusal (FS-06.R37/A26, TS-04.R67).**
   Removed `pipelineRecipientRefusal` and its `send_message`/`create_task` call sites; a
   snapshot-less stopped stage agent now gets the ordinary `recipient_not_found` wording, proven by
