@@ -1,11 +1,22 @@
 import { useState } from "react";
 import type { Model } from "../../schemas/backends";
 
+// ModelCapability tells the row whether the owning backend's current type
+// supports NEW effort/fast declarations (FS-09.R62). `unknown` means launch
+// support metadata could not be loaded for that type at all (as opposed to a
+// type that is known to lack the capability) and changes the reason shown.
+export interface ModelCapability {
+  effortAllowed: boolean;
+  fastAllowed: boolean;
+  unknown: boolean;
+}
+
 interface ModelRowProps {
   modelId: string;
   model: Model;
   isDefault: boolean;
   radioGroup: string;
+  capability: ModelCapability;
   onSetDefault: () => void;
   onChange: (model: Model) => void;
   onRemove: () => void;
@@ -49,7 +60,7 @@ function SensitiveInput({ value, fieldKey, onChange }: {
   );
 }
 
-export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, onChange, onRemove }: ModelRowProps) {
+export function ModelRow({ modelId, model, isDefault, radioGroup, capability, onSetDefault, onChange, onRemove }: ModelRowProps) {
   const [expanded, setExpanded] = useState(false);
   const pairs = toPairs(model.env);
 
@@ -58,6 +69,18 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, 
     const efforts = raw.split(",").map((level) => level.trim()).filter(Boolean);
     onChange({ ...model, efforts, default_effort: efforts.includes(model.default_effort ?? "") ? model.default_effort : efforts[0] });
   };
+
+  // A declaration already in the draft stays visible with a reason and an
+  // explicit clear, even when the current backend type can't offer it as a
+  // NEW choice (FS-09.R62). Clearing effort also clears its default_effort;
+  // clearing fast just turns it off.
+  const hasEffort = (model.efforts ?? []).length > 0;
+  const hasFast = model.fast === true;
+  const capabilityReason = capability.unknown
+    ? "Launch options for this backend type could not be loaded."
+    : "This backend type doesn't support this.";
+  const clearEfforts = () => onChange({ ...model, efforts: [], default_effort: undefined });
+  const clearFast = () => onChange({ ...model, fast: false });
 
   return (
     <div className="model-row">
@@ -91,22 +114,46 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, onSetDefault, 
       </div>
       {expanded && (
         <div className="model-env-editor">
-          <label className="form-field">
-            <span>Effort levels (comma separated)</span>
-            <input value={(model.efforts ?? []).join(", ")} placeholder="low, medium, high" onChange={(e) => updateEfforts(e.target.value)} />
-          </label>
+          {(capability.effortAllowed || hasEffort) && (
+            <label className="form-field">
+              <span>Effort levels (comma separated)</span>
+              {capability.effortAllowed ? (
+                <input value={(model.efforts ?? []).join(", ")} placeholder="low, medium, high" onChange={(e) => updateEfforts(e.target.value)} />
+              ) : (
+                <span className="model-capability-note">
+                  <input value={(model.efforts ?? []).join(", ")} disabled />
+                  <span className="model-capability-reason">{capabilityReason}</span>
+                  <button type="button" className="btn-link" onClick={clearEfforts}>Clear effort levels</button>
+                </span>
+              )}
+            </label>
+          )}
           {(model.efforts ?? []).length > 0 && (
             <label className="form-field">
               <span>Default effort</span>
-              <select value={model.default_effort ?? ""} onChange={(e) => onChange({ ...model, default_effort: e.target.value })}>
+              <select
+                value={model.default_effort ?? ""}
+                disabled={!capability.effortAllowed}
+                onChange={(e) => onChange({ ...model, default_effort: e.target.value })}
+              >
                 {(model.efforts ?? []).map((level) => <option key={level} value={level}>{level}</option>)}
               </select>
             </label>
           )}
-          <label className="form-field">
-            <span>Fast mode capability</span>
-            <span><input type="checkbox" checked={model.fast ?? false} onChange={(e) => onChange({ ...model, fast: e.target.checked })} /> This model can use the adapter's faster, higher-usage mode</span>
-          </label>
+          {(capability.fastAllowed || hasFast) && (
+            <label className="form-field">
+              <span>Fast mode capability</span>
+              {capability.fastAllowed ? (
+                <span><input type="checkbox" checked={model.fast ?? false} onChange={(e) => onChange({ ...model, fast: e.target.checked })} /> This model can use the adapter's faster, higher-usage mode</span>
+              ) : (
+                <span className="model-capability-note">
+                  <input type="checkbox" checked disabled />
+                  <span className="model-capability-reason">{capabilityReason}</span>
+                  <button type="button" className="btn-link" onClick={clearFast}>Clear fast mode</button>
+                </span>
+              )}
+            </label>
+          )}
           {pairs.map((pair, i) => (
             <div key={i} className="env-row">
               <input

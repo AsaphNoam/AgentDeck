@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { BackendsEditor } from "./BackendsEditor";
+import { BACKEND_SUPPORT_WIRE } from "../../test/backendSupport";
 
 const defaultBackendsDoc = {
   version: 2,
@@ -22,10 +23,11 @@ const defaultBackendsDoc = {
 };
 
 const server = setupServer(
-  http.get("/api/backends", () => HttpResponse.json(defaultBackendsDoc)),
+  http.get("/api/backends", () => HttpResponse.json({ ...defaultBackendsDoc, backend_support: BACKEND_SUPPORT_WIRE })),
   http.put("/api/backends", () =>
     HttpResponse.json({
       ...defaultBackendsDoc,
+      backend_support: BACKEND_SUPPORT_WIRE,
       credentials: { claude: { status: "ok", detail: "" } },
     }),
   ),
@@ -310,5 +312,148 @@ describe("BackendsEditor", () => {
     await waitFor(() => expect(screen.queryByLabelText("Provider")).not.toBeInTheDocument());
     expect(posts).toBe(0);
     expect(screen.getByDisplayValue("Claude")).toBeInTheDocument();
+  });
+
+  // ---- Model capability controls (FS-09.R62 / A32) ----
+
+  function fastCheckbox() {
+    return screen.getByText("Fast mode capability").parentElement!.querySelector("input") as HTMLInputElement;
+  }
+
+  it("lets a supported Claude model gain effort and fast declarations", async () => {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    const levels = screen.getByPlaceholderText("low, medium, high") as HTMLInputElement;
+    expect(levels.disabled).toBe(false);
+    fireEvent.change(levels, { target: { value: "low, high" } });
+    await waitFor(() => expect(levels.value).toBe("low, high"));
+
+    const fast = fastCheckbox();
+    expect(fast.disabled).toBe(false);
+    fireEvent.click(fast);
+    await waitFor(() => expect(fast.checked).toBe(true));
+  });
+
+  it("preserves and explains now-unsupported values after changing type to OpenCode, offers explicit clearing, and saves after clearing", async () => {
+    let putBody: { backends: Record<string, { models: Record<string, { efforts?: string[]; default_effort?: string; fast?: boolean }> }> } | null = null;
+    server.use(
+      http.put("/api/backends", async ({ request }) => {
+        putBody = (await request.json()) as typeof putBody;
+        return HttpResponse.json({ ...defaultBackendsDoc, backend_support: BACKEND_SUPPORT_WIRE, credentials: {} });
+      }),
+    );
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+    fireEvent.change(screen.getByPlaceholderText("low, medium, high"), { target: { value: "low, high" } });
+    await waitFor(() => expect((screen.getByPlaceholderText("low, medium, high") as HTMLInputElement).value).toBe("low, high"));
+    fireEvent.click(fastCheckbox());
+    await waitFor(() => expect(fastCheckbox().checked).toBe(true));
+
+    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    fireEvent.change(typeSelect, { target: { value: "opencode-acp" } });
+
+    // The values stay, but as disabled controls with a reason and a clear action.
+    await waitFor(() => expect(screen.getAllByText("This backend type doesn't support this.")).toHaveLength(2));
+    const stillLevels = screen.getByDisplayValue("low, high") as HTMLInputElement;
+    expect(stillLevels.disabled).toBe(true);
+    const stillFast = fastCheckbox();
+    expect(stillFast.checked).toBe(true);
+    expect(stillFast.disabled).toBe(true);
+
+    fireEvent.click(screen.getByText("Clear effort levels"));
+    fireEvent.click(screen.getByText("Clear fast mode"));
+
+    await waitFor(() => expect(screen.queryByDisplayValue("low, high")).not.toBeInTheDocument());
+    expect(screen.queryByText("Fast mode capability")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(putBody).not.toBeNull());
+    const savedModel = putBody!.backends.claude.models.sonnet;
+    expect(savedModel.efforts).toEqual([]);
+    expect(savedModel.default_effort).toBeUndefined();
+    expect(savedModel.fast).toBe(false);
+  });
+
+  it("retains unsupported values when switching back to a supporting type before clearing", async () => {
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+    fireEvent.change(screen.getByPlaceholderText("low, medium, high"), { target: { value: "low, high" } });
+    await waitFor(() => expect((screen.getByPlaceholderText("low, medium, high") as HTMLInputElement).value).toBe("low, high"));
+
+    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    fireEvent.change(typeSelect, { target: { value: "opencode-acp" } });
+    await waitFor(() => expect(screen.getByDisplayValue("low, high")).toBeInTheDocument());
+
+    fireEvent.change(typeSelect, { target: { value: "claude-acp" } });
+    await waitFor(() => expect((screen.getByPlaceholderText("low, medium, high") as HTMLInputElement).value).toBe("low, high"));
+  });
+
+  it("does not let an empty model under OpenCode gain declarations through the controls", async () => {
+    server.use(
+      http.get("/api/backends", () =>
+        HttpResponse.json({
+          version: 2,
+          backends: {
+            oc: {
+              name: "OC",
+              type: "opencode-acp",
+              default: true,
+              default_model: "m1",
+              models: { m1: { name: "Model 1", model: "oc-model" } },
+            },
+          },
+          backend_support: BACKEND_SUPPORT_WIRE,
+        }),
+      ),
+    );
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("OC");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    expect(screen.queryByPlaceholderText("low, medium, high")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fast mode capability")).not.toBeInTheDocument();
+  });
+
+  it("shows retry guidance when backend_support is missing, and Retry refetches support without truncating the unsaved draft or leaking backend_support into the PUT body", async () => {
+    let getCount = 0;
+    server.use(
+      http.get("/api/backends", () => {
+        getCount += 1;
+        return HttpResponse.json(
+          getCount === 1 ? defaultBackendsDoc : { ...defaultBackendsDoc, backend_support: BACKEND_SUPPORT_WIRE },
+        );
+      }),
+    );
+    let putBody: Record<string, unknown> | null = null;
+    server.use(
+      http.put("/api/backends", async ({ request }) => {
+        putBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...defaultBackendsDoc, credentials: {} });
+      }),
+    );
+
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("low, medium, high")).not.toBeInTheDocument();
+
+    // An unsaved edit made while support is missing must survive the retry.
+    const nameInput = screen.getByDisplayValue("Claude") as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Renamed Claude" } });
+
+    fireEvent.click(screen.getByText("Retry"));
+
+    await waitFor(() => expect(screen.getByPlaceholderText("low, medium, high")).toBeInTheDocument());
+    expect(screen.getByDisplayValue("Renamed Claude")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Save"));
+    await waitFor(() => expect(putBody).not.toBeNull());
+    expect(putBody!.backend_support).toBeUndefined();
   });
 });

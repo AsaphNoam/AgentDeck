@@ -3,12 +3,14 @@ import { useBackends, usePutBackends, configErrorMessage, type CatalogETagged } 
 import type {
   BackendsConfig,
   Backend,
+  BackendSupport,
   Model,
   CredResult,
   CreateBackendResponse,
 } from "../../schemas/backends";
+import { launchSupportFor } from "../../schemas/backends";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
-import { ModelRow } from "./ModelRow";
+import { ModelRow, type ModelCapability } from "./ModelRow";
 import { ConfigSourcePanel } from "./ConfigSourcePanel";
 import { AddBackendDialog } from "./AddBackendDialog";
 
@@ -106,6 +108,21 @@ function entriesToConfig(entries: BackendEntry[], defaultId: string): BackendsCo
     };
   }
   return { version: 2, backends };
+}
+
+// modelCapability derives what NEW model declarations a backend's current
+// type may offer (FS-09.R62): effort needs at least one available interface
+// that supports it, fast needs chat support specifically (terminal never
+// supports fast). `unknown` means neither interface's support could be
+// parsed at all, which is distinct from a type known to lack the capability.
+function modelCapability(support: BackendSupport | undefined, type: Backend["type"]): ModelCapability {
+  const chat = launchSupportFor(support, type, "chat");
+  const terminal = launchSupportFor(support, type, "terminal");
+  return {
+    unknown: chat === undefined && terminal === undefined,
+    effortAllowed: Boolean((chat?.available && chat.effort) || (terminal?.available && terminal.effort)),
+    fastAllowed: Boolean(chat?.available && chat.fast),
+  };
 }
 
 function credChip(result: CredResult) {
@@ -247,7 +264,9 @@ export function BackendsEditor() {
         <p className="config-empty">No backends configured. Add one to get started.</p>
       )}
 
-      {entries.map(({ id, backend, envPairs }) => (
+      {entries.map(({ id, backend, envPairs }) => {
+        const capability = modelCapability(data?.backend_support, backend.type);
+        return (
         <div key={id} className="backend-card" data-slot="item">
           <div className="backend-card-header">
             <label className="backend-default-label">
@@ -325,6 +344,14 @@ export function BackendsEditor() {
             <div className="backend-models-header">
               <strong>Models</strong>
             </div>
+            {capability.unknown && (
+              <p className="config-notice model-capability-note" role="status">
+                Launch options for this backend type could not be loaded, so new effort or fast
+                declarations are unavailable until they can be checked. Existing declarations can
+                still be cleared.
+                <button type="button" className="btn-link" onClick={() => void refetch()}>Retry</button>
+              </p>
+            )}
             {Object.entries(backend.models ?? {}).map(([modelId, model]) => (
               <ModelRow
                 key={modelId}
@@ -332,6 +359,7 @@ export function BackendsEditor() {
                 model={model}
                 isDefault={backend.default_model === modelId}
                 radioGroup={`default-model-${id}`}
+                capability={capability}
                 onSetDefault={() => updateBackend(id, { default_model: modelId })}
                 onChange={(updatedModel) => {
                   updateBackend(id, {
@@ -361,7 +389,8 @@ export function BackendsEditor() {
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {error && <p className="form-error">{error}</p>}
 

@@ -337,6 +337,30 @@
   padding-left: var(--ad-space-3);
 }
 
+/* A declaration the current backend type can't offer as new, but that stays
+   in the draft with a reason and an explicit clear (FS-09.R62). */
+.model-capability-note {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+.model-capability-reason {
+  color: var(--ad-text-muted);
+  font-size: 0.76rem;
+}
+
+p.model-capability-note {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+  padding: var(--ad-space-3);
+}
+
 .source-panel {
   background: var(--ad-surface-subtle);
   border: var(--ad-border-thin) solid var(--ad-border-default);
