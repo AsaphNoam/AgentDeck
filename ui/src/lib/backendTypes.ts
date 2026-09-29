@@ -16,10 +16,3 @@ export const BACKEND_TYPE_OPTIONS: BackendType[] = [
   "opencode-acp",
   "openhands-acp",
 ];
-
-// terminalSupported mirrors the server gate (internal/server/terminal.go): only
-// claude-acp has a verified interactive-CLI hook path, so the New-Agent modal
-// hides/disables the Terminal interface for every other backend type.
-export function terminalSupported(type: BackendType): boolean {
-  return type === "claude-acp";
-}

@@ -9,6 +9,7 @@ import { CardContextMenu } from "./CardContextMenu";
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 import type { AgentState } from "../../api/types";
+import { BACKEND_SUPPORT_WIRE } from "../../test/backendSupport";
 
 const agent: AgentState = {
   agent_id: "a_1",
@@ -54,6 +55,17 @@ function renderMenu() {
   );
 }
 
+function switchBackends() {
+  return {
+    version: 2,
+    backends: {
+      claude: { name: "Claude", type: "claude-acp", default_model: "sonnet", models: { sonnet: { name: "Sonnet", model: "sonnet" }, opus: { name: "Opus", model: "opus" } } },
+      codex: { name: "Codex", type: "codex-acp", default_model: "gpt", models: { gpt: { name: "GPT", model: "gpt" } } },
+    },
+    backend_support: BACKEND_SUPPORT_WIRE as unknown,
+  };
+}
+
 function LocationProbe() {
   return <output data-testid="location">{useLocation().pathname}</output>;
 }
@@ -97,7 +109,7 @@ describe("CardContextMenu error surfacing", () => {
 
   it("shows an error toast with the server message when switch-runtime fails", async () => {
     server.use(
-      http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: { claude: { name: "Claude", type: "claude-acp", default_model: "sonnet", models: { sonnet: { name: "Sonnet", model: "sonnet" } } } } })),
+      http.get("/api/backends", () => HttpResponse.json(switchBackends())),
       http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: true } })),
       http.post("/api/sessions/:id/switch-runtime", () =>
         HttpResponse.json({ error: { code: "no_change", message: "no runtime change requested" } }, { status: 400 }),
@@ -113,6 +125,54 @@ describe("CardContextMenu error surfacing", () => {
     await waitFor(() =>
       expect(useUiStore.getState().toasts.some((t) => t.type === "error" && t.body === "no runtime change requested")).toBe(true),
     );
+  });
+
+  // FS-09.A31 / R63: the Switch runtime dialog's Terminal comes from the
+  // server's launch support plus host availability.
+  it("offers Terminal only for a backend whose launch support reports it", async () => {
+    server.use(
+      http.get("/api/backends", () => HttpResponse.json(switchBackends())),
+      http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: true } })),
+    );
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /Switch runtime/i }));
+    await screen.findByRole("option", { name: "Codex (codex)" });
+    const terminalOption = screen.getByRole("option", { name: "Terminal" }) as HTMLOptionElement;
+    await waitFor(() => expect(terminalOption.disabled).toBe(false));
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    await waitFor(() => expect(terminalOption.disabled).toBe(true));
+  });
+
+  it("withholds an unverified Terminal switch and keeps the target through retry", async () => {
+    let withSupport = false;
+    let switched: Record<string, unknown> | undefined;
+    server.use(
+      http.get("/api/backends", () => {
+        const doc = switchBackends();
+        if (!withSupport) delete (doc as { backend_support?: unknown }).backend_support;
+        return HttpResponse.json(doc);
+      }),
+      http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: true } })),
+      http.post("/api/sessions/:id/switch-runtime", async ({ request }) => {
+        switched = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ agent });
+      }),
+    );
+    useAgentStore.setState({ agents: { a_1: { ...agent, interface: "terminal" } }, order: ["a_1"], hydrating: false });
+    renderMenu();
+    fireEvent.click(screen.getByRole("button", { name: /Switch runtime/i }));
+    expect(await screen.findByText(/Retry to verify the Terminal switch/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "opus" } });
+    expect((screen.getByLabelText("Interface") as HTMLSelectElement).value).toBe("terminal");
+    expect(screen.getByRole("button", { name: /^Switch runtime$/i })).toBeDisabled();
+
+    withSupport = true;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByText(/Launch options could not be loaded/)).not.toBeInTheDocument());
+    expect((screen.getByLabelText("Interface") as HTMLSelectElement).value).toBe("terminal");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("opus");
+    fireEvent.click(screen.getByRole("button", { name: /^Switch runtime$/i }));
+    await waitFor(() => expect(switched).toMatchObject({ interface: "terminal", backend: "claude", model: "opus" }));
   });
 
   it("shows an error toast when rename fails", async () => {

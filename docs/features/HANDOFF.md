@@ -67,7 +67,11 @@ three GET/PUT paths), `ui/src/schemas/backends.ts` `parseBackendSupport`/`launch
 `withBackendSupport`/`editableBackendsConfig` (PUT body), MSW wire fixture
 `ui/src/test/backendSupport.ts`. Tests: `TestLaunchSupportMatrix`,
 `TestGetBackendsReportsLaunchSupport`, `TestPutBackendsIgnoresEchoedLaunchSupport`,
-`schemas/backends.test.ts`. Specs stay `(planned)` until consumers ship. Next: slice 3.
+`schemas/backends.test.ts`. Slice 3 done: New Agent and CardContextMenu Switch runtime use
+`launchSupportFor` + host availability, missing metadata offers Retry (backends `refetch`) and
+withholds unverified Terminal/effort/fast; `lib/backendTypes.terminalSupported` removed. Specs stay
+`(planned)` until consumers ship. Next: slice 4 (Settings; drafted by a delegated Sonnet agent,
+uncommitted in `ui/src/features/settings`, needs review), then slice 5.
 
 **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.

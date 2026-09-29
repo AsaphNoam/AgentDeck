@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { archiveAgent, cloneAgent, getCapabilities, renameAgent, resumeAgent, stopAgent, switchRuntime, updateAgentIdentity } from "../../api/client";
 import { useBackends } from "../../api/config";
 import type { AgentState } from "../../api/types";
-import { terminalSupported } from "../../lib/backendTypes";
+import { launchSupportFor } from "../../schemas/backends";
 import { useMenuPlacement } from "../../lib/menuPlacement";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
 import { useAgentStore } from "../../store/agentStore";
@@ -22,7 +22,7 @@ export function CardContextMenu() {
   const agents = useAgentStore((state) => state.agents);
   const agent = menu ? agents[menu.agentId] : null;
   const navigate = useNavigate();
-  const { data: backends } = useBackends();
+  const { data: backends, refetch: refetchBackends, isFetching: backendsFetching } = useBackends();
   const [dialog, setDialog] = useState<ActiveDialog | null>(null);
   const [name, setName] = useState("");
   const [group, setGroup] = useState("");
@@ -66,11 +66,18 @@ export function CardContextMenu() {
   );
   const selectedBackend = backends?.backends[runtime.backend];
   const modelEntries = Object.entries(selectedBackend?.models ?? {});
-  const terminalOK = terminalAvailable && !!selectedBackend && terminalSupported(selectedBackend.type);
+  // Terminal needs the host and the server's adapter launch support (FS-09.R63).
+  // Missing support withholds a Terminal switch for retry rather than silently
+  // retargeting it to chat.
+  const terminalSupport = launchSupportFor(backends?.backend_support, selectedBackend?.type, "terminal");
+  const terminalSupportMissing = !!selectedBackend && !terminalSupport;
+  const terminalOK = terminalAvailable && !!terminalSupport?.available;
+  const knownNoTerminal = !terminalAvailable || (!!terminalSupport && !terminalSupport.available);
+  const terminalUnverified = runtime.interface === "terminal" && terminalSupportMissing;
 
   useEffect(() => {
-    if (runtime.interface === "terminal" && selectedBackend && !terminalOK) setRuntime((current) => ({ ...current, interface: "chat" }));
-  }, [runtime.interface, selectedBackend, terminalOK]);
+    if (runtime.interface === "terminal" && selectedBackend && knownNoTerminal) setRuntime((current) => ({ ...current, interface: "chat" }));
+  }, [runtime.interface, selectedBackend, knownNoTerminal]);
 
   const openDialog = (kind: DialogKind) => {
     if (!agent) return;
@@ -202,8 +209,14 @@ export function CardContextMenu() {
                   <div className="form-field"><label htmlFor="runtime-backend">Backend</label><select id="runtime-backend" value={runtime.backend} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForBackend(backends, event.target.value) }))}>{Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}</select></div>
                   <div className="form-field"><label htmlFor="runtime-model">Model</label><select id="runtime-model" value={runtime.model} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForModel(backends, current.backend, event.target.value) }))}>{modelEntries.map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}</select></div>
                   {(selectedBackend?.models[runtime.model]?.efforts ?? []).length > 0 && <div className="form-field"><label htmlFor="runtime-effort">Effort</label><select id="runtime-effort" value={runtime.effort} onChange={(event) => setRuntime((current) => ({ ...current, effort: event.target.value }))}>{(selectedBackend?.models[runtime.model]?.efforts ?? []).map((level) => <option key={level} value={level}>{level}</option>)}</select></div>}
+                  {terminalSupportMissing && (
+                    <div className="form-warning" role="status">
+                      <p>Launch options could not be loaded, so Terminal is not offered.{terminalUnverified && " Retry to verify the Terminal switch."}</p>
+                      <button type="button" onClick={() => void refetchBackends()} disabled={backendsFetching}>{backendsFetching ? "Retrying…" : "Retry"}</button>
+                    </div>
+                  )}
                   {dialogError && <p className="form-error">{dialogError}</p>}
-                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" disabled={!runtime.backend || !runtime.model}>Switch runtime</button></div>
+                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" disabled={!runtime.backend || !runtime.model || terminalUnverified}>Switch runtime</button></div>
                 </form>
               )}
             </Dialog.Content>

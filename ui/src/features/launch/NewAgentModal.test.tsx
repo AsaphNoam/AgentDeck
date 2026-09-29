@@ -1,10 +1,11 @@
 import React from "react";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { NewAgentModal } from "./NewAgentModal";
+import { BACKEND_SUPPORT_WIRE } from "../../test/backendSupport";
 
 const server = setupServer(
   http.get("/api/roles", () =>
@@ -21,8 +22,22 @@ const server = setupServer(
       billing: { title: "Billing", color: [200, 100, 50], cwd: "/tmp/billing", add_dirs: [], context_prompt: "" },
     }),
   ),
-  http.get("/api/backends", () =>
+  http.get("/api/backends", () => HttpResponse.json(backendsFixture())),
+  http.post("/api/sessions", () =>
+    HttpResponse.json(
+      { agent: { agent_id: "a1", name: "Atlas", role: "implementer", project: "my-app" } },
+      { status: 201 },
+    ),
+  ),
+  http.get("/api/capabilities", () =>
     HttpResponse.json({
+      terminal: { available: true, default_driver: "xterm", drivers: { xterm: true } },
+    }),
+  ),
+);
+
+function backendsFixture() {
+  return {
       version: 2,
       backends: {
         claude: {
@@ -53,20 +68,9 @@ const server = setupServer(
         cache_version: "0.153.4",
         catalog_status: "mismatch",
       },
-    }),
-  ),
-  http.post("/api/sessions", () =>
-    HttpResponse.json(
-      { agent: { agent_id: "a1", name: "Atlas", role: "implementer", project: "my-app" } },
-      { status: 201 },
-    ),
-  ),
-  http.get("/api/capabilities", () =>
-    HttpResponse.json({
-      terminal: { available: true, default_driver: "xterm", drivers: { xterm: true } },
-    }),
-  ),
-);
+      backend_support: BACKEND_SUPPORT_WIRE as unknown,
+  };
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
@@ -281,6 +285,107 @@ describe("NewAgentModal", () => {
     fireEvent.change(backendSelect, { target: { value: "codex" } });
     await waitFor(() => expect(chatRadio.checked).toBe(true));
     expect(terminalRadio.checked).toBe(false);
+  });
+
+  // FS-09.A31: choices come from adapter launch support, not the backend type.
+  it("offers only the options the selected backend/interface supports", async () => {
+    server.use(http.get("/api/backends", () => {
+      const doc = backendsFixture();
+      // An adapter reporting no chat effort/fast hides them even for a model
+      // that declares both, and a reported Terminal is offered for Codex.
+      doc.backend_support = {
+        ...BACKEND_SUPPORT_WIRE,
+        "codex-acp": {
+          chat: { available: true, effort: false, fast: false },
+          terminal: { available: true, effort: true, fast: false },
+        },
+      };
+      return HttpResponse.json(doc);
+    }));
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
+    expect(screen.queryByLabelText("Effort")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Fast mode/)).not.toBeInTheDocument();
+    fireEvent.click(terminalRadio);
+    expect(await screen.findByLabelText("Effort")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Fast mode/)).not.toBeInTheDocument();
+  });
+
+  it("withholds Terminal when the host lacks it even if the backend supports it", async () => {
+    server.use(http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: false } })));
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    await waitFor(() => expect(screen.getByRole("radio", { name: /Terminal/i })).toBeDisabled());
+  });
+
+  it("offers no optional choices and a retry when support metadata is missing, keeping ordinary chat launchable", async () => {
+    let posted: Record<string, unknown> | undefined;
+    server.use(
+      http.get("/api/backends", () => {
+        const { backend_support: _omit, ...doc } = backendsFixture();
+        return HttpResponse.json(doc);
+      }),
+      http.post("/api/sessions", async ({ request }) => {
+        posted = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ agent: { agent_id: "a3", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    expect(await screen.findByText(/Launch options could not be loaded/)).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Terminal/i })).toBeDisabled();
+    expect(screen.queryByLabelText("Effort")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Fast mode/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(posted).toBeDefined());
+    expect(posted).toMatchObject({ backend: "codex", model: "gpt-4o", fast: false, interface: "chat" });
+    expect(posted!.effort).toBeUndefined();
+  });
+
+  it("blocks a selection made before support went missing until retry or clear, preserving other input", async () => {
+    let withSupport = true;
+    server.use(http.get("/api/backends", () => {
+      const doc = backendsFixture();
+      if (!withSupport) delete (doc as { backend_support?: unknown }).backend_support;
+      return HttpResponse.json(doc);
+    }));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={qc}><NewAgentModal open={true} onClose={() => {}} /></QueryClientProvider>);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Kept" } });
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
+    const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
+    fireEvent.click(terminalRadio);
+
+    withSupport = false;
+    await act(() => qc.refetchQueries({ queryKey: ["backends"] }));
+    expect(await screen.findByText(/Retry to verify your selected options/)).toBeInTheDocument();
+    expect(terminalRadio.checked).toBe(true);
+    expect(screen.getByRole("button", { name: "Launch" })).toBeDisabled();
+
+    withSupport = true;
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.queryByText(/Launch options could not be loaded/)).not.toBeInTheDocument());
+    expect(terminalRadio.checked).toBe(true);
+    expect((screen.getByLabelText("Name") as HTMLInputElement).value).toBe("Kept");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("haiku");
+    expect(screen.getByRole("button", { name: "Launch" })).toBeEnabled();
+
+    withSupport = false;
+    await act(() => qc.refetchQueries({ queryKey: ["backends"] }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear options" }));
+    expect((screen.getByRole("radio", { name: /Chat/i }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("button", { name: "Launch" })).toBeEnabled();
   });
 
   it("preselects configured default_role / default_project over the first entry", async () => {

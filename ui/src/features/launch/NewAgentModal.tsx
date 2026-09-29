@@ -7,7 +7,7 @@ import { useBackends } from "../../api/config";
 import { useConfig } from "../../api/config";
 import { useLaunchAgent } from "../../api/config";
 import { useConfigSources } from "../../api/configSources";
-import { terminalSupported } from "../../lib/backendTypes";
+import { launchSupportFor, type LaunchSupport } from "../../schemas/backends";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
 import { useSuggestedName } from "./useSuggestedName";
 
@@ -27,7 +27,7 @@ interface NewAgentModalProps {
 export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched }: NewAgentModalProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
-  const { data: backendsData } = useBackends();
+  const { data: backendsData, refetch: refetchBackends, isFetching: backendsFetching } = useBackends();
   const { data: configData } = useConfig();
   const launch = useLaunchAgent();
 
@@ -89,13 +89,16 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
     if (!backendId && defaultBackendId) setBackendId(defaultBackendId);
   }, [defaultBackendId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When backend changes, reset model to that backend's default_model.
+  // When backend changes, reset model to that backend's default_model. Keyed on
+  // the backend entry (kept by reference across an unchanged refetch) so a
+  // launch-options retry does not overwrite the person's choices.
+  const backendEntry = backendsData?.backends[backendId];
   useEffect(() => {
     const runtime = resetRuntimeForBackend(backendsData, backendId);
     setModelId(runtime.model);
     setEffort(runtime.effort);
     setFast(false);
-  }, [backendId, backendsData]);
+  }, [backendId, backendEntry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -127,22 +130,48 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
     (sourceBinding.stale ||
       ["source_invalid", "approval_required", "source_conflict"].includes(sourceBinding.health ?? ""));
 
-  // Terminal is offered only when the host advertises it AND the selected backend
-  // type supports it (only claude-acp — mirrors the server terminalSupported gate).
-  const backendTerminalOK = !selectedBackend || terminalSupported(selectedBackend.type);
-  const canTerminal = terminalAvailable && backendTerminalOK;
+  // Optional launch choices come from the server's adapter launch support
+  // (FS-09.R61): Terminal also needs the host, effort/fast also need the model's
+  // declaration. Missing metadata offers none of them and never infers support
+  // from the backend type.
+  const support = backendsData?.backend_support;
+  const chatSupport = launchSupportFor(support, selectedBackend?.type, "chat");
+  const terminalSupport = launchSupportFor(support, selectedBackend?.type, "terminal");
+  const interfaceSupport = agentInterface === "terminal" ? terminalSupport : chatSupport;
+  const supportMissing = !!selectedBackend && (!chatSupport || !terminalSupport);
+  const canTerminal = terminalAvailable && !!terminalSupport?.available;
+  const offerEffort = effortLevels.length > 0 && !!interfaceSupport?.effort;
+  const offerFast = !!selectedModel?.fast && !!interfaceSupport?.fast;
+  const defaultEffort = selectedModel?.default_effort ?? "";
+  // A non-default choice made before support went missing must be re-verified
+  // or cleared; an ordinary chat launch with defaults is never gated.
+  const unverifiedSelection = supportMissing && (agentInterface === "terminal" || fast || effort !== defaultEffort);
 
-  // A backend that can't run terminal must not leave a stale terminal selection.
+  // A known-unsupported Terminal must not leave a stale selection; unknown
+  // support keeps it for re-verification instead of silently changing it.
   useEffect(() => {
-    if (!canTerminal && agentInterface === "terminal") setAgentInterface("chat");
-    if (agentInterface === "terminal") setFast(false);
-  }, [canTerminal, agentInterface]);
+    const knownNoTerminal = !terminalAvailable || (!!terminalSupport && !terminalSupport.available);
+    if (knownNoTerminal && agentInterface === "terminal") setAgentInterface("chat");
+  }, [terminalAvailable, terminalSupport, agentInterface]);
+  useEffect(() => {
+    if (interfaceSupport && !interfaceSupport.fast) setFast(false);
+  }, [interfaceSupport]);
+
+  const clearUnverified = () => {
+    setAgentInterface("chat");
+    setFast(false);
+    setEffort(defaultEffort);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLaunchError(null);
+    if (unverifiedSelection) return;
     launch.mutate(
-      { name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined, effort: effort || undefined, fast, interface: agentInterface },
+      {
+        name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined,
+        effort: (offerEffort && effort) || undefined, fast: offerFast && fast, interface: agentInterface,
+      },
       {
         onSuccess: (result) => {
           onLaunched?.(result.agent.agent_id);
@@ -234,7 +263,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                   </select>
                 </div>
 
-                {effortLevels.length > 0 && (
+                {offerEffort && (
                   <div className="form-field">
                     <label htmlFor="new-agent-effort">Effort</label>
                     <select id="new-agent-effort" value={effort} onChange={(e) => setEffort(e.target.value)}>
@@ -243,7 +272,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                   </div>
                 )}
 
-                {selectedModel?.fast && agentInterface === "chat" && (
+                {offerFast && (
                   <label className="form-field">
                     <span>Speed</span>
                     <span><input type="checkbox" checked={fast} onChange={(e) => setFast(e.target.checked)} /> Fast mode — faster responses with higher provider usage</span>
@@ -257,7 +286,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                       <input type="radio" name="interface" value="chat" checked={agentInterface === "chat"} onChange={() => setAgentInterface("chat")} />
                       Chat
                     </label>
-                    <label className={canTerminal ? "interface-option" : "interface-option interface-disabled"} title={canTerminal ? "Terminal runtime" : !backendTerminalOK ? "Terminal is only supported by the Claude backend" : "Terminal unavailable"}>
+                    <label className={canTerminal ? "interface-option" : "interface-option interface-disabled"} title={terminalOptionTitle(canTerminal, terminalAvailable, terminalSupport)}>
                       <input type="radio" name="interface" value="terminal" checked={agentInterface === "terminal"} disabled={!canTerminal} onChange={() => setAgentInterface("terminal")} />
                       Terminal
                     </label>
@@ -273,13 +302,25 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                 Launch may be blocked — refresh or fix it in Settings → Backends → Configuration source first.
               </p>
             )}
+            {supportMissing && (
+              <div className="form-warning" role="status">
+                <p>
+                  Launch options could not be loaded, so Terminal, effort and fast mode are not offered.
+                  {unverifiedSelection && " Retry to verify your selected options, or clear them to launch with defaults."}
+                </p>
+                <button type="button" onClick={() => void refetchBackends()} disabled={backendsFetching}>
+                  {backendsFetching ? "Retrying…" : "Retry"}
+                </button>
+                {unverifiedSelection && <button type="button" onClick={clearUnverified}>Clear options</button>}
+              </div>
+            )}
             {launchError && <p className="form-error">{launchError}</p>}
 
             <div className="form-actions">
               <button type="button" onClick={onClose} disabled={launch.isPending}>Cancel</button>
               <button
                 type="submit"
-                disabled={launch.isPending || !role || !project}
+                disabled={launch.isPending || !role || !project || unverifiedSelection}
               >
                 {launch.isPending ? "Launching…" : "Launch"}
               </button>
@@ -289,6 +330,13 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function terminalOptionTitle(canTerminal: boolean, hostAvailable: boolean, support: LaunchSupport | undefined): string {
+  if (canTerminal) return "Terminal runtime";
+  if (!hostAvailable) return "Terminal unavailable";
+  if (!support) return "Launch options could not be loaded";
+  return "This backend does not support Terminal";
 }
 
 function displayLabel(entries: [string, string][], id: string): string {
