@@ -118,19 +118,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   memory. Give the remote transcript surface a byte/event-bounded window with continuation, keep
   permission/latest-message derivation correct at the boundary, and cover a transcript larger than
   the window.
-- **Must fix** — confirmed partial planned capability; FS-20.R32, TS-13.R16, INV §8/§10.
-  `ui/src/remote/AgentScreen.tsx:105-116` passes a no-op annotation callback into the shared diff,
-  while `ui/src/components/chat/renderers/DiffBlock.tsx:8-35` still tells phone users to select
-  lines and presents an **Annotate lines** button; the tailnet route table also denies the shared
-  annotation endpoint. Implement the approved phone-sized diff annotation-and-assignment flow,
-  allowlist its bounded shared mutation, and test successful delivery plus preserved drafts on
-  failure.
-- **Must fix** — confirmed stale-request side-effect race; FS-20.R14/R24/A7, INV §5/§15.
-  `internal/server/pipeline_handlers.go:309-335` repairs task cleanup and invokes external cleanup
-  effects before `internal/pipeline/actions.go:322-339` checks the submitted run revision. Two
-  desktop/phone repairs, or one stale phone request, can mutate cleanup and then return
-  `revision_conflict`. Claim or revalidate the run generation durably before any member mutation or
-  external effect, and add a concurrent regression proving the losing request performs no effects.
 - **Must fix** — confirmed partial planned capability; FS-20.R31, TS-13.R15, INV §8/§14.
   `internal/server/pipeline_handlers.go:262-279` already accepts a replacement orchestrator's
   backend, model, effort, and fast values, but the phone has neither a runtime picker nor a safe
@@ -154,7 +141,10 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   keeps its draft on refusal, and the tailnet route accepts only `arms` (INV §8/§10). Push rereads
   Remote enablement, type mutes and the device switch before every attempt, including retries
   (INV §1/§15). Every tailnet mutation body is capped at 1 MiB (`413 remote_body_too_large`), and
-  pairing-failure tracking prunes expired windows and caps at 256 peers (INV §16).
+  pairing-failure tracking prunes expired windows and caps at 256 peers (INV §16). Cleanup repair
+  claims the run revision under the run lock before any member mutation or cleanup effect, so a
+  stale or losing request does nothing (INV §5/§15). The phone annotates diff lines through the
+  shared FS-13 drafts, batch builder and allowlisted handler (FS-20.R32, TS-13.R16; INV §2/§8/§10).
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from

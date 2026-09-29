@@ -133,10 +133,12 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   configuration before launching it. Backend/model environment, credentials, configuration, and
   editing remain desktop-only. This is the one runtime-choice exception to R15/R16; new agents,
   tasks, and pipeline starts still use their configured defaults.
-- **R32 (planned) — A phone can annotate and assign a diff.** In a chat-interface agent's phone
+- **R32 — A phone can annotate and assign a diff.** In a chat-interface agent's phone
   conversation, selecting a contiguous diff-line range opens a phone-sized form for the required
   instruction and the FS-13 targets: the current agent, another running chat agent, or a new task.
-  The structured anchor, excerpt clipping, bounded browser-local drafts, delivery, durable source
+  The phone's new task launches the source agent's role in its project with the runtime defaults
+  of R15, then delivers to it; a retry after a failed delivery targets that launched agent rather
+  than launching another. The FS-13 overall instruction stays desktop-only. The structured anchor, excerpt clipping, bounded browser-local drafts, delivery, durable source
   event, failure preservation, and target validation are the same as FS-13.R2–R9/R11–R17. Terminal
   agents remain ineligible. This supersedes R16's blanket annotate-and-assign exclusion only for
   live diff lines; other transcript-event and archive annotation interactions remain desktop-only.
@@ -247,8 +249,8 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or
   `pmset -g assertions` check has run. Their automated halves pass.
-- R31–R32 and A9 are approved but unshipped. The current phone has no replacement-runtime picker or
-  safe runtime catalog, and renders a diff annotation action whose callback is a no-op.
+- R31 and A9 are approved but unshipped. The current phone has no replacement-runtime picker or
+  safe runtime catalog.
 
 ## 7. Traceability
 
