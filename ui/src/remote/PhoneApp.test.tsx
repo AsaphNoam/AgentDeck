@@ -153,7 +153,7 @@ describe("PhoneApp", () => {
     });
     expect(useConnection.getState().link).toBe("reconnecting");
     expect(useConnection.getState().agents.stale).toBeDefined();
-    act(() => stream.emit("state_update", { data: { agent_id: "__hydrated__" } }));
+    act(() => stream.emit("state_update", { agent_id: "__hydrated__", data: { hydrated: true } }));
     expect(useConnection.getState().link).toBe("connected");
     expect(Object.keys(useConnection.getState().agents)).toEqual(["fresh"]);
     expect(useConnection.getState().transcriptRev).toEqual({});

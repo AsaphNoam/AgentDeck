@@ -40,9 +40,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** the 2026-09-29 usability review records one **Must fix** blocker: the phone
-  app never finishes connecting, so no phone decision or conversation works (see **Review
-  findings**). The injected-steer lifetime
+- **Open findings:** none recorded. The 2026-09-29 usability review's phone-hydration blocker
+  closed the same day. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -57,9 +56,14 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); FS-20.A9's fakeACP phone-size browser pass
 (Re-arm editor, runtime picker, diff annotation, **Show earlier**); a PNG touch icon for iPhone
-Home Screen.
+Home Screen. A3's pair → Needs you → Approve path passed at 390px on 2026-09-29; the rest of the
+phone pass (A4 actions, A9) is unblocked but not yet run.
 Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
-./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5).
+./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5). Allow
+uses `pending_pairing.id` from `GET /api/remote`, not the code's id. For a permission card, set the
+claude backend env `FAKEACP_SCENARIO=permission` via `PUT /api/backends` with `If-Match: <ETag>`.
+The in-app browser pane rejects the fixture's certificate; use headless Chromium with
+`--ignore-certificate-errors` over CDP.
 Observed pre-existing flakes under full `go test ./...` load: `TestContextSharingStartsNoModelTurn`
 and `TestStoppedRecipientKeepsContextAcrossResume` (both pass in isolation).
 
@@ -79,8 +83,7 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take the phone-hydration finding from the
-[2026-09-29 usability review](../archive/reviews/usability-review-run-2026-09-29.md); `/review` may take
+**Available by role:** `/fix` has no recorded findings; `/review` may take
 `drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -99,22 +102,7 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-### usability-review-run-2026-09-29 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-J1 and the FS-20 phone-size pass are in
-[`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
-
-- **Must fix** (FS-20.R12/R13/R17, A3; INV §11/§17) — J-FS20 phone app: after pairing, the phone stays on
-  **Reconnecting…** forever and opening any agent, including one waiting on permission, says "This
-  agent is not on the Mac any more", so no decision, reply, stop, Re-arm, annotation or Show earlier
-  is possible from a phone. `ui/src/remote/connection.ts` detects the hydration marker by
-  `data.agent_id === "__hydrated__"`, but `internal/bus/bus.go` `HydratedMarker` puts that id on the
-  envelope and sends `data: {"hydrated":true}`; the early return leaves `hydratingAgents` buffering
-  forever. Regressed in `680775d`; `PhoneApp.test.tsx:156` mocks a marker shape the server never
-  sends. Evidence: `docs/archive/reviews/usability-review-2026-09-29-evidence/04-permission-card.png`.
-  *Fix:* recognise the marker by the envelope's `agent_id` (or `data.hydrated`), and make the test
-  emit the real envelope. *Verify:* at 390px against the dev fixture, the banner clears, the waiting
-  agent's decision card shows Approve/Deny, then rerun the owed A9 pass.
+None open.
 
 ## Design consistency notes
 
@@ -131,6 +119,12 @@ J1 and the FS-20 phone-size pass are in
 
 ## Changelog
 
+- **2026-09-29 — Fix: phone app never finished connecting (FS-20.R12/R13/R17, A3; INV §11
+  cross-boundary serialization / §17 tests prove their contract).** The phone now recognises the hydration marker on
+  the event envelope, as `HydratedMarker` sends it, and its test emits the real envelope (it fails
+  against the old code). At 390px against the dev fixture the banner cleared, agents appeared live,
+  and a waiting agent's Approve reached the Mac. Closes the 2026-09-29 usability review's findings;
+  FS-20.A4/A9 phone passes stay owed.
 - **2026-09-29 — Usability review: first paint and phone-size remote pass.** J1 passed on a fresh
   home. The FS-20 phone pass (headless Chromium at 390px against the dev fixture) found one blocker:
   the phone never leaves Reconnecting and shows no agents, blocking A3/A4/A9. FS-20.A9's browser

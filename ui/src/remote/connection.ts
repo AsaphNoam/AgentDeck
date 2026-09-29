@@ -93,9 +93,8 @@ export function connect() {
   for (const type of homeEvents) source.addEventListener(type, () => bump());
   source.addEventListener("state_update", (event) => {
     const envelope = parse(event);
-    const agent = envelope?.data as AgentState | undefined;
-    if (!agent?.agent_id) return;
-    if (agent.agent_id === "__hydrated__") {
+    // The server marks hydration on the envelope: {agent_id:"__hydrated__", data:{hydrated:true}}.
+    if (envelope?.agent_id === "__hydrated__") {
       const agents = hydratingAgents ?? {};
       hydratingAgents = null;
       useConnection.setState((state) => ({
@@ -106,6 +105,8 @@ export function connect() {
       bump(); // catch up only after the authoritative snapshot is complete.
       return;
     }
+    const agent = envelope?.data as AgentState | undefined;
+    if (!agent?.agent_id) return;
     if (hydratingAgents) {
       if (agent.removed) delete hydratingAgents[agent.agent_id];
       else hydratingAgents[agent.agent_id] = agent;
