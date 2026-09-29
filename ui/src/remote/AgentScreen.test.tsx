@@ -157,6 +157,29 @@ describe("AgentScreen", () => {
     expect(reads[0]).toContain("limit=150");
   });
 
+  it("folds tool results into their collapsed tool line", async () => {
+    live = {
+      agent_id: "a1",
+      events: [
+        { agent_id: "a1", seq: 10, type: "tool_call", ts: "", data: { tool_call_id: "c1", name: "Edit", args: { path: "main.go" } } },
+        { agent_id: "a1", seq: 11, type: "tool_result", ts: "", data: { tool_call_id: "c1", content: { diff: "raw-result-json" } } },
+        { agent_id: "a1", seq: 12, type: "tool_call", ts: "", data: { tool_call_id: "c2", name: "Bash" } },
+        { agent_id: "a1", seq: 13, type: "tool_result", ts: "", data: { tool_call_id: "c2", content: "second-result" } },
+        { agent_id: "a1", seq: 14, type: "assistant_text", ts: "", data: { text: "Done." } },
+      ],
+      has_more: false,
+      pending_permission: null,
+      latest_assistant: "Done.",
+    };
+    renderScreen();
+    const toggle = await screen.findByRole("button", { name: "Ran 2 tools" });
+    expect(screen.getByRole("list", { name: "Conversation" })).not.toHaveTextContent("raw-result-json");
+    expect(screen.queryByText(/second-result/)).toBeNull();
+    fireEvent.click(toggle);
+    expect(await screen.findByText(/raw-result-json/)).toBeInTheDocument();
+    expect(screen.getByText(/second-result/)).toBeInTheDocument();
+  });
+
   it("loads earlier windows on request and keeps them contiguous with the live one", async () => {
     live = {
       agent_id: "a1",

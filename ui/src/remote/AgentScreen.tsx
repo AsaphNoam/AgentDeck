@@ -17,7 +17,8 @@ import { normalizeEvent } from "../store/transcriptStore";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
-import { shouldRenderToolResult, ToolResult } from "../components/chat/renderers/ToolResult";
+import { ToolResult } from "../components/chat/renderers/ToolResult";
+import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
 import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection } from "./connection";
 
@@ -115,7 +116,7 @@ function EventRow({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (
     case "tool_call":
       return <ToolCall event={event} />;
     case "tool_result":
-      return shouldRenderToolResult(event) ? <ToolResult event={event} /> : null;
+      return <ToolResult event={event} />;
     case "diff":
       return <DiffBlock event={event} onAnnotate={onAnnotate} selectHint="Tap line numbers to select a range." />;
     case "permission_request":
@@ -244,11 +245,17 @@ export function AgentScreen({ agentId }: { agentId: string }) {
               <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
             ))}
           <ol className="phone-transcript" aria-label="Conversation">
-            {events.map((event) => (
-              <li key={`${event.seq}:${event.kind}`}>
-                <EventRow event={event} onAnnotate={annotate} />
-              </li>
-            ))}
+            {groupTranscriptRows(events).map((row) =>
+              row.kind === "tool-run" ? (
+                <li key={`run:${row.events[0].seq}`}>
+                  <ToolRun events={row.events} renderEvent={(event) => <EventRow key={`${event.seq}:${event.kind}`} event={event} onAnnotate={annotate} />} />
+                </li>
+              ) : (
+                <li key={`${row.event.seq}:${row.event.kind}`}>
+                  <EventRow event={row.event} onAnnotate={annotate} />
+                </li>
+              ),
+            )}
           </ol>
           <PhoneAnnotationForm agent={agent} />
           {heldText && (

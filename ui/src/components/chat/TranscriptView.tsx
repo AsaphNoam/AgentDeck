@@ -7,7 +7,8 @@ import { AssistantText } from "./renderers/AssistantText";
 import { DiffBlock } from "./renderers/DiffBlock";
 import { PermissionPrompt } from "./renderers/PermissionPrompt";
 import { ToolCall } from "./renderers/ToolCall";
-import { shouldRenderToolResult, ToolResult } from "./renderers/ToolResult";
+import { ToolResult } from "./renderers/ToolResult";
+import { groupTranscriptRows, kindOf, ToolRun } from "./toolRun";
 import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
@@ -197,39 +198,7 @@ function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, onOpe
   );
 }
 
-function ToolRun({ events, renderEvent }: { events: TranscriptEvent[]; renderEvent: (event: TranscriptEvent, index: number) => ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const count = events.filter((event) => kindOf(event) === "tool_call").length;
-  return (
-    <section className="tool-run" data-ui="tool-run" data-state={open ? "expanded" : "collapsed"}>
-      <button type="button" className="tool-toggle" data-slot="trigger" aria-label={`Ran ${count} tool${count === 1 ? "" : "s"}`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {open ? "▾" : "▸"} Ran {count} tool{count === 1 ? "" : "s"}
-      </button>
-      {open && <div className="tool-run-content" data-slot="content">{events.filter(shouldRenderToolEvent).map(renderEvent)}</div>}
-    </section>
-  );
-}
-
 type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "fork-boundary" | "annotation" | "thinking" | "unknown";
-
-type TranscriptRow = { kind: "event"; event: TranscriptEvent } | { kind: "tool-run"; events: TranscriptEvent[] };
-
-export function groupTranscriptRows(events: TranscriptEvent[]): TranscriptRow[] {
-  const rows: TranscriptRow[] = [];
-  for (let index = 0; index < events.length;) {
-    const event = events[index];
-    if (!isToolEvent(event)) {
-      if (shouldRenderTranscriptEvent(event)) rows.push({ kind: "event", event });
-      index++;
-      continue;
-    }
-    const run: TranscriptEvent[] = [];
-    while (index < events.length && isToolEvent(events[index])) run.push(events[index++]);
-    if (run.some((item) => kindOf(item) === "tool_call")) rows.push({ kind: "tool-run", events: run });
-    else run.filter(shouldRenderTranscriptEvent).forEach((item) => rows.push({ kind: "event", event: item }));
-  }
-  return rows;
-}
 
 // withReasoning places each live reasoning span at its chronological slot as a
 // render-only row. It has no seq, so it is never annotated, and it never enters
@@ -251,22 +220,6 @@ export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] 
   return out;
 }
 
-function isToolEvent(event: TranscriptEvent) {
-  const kind = kindOf(event);
-  return kind === "tool_call" || kind === "tool_result";
-}
-
-function shouldRenderToolEvent(event: TranscriptEvent) {
-  return kindOf(event) !== "tool_result" || shouldRenderToolResult(event);
-}
-
-function shouldRenderTranscriptEvent(event: TranscriptEvent) {
-  return shouldRenderToolEvent(event);
-}
-
-function kindOf(event: TranscriptEvent) {
-  return String(event.kind ?? event.type ?? "");
-}
 
 function variantOf(event: TranscriptEvent): TranscriptVariant {
   const kind = String(event.kind ?? event.type ?? "");

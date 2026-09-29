@@ -109,12 +109,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 Results are in the **Second pass** section of
 [`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
 
-- **Worth fixing** (FS-20.R13; INV §2) — J-FS20 phone transcript: each tool result renders
-  expanded raw JSON under the collapsed tool line (`EventRow` in `ui/src/remote/AgentScreen.tsx`
-  renders `tool_result` on its own row), repeating every diff and lengthening the phone view.
-  The desktop folds results into the collapsed tool run. Evidence: `r2-07-transcript-top.png`.
-  *Fix:* collapse the result with its tool line. *Verify:* a tool_flow transcript shows one line per
-  tool call until it is expanded.
 - **Worth fixing** (FS-20.R30; INV §8) — J-FS20 phone Re-arm: a successful re-arm shows no
   confirmation, and refusals show raw server text ("satisfying_outcomes is required", "state: task
   arms would create a cycle"). Evidence: `r2-10-rearm-done.png`, `r2-11-rearm-invalid.png`.
@@ -140,6 +134,12 @@ Results are in the **Second pass** section of
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix: phone transcript showed raw tool results (FS-20.R13; INV §2 parallel paths
+  share one helper).** The desktop's tool-run grouping moved from `TranscriptView.tsx` into
+  `ui/src/components/chat/toolRun.tsx` (registered in INV's helpers table) and the phone uses it, so
+  consecutive tool calls and their results fold into one collapsed "Ran N tools" line on both.
+  `AgentScreen.test.tsx` "folds tool results…" fails on the old phone code.
 
 - **2026-09-29 — Fix: phone Start pipeline always refused (FS-20.R15/A4, FS-14.R80, TS-13.R5;
   INV §2 parallel paths share one helper / §17 tests prove their contract).** The tailnet filter
