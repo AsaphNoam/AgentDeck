@@ -1,6 +1,6 @@
 # FS-06 — Agent coordination & notifications
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/messaging/`, `internal/state/messages.go`, `internal/server/` (`messaging_registration.go`, `messaging_loops.go`, `sessions.go`), `internal/bus/`, `ui/src/api/sse.ts`, `ui/src/components/grid/AgentCard.tsx`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx` · **Journeys:** J10, J11, J12
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F8/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -247,7 +247,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 ### 4.3 Pipeline history and recipients
 
-- **R37** (planned) — Historical pipeline association never shapes recipient resolution or its
+- **R37** — Historical pipeline association never shapes recipient resolution or its
   refusals. A stopped agent that ran a pipeline stage resolves, lists and wakes under R22 exactly
   like any other stopped chat agent. When `create_task` or `send_message` cannot reach such an agent
   for another reason (no resumable snapshot, archived agent or project), the caller receives that
@@ -384,7 +384,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   the next turn and does not alter a turn already counting. — `internal/messaging/messaging_test.go`
   and `internal/state` budget tests.
 
-- **A26** (planned; R37) — `create_task` and `send_message` aimed at a stopped chat agent with a
+- **A26** (R37) — `create_task` and `send_message` aimed at a stopped chat agent with a
   pipeline attempt row are accepted, and mail wakes it. The same calls aimed at a stopped agent with
   a pipeline attempt row but no resumable snapshot are refused with the ordinary no-match outcome,
   whose message mentions neither a pipeline nor Resume. —
@@ -408,8 +408,8 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 - **Pipeline replacement:** FS-14.R74 (shipped 2026-09-13) replaced R22's permanent exclusion of
   stopped agents with pipeline history; R10, R22, R27 and A11/A15/A16 were reconciled on
-  2026-09-28. The residual pipeline-association refusal in `create_task`/`send_message` is dead
-  except for a snapshot-less stage agent, where it wrongly promises Resume; R37 removes it. A waiting assigned agent resumes its task through TS-10.R29 before
+  2026-09-28. R37 (shipped 2026-09-29) removed the residual pipeline-association refusal that
+  wrongly promised Resume for a snapshot-less stage agent. A waiting assigned agent resumes its task through TS-10.R29 before
   queued mail delivery, and a former run orchestrator becomes ordinarily wakeable after ownership
   ends. Delivery never bypasses an active task's capacity or run-closure boundary.
 
@@ -426,7 +426,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   MCP client and fake ACP sessions, but real Claude Code and Codex acceptance of the generated
   per-session HTTP registration and a live `ping`/tool call remains a manual gate. Do not claim
   compatibility for a CLI until that gate passes; implement a stdio proxy if either rejects HTTP.
-- **Recipient refusal boundary.** R37 changes only refusal wording for stopped agents with
+- **Recipient refusal boundary.** R37 changed only refusal wording for stopped agents with
   pipeline history: no change to R22's addressable set, its resolver, retry classification, wake
   behavior, or the context plane's deliberately looser set (FS-15.R17).
 

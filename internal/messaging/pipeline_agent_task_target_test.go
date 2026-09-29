@@ -10,12 +10,13 @@ import (
 )
 
 // stoppedPipelineAgent writes the exact shape of the field report's earlier
-// stage coordinator: a real, non-archived chat agent with the frozen session
-// snapshot a resume needs, no running row, and the pipeline attempt its stage
-// left behind. That attempt row lives as long as the run record does
-// (`ON DELETE CASCADE` from `pipeline_runs`, internal/state/schema.go:237), so
-// the association outlives the stage, the run, and the whole pipeline.
-func stoppedPipelineAgent(t *testing.T, st *state.Store, id, name, role, project string) {
+// stage coordinator: a real, non-archived chat agent with no running row and
+// the pipeline attempt its stage left behind. That attempt row lives as long as
+// the run record does (`ON DELETE CASCADE` from `pipeline_runs`,
+// internal/state/schema.go:237), so the association outlives the stage, the
+// run, and the whole pipeline. withSnapshot adds the frozen session snapshot a
+// resume needs.
+func stoppedPipelineAgent(t *testing.T, st *state.Store, id, name, role, project string, withSnapshot bool) {
 	t.Helper()
 	if err := st.WriteAgent(state.Agent{
 		AgentID: id, Name: name, Role: role, Project: project,
@@ -23,11 +24,13 @@ func stoppedPipelineAgent(t *testing.T, st *state.Store, id, name, role, project
 	}); err != nil {
 		t.Fatalf("WriteAgent %s: %v", id, err)
 	}
-	if _, err := st.DB().Exec(`
+	if withSnapshot {
+		if _, err := st.DB().Exec(`
 INSERT INTO sessions(agent_id, name, role, project, backend, model, interface, cwd, system_prompt, created_at, updated_at)
 VALUES (?,?,?,?,'claude','sonnet','chat','/tmp','prompt','2026-09-01T10:00:00Z','2026-09-01T10:01:00Z')`,
-		id, name, role, project); err != nil {
-		t.Fatalf("insert session %s: %v", id, err)
+			id, name, role, project); err != nil {
+			t.Fatalf("insert session %s: %v", id, err)
+		}
 	}
 	if _, err := st.DB().Exec(`
 INSERT INTO pipeline_runs(run_id, template_id, display_name, project, goal, state, created_at, updated_at)
@@ -42,9 +45,9 @@ VALUES ('pr_1','t_1','Ship','` + project + `','ship','running','2026-09-01T10:00
 	}
 }
 
-// A historical pipeline association is no longer a wake veto. Durable task
-// ownership provides the execution fence, so an otherwise resumable stopped
-// agent remains an ordinary task and mail target.
+// FS-06.A26 (R37) — a historical pipeline association is no wake veto. Durable
+// task ownership provides the execution fence, so an otherwise resumable
+// stopped agent remains an ordinary task and mail target, and mail wakes it.
 func TestStoppedPipelineAgentRemainsAddressable(t *testing.T) {
 	f := newContextFixture(t)
 	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
@@ -59,7 +62,7 @@ func TestStoppedPipelineAgentRemainsAddressable(t *testing.T) {
 	)
 
 	// The earlier stage's coordinator, exactly as the pipeline left it.
-	stoppedPipelineAgent(t, f.store, "a_stage", "Nova", "implementer", "my-app")
+	stoppedPipelineAgent(t, f.store, "a_stage", "Nova", "implementer", "my-app", true)
 
 	coord := connect(t, f.srv, "tok-coord")
 
@@ -82,27 +85,39 @@ func TestStoppedPipelineAgentRemainsAddressable(t *testing.T) {
 	res, isErr = call(t, coord, "send_message", map[string]any{
 		"to": "a_stage", "subject": "status", "body": "report when ready",
 	})
-	if isErr || res["ok"] != true {
-		t.Fatalf("send_message to stopped pipeline agent = %v (isErr=%v)", res, isErr)
+	if isErr || res["ok"] != true || res["delivery"] != "waking" {
+		t.Fatalf("send_message to stopped pipeline agent = %v (isErr=%v), want a waking delivery", res, isErr)
 	}
 }
 
-// FS-06.A19: do not promise Resume when the configuration-owned project gate
-// means Resume cannot succeed until the project is restored.
-func TestArchivedProjectDoesNotOfferPipelineResume(t *testing.T) {
+// FS-06.A26 (R37) — a stopped stage agent with no resumable snapshot is not
+// addressable, and the caller gets the ordinary no-match refusal. Resume cannot
+// succeed for it, so the refusal must neither name the pipeline nor promise
+// Resume.
+func TestSnapshotlessPipelineAgentGetsOrdinaryRefusal(t *testing.T) {
 	f := newContextFixture(t)
 	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
 	f.srv.RegisterSession("tok-coord", "a_coord", "gen-a_coord")
-	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) { return f.store.LiveAgents() })
-	f.srv.SetProjectAvailable(func(project string) (bool, error) { return false, nil })
-	f.srv.SetTaskControl(&stubTaskControl{})
-	stoppedPipelineAgent(t, f.store, "a_stage", "Nova", "implementer", "archived")
-	coord := connect(t, f.srv, "tok-coord")
-	result, isErr := call(t, coord, "create_task", map[string]any{
-		"display_name": "validate", "instruction": "run checks", "to": "a_stage",
+	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) {
+		return f.store.AddressableAgents()
 	})
-	message, _ := result["message"].(string)
-	if !isErr || strings.Contains(message, "resume") {
-		t.Fatalf("archived-project refusal = %v isErr=%v", result, isErr)
+	f.srv.SetTaskControl(&stubTaskControl{})
+	stoppedPipelineAgent(t, f.store, "a_stage", "Nova", "implementer", "my-app", false)
+	coord := connect(t, f.srv, "tok-coord")
+
+	for _, tc := range []struct {
+		tool string
+		args map[string]any
+	}{
+		{"create_task", map[string]any{"display_name": "validate", "instruction": "run checks", "to": "a_stage"}},
+		{"send_message", map[string]any{"to": "a_stage", "subject": "status", "body": "report when ready"}},
+	} {
+		res, isErr := call(t, coord, tc.tool, tc.args)
+		message, _ := res["message"].(string)
+		lower := strings.ToLower(message)
+		if !isErr || res["error"] != "recipient_not_found" ||
+			strings.Contains(lower, "pipeline") || strings.Contains(lower, "resume") {
+			t.Fatalf("%s to snapshot-less stage agent = %v (isErr=%v), want the ordinary no-match refusal", tc.tool, res, isErr)
+		}
 	}
 }

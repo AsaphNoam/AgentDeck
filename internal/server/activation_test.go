@@ -208,8 +208,8 @@ func TestStoppedActivationKeepsPendingWhenBackendIsMissing(t *testing.T) {
 	}
 }
 
-// FS-06.R10/R27 / INV §1/§6 — mail inserted before a recipient is switched,
-// archived, or assigned to a pipeline cannot keep re-claiming forever. A durable
+// FS-06.R10/R27 / INV §1/§6 — mail inserted before a recipient is switched or
+// archived cannot keep re-claiming forever. A durable
 // exclusion discards the opportunity while retaining the unread mail.
 func TestIneligibleMailActivationIsDiscarded(t *testing.T) {
 	for _, tc := range []struct {
@@ -232,13 +232,6 @@ func TestIneligibleMailActivationIsDiscarded(t *testing.T) {
 				if _, err := srv.stateStore.DB().Exec(`UPDATE agents SET archived = 1 WHERE agent_id = ?`, id); err != nil {
 					t.Fatalf("archive agent: %v", err)
 				}
-			},
-		},
-		{
-			name: "pipeline association",
-			makeIneligible: func(t *testing.T, srv *Server, id string) {
-				t.Helper()
-				associatePipeline(t, srv, id)
 			},
 		},
 	} {
@@ -286,12 +279,11 @@ func TestRunningTerminalRecipientDiscardsPendingActivation(t *testing.T) {
 	}
 }
 
-// FS-06.A16 (R22/R27), FS-01.R33 — the pipeline-association exclusion is a *wake* gate:
-// it keeps an agent the pipeline state machine deliberately stopped asleep. A
-// running agent that has run a stage stays addressable, so mail sent to it must
-// still start exactly one activation turn. Running the stopped-only gate on the
-// running branch silently swallowed every such activation for the rest of the
-// agent's life, because the attempt row is never cleared.
+// FS-06.R37, FS-14.R74 — pipeline history never gates mail. A running agent
+// that has run a stage stays addressable, so mail sent to it must still start
+// exactly one activation turn. A former running-branch pipeline gate silently
+// swallowed every such activation for the rest of the agent's life, because the
+// attempt row is never cleared.
 func TestRunningPipelineAgentStillActivatesForMail(t *testing.T) {
 	srv, ts, promptLog := activationTestServer(t)
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")

@@ -28,15 +28,15 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `share-creative-workspace-layout` (finished 2026-09-28, reviewed and fixed 2026-09-29) is
   closed. Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
-  instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` and
-  `drop-pipeline-recipient-refusal.md` are Waiting to start. `migrate-internal-actions-from-mcp.md` stays
-  paused on its transport blocker.
+  instruction; it can be added later. **Available:** `drop-pipeline-recipient-refusal`
+  (finished 2026-09-29; `create_task`/`send_message` refusal path in `internal/messaging`).
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
+  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
   entries are available. The unaddressable-pipeline-agent idea was already shipped by FS-14.R74
   (`8d8ca6e`); on 2026-09-28 its stale FS-01/03/06/14/16 and TS-04 text was reconciled and the
-  leftover refusal became `drop-pipeline-recipient-refusal.md` (FS-06.R37/A26, TS-04.R67).
+  leftover refusal shipped 2026-09-29 as `drop-pipeline-recipient-refusal` (FS-06.R37/A26, TS-04.R67).
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
@@ -77,8 +77,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** no `/fix` findings or `/review` unit is pending.
-`/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
+**Available by role:** no `/fix` findings are pending; `/review` may take
+`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -112,6 +112,13 @@ None open.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Drop the stale pipeline-stage recipient refusal (FS-06.R37/A26, TS-04.R67).**
+  Removed `pipelineRecipientRefusal` and its `send_message`/`create_task` call sites; a
+  snapshot-less stopped stage agent now gets the ordinary `recipient_not_found` wording, proven by
+  `TestSnapshotlessPipelineAgentGetsOrdinaryRefusal` (fails on the old code). Dropped the
+  `pipeline association` subcase of `TestIneligibleMailActivationIsDiscarded` and fixed the stale
+  wake-gate comments. FS-06 returns to Current. `make test` (both variants) and `make build` pass.
 
 - **2026-09-29 — Fix shared creative-workspace layout findings (FS-12.R52/R56/A29,
   TS-08.R38/R74; INV §8/§10).** Closed the unit. Finished task rows (INV §8) now recede through

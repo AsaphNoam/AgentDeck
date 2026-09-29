@@ -167,9 +167,6 @@ func (s *Server) handleSendMessage(_ context.Context, req *mcp.CallToolRequest, 
 				"message":    fmt.Sprintf("Multiple live agents match %q; address by agent_id.", in.To),
 				"candidates": amb.Candidates})
 		case errors.Is(err, state.ErrRecipientNotFound):
-			if message, diagnosed := s.pipelineRecipientRefusal(in.To); diagnosed {
-				return errResult(map[string]any{"ok": false, "error": "recipient_not_found", "message": message, "candidates": candidates})
-			}
 			return errResult(map[string]any{"ok": false, "error": "recipient_not_found",
 				"message":    fmt.Sprintf("No live agent matches %q.", in.To),
 				"candidates": candidates})
@@ -250,36 +247,6 @@ func (s *Server) deferredMailRecipients() ([]state.LiveAgent, error) {
 		out = append(out, recipient)
 	}
 	return out, nil
-}
-
-func (s *Server) pipelineRecipientRefusal(selector string) (string, bool) {
-	recipients, err := s.store.ContextRecipients()
-	if err != nil {
-		return "", false
-	}
-	agentID, _, err := state.ResolveRecipient(recipients, selector)
-	if err != nil {
-		return "", false
-	}
-	for _, recipient := range recipients {
-		if recipient.AgentID != agentID || recipient.Availability != state.AvailabilityStopped {
-			continue
-		}
-		association, err := s.store.PipelineAssociationForAgent(agentID)
-		if err == nil && association != nil {
-			s.mu.RLock()
-			projectAvailable := s.projectAvailable
-			s.mu.RUnlock()
-			if projectAvailable != nil {
-				available, gateErr := projectAvailable(recipient.Project)
-				if gateErr != nil || !available {
-					return "", false
-				}
-			}
-			return fmt.Sprintf("Agent %q is stopped and held out while associated with pipeline stage %q; resume the agent, then try again.", selector, association.StageID), true
-		}
-	}
-	return "", false
 }
 
 // --- check_messages (techspec §3.5) ---

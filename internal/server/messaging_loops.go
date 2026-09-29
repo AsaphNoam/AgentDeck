@@ -103,13 +103,12 @@ func (s *Server) executeMailActivation(ctx context.Context, activation state.Act
 	// both branches: discard the opportunity without crossing mail's
 	// non-replayable boundary.
 	//
-	// The other durable exclusions — archived agent, archived project, pipeline
-	// association — are *stopped-only* wake gates (FS-01.R33, FS-06.R22/R27), and
-	// belong to the stopped branch alone, where startStoppedMailActivation applies
-	// them through the one shared wakeCandidate/stoppedWakeGates predicate (INV
-	// §2). Repeating them here excluded running recipients the addressable set
-	// still accepts mail for: a pipeline attempt row is permanent, so a running
-	// agent that had ever run a stage silently stopped being activated forever.
+	// The other durable exclusions — archived agent, archived project — are
+	// *stopped-only* wake gates (FS-01.R33, FS-06.R22/A16), and belong to the
+	// stopped branch alone, where startStoppedMailActivation applies them through
+	// the one shared wakeCandidate/stoppedWakeGates predicate (INV §2). Repeating
+	// them here excluded running recipients the addressable set still accepts
+	// mail for. Pipeline history is never a gate (FS-14.R74, FS-06.R37).
 	agent, err := s.stateStore.ReadAgent(activation.AgentID)
 	if err != nil {
 		s.log.Debug("activation read agent failed", "agent", activation.AgentID, "err", err)

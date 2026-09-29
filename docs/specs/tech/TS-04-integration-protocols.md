@@ -814,7 +814,7 @@ malformed, unavailable or unmatched reports are ignored with bounded diagnostics
 standalone MCP elicitation fix is consumed through the existing permission lifecycle; AgentDeck adds
 no provider-specific elicitation form.
 
-**R67 `(planned)` — Recipient refusals derive from the addressable-set resolver alone.** When
+**R67 — Recipient refusals derive from the addressable-set resolver alone.** When
 `send_message` or `create_task` resolution against R26's addressable set returns not-found, the
 tool returns the ordinary `recipient_not_found` outcome and wording. The refusal path performs no
 pipeline-association lookup and no second resolution over the context-recipient set; the special
