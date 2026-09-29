@@ -43,6 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`centralize-launch-support.md`](centralize-launch-support.md) — share adapter launch support
+  with New Agent and Settings while preserving model catalogs and live-session capability handling.
+
 - [`share-creative-workspace-layout.md`](share-creative-workspace-layout.md) — finish Figma-directed
   composition, project tabs and status badges, then share the layout across all three palettes.
 

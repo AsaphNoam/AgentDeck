@@ -38,16 +38,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Assess runtime and model capability ownership.** Inspect the shipped adapter, model-catalog,
-  session, desktop, phone and pipeline boundaries before deciding whether a refactor is useful.
-  Prefer extending Codex's existing discovery and normalized capability seams over a new framework.
-  The goal is less duplicated provider knowledge; preserve provider-specific delivery, lifecycle,
-  permission and compatibility semantics. Requested 2026-09-29 from an AI-generated suggestion,
-  explicitly subject to verification against the repository. The
-  [assessment](plans/runtime-capability-assessment.md) recommends no broad refactor, only adapter-owned
-  launch support projected to New Agent/Settings; model discovery and live session capabilities
-  already have useful shared ownership. Awaiting scope confirmation before FS/TS promotion; no
-  ready change or product implementation exists.
 - **Read files from configured additional project directories.** Let an operator open files under
   explicitly configured project `add_dirs`, not arbitrary host paths. Define whether the readable
   roots come from the frozen session snapshot, how symlinks and `.git` paths are handled, and how

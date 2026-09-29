@@ -613,7 +613,46 @@ cross the API. Child tool, result, diff and permission payloads carry Runtime's 
 `tool_call_id`; the existing permission endpoint accepts that opaque value unchanged, so no provider
 child-session id or second decision route reaches HTTP.
 
+**R47 (planned) — Backend responses project adapter launch support without extending editable
+configuration.** `GET /api/backends` and successful `PUT /api/backends` responses add
+`backend_support`, a non-null object keyed by every registered backend type, independently of
+configured backend instances. Each value contains explicit `chat` and `terminal` objects with
+`available`, `effort` and `fast` booleans (no omitted false values), derived only from TS-01.R36.
+Use one projection builder for normal GET, fallback/default GET and successful PUT responses.
+Do not add a second endpoint or infer support from credential-check results.
+
+The field belongs to the response wrapper, not `config.BackendsConfig`, a backend/model entry or
+session state. Existing request bodies, catalog version, ETag/If-Match semantics, fallback behavior
+and validation errors remain unchanged. UI writes use an explicit editable-schema/field projection,
+not a spread of the response with selected fields removed; an API
+client echoing this response-only field gains no authority and it is ignored rather than persisted
+or used for validation. Catalog ETags continue to cover only editable catalog data. A support read
+does not execute a provider, refresh its catalog or mutate configuration.
+
+The browser validates editable catalog data normally and parses support metadata separately with
+a tolerant per-type/interface boundary, so a bad entry cannot fail the catalog parse or erase good
+support for another entry. The parsed field stays outside the editable schema. Missing,
+null or malformed support for the selected type/interface means unavailable metadata for the
+affected controls under FS-09.R61–R63; it must not invalidate otherwise usable catalog data or fall
+back to a provider allowlist. Distinguish missing/unusable metadata from a valid all-false support
+value so retry guidance is not shown for known unsupported options. Explicit retry refetches the
+existing catalog query without discarding unsaved input. Server and client schema changes ship
+together (R11); existing clients may ignore the additive field.
+
+`GET /api/capabilities` remains the host terminal-driver projection. TS-13.R15's phone
+runtime-options response and tailnet route permissions remain unchanged: the new desktop field
+does not authorize sending backend types, environment, credentials or paths to a phone. Test the
+actual JSON response and schema, metadata-free writes/ETags and restricted phone response under
+FS-09.A30, not a separately handwritten ideal response alone.
+
 ## 3. Interfaces & data shapes
+
+Planned additive backend response field (R47; the example shows one entry, but all registered
+types are returned):
+
+```json
+{"backend_support":{"claude-acp":{"chat":{"available":true,"effort":true,"fast":true},"terminal":{"available":true,"effort":true,"fast":false}}}}
+```
 
 Feature-owned request/response fields are specified in the owning FS, including FS-14 for pipeline
 templates, run summaries/details, and controls. Cross-cutting shapes:
@@ -664,6 +703,11 @@ integers instead of silently applying defaults.
   several operations, but uniform pre-decode bounding is a security/API backlog item.
 
 ## 6. Traceability
+
+- Planned backend support (R47): `internal/server/{handlers,config_handlers}.go`,
+  `ui/src/schemas/backends.ts`, `ui/src/features/{launch,settings}/` and
+  `ui/src/components/grid/CardContextMenu.tsx`; FS-09.A30–A32 cover
+  response serialization, browser consumption, editable-data separation and recovery.
 
 - Route inventory: `internal/server/routes.go`.
 - **Steer lifecycle (R39/R41):** `internal/server/sessions.go`

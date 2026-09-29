@@ -30,7 +30,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later. **Available:** `drop-pipeline-recipient-refusal`
   (finished 2026-09-29; `create_task`/`send_message` refusal path in `internal/messaging`).
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
+- **Work units:** `rename-product-to-deckhand.md` and `centralize-launch-support.md` are Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
@@ -39,9 +39,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   leftover refusal shipped 2026-09-29 as `drop-pipeline-recipient-refusal` (FS-06.R37/A26, TS-04.R67).
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
-  entries were merged. The 2026-09-29 runtime/model capability
-  [assessment](../plans/runtime-capability-assessment.md) recommends only a bounded projection of
-  adapter launch support for New Agent/Settings; scope confirmation is pending before FS/TS promotion.
+  entries were merged. The runtime/model capability assessment was accepted 2026-09-29 and promoted
+  to `centralize-launch-support.md` (FS-09.R60–R63, TS-01.R36, TS-03.R47); no design decision remains
+  open for that slice.
 - **Open findings:** none recorded. The 2026-09-29 usability review's phone findings (both passes)
   closed the same day and a third pass re-checked the second pass's four fixes at 390px. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
@@ -86,7 +86,8 @@ unreviewed on the operator's explicit decision. Owed: the credentialed Claude an
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
 **Available by role:** `/fix` has no recorded findings; `/review` may take
-`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
+`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand` or
+`centralize-launch-support`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -130,6 +131,15 @@ browser re-check of the four fixes passed the same day (third pass).
   its result; Moving shows a task and its own agent as two rows). Unexercised: fast-mode picker,
   Continue on an approval pause, real-device gates. Report:
   `docs/archive/reviews/usability-review-run-2026-09-29.md`.
+
+- **2026-09-29 — Design: shared adapter launch support ready.** The operator accepted the bounded
+  assessment. FS-09.R60–R63/A30–A32, TS-01.R36 and TS-03.R47 specify adapter-owned interface/setting
+  support, read-only backend response metadata, New Agent and dashboard Terminal-switch consumption,
+  and Settings repair/retry without lost drafts. `centralize-launch-support.md` is Waiting to start;
+  the source idea was removed. Model discovery, live session capability/state, permissions,
+  phone/pipeline behavior and provider wire handling stay unchanged. No active change or product-code
+  edits. Focused consistency review is resolved; `make check-specs`, design-feature/UX twin
+  comparisons and `git diff --check` pass. Implementation and its acceptance checks have not run.
 
 - **2026-09-29 — Design assessment: runtime/model capability ownership.** Inspected adapters,
   Codex/Claude catalog import, live session negotiation and desktop/phone/pipeline consumers.

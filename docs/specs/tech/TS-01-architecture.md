@@ -466,6 +466,35 @@ best-effort through the same ACP session owner before the error returns (INV §4
 background processes never transfer; copied open task state is terminally fenced at the clone
 boundary.
 
+**R36 (planned) — Adapter launch support has one owner and remains separate from session
+capabilities.** `internal/backend` owns a typed `LaunchSupport` value with `Available`, `Effort`
+and `Fast` booleans for a backend type and interface. Each registered adapter explicitly declares
+which of the existing `chat` and `terminal` interfaces it implements. One pure helper derives effort
+from that interface's `EffortDelivery` and fast from the existing chat `SessionConfigIDs` delivery
+contract; an unavailable or unknown interface/type yields all false. A hook map, executable probe,
+model name or version is not evidence of interface support. Preserve FS-09.R13/R39/R52's matrix.
+This adds no runtime registry, provider probe, callback framework or dependency from `backend`
+into `config`, `runtime` or `server`.
+
+The shared server Terminal gate used by launch/resume/switch delegates to this owner, preserving
+existing errors and pre-spawn refusal. Existing adapter support helpers derive from the same value:
+catalog effort support means effort on any available interface, and catalog fast support means
+chat fast support. `config.Model` and the shared model validators continue to own declared values;
+do not create a second model-capability record or change frozen session settings. New Agent and
+Settings consume TS-03.R47's read projection; the dashboard Switch runtime dialog consumes its
+Terminal support too, removing all callers of the browser's provider-based Terminal rule.
+Settings support refresh is separate from draft initialization: a refetch may update affordances
+but cannot reseed or truncate an unsaved catalog (FS-09.R62).
+
+This static integration support neither supersedes live ACP advertisements and R35's native session
+capabilities nor authorizes an action. Preserve fast/steering availability, clone eligibility,
+host-owned queued sends, permission policy, native resume/history-primer decisions and pipeline
+replacement validation. Provider-specific discovery, wire encoding, profile preparation and
+credentials stay at their existing specialized boundaries. No database/config migration, catalog
+auto-rewrite or new upstream capability is part of this requirement. FS-09.A30–A32 verify the
+projection and consumers; existing protocol-schema and ordered session-configuration tests remain
+the protection for the unchanged runtime boundary.
+
 ## 3. Interfaces & data shapes
 
 **Runtime interface** (`internal/runtime/runtime.go`, minimum surface):
@@ -545,6 +574,10 @@ lost.
 
 ## 6. Traceability
 
+- Planned launch support (R36): `internal/backend/adapter.go`, the shared Terminal gate in
+  `internal/server/terminal.go`, `internal/config/validate.go`, and the FS-09.A30–A32 consumers
+  in `ui/src/features/{launch,settings}/` and `ui/src/components/grid/CardContextMenu.tsx`;
+  response shape is owned by TS-03.R47.
 - Bind/loopback: `internal/server/bind.go` (`BindHost`, `assertLoopback`); `internal/server/security.go`.
 - Runtime abstraction + dispatch: `internal/runtime/runtime.go` (`Runtime`), `internal/runtime/registry.go` (`byIface`, `handleAgentExit`, `SetExitHook`).
 - Composition seam: `internal/server/launch.go` (`composeLaunch`, `resolveSkip`, `expandAddDirs`, `composeEnv`, `teardownAgentRegistration`), `resume.go` (`composeResumeSpec`), `switch.go` (`composeSwitchSpec`).

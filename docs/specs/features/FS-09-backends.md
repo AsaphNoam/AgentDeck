@@ -221,6 +221,40 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R19** — The onboarding backend step is complete only when the current default backend/default
   model probe returns `ok`; its result is cached for 60 seconds and invalidated by a backend save.
 
+### Shared launch support
+
+- **R60** `(planned)` — Backend catalog responses include read-only launch support for every
+  registered backend type, including types with no configured backend. For each of chat and
+  terminal, support reports whether that interface is implemented and whether it can deliver effort
+  and fast settings. This describes AgentDeck's integration, not executable installation, account
+  entitlement, a model's declared choices, or a live session's availability. The existing support
+  matrix in R13/R39/R52 is unchanged. The metadata is not user-editable configuration and creates
+  no stored preference, session data, or retention change.
+- **R61** `(planned)` — New Agent uses R60's selected backend/interface support for its launch
+  choices. Terminal still also requires the host's terminal availability; effort choices require
+  both interface support and the model's declared levels, and fast requires both interface support
+  and the model's declaration. Existing model/default/effort selection and fast-reset behavior is
+  preserved. Missing or unusable support metadata offers no optional Terminal/effort/fast action,
+  explains that launch options could not be loaded and offers retry; it does not infer support from
+  a backend name or silently submit an already selected unsupported setting. An existing selection
+  needing support verification blocks launch until support is refreshed or the person clears it.
+  This does not add a support gate to an otherwise ordinary chat launch without optional settings.
+  Server validation and live session checks remain authoritative.
+- **R62** `(planned)` — Settings offers new effort declarations only when the backend supports
+  effort on at least one implemented interface, and offers a new fast declaration only when chat
+  supports fast. An unsupported declaration already in the draft, including after a backend-type
+  change, stays visible with the reason and an explicit way to clear it. Clearing effort also clears
+  its default; clearing fast turns it off. Changing type, refreshing support, or hiding a control
+  never silently removes model declarations or unrelated edits. When support cannot be loaded,
+  prevent new declarations and offer retry while preserving the draft and explicit clearing actions.
+  Existing field-level server validation still rejects an invalid save; support metadata grants no
+  bypass. This qualifies R37/R51's Settings controls without changing which catalogs are valid.
+- **R63** `(planned)` — The dashboard's Switch runtime dialog also uses R60's backend terminal
+  support combined with host availability, replacing its use of the browser Terminal allowlist.
+  When support metadata is unavailable, offer retry and withhold an unverified Terminal switch
+  without silently changing the selected target. Existing backend/model/effort choices, reset rules,
+  running-agent eligibility and server-side switch/rollback behavior remain unchanged.
+
 ## 3. States & transitions
 
 - **R20** — Saving Settings transitions the submitted catalog through validation → deterministic
@@ -522,7 +556,41 @@ Configuration-source federation for Claude/Codex is FS-08.
   packaged executable/version and explains the mismatch before launch. *Verified by* Codex catalog,
   startup autosync, release-wrapper, backend-response, and New Agent UI tests.
 
+- **A30** `(planned)` (R60) — GET and successful PUT catalog responses report support for all
+  registered types even with an empty catalog: Claude chat supports effort/fast, Claude terminal
+  supports effort but not fast, Codex chat supports effort/fast, OpenCode/OpenHands chat supports
+  neither, and all non-Claude terminal interfaces are unavailable with both setting flags false.
+  The response parses through the real browser schema; missing/null/malformed support for one
+  interface leaves the catalog and other valid support entries usable, and differs from known
+  all-false support. The actual UI PUT JSON excludes the response-only field even when given a
+  response object; an external client's echoed field is ignored. A save does not persist metadata
+  or change the catalog ETag merely because support metadata changed. The phone runtime-options projection
+  retains its existing allowlisted fields. *Verify by* adapter-registry contract tests using this
+  matrix as the oracle, HTTP serialization/client-schema tests, persistence/ETag tests and the
+  existing phone projection regression.
+- **A31** `(planned)` (R61, R63) — New Agent combines host terminal availability, adapter/interface
+  support and model declarations, preserves default/reset behavior, and cannot submit stale optional
+  settings while support is missing. Retry restores choices without overwriting unrelated input;
+  ordinary chat without optional settings remains usable. The dashboard Switch runtime dialog
+  uses the same Terminal support and preserves its selected target during missing-metadata retry.
+  Existing A3 launch/resume/switch refusals still occur before spawning. *Verify by* New Agent and
+  CardContextMenu component tests for host/support/model combinations and missing metadata,
+  lifecycle gate tests, and a focused rendered New Agent/Terminal-switch check.
+- **A32** `(planned)` (R62) — In Settings, a supported model can gain effort/fast declarations;
+  changing its backend to OpenCode preserves and explains those now-unsupported values, offers
+  explicit clearing, and permits a valid save after clearing. Changing back before clearing retains
+  the values. An empty unsupported model cannot gain declarations through the controls. A support
+  retry preserves unsaved model/env edits and does not persist response metadata. *Verify by*
+  BackendsEditor/ModelRow tests covering type change, clear, failed save and missing metadata, plus
+  a focused rendered edit→type change→repair→save journey.
+
 ## 6. Deviations & open decisions
+
+- **Bounded launch-support projection is specified, not shipped.** R60–R63 and A30–A32 cover the
+  approved adapter-support projection, New Agent, Settings and the existing Terminal-switch control.
+  Existing model discovery,
+  live-session controls, queueing, permissions, resume/replacement eligibility and the restricted
+  phone catalog are unchanged. No product decision remains open for this slice.
 
 - **Claude configured-model sync is deliberately not full discovery (R45).** Claude exposes
   no stable local full-catalog contract equivalent to Codex's cache. The planned sync therefore

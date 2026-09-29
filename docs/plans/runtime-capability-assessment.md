@@ -1,7 +1,11 @@
 # Runtime and model capability assessment
 
 **Date:** 2026-09-29 · **Baseline:** `367a433`
-**State:** Recommendation; not a ready change or an authoritative specification.
+**State:** Assessment accepted 2026-09-29; retained rationale, not an authoritative specification.
+The bounded design is now [ready to start](../ready-changes/centralize-launch-support.md), governed
+by FS-09.R60–R63, TS-01.R36 and TS-03.R47. Implementation has not started. The promotion call-site
+check also included the dashboard Switch runtime dialog, which shares the browser Terminal rule;
+the baseline assessment below predates that additional consumer check.
 **Origin:** Operator requested a skeptical assessment of an AI-generated architecture suggestion.
 
 ## Recommendation
@@ -93,7 +97,7 @@ Keep three distinct facts, each with one owner:
   capabilities, fast/steering availability and clone affordance. Live advertisements and lifecycle
   state remain authoritative at execution time. Do not fold them into static backend metadata.
 
-Proposed API boundary, subject to scope confirmation: add a read-only adapter-support map to the
+Accepted API boundary: add a read-only adapter-support map to the
 existing desktop backend response, keyed by registered backend type and covering all four types
 so Settings can edit an unsaved backend/type. Keep it outside editable `BackendsConfig`; never save
 it into `backends.json` or include it in the catalog ETag. Existing request bodies and model fields
@@ -108,7 +112,7 @@ Pipelines and tasks retain their current model-neutral assignments and shared la
 In Settings, unsupported new effort/fast declarations would no longer be offered. If an existing
 draft contains them, keep them visible with an explanation and a way to remove them; never silently
 erase data on a type change. This is the only proposed visible behavior adjustment beyond sourcing
-existing launch affordances from the server. It needs feature-scope confirmation before promotion.
+existing launch affordances from the server. The operator accepted this scope on 2026-09-29.
 
 ## Migration boundaries and exclusions
 
@@ -129,8 +133,8 @@ automatic rewrite of old models, or new provider support belongs in this change.
 
 ## Migration and verification
 
-1. Confirm the bounded behavior and additive read-only API projection. Extend FS-09 and TS-01/03
-   where necessary; use TS-04's existing delivery contract. No new FS/TS family is needed. Keep
+1. The bounded behavior and additive read-only API projection are confirmed and specified in
+   FS-09 and TS-01/03; use TS-04's existing delivery contract. No new FS/TS family is needed. Keep
    FS-03 and TS-13 semantics unchanged. Relevant invariants: INV §1/§2/§3/§10/§11/§12/§17.
 2. Define adapter launch support using existing delivery declarations. Route the current server
    Terminal gate through it, preserving rejection codes and all four backends' behavior.
