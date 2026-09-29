@@ -210,6 +210,29 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	}
 }
 
+// Every tailnet mutation body is bounded before its handler runs, including
+// actions with no field filter (TS-13.R5/R6, INV §16).
+func TestRemoteMutationBodyIsBounded(t *testing.T) {
+	s := testServer(t, true)
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+
+	big := `{"text":"` + strings.Repeat("x", remoteBodyLimit) + `"}`
+	for _, path := range []string{"/api/sessions/nope/prompt", "/api/sessions/nope/steer", "/api/tasks"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, phoneRequest(http.MethodPost, path, big, token))
+		if rec.Code != http.StatusRequestEntityTooLarge || errorCode(t, rec) != codeRemoteBodyTooLarge {
+			t.Errorf("oversized POST %s = %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	// A normal body still reaches the shared handler.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions/nope/steer", `{"text":"hi"}`, token))
+	if code := errorCode(t, rec); code != "not_found" {
+		t.Fatalf("normal body blocked: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestRemoteAdmissionCannotOutliveRevoke(t *testing.T) {
 	devices := newRemoteDevices()
 	validated := make(chan struct{})

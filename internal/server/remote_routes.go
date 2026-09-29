@@ -109,6 +109,7 @@ const (
 	codeRemoteUnpaired          = "remote_unpaired"
 	codeRemoteDeviceMismatch    = "remote_device_mismatch"
 	codeRemoteForbidden         = "remote_forbidden"
+	codeRemoteBodyTooLarge      = "remote_body_too_large"
 )
 
 // remoteDeviceCookie is the phone's credential cookie (TS-13.R7).
@@ -268,7 +269,7 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 	// Everything under /api/ needs a paired device. Other GETs are the phone
 	// app itself, which an unpaired device may load to learn it must pair
 	// (FS-20.R7); it carries no agent, task, project, or transcript data.
-	api, static := s.remoteAuth(authed), s.phoneStaticHandler()
+	api, static := s.remoteAuth(remoteBodyFilter(authed)), s.phoneStaticHandler()
 	outer.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/"):
@@ -389,21 +390,43 @@ func (s *Server) remoteAuth(next http.Handler) http.Handler {
 	})
 }
 
+// remoteBodyFilter buffers every authenticated tailnet mutation body up to
+// remoteBodyLimit and refuses a larger one before any route filter or handler
+// runs (TS-13.R5/R6, INV §16).
+func remoteBodyFilter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, remoteBodyLimit+1))
+		if err != nil {
+			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "unreadable request body")
+			return
+		}
+		if len(body) > remoteBodyLimit {
+			writeRemoteError(w, http.StatusRequestEntityTooLarge, codeRemoteBodyTooLarge, "request body too large")
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		next.ServeHTTP(w, r)
+	})
+}
+
 // remoteFieldFilter rejects a body carrying any field the phone's forms do not
-// set, before any process work (TS-13.R6).
+// set, before any process work (TS-13.R6). remoteBodyFilter has bounded it.
 func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 	ok := map[string]bool{}
 	for _, f := range allowed {
 		ok[f] = true
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(io.LimitReader(r.Body, remoteBodyLimit+1))
-		if err != nil || len(body) > remoteBodyLimit {
-			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "request body too large")
-			return
-		}
+		body, err := io.ReadAll(r.Body)
 		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(body, &fields); err != nil {
+		if err == nil {
+			err = json.Unmarshal(body, &fields)
+		}
+		if err != nil {
 			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "invalid JSON body")
 			return
 		}
@@ -420,6 +443,7 @@ func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 
 // remotePipelineRuntimeFilter keeps the desktop-owned runtime assignments at
 // their empty/default phone representation (TS-13.R5/R6, FS-20.R15).
+// remoteBodyFilter has bounded the body.
 func remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 	type assignment struct {
 		Backend string `json:"backend"`
@@ -447,16 +471,15 @@ func remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 		return json.Unmarshal(raw, &value) == nil && empty(value)
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(io.LimitReader(r.Body, remoteBodyLimit+1))
-		if err != nil || len(body) > remoteBodyLimit {
-			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "request body too large")
-			return
-		}
+		body, err := io.ReadAll(r.Body)
 		var request struct {
 			Orchestrator         json.RawMessage            `json:"orchestrator"`
 			DedicatedAssignments map[string]json.RawMessage `json:"dedicated_assignments"`
 		}
-		if err := json.Unmarshal(body, &request); err != nil {
+		if err == nil {
+			err = json.Unmarshal(body, &request)
+		}
+		if err != nil {
 			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "invalid JSON body")
 			return
 		}
