@@ -23,10 +23,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
-  (finished 2026-09-25) await `/review`; the operator shipped them unreviewed in `v0.6.0`. Review
-  `add-studio-skin` against `e474d8a..1d78e1d` and `complete-studio-composition` against
-  `9ae10ee..4bb5b2e`; `71c2810` is the latter's evidence-only handoff follow-up, not another unit.
-  FS-12.A19–A23 and TS-08.R68 remain planned despite the shipped requirements.
+  (finished 2026-09-25) were reviewed together on 2026-09-29 and remain open as one `/fix` unit
+  with the findings below. The review covered `e474d8a..1d78e1d` and `9ae10ee..4bb5b2e` while
+  excluding unrelated substantive and administrative commits; `71c2810` remains evidence-only.
   `share-creative-workspace-layout` finished 2026-09-28 and awaits `/review`; its substantive
   commits are `0b31c9a`, `ddab692` and the closure commit named
   `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
@@ -46,9 +45,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** `add-mobile-remote-control` has seven Must-fix and two Worth-fixing findings
-  below. The injected-steer lifetime edge case is still named in prose but was never recorded as a
-  finding; it needs `/investigate-bug` before `/fix` can take it.
+- **Open findings:** the combined Studio unit has one Must-fix and one Worth-fixing finding below;
+  `add-mobile-remote-control` has two remaining Must-fix findings below. The injected-steer lifetime
+  edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
+  before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
 - **Bug reports:** BR-6 closed 2026-09-28 (file links: rendered-file relative links, `name:line`,
   `:start-end`, case-variant roots, refusal logging). BR-7 closed 2026-09-28: live shared workers
@@ -88,8 +88,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take `add-mobile-remote-control`; `/review` may take
-`add-studio-skin`, `complete-studio-composition` or `share-creative-workspace-layout`.
+**Available by role:** `/fix` may take `add-mobile-remote-control` or the combined Studio unit;
+`/review` may take `share-creative-workspace-layout`.
 `/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -107,6 +107,24 @@ None for shared creative-workspace implementation. Its approved system check pas
 correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
+
+### add-studio-skin + complete-studio-composition (2026-09-29) — **Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix** — the shipped Studio requirements still lack their required independent acceptance
+  gate; FS-12.A19–A23, TS-08.R64/R68, INV §10/§17. `ui/src/presentation/VisualMatrix.tsx:248-286`
+  carries one paused pipeline, one archive row and one backend-settings fixture, while
+  `ui/src/presentation/VisualMatrix.test.tsx:80-105` proves DOM structure rather than rendered CSS,
+  interaction parity or route/state coverage. The archived browser pass did not establish the
+  requested 1024px viewport, the remaining long/dense interaction states, a non-dashboard
+  desaturated comparison or a genuine finished-run timeline. Run and record the remaining matched
+  Core/Sky & Grove/Studio route-state matrix at confirmed 1024px and wide viewports, including
+  focus, contrast, overflow and real expanded-chat behavior; do not treat the later shared-layout
+  acceptance as closing this Studio-specific debt.
+- **Worth fixing** — the shipped ornament is materially stronger than its contract; FS-12.R43,
+  TS-08.R62, INV §10/§17. `ui/src/styles/skins/studio.css:54-57` renders the open-canvas dot grid
+  at `opacity: 0.18`, while R62 specifies approximately 10%. Selecting Studio therefore shows an
+  almost doubled background treatment on every open canvas. Bring the opacity near `0.10` and add
+  a rendered or independent CSS-contract check so the visual value cannot drift again.
 
 ### add-mobile-remote-control, second pass (2026-09-29) — **Fix model:** difficult — Codex Sol.
 
@@ -134,6 +152,17 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Review Studio skin and composition together (FS-12.R42–R49/A18–A23,
+  TS-02.R36, TS-03.R45, TS-08.R61–R68; INV §1–§17).** One Must-fix acceptance-evidence gap and
+  one Worth-fixing dot-opacity mismatch keep the grouped unit open. Appearance persistence,
+  optimistic rollback, finite-id lockstep, local stylesheet wiring, neutral presentation hooks,
+  semantic DOM order and Core/Sky preservation otherwise match the requirements. INV §1–§3,
+  §8, §10–§11, §13 and §17 had applicable surfaces and no other finding; §4–§7, §9,
+  §12 and §14–§16 had none. Fix model: medium — Codex Terra or Claude Opus. The 17 focused UI
+  tests, 37 style/contract checks, focused config and server appearance tests, `make check-specs`
+  and diff checks pass. The broader server package reached only the already-documented
+  `TestContextSharingStartsNoModelTurn` full-load flake.
 
 - **2026-09-29 — Fix add-mobile-remote-control second-pass review (in progress).** Task controls
   now come from one shared FS-16.R22/R23 eligibility helper on desktop and phone (INV §2/§8/§10).
