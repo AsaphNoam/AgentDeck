@@ -18,8 +18,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28 and its review findings
-  closed 2026-09-29.
+- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28; its first review closed
+  2026-09-29, and a requested second-pass review reopened it for `/fix` the same day.
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -31,6 +31,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   commits are `0b31c9a`, `ddab692` and the closure commit named
   `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
   Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
+  `add-mobile-remote-control` was reviewed again 2026-09-29 across its implementation and first
+  review fix; the second-pass findings remain open below.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` and
@@ -44,8 +46,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** None. The injected-steer lifetime edge case is still named in prose but was
-  never recorded as a finding; it needs `/investigate-bug` before `/fix` can take it.
+- **Open findings:** `add-mobile-remote-control` has seven Must-fix and two Worth-fixing findings
+  below. The injected-steer lifetime edge case is still named in prose but was never recorded as a
+  finding; it needs `/investigate-bug` before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
 - **Bug reports:** BR-6 closed 2026-09-28 (file links: rendered-file relative links, `name:line`,
   `:start-end`, case-variant roots, refusal logging). BR-7 closed 2026-09-28: live shared workers
@@ -85,8 +88,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/review` may take `add-studio-skin`, `complete-studio-composition` or
-`share-creative-workspace-layout`.
+**Available by role:** `/fix` may take `add-mobile-remote-control`; `/review` may take
+`add-studio-skin`, `complete-studio-composition` or `share-creative-workspace-layout`.
 `/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -105,7 +108,64 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-None.
+### add-mobile-remote-control, second pass (2026-09-29) — **Fix model:** difficult — Codex Sol.
+
+- **Must fix** — confirmed unbounded normal-use path; FS-20.R13, INV §16.
+  `ui/src/remote/AgentScreen.tsx:138-155`, `internal/server/sessions.go:407-426`, and
+  `internal/transcript/reader.go:39-57` read, decode, retain, normalize, and copy the complete
+  durable transcript on every phone refresh, then limit only the rendered tail. Long-lived agents
+  can therefore make one ordinary phone conversation request consume unbounded server and browser
+  memory. Give the remote transcript surface a byte/event-bounded window with continuation, keep
+  permission/latest-message derivation correct at the boundary, and cover a transcript larger than
+  the window.
+- **Must fix** — confirmed unavailable-action defect; FS-20.R16, INV §8.
+  `ui/src/remote/AgentScreen.tsx:105-116` passes a no-op annotation callback into the shared diff,
+  while `ui/src/components/chat/renderers/DiffBlock.tsx:8-35` still tells phone users to select
+  lines and presents an **Annotate lines** button. The visible action silently does nothing even
+  though annotate-and-assign is desktop-only. Make annotation capability explicit in the shared
+  renderer, hide its selection affordance on phone, and add a phone diff regression.
+- **Must fix** — confirmed task-state contract defect; FS-20.R14, FS-16.R22/R23, INV §8/§10.
+  `ui/src/remote/WorkScreens.tsx:71-138` offers **Record result** for every unfinished task although
+  only `running` and `interrupted` accept it, and offers **Re-arm** only for `dependency_failed`
+  although `armed` and `ready` accept it too. Render task controls from the specified eligibility
+  matrix and test every relevant state.
+- **Must fix** — confirmed send-time notification-policy defect; TS-13.R11, INV §1/§15.
+  `internal/server/remote_push.go:180-212,259-320` checks remote enablement and notification mutes
+  only before enqueue. A queued notification, including a retry, can still send after Remote is
+  disabled or its type is muted because `pushNote` loses the classification and delivery rereads
+  only devices. Preserve the classification, revalidate global and type policy before every send
+  attempt, and test disable/mute while queued and during retry.
+- **Must fix** — confirmed stale-request side-effect race; FS-20.R14/R24/A7, INV §5/§15.
+  `internal/server/pipeline_handlers.go:309-335` repairs task cleanup and invokes external cleanup
+  effects before `internal/pipeline/actions.go:322-339` checks the submitted run revision. Two
+  desktop/phone repairs, or one stale phone request, can mutate cleanup and then return
+  `revision_conflict`. Claim or revalidate the run generation durably before any member mutation or
+  external effect, and add a concurrent regression proving the losing request performs no effects.
+- **Must fix** — confirmed remote runtime-policy bypass; FS-20.R14/R16, TS-13.R5/R6, INV §14.
+  `internal/server/remote_routes.go:55-62,237-251` applies its runtime filter only to pipeline start,
+  while `internal/server/pipeline_handlers.go:262-279` accepts the replacement orchestrator's
+  backend, model, effort, and fast values verbatim. A crafted paired phone can select arbitrary
+  replacement runtime settings even though runtime choices are desktop-only. Resolve the standing
+  assignment server-side or require an exact match before handler work, and test changed and
+  unknown nested fields leave the run untouched.
+- **Must fix** — confirmed remote dependency-authority bypass; FS-20.R14, TS-13.R6, INV §14.
+  `internal/server/remote_routes.go:47-53,237-251` sends phone re-arm requests directly to
+  `internal/server/task_handlers.go:507-527`, whose shared contract accepts any valid arm set. A
+  crafted paired phone can therefore rewrite a task onto different prerequisites rather than only
+  reuse its current prerequisites or remove them. Accept only an empty set or an exact structural
+  match to the persisted arms, and test that a changed task, signal, or outcome arm is rejected
+  without mutating the task.
+- **Worth fixing** — confirmed request-bound gap; TS-13.R5/R6, INV §16.
+  `internal/server/remote_routes.go:24-62,392-418` bounds only routes with a field list (plus
+  pipeline start); prompt, steer, permission, task controls, and pipeline controls use unbounded
+  shared decoders. An authenticated buggy or crafted phone can make these tailnet endpoints retain
+  arbitrarily large JSON bodies. Apply one uniform remote mutation-body limit before route-specific
+  filters and add oversized-body coverage for an otherwise unfiltered action.
+- **Worth fixing** — confirmed unbounded adversarial-state path; TS-13.R8, INV §16.
+  `internal/server/remote_pairing.go:64-69,244-269` removes an expired failure entry only when that
+  same peer retries. Failed claims from distinct tailnet peers can therefore grow `failures`
+  without bound despite the code's bounded comment. Prune expired entries and impose a hard cap or
+  bounded eviction policy; test more unique failing peers than the cap.
 
 ## Design consistency notes
 
@@ -116,6 +176,15 @@ None.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Re-review add-mobile-remote-control (INV §1, §5, §8, §10, §14–§16).** Seven
+  Must-fix and two Worth-fixing findings reopened the unit: unbounded transcript retrieval, a dead
+  phone annotation affordance, wrong task-action eligibility, push policy not rechecked at send
+  time, cleanup repair effects before revision validation, pipeline replacement runtime override,
+  arbitrary mobile re-arm dependencies, unbounded remote mutation bodies, and an unbounded pairing
+  failure map. Fix model: difficult — Codex Sol. `make test`, UI 516 tests, UI production build,
+  `make build`, and focused remote/server race tests pass; the race run required approved loopback
+  access. Real tailnet, Android, iPhone, and keep-awake gates remain owed.
 
 - **2026-09-29 — Fix add-mobile-remote-control review (INV §1 boundary reset; §4 teardown;
   §5 atomic claim; §8 bounded user data; §9 durable files; §10 shipped wiring; §11 serialization;
