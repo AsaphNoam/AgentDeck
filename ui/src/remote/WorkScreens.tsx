@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TaskArmInput } from "../api/tasks";
 import {
   continuePipelineRun,
   getPipelineRun,
+  listPipelineRuns,
   repairPipelineCleanup,
   replacePipelineOrchestrator,
   retryPipelineRun,
   stopPipelineRun,
 } from "../api/pipelines";
-import { taskActions, type Task, type TaskArm } from "../schemas/task";
+import { WORK_RESULT_OUTCOMES, taskActions, type Task, type TaskArm } from "../schemas/task";
 import { phoneFetch } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
@@ -47,13 +49,125 @@ function OpenConversation({ agentId }: { agentId?: string }) {
   );
 }
 
-const armInput = (arm: TaskArm) => ({
-  kind: arm.kind,
-  source_kind: arm.source_kind,
-  source_id: arm.source_id,
-  satisfying_outcomes: arm.satisfying_outcomes,
-  signal_name: arm.signal_name,
+type SourceKind = "task" | "pipeline_run";
+type ArmDraft = { key: number; kind: TaskArm["kind"]; source_kind: SourceKind; source_id: string; satisfying_outcomes: string[]; signal_name: string };
+
+let nextArmKey = 0;
+const armDraft = (arm?: TaskArm): ArmDraft => ({
+  key: nextArmKey++,
+  kind: arm?.kind ?? "work_result",
+  source_kind: arm?.source_kind === "pipeline_run" ? "pipeline_run" : "task",
+  source_id: arm?.source_id ?? "",
+  satisfying_outcomes: arm?.satisfying_outcomes ?? ["success"],
+  signal_name: arm?.signal_name ?? "",
 });
+const armInput = (arm: ArmDraft): TaskArmInput =>
+  arm.kind === "signal"
+    ? { kind: "signal", signal_name: arm.signal_name.trim() }
+    : { kind: "work_result", source_kind: arm.source_kind, source_id: arm.source_id, satisfying_outcomes: arm.satisfying_outcomes };
+
+/** RearmEditor starts from the task's current prerequisites and submits the
+ *  complete replacement set; the Mac is the one graph/state validator, and a
+ *  refusal keeps the draft (FS-20.R30, FS-16.R23). */
+function RearmEditor({ task, disabled, run }: { task: Task; disabled: boolean; run: ReturnType<typeof useAction>["run"] }) {
+  const [arms, setArms] = useState(() => (task.arms ?? []).map(armDraft));
+  const tasks = useQuery({
+    queryKey: ["tasks", task.project],
+    queryFn: () => phoneFetch<{ tasks: Task[] }>(`/api/tasks?project=${encodeURIComponent(task.project)}`),
+  });
+  const runs = useQuery({ queryKey: ["runs"], queryFn: () => listPipelineRuns() });
+  const sources: Record<SourceKind, { id: string; label: string }[]> = {
+    task: (tasks.data?.tasks ?? []).filter((item) => item.task_id !== task.task_id).map((item) => ({ id: item.task_id, label: `${item.display_name} · ${item.state.replace("_", " ")}` })),
+    pipeline_run: (runs.data?.runs ?? []).filter((item) => item.project === task.project).map((item) => ({ id: item.run_id, label: `${item.display_name || item.template_id} · ${item.state}` })),
+  };
+  const update = (key: number, change: Partial<ArmDraft>) => setArms((current) => current.map((arm) => (arm.key === key ? { ...arm, ...change } : arm)));
+
+  return (
+    <form
+      className="phone-card phone-form"
+      aria-label="Re-arm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void run(() => post(`/api/tasks/${encodeURIComponent(task.task_id)}/rearm`, { arms: arms.map(armInput) }));
+      }}
+    >
+      <p className="phone-card-kicker">Re-arm</p>
+      <p className="phone-meta">Re-arm replaces every prerequisite with the list below. An empty list removes them all.</p>
+      {arms.map((arm, index) => {
+        const label = `Prerequisite ${index + 1}`;
+        const options = sources[arm.source_kind];
+        return (
+          <fieldset key={arm.key} className="phone-arm" aria-label={label}>
+            <legend>{label}</legend>
+            <label className="phone-field">
+              Wait for
+              <select
+                value={arm.kind === "signal" ? "signal" : arm.source_kind}
+                onChange={(event) =>
+                  event.target.value === "signal"
+                    ? update(arm.key, { kind: "signal" })
+                    : update(arm.key, { kind: "work_result", source_kind: event.target.value as SourceKind, source_id: "", satisfying_outcomes: ["success"] })
+                }
+              >
+                <option value="task">A task's result</option>
+                <option value="pipeline_run">A pipeline run's result</option>
+                <option value="signal">A named signal</option>
+              </select>
+            </label>
+            {arm.kind === "signal" ? (
+              <label className="phone-field">
+                Signal name
+                <input value={arm.signal_name} onChange={(event) => update(arm.key, { signal_name: event.target.value })} />
+              </label>
+            ) : (
+              <>
+                <label className="phone-field">
+                  {arm.source_kind === "task" ? "Task" : "Pipeline run"}
+                  <select value={arm.source_id} onChange={(event) => update(arm.key, { source_id: event.target.value })}>
+                    <option value="">Choose…</option>
+                    {arm.source_id && !options.some((option) => option.id === arm.source_id) && <option value={arm.source_id}>{arm.source_id}</option>}
+                    {options.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="phone-arm-outcomes" role="group" aria-label={`${label} outcomes`}>
+                  {WORK_RESULT_OUTCOMES[arm.source_kind].map((outcome) => (
+                    <label key={outcome.value}>
+                      <input
+                        type="checkbox"
+                        checked={arm.satisfying_outcomes.includes(outcome.value)}
+                        onChange={(event) =>
+                          update(arm.key, {
+                            satisfying_outcomes: event.target.checked
+                              ? [...arm.satisfying_outcomes, outcome.value]
+                              : arm.satisfying_outcomes.filter((value) => value !== outcome.value),
+                          })
+                        }
+                      />
+                      {outcome.label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+            <button type="button" className="phone-link" onClick={() => setArms((current) => current.filter((item) => item.key !== arm.key))}>
+              Remove {label.toLowerCase()}
+            </button>
+          </fieldset>
+        );
+      })}
+      <button type="button" onClick={() => setArms((current) => [...current, armDraft()])}>
+        Add prerequisite
+      </button>
+      <button type="submit" className="phone-primary" disabled={disabled}>
+        Re-arm
+      </button>
+    </form>
+  );
+}
 
 export function TaskScreen({ taskId }: { taskId: string }) {
   const offline = useConnection((state) => state.link !== "connected");
@@ -93,22 +207,15 @@ export function TaskScreen({ taskId }: { taskId: string }) {
             Retry
           </button>
         )}
-        {actions.rearm && (
-          <>
-            <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: (t.arms ?? []).map(armInput) }))}>
-              Re-arm with its prerequisites
-            </button>
-            <button type="button" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/rearm`, { arms: [] }))}>
-              Re-arm without prerequisites
-            </button>
-          </>
-        )}
         {actions.cancel && (
           <button type="button" className="phone-danger" disabled={disabled} onClick={() => void run(() => post(`/api/tasks/${id}/cancel`))}>
             Cancel task
           </button>
         )}
       </div>
+      {/* Keyed by revision: an accepted Re-arm resets the draft to the new
+          arms, while a refusal leaves the revision and the draft untouched. */}
+      {actions.rearm && <RearmEditor key={t.revision} task={t} disabled={disabled} run={run} />}
       {actions.recordResult && (
         <form
           className="phone-card phone-form"

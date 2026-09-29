@@ -119,7 +119,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   desktop-only.
 - **R17 — The app is live while open.** Every view updates without refreshing while the
   phone is connected, and catches up to current state after reconnecting.
-- **R30 (planned) — Re-arm can edit prerequisites on the phone.** On an `armed`, `ready`, or
+- **R30 — Re-arm can edit prerequisites on the phone.** On an `armed`, `ready`, or
   `dependency_failed` task, the Re-arm flow starts from the task's current arms and lets the person
   add, remove, or change work-result and named-signal prerequisites before submitting the complete
   replacement set. The Mac applies the same project, source, outcome, cycle, cardinality, and state
@@ -247,9 +247,8 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or
   `pmset -g assertions` check has run. Their automated halves pass.
-- R30–R32 and A9 are approved but unshipped. The current phone offers only reusing or removing task
-  prerequisites, has no replacement-runtime picker or safe runtime catalog, and renders a diff
-  annotation action whose callback is a no-op.
+- R31–R32 and A9 are approved but unshipped. The current phone has no replacement-runtime picker or
+  safe runtime catalog, and renders a diff annotation action whose callback is a no-op.
 
 ## 7. Traceability
 

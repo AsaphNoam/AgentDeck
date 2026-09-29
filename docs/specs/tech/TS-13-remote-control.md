@@ -156,7 +156,7 @@ the installed app on iOS.
   includes the existing `POST /api/sessions/{id}/annotations` handler for FS-20.R32. The remote
   chain bounds and schema-validates its body before the shared FS-13 validation and commit-before-
   delivery path; it adds no phone-only annotation representation or delivery mechanism.
-- **R17 (planned) — Remote Re-arm has the desktop's value authority.** A paired phone may submit
+- **R17 — Remote Re-arm has the desktop's value authority.** A paired phone may submit
   any complete arm set that the existing `POST /api/tasks/{id}/rearm` handler accepts under
   FS-16.R15/R23, not only the current set or an empty set. The remote chain bounds and
   schema-validates the request, while the shared handler remains the one graph/state validator
@@ -198,9 +198,9 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
 
-- R15–R17 are approved but unshipped. Until they land, no secret-free runtime-options route exists,
-  annotations remain remote-denied, and the phone UI does not expose the broader Replace/Re-arm
-  choices even though their shared handlers already accept those request values.
+- R15–R16 are approved but unshipped. Until they land, no secret-free runtime-options route exists,
+  annotations remain remote-denied, and the phone UI does not expose the broader Replace choices
+  even though its shared handler already accepts those request values.
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.
 - Face ID or fingerprint app lock and native apps are out of scope (FS-20 §6).

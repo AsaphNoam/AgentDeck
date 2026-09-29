@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -11,14 +11,21 @@ import type { AgentState } from "../api/types";
 
 const calls: string[] = [];
 let taskState = "interrupted";
+let taskArms: unknown[] = [];
+let rearmRefusal: string | null = null;
 
 const task = () => ({
   task_id: "t1", project: "my-app", display_name: "Fix login", instruction: "x", target_kind: "launch", role: "implementer",
   fast: false, state: taskState, outcome: "", attention_reason: "The agent exited.", created_by_kind: "person", assigned_agent_id: "a9",
   pending_release: false, continuation_pending: false, pending_yield: false, wait_version: 0, resume_needed: false,
   cleanup_unsafe: false, start_attempt_count: 1, revision: 3, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  arms: [], retry_eligible: taskState === "interrupted", attachments: [],
+  arms: taskArms, retry_eligible: taskState === "interrupted", attachments: [],
 });
+const otherTask = { ...task(), task_id: "t0", display_name: "Build API", state: "finished", outcome: "failure" };
+const runSummary = {
+  run_id: "r0", template_id: "ship", display_name: "Nightly", project: "my-app", state: "completed", revision: 1, pending_action: "",
+  current_stage_id: "", current_agent_id: "", attention_reason: "", final_outcome: "success", updated_at: "", diagnostics: [],
+};
 
 const template = {
   version: 2, title: "Ship", orchestrator_role: "orchestrator",
@@ -39,9 +46,12 @@ const runDetail = {
 
 const server = setupServer(
   http.get("/api/tasks/t1", () => HttpResponse.json(task())),
+  http.get("/api/tasks", () => HttpResponse.json({ tasks: [task(), otherTask] })),
+  http.get("/api/pipeline-runs", () => HttpResponse.json([runSummary])),
   http.post("/api/tasks/t1/:action", async ({ params, request }) => {
     calls.push(`task ${String(params.action)} ${await request.text()}`);
     if (params.action === "cancel") return HttpResponse.json({ error: { code: "task_not_cancellable", message: "a finished task cannot be cancelled" } }, { status: 409 });
+    if (params.action === "rearm" && rearmRefusal) return HttpResponse.json({ error: { code: "task_arm_cycle", message: rearmRefusal } }, { status: 409 });
     return HttpResponse.json(task());
   }),
   http.get("/api/pipeline-runs/r1", () => HttpResponse.json(runDetail)),
@@ -79,6 +89,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   calls.length = 0;
   taskState = "interrupted";
+  taskArms = [];
+  rearmRefusal = null;
   useConnection.setState({ link: "connected", agents: {}, revision: 0 });
   window.history.replaceState(null, "", "/");
 });
@@ -103,11 +115,51 @@ describe("phone task and run actions", () => {
     expect(screen.getByRole("button", { name: "Open conversation" })).toBeInTheDocument();
   });
 
-  it("re-arms a dependency-failed task with or without prerequisites", async () => {
+  it("edits prerequisites from the current arms and submits the complete replacement set", async () => {
     taskState = "dependency_failed";
+    taskArms = [{ arm_id: "a1", task_id: "t1", kind: "work_result", source_kind: "task", source_id: "t0", satisfying_outcomes: ["success"], state: "unsatisfiable" }];
     renderWith(<TaskScreen taskId="t1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Re-arm without prerequisites" }));
+    const first = await screen.findByRole("group", { name: "Prerequisite 1" });
+    expect(within(first).getByLabelText("Task")).toHaveValue("t0");
+    // Change the outcome: the parked task failed, so accept failure instead.
+    fireEvent.click(within(first).getByLabelText("Failure"));
+    fireEvent.click(within(first).getByLabelText("Success"));
+    // Add a pipeline-run prerequisite and a named signal.
+    fireEvent.click(screen.getByRole("button", { name: "Add prerequisite" }));
+    const second = screen.getByRole("group", { name: "Prerequisite 2" });
+    fireEvent.change(within(second).getByLabelText("Wait for"), { target: { value: "pipeline_run" } });
+    fireEvent.change(await within(second).findByLabelText("Pipeline run"), { target: { value: "r0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add prerequisite" }));
+    const third = screen.getByRole("group", { name: "Prerequisite 3" });
+    fireEvent.change(within(third).getByLabelText("Wait for"), { target: { value: "signal" } });
+    fireEvent.change(within(third).getByLabelText("Signal name"), { target: { value: " ci-green " } });
+    fireEvent.click(screen.getByRole("button", { name: "Re-arm" }));
+    await waitFor(() =>
+      expect(calls).toContain(
+        'task rearm {"arms":[{"kind":"work_result","source_kind":"task","source_id":"t0","satisfying_outcomes":["failure"]},{"kind":"work_result","source_kind":"pipeline_run","source_id":"r0","satisfying_outcomes":["success"]},{"kind":"signal","signal_name":"ci-green"}]}',
+      ),
+    );
+  });
+
+  it("removes every prerequisite on an armed task", async () => {
+    taskState = "armed";
+    taskArms = [{ arm_id: "a1", task_id: "t1", kind: "signal", signal_name: "deploy", state: "unsatisfied" }];
+    renderWith(<TaskScreen taskId="t1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove prerequisite 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-arm" }));
     await waitFor(() => expect(calls).toContain('task rearm {"arms":[]}'));
+  });
+
+  it("keeps the draft and shows the Mac's reason when a replacement set is refused", async () => {
+    taskState = "ready";
+    rearmRefusal = "this prerequisite would create a cycle";
+    renderWith(<TaskScreen taskId="t1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add prerequisite" }));
+    const arm = screen.getByRole("group", { name: "Prerequisite 1" });
+    fireEvent.change(await within(arm).findByLabelText("Task"), { target: { value: "t0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Re-arm" }));
+    expect(await screen.findByText("this prerequisite would create a cycle")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "Prerequisite 1" })).getByLabelText("Task")).toHaveValue("t0");
   });
 
   // FS-16.R22/R23: Record result only on running/interrupted; Re-arm only on
@@ -124,7 +176,7 @@ describe("phone task and run actions", () => {
     taskState = state;
     renderWith(<TaskScreen taskId="t1" />);
     await screen.findByRole("heading", { name: "Fix login" });
-    expect(!!screen.queryByRole("button", { name: "Re-arm with its prerequisites" })).toBe(expected.rearm);
+    expect(!!screen.queryByRole("form", { name: "Re-arm" })).toBe(expected.rearm);
     expect(!!screen.queryByRole("form", { name: "Record result" })).toBe(expected.record);
     expect(!!screen.queryByRole("button", { name: "Cancel task" })).toBe(expected.cancel);
   });

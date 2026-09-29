@@ -143,12 +143,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   catalog from which to choose them. Add the secret-free runtime-options projection and visible
   replacement controls, retain shared current-configuration validation, and test a valid changed
   assignment plus rejected stale/unsupported choices without exposing backend secrets.
-- **Must fix** — confirmed partial planned capability; FS-20.R30, TS-13.R17, INV §8/§10.
-  `internal/server/task_handlers.go:507-527` already accepts any valid replacement arm set from a
-  paired phone, but `ui/src/remote/WorkScreens.tsx:96-105` exposes only the current set or no arms.
-  Add the phone Re-arm prerequisite editor over the existing shared graph/state validation, preserve
-  its draft and typed errors on refusal, and test changing task, outcome, and named-signal arms as
-  well as rejecting an invalid graph without mutation.
 - **Worth fixing** — confirmed request-bound gap; TS-13.R5/R6, INV §16.
   `internal/server/remote_routes.go:24-62,392-418` bounds only routes with a field list (plus
   pipeline start); prompt, steer, permission, task controls, and pipeline controls use unbounded
@@ -173,6 +167,8 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 - **2026-09-29 — Fix add-mobile-remote-control second-pass review (in progress).** Task controls
   now come from one shared FS-16.R22/R23 eligibility helper on desktop and phone (INV §2/§8/§10).
+  The phone Re-arm editor (FS-20.R30, TS-13.R17) edits task, run, outcome and signal prerequisites,
+  keeps its draft on refusal, and the tailnet route accepts only `arms` (INV §8/§10).
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from

@@ -310,6 +310,33 @@ body {
   min-height: 44px;
 }
 
+.phone-arm {
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-3);
+  margin: 0;
+  padding: var(--ad-space-3);
+}
+
+.phone-arm legend {
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.phone-arm-outcomes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2) var(--ad-space-4);
+}
+
+.phone-arm-outcomes label {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+  min-height: 44px;
+}
+
 .phone-controls {
   border-top: var(--ad-border-thin) solid var(--ad-border-default);
   padding-top: var(--ad-space-3);

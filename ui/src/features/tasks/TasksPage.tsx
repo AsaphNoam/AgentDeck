@@ -18,7 +18,7 @@ import { usePipelineRuns } from "../../api/pipelines";
 import type { PipelineRunSummary } from "../../schemas/pipeline";
 import type { Task, TaskArm } from "../../schemas/task";
 import { useAgentStore } from "../../store/agentStore";
-import { TASK_ATTENTION_STATES, taskActions } from "../../schemas/task";
+import { TASK_ATTENTION_STATES, WORK_RESULT_OUTCOMES, taskActions } from "../../schemas/task";
 
 /** needsAttention is the one definition the page and the dashboard count share:
  *  parked work and work whose agent went away without a result (FS-02.R44). */
@@ -41,19 +41,7 @@ type WorkPrerequisiteSelection = { sourceKind: WorkSourceKind; sourceID: string;
 type TasksQuery = ReturnType<typeof useTasks>;
 type RunsQuery = ReturnType<typeof usePipelineRuns>;
 
-const WORK_OUTCOMES: Record<WorkSourceKind, readonly { value: string; label: string }[]> = {
-  task: [
-    { value: "success", label: "Success" },
-    { value: "failure", label: "Failure" },
-    { value: "blocked", label: "Blocked" },
-    { value: "cancelled", label: "Cancelled" },
-  ],
-  pipeline_run: [
-    { value: "success", label: "Success" },
-    { value: "failure", label: "Failure" },
-    { value: "cancelled", label: "Cancelled" },
-  ],
-};
+const WORK_OUTCOMES = WORK_RESULT_OUTCOMES;
 
 function dependencyArms(selection: WorkPrerequisiteSelection, signal: string): TaskArmInput[] {
   const arms: TaskArmInput[] = [];

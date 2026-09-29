@@ -340,3 +340,48 @@ func TestRemoteStreamFilteringRevokeAndDisable(t *testing.T) {
 		t.Fatal("phone address still answers after disable")
 	}
 }
+
+// A paired phone may replace a task's prerequisites with any set the shared
+// Re-arm handler accepts, and that handler still refuses an invalid graph
+// without mutating the task (FS-20.R30, TS-13.R17).
+func TestRemoteRearmHasDesktopValueAuthority(t *testing.T) {
+	srv, ts := wakeTestServer(t)
+	h := srv.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, srv, "d1", "n")
+	waitOn := func(signal string) map[string]any {
+		body := launchTaskBody("waits on " + signal)
+		body["arms"] = []map[string]any{{"kind": "signal", "signal_name": signal}}
+		return body
+	}
+	first := createTaskHTTP(t, ts, waitOn("go"))
+	second := createTaskHTTP(t, ts, waitOn("later"))
+	rearm := func(id, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/tasks/"+id+"/rearm", body, token))
+		return rec
+	}
+
+	rec := rearm(first.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"`+second.TaskID+`","satisfying_outcomes":["success","blocked"]},{"kind":"signal","signal_name":"ci-green"}]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("changed arm set from a phone = %d %s", rec.Code, rec.Body)
+	}
+	changed, err := srv.stateStore.ReadTask(first.TaskID)
+	if err != nil || len(changed.Arms) != 2 || changed.Arms[0].SourceID != second.TaskID || changed.Arms[1].SignalName != "ci-green" {
+		t.Fatalf("rearmed task = %+v, %v", changed.Arms, err)
+	}
+
+	// A cycle is refused by the shared validator and changes nothing.
+	rec = rearm(second.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"`+first.TaskID+`","satisfying_outcomes":["success"]}]}`)
+	if rec.Code < 400 || errorCode(t, rec) == codeRemoteFieldNotAllowed {
+		t.Fatalf("cyclic arm set from a phone = %d %s", rec.Code, rec.Body)
+	}
+	// So is a body carrying anything but the arm set.
+	rec = rearm(second.TaskID, `{"arms":[],"state":"ready"}`)
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
+		t.Fatalf("extra Re-arm field = %d %s", rec.Code, rec.Body)
+	}
+	unchanged, err := srv.stateStore.ReadTask(second.TaskID)
+	if err != nil || unchanged.Revision != second.Revision || len(unchanged.Arms) != 1 || unchanged.Arms[0].SignalName != "later" {
+		t.Fatalf("refused Re-arm mutated the task: %+v, %v", unchanged, err)
+	}
+}

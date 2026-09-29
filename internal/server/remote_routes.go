@@ -50,7 +50,7 @@ var remoteAllowed = map[string][]string{
 	"POST /api/tasks/{id}/cancel": nil,
 	"POST /api/tasks/{id}/result": nil,
 	"POST /api/tasks/{id}/retry":  nil,
-	"POST /api/tasks/{id}/rearm":  nil,
+	"POST /api/tasks/{id}/rearm":  {"arms"},
 
 	"GET /api/pipeline-runs":                      nil,
 	"POST /api/pipeline-runs":                     {"request_id", "template_id", "display_name", "project", "goal", "inputs", "orchestrator", "dedicated_assignments", "acknowledge_shared_workspace"},

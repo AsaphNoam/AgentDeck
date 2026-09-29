@@ -68,6 +68,21 @@ export const taskListSchema = z.object({ tasks: z.array(taskSchema) });
 export type Task = z.output<typeof taskSchema>;
 export type TaskArm = z.output<typeof taskArmSchema>;
 
+/** The outcomes a work-result prerequisite may wait for, by source kind (FS-16.R5). */
+export const WORK_RESULT_OUTCOMES: Record<"task" | "pipeline_run", readonly { value: string; label: string }[]> = {
+  task: [
+    { value: "success", label: "Success" },
+    { value: "failure", label: "Failure" },
+    { value: "blocked", label: "Blocked" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+  pipeline_run: [
+    { value: "success", label: "Success" },
+    { value: "failure", label: "Failure" },
+    { value: "cancelled", label: "Cancelled" },
+  ],
+};
+
 /** taskActions is the one FS-16.R22/R23 eligibility matrix the desktop Tasks
  *  view and the phone render controls from (INV §2). Retry eligibility is the
  *  server's own projection. */
