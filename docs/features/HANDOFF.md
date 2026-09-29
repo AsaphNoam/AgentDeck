@@ -40,8 +40,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** none recorded. The 2026-09-29 usability review's phone-hydration blocker
-  closed the same day. The injected-steer lifetime
+- **Open findings:** the 2026-09-29 usability review's second phone pass records one **Must fix**
+  (phone Start pipeline always refused) and three **Worth fixing** under **Review findings**; its
+  phone-hydration blocker closed the same day. The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -54,10 +55,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
-real Android phone and iPhone, `pmset -g assertions`); FS-20.A9's fakeACP phone-size browser pass
-(Re-arm editor, runtime picker, diff annotation, **Show earlier**); a PNG touch icon for iPhone
-Home Screen. A3's pair → Needs you → Approve path passed at 390px on 2026-09-29; the rest of the
-phone pass (A4 actions, A9) is unblocked but not yet run.
+real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
+The fakeACP phone-size browser pass (A3/A4/A7/A9) ran at 390px on 2026-09-29 and passed except the
+findings below; only the fast-mode picker and Continue on an approval pause stay unexercised.
+FS-20 §6's "A9 browser pass is owed" line is now stale.
 Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
 ./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5). Allow
 uses `pending_pairing.id` from `GET /api/remote`, not the code's id. For a permission card, set the
@@ -83,7 +84,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` has no recorded findings; `/review` may take
+**Available by role:** `/fix` may take the phone findings from the
+[2026-09-29 usability review](../archive/reviews/usability-review-run-2026-09-29.md); `/review` may take
 `drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -102,7 +104,38 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-None open.
+### usability-review-run-2026-09-29 (second pass) — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Results are in the **Second pass** section of
+[`usability-review-run-2026-09-29.md`](../archive/reviews/usability-review-run-2026-09-29.md).
+
+- **Must fix** (FS-20.R15/A4, FS-14.R80; INV §2/§17) — J-FS20 phone **Start pipeline** never
+  starts a run: `ui/src/remote/NewWorkScreen.tsx` submits an empty `orchestrator`
+  (`backend:""`, `model:""`), and the Mac refuses with 422 "the standing orchestrator requires a
+  configured backend and model". The phone shows only "run cannot start", including after **Start
+  anyway**. Reproduced on a conflict-free project. Evidence:
+  `docs/archive/reviews/usability-review-2026-09-29-evidence/r2-14-start-pipeline-refused.png`.
+  *Fix:* resolve the standing owner and dedicated coordinators to their configured defaults the
+  way `ui/src/features/pipelines/RunStartForm.tsx` does, preferably through one shared helper, and
+  show the refusal's diagnostic. *Verify:* at 390px against the dev fixture, a template with a
+  required input starts and opens its run page; a UI test asserts the submitted assignments are
+  non-empty.
+- **Worth fixing** (FS-20.R13; INV §2) — J-FS20 phone transcript: each tool result renders
+  expanded raw JSON under the collapsed tool line (`EventRow` in `ui/src/remote/AgentScreen.tsx`
+  renders `tool_result` on its own row), repeating every diff and lengthening the phone view.
+  The desktop folds results into the collapsed tool run. Evidence: `r2-07-transcript-top.png`.
+  *Fix:* collapse the result with its tool line. *Verify:* a tool_flow transcript shows one line per
+  tool call until it is expanded.
+- **Worth fixing** (FS-20.R30; INV §8) — J-FS20 phone Re-arm: a successful re-arm shows no
+  confirmation, and refusals show raw server text ("satisfying_outcomes is required", "state: task
+  arms would create a cycle"). Evidence: `r2-10-rearm-done.png`, `r2-11-rearm-invalid.png`.
+  *Fix:* confirm the applied set and map the typed refusal codes to plain language. *Verify:*
+  success and both refusals read clearly at 390px.
+- **Worth fixing** (FS-20.R11; INV §8) — J-FS20 phone Home: after a running task's agent is
+  stopped, the task sits under **Needs you** as "was interrupted" while its same-named agent is
+  under **Since you last looked** as "finished" (`/api/remote/home` reports the agent `done`).
+  Evidence: `r2-16-home-mixed.png`. *Fix:* skip, or label, task-owned agents whose task is in
+  Needs you. *Verify:* stopping a task's agent yields one consistent entry.
 
 ## Design consistency notes
 
@@ -118,6 +151,12 @@ None open.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Usability review, second phone pass (after the hydration fix).** At 390px against
+  the dev fixture: decisions, conversation controls, Show earlier, Ask AgentDecker, New task, task
+  and stage Retry, Re-arm editing, Replace orchestrator runtime choice, all three annotation targets,
+  failed-send draft preservation and Mac-unreachable passed. Phone Start pipeline is a new blocker;
+  three minor phone issues recorded. The run file holds the rest.
 
 - **2026-09-29 — Fix: phone app never finished connecting (FS-20.R12/R13/R17, A3; INV §11
   cross-boundary serialization / §17 tests prove their contract).** The phone now recognises the hydration marker on
