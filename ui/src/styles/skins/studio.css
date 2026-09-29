@@ -54,7 +54,7 @@
 :root[data-skin="studio"] body::before {
   background-image: radial-gradient(circle, var(--ad-studio-dot) 1.2px, transparent 1.6px);
   background-size: 26px 26px;
-  opacity: 0.18;
+  opacity: 0.1;
 }
 
 [data-ui="config-editor"][data-variant="appearance"] [data-preview-skin="studio"] {

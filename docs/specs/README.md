@@ -38,7 +38,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, per-backend capability matrix |
 | FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Partial | macOS release installation, guided provider setup, explicit updates and rollback |
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
-| FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Partial | Core, Sky & Grove and Studio share creative-workspace composition and polish; older Studio acceptance debt remains |
+| FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Core, Sky & Grove and Studio share creative-workspace composition and polish; Studio acceptance is closed |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail browser acceptance pending |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |

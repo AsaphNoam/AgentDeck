@@ -78,6 +78,15 @@ test("accepts several built-in skins, each with its own private palette", () => 
   expectFailure(crossed, "may be used only in sky-grove.css");
 });
 
+test("keeps the Studio canvas dot grid at its specified low contrast", () => {
+  const studio = fs.readFileSync(path.join(process.cwd(), "src", "styles", "skins", "studio.css"), "utf8");
+  const ornament = studio.match(/:root\[data-skin="studio"\] body::before\s*\{([^}]*)\}/)?.[1] ?? "";
+
+  assert.match(ornament, /background-image:\s*radial-gradient\(circle, var\(--ad-studio-dot\) 1\.2px, transparent 1\.6px\)/);
+  assert.match(ornament, /background-size:\s*26px 26px/);
+  assert.match(ornament, /opacity:\s*0\.1(?:0)?\s*;/);
+});
+
 test("rejects implementation classes in production skin selectors", () => {
   expectFailure(fixture({
     skins: ["sky-grove"],

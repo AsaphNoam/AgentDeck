@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -511,31 +511,31 @@ Requirements are user-observable.
   Unknown configuration and a refused save retain R32's usable fallback and rollback behavior.
   *Verify:* Settings and configuration round-trip tests plus a real-browser appearance-switch
   journey.
-- **A19 (planned)** (R43–R45) — A deterministic three-appearance visual matrix and real-browser
+- **A19 (shipped 2026-09-29)** (R43–R45) — A deterministic three-appearance visual matrix and real-browser
   review cover the dashboard's empty, dense, grouped, expanded-chat, long-name, and attention
   states; live and archived transcript variants; pipeline, task, archive, settings, onboarding,
   overlays, permissions, syntax, diffs, and terminal. At the supported desktop floor and a wider
   viewport, the new skin follows R43's visual direction, keeps R45's semantic distinctions, and
   has no clipping, overflow, or network-loaded asset. *Verify:* visual fixtures, presentation
   contract checks, and rendered screenshots in the actual UI.
-- **A20 (planned)** (R44) — Expanding a dashboard agent card in the new skin shows the same real
+- **A20 (shipped 2026-09-29)** (R44) — Expanding a dashboard agent card in the new skin shows the same real
   chronological chat, composer, permissions, tool disclosure, and navigation behavior as Core;
   collapsed card density and grouping are unchanged. *Verify:* existing dashboard/chat behavior
   tests plus a real-browser expanded-pane and agent-screen journey in Core and Studio.
-- **A21 (planned)** (R46–R49) — At 1024px and a wider desktop viewport, paired rendered views of
+- **A21 (shipped 2026-09-29; superseded by R52/A26)** (R46–R49) — At 1024px and a wider desktop viewport, paired rendered views of
   Core, Sky & Grove, and Studio show Studio-specific changes to spatial hierarchy, grouping,
   typography scale, and surface composition on the shell, dashboard, expanded card, agent screen,
   Tasks, Pipelines, Archive, and Settings. A desaturated comparison still identifies Studio by its
   layout and hierarchy; changing only color, radius, shadow, or the dot pattern does not pass.
   *Verify:* real-browser side-by-side design review against the Figma Make direction and the
   screen-specific requirements R46–R49, with representative long/dense and empty states.
-- **A22 (planned)** (R47–R48) — A grouped dashboard at every existing density keeps the same card
+- **A22 (shipped 2026-09-29)** (R47–R48) — A grouped dashboard at every existing density keeps the same card
   positions before and after one pane expands; a long-name card, waiting/error card, stopped card,
   and terminal card remain scannable. The expanded chat uses the real transcript and composer,
   exposes permission/tool detail, and neither clips controls nor visually reads as a static code
   sample. *Verify:* FS-02.A37–A41 regressions plus Core/Sky & Grove/Studio browser screenshots
   and the live expanded-pane journey.
-- **A23 (planned)** (R48–R49) — Studio's active and archived agent views, task attention and
+- **A23 (shipped 2026-09-29)** (R48–R49) — Studio's active and archived agent views, task attention and
   waiting rows, active/paused/finished pipeline runs, template editor, archive results, all
   Settings sections, and four onboarding steps retain their existing controls and reading order
   while meeting their distinct composition in R48–R49. Focus, hover, disabled, error, success,
@@ -605,8 +605,9 @@ Requirements are user-observable.
   2026-09-28; TS-08.R74–R79 specify its architecture. Implementation and acceptance closed
   2026-09-28, including actual system reduced-motion verification after correcting the CSS
   fallback specificity. Evidence is recorded in the shared-layout implementation report.
-  Previous A19–A23/TS-08.R68 evidence debt is not closed by this work. A26 supersedes A21's
-  Studio-only layout oracle without treating A21 as passed.
+  A26 supersedes A21's Studio-only layout oracle. The remaining A19–A23/TS-08.R68 evidence debt
+  closed on 2026-09-29 with a matched confirmed-viewport route/state pass, real expanded chat,
+  a genuine completed pipeline timeline, and independent desaturated/common-geometry review.
 
 - The previous Field Atlas proposal was rejected because it made the default design a conceptual
   skin. This revision defines a product-native core interface and removes the proposed expedition,
@@ -629,17 +630,15 @@ Requirements are user-observable.
   Core's composition. The operator rejected that as an incomplete UI redesign on 2026-09-25.
   R46–R49 (shipped 2026-09-25) added Studio-only spatial and typographic composition while
   preserving the existing interactions; TS-08.R65–R67 (shipped) superseded the restrictive Studio
-  clauses in R62–R63. A19–A23 remain `(planned)` acceptance, distinct from the shipped
-  implementation. An earlier desaturated Core/Sky & Grove/Studio dashboard comparison showed
+  clauses in R62–R63. A19–A23 closed on 2026-09-29 after the independent rendered acceptance pass;
+  A21 is read through the later R52/A26 common-geometry supersession. An earlier desaturated Core/Sky & Grove/Studio dashboard comparison showed
   Studio's bounded card accent beyond palette differences; a later correction removed the
   full-chat panel gaps. An isolated built-app pass then exercised all four onboarding steps,
   populated attention/waiting Tasks, active and paused pipeline states, the template editor,
   Archive and archived chat, active permission chat, and all six Settings tabs; populated Tasks
-  were compared across all three appearances. Before acceptance closes, review the remaining
-  long/dense and interaction states across routes at a confirmed 1024px and wider desktop viewport,
-  complete the non-dashboard desaturated comparison, and inspect a genuine finished-run timeline.
-  The later Chrome adapter reported 1280px after a 1024px viewport request, so that pass is not
-  floor-width evidence.
+  were compared across all three appearances. The closing pass covered the remaining long/dense
+  and interaction states at confirmed 1024×900 and 1280×720 viewports, a non-dashboard
+  desaturated/common-geometry comparison, and a genuine finished-run timeline.
 
 ## 7. Traceability
 

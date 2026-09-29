@@ -23,9 +23,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
-  (finished 2026-09-25) were reviewed together on 2026-09-29 and remain open as one `/fix` unit
-  with the findings below. The review covered `e474d8a..1d78e1d` and `9ae10ee..4bb5b2e` while
-  excluding unrelated substantive and administrative commits; `71c2810` remains evidence-only.
+  (finished 2026-09-25) were reviewed and fixed together on 2026-09-29; the combined unit is
+  closed. Evidence: `docs/archive/reviews/implementation-studio-acceptance-2026-09-29.md`.
   `share-creative-workspace-layout` finished 2026-09-28 and awaits `/review`; its substantive
   commits are `0b31c9a`, `ddab692` and the closure commit named
   `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
@@ -43,8 +42,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** the combined Studio unit has one Must-fix and one Worth-fixing finding below.
-  The injected-steer lifetime
+- **Open findings:** the injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -70,14 +68,6 @@ A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) g
 FS-03.A41/A42 and FS-01.A20; Sky & Grove unviewed for Codex capabilities. Pre-existing, not Studio:
 Sky & Grove tints the whole user event row; `--ad-shadow-project-edge` resolves at `:root`.
 
-**Acceptance remains planned, not shipped:** FS-12.A19–A23 and TS-08.R68 still need the complete
-route/state comparison. In this pass, the available Chrome browser adapter reported 1280×1125 after
-its 1024×900 viewport request, so the populated built-app review does not establish true-1024
-behavior; the in-app browser was unavailable to that run. A faithful desaturated cross-skin
-comparison beyond the dashboard was also unavailable. fakeACP produced active and paused pipeline
-states but not a genuine finished-run timeline. No product code or specifications changed in this
-evidence pass.
-
 **Release state:** `v0.6.0` is published on tag `24ab07b` (range `v0.5.0..main`, 49 commits). The
 CI and Release macOS installer runs both succeeded; the GitHub Release carries the darwin/arm64
 archive, `install.sh`, and a manifest declaring `0.6.0` whose SHA-256 and size match the uploaded
@@ -89,8 +79,7 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take the combined Studio unit;
-`/review` may take `share-creative-workspace-layout`.
+**Available by role:** `/review` may take `share-creative-workspace-layout`.
 `/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
@@ -109,24 +98,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-### add-studio-skin + complete-studio-composition (2026-09-29) — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — the shipped Studio requirements still lack their required independent acceptance
-  gate; FS-12.A19–A23, TS-08.R64/R68, INV §10/§17. `ui/src/presentation/VisualMatrix.tsx:248-286`
-  carries one paused pipeline, one archive row and one backend-settings fixture, while
-  `ui/src/presentation/VisualMatrix.test.tsx:80-105` proves DOM structure rather than rendered CSS,
-  interaction parity or route/state coverage. The archived browser pass did not establish the
-  requested 1024px viewport, the remaining long/dense interaction states, a non-dashboard
-  desaturated comparison or a genuine finished-run timeline. Run and record the remaining matched
-  Core/Sky & Grove/Studio route-state matrix at confirmed 1024px and wide viewports, including
-  focus, contrast, overflow and real expanded-chat behavior; do not treat the later shared-layout
-  acceptance as closing this Studio-specific debt.
-- **Worth fixing** — the shipped ornament is materially stronger than its contract; FS-12.R43,
-  TS-08.R62, INV §10/§17. `ui/src/styles/skins/studio.css:54-57` renders the open-canvas dot grid
-  at `opacity: 0.18`, while R62 specifies approximately 10%. Selecting Studio therefore shows an
-  almost doubled background treatment on every open canvas. Bring the opacity near `0.10` and add
-  a rendered or independent CSS-contract check so the visual value cannot drift again.
-
 ## Design consistency notes
 
 - The paused direct-action change cites `TS-04.R32–R40`, while TS-01.R25 and TS-03.R32 cite
@@ -136,6 +107,15 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Fix combined Studio review findings (FS-12.R43/A19–A23, TS-08.R62/R68;
+  INV §10/§17).** Closed the grouped unit. Studio's open-canvas dots now render at the specified
+  `0.10` opacity, with an independent CSS contract check pinning opacity, dot size and pitch. The
+  independent browser pass covered matched Core, Sky & Grove and Studio routes at confirmed
+  1024×900 and 1280×720 viewports, real expanded chat, keyboard focus and overflow, a genuine
+  completed pipeline timeline, and desaturated common-geometry comparison under the later
+  FS-12.R52/A26 and TS-08.R74/R79 supersession. Focused style/contract and matrix tests pass;
+  closure matrix recorded with the fix commit.
 
 - **2026-09-29 — Review Studio skin and composition together (FS-12.R42–R49/A18–A23,
   TS-02.R36, TS-03.R45, TS-08.R61–R68; INV §1–§17).** One Must-fix acceptance-evidence gap and

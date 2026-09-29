@@ -733,7 +733,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   conditional Terminal, and composer focus; task, pipeline, archive, Settings, and onboarding
   surfaces preserve their existing action/validation order. No CSS visual reordering may make
   keyboard or screen-reader order disagree with the reading path (FS-12.R47–R49, INV §8/§10).
-- **R68 (planned) — Composition is a separate acceptance gate from skin activation.** Extend the
+- **R68 (shipped 2026-09-29) — Composition is a separate acceptance gate from skin activation.** Extend the
   deterministic matrix only with representative content/states the shipped fixture lacks; do not
   duplicate feature components or construct a Make-derived dashboard. Real-browser review compares
   Core, Sky & Grove, and Studio at 1024px and a wider desktop viewport for the exact route/state
