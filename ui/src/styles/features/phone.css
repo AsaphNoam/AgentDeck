@@ -367,4 +367,38 @@ body {
   border-color: var(--ad-state-error);
   color: var(--ad-state-error);
 }
+
+/* Diff-line annotate-and-assign form (FS-20.R32). */
+.phone-annotate {
+  border: var(--ad-border-thick) solid var(--ad-action-primary);
+  gap: var(--ad-space-3);
+}
+
+.phone-annotate-drafts {
+  display: grid;
+  gap: var(--ad-space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.phone-annotate-draft {
+  display: grid;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.phone-annotate-head {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+  justify-content: space-between;
+}
+
+.phone-annotate-head h3 {
+  font-family: var(--ad-font-mono);
+  font-size: 0.85rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 }

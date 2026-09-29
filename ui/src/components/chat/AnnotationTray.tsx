@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { sendAnnotations } from "../../api/client";
 import type { AnnotationDraft } from "../../api/types";
+import { annotationAnchor, annotationBatch } from "../../lib/annotations";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
@@ -25,11 +26,7 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
 
   if (drafts.length === 0) return null;
 
-  const batch = (agentId?: string) => ({
-    annotations: drafts,
-    overall_instruction: overall || undefined,
-    target: agentId ? { kind: "agent" as const, agent_id: agentId } : { kind: "self" as const },
-  });
+  const batch = (agentId?: string) => annotationBatch(drafts, overall, agentId);
 
   const send = async () => {
     setError(null);
@@ -123,7 +120,7 @@ function AnnotationDraftRow({ draft, index, sourceId, onRemove, onUpdate, disabl
   onUpdate: (sourceId: string, index: number, instruction: string) => void;
   disabled: boolean;
 }) {
-  const anchor = draft.path ? `${draft.path}:${draft.start_line}${draft.end_line && draft.end_line !== draft.start_line ? `–${draft.end_line}` : ""}` : `Event ${draft.seq}`;
+  const anchor = annotationAnchor(draft);
   return (
     <li className="annotation-draft">
       {/* The anchor is what the reader scans for, so it is the row's heading

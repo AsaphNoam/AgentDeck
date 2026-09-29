@@ -11,16 +11,17 @@ import {
   stopAgent,
   withdrawPrompt,
 } from "../api/client";
-import type { AgentState, TranscriptEvent } from "../api/types";
+import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types";
+import { useAnnotationStore } from "../store/annotationStore";
 import { normalizeEvent } from "../store/transcriptStore";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { shouldRenderToolResult, ToolResult } from "../components/chat/renderers/ToolResult";
+import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection } from "./connection";
 
 const TRANSCRIPT_TAIL = 150;
-const noop = () => undefined;
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export function agentTitle(agent: Pick<AgentState, "name" | "role" | "project">) {
@@ -102,7 +103,7 @@ function PermissionCard({ agent, event, latest, disabled, onSettled }: {
   );
 }
 
-function EventRow({ event }: { event: TranscriptEvent }) {
+function EventRow({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void }) {
   switch (event.kind) {
     case "user_text":
       return <p className="phone-user">{String(event.text ?? "")}</p>;
@@ -113,7 +114,7 @@ function EventRow({ event }: { event: TranscriptEvent }) {
     case "tool_result":
       return shouldRenderToolResult(event) ? <ToolResult event={event} /> : null;
     case "diff":
-      return <DiffBlock event={event} onAnnotate={noop} />;
+      return <DiffBlock event={event} onAnnotate={onAnnotate} selectHint="Tap line numbers to select a range." />;
     case "permission_request":
       return event.resolved ? <p className="phone-meta">{String(event.name ?? "Permission")} · {String(event.resolved)}</p> : null;
     case "error":
@@ -134,6 +135,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const chat = agent?.interface !== "terminal";
+  const addAnnotation = useAnnotationStore((state) => state.add);
 
   const transcript = useQuery({
     queryKey: ["transcript", agentId, rev],
@@ -176,6 +178,9 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     }
   };
   const isBusy = agent.state === "busy" || agent.state === "waiting_input";
+  const annotate = (draft: AnnotationDraft) => {
+    if (!addAnnotation(agentId, draft)) setError("At most 20 annotations can wait at once. Send or discard them first.");
+  };
   const heldText = held.data && typeof held.data === "object" && "text" in held.data ? String((held.data as { text?: string }).text ?? "") : "";
 
   return (
@@ -195,10 +200,11 @@ export function AgentScreen({ agentId }: { agentId: string }) {
           <ol className="phone-transcript" aria-label="Conversation">
             {events.slice(-TRANSCRIPT_TAIL).map((event) => (
               <li key={`${event.seq}:${event.kind}`}>
-                <EventRow event={event} />
+                <EventRow event={event} onAnnotate={annotate} />
               </li>
             ))}
           </ol>
+          <PhoneAnnotationForm agent={agent} />
           {heldText && (
             <div className="phone-card">
               <p className="phone-card-kicker">Held until the current turn ends</p>

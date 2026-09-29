@@ -1,5 +1,5 @@
 import React from "react";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
@@ -7,6 +7,15 @@ import { setupServer } from "msw/node";
 import { AgentScreen } from "./AgentScreen";
 import { useConnection } from "./connection";
 import type { AgentState } from "../api/types";
+import { useAnnotationStore } from "../store/annotationStore";
+
+// jsdom has no layout for the diff library; a tap on its line number is what
+// the shared DiffBlock listens for (FS-13.R17).
+vi.mock("react-diff-viewer-continued", () => ({
+  default: ({ onLineNumberClick }: { onLineNumberClick: (lineId: string) => void }) => (
+    <button type="button" onClick={() => onLineNumberClick("L-2")}>Old line 2</button>
+  ),
+}));
 
 const agent: AgentState = {
   agent_id: "a1", name: "", role: "implementer", project: "my-app", backend: "claude", model: "m", fast: false,
@@ -16,11 +25,13 @@ const agent: AgentState = {
 
 let permissionStatus = 200;
 let promptStatus = 200;
+let annotationStatus = 202;
 const posts: string[] = [];
 const events = [
   { agent_id: "a1", seq: 1, type: "user_text", ts: "", data: { text: "Clean the build" } },
   { agent_id: "a1", seq: 2, type: "assistant_text", ts: "", data: { text: "I will remove the dist folder." } },
   { agent_id: "a1", seq: 3, type: "permission_request", ts: "", data: { tool_call_id: "t1", name: "Bash", reason: "", args: { command: "rm -rf dist" } } },
+  { agent_id: "a1", seq: 4, type: "diff", ts: "", data: { path: "main.go", old_text: "first\nsecond\nthird", new_text: "replacement" } },
 ];
 
 const server = setupServer(
@@ -36,6 +47,15 @@ const server = setupServer(
     if (promptStatus === 409) return HttpResponse.json({ error: { code: "conflict", message: "agent is not running" } }, { status: 409 });
     return HttpResponse.json({ accepted: true, delivery: "held" });
   }),
+  http.post("/api/sessions/a1/annotations", async ({ request }) => {
+    posts.push(`annotations ${JSON.stringify(await request.json())}`);
+    if (annotationStatus === 409) return HttpResponse.json({ error: { code: "conflict", message: "the recipient agent is not running" } }, { status: 409 });
+    return HttpResponse.json({ accepted: true, seq: 5 }, { status: 202 });
+  }),
+  http.post("/api/sessions", async ({ request }) => {
+    posts.push(`launch ${JSON.stringify(await request.json())}`);
+    return HttpResponse.json({ agent: { agent_id: "a3", name: "fresh" } }, { status: 201 });
+  }),
   http.post("/api/sessions/a1/steer", () => HttpResponse.json({ accepted: true, outcome: "steered" })),
   http.post("/api/sessions/a1/cancel", () => HttpResponse.json({})),
   http.post("/api/sessions/a1/stop", () => HttpResponse.json({})),
@@ -45,8 +65,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   permissionStatus = 200;
   promptStatus = 200;
+  annotationStatus = 202;
   posts.length = 0;
   useConnection.setState({ link: "connected", agents: { a1: agent }, transcriptRev: {} });
+  useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
 });
 afterEach(() => {
   cleanup();
@@ -112,5 +134,66 @@ describe("AgentScreen", () => {
     renderScreen();
     expect(await screen.findByText(/terminal is on the Mac/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Message")).toBeNull();
+    // Terminal agents are not an annotation surface (FS-13.R13, FS-20.R32).
+    expect(screen.queryByText("Tap line numbers to select a range.")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Annotate lines/ })).toBeNull();
+  });
+});
+
+// FS-20.R32 — the phone's diff-line annotate-and-assign form over the shared
+// FS-13 tray and batch request.
+describe("AgentScreen diff annotations", () => {
+  const idle = { ...agent, state: "idle" as const, detail: "" };
+  const draft = { seq: 4, path: "main.go", side: "old", start_line: 2, end_line: 2, excerpt: "second" };
+
+  async function annotateLine() {
+    renderScreen();
+    expect(await screen.findByText("Tap line numbers to select a range.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Old line 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Annotate lines 2–2" }));
+    const form = await screen.findByRole("region", { name: "Annotate and assign" });
+    expect(form).toHaveTextContent("main.go:2");
+    expect(screen.getByRole("button", { name: "Send annotations" })).toBeDisabled();
+    const instruction = screen.getByLabelText("Instruction");
+    await waitFor(() => expect(instruction).toHaveFocus());
+    fireEvent.change(instruction, { target: { value: "rename this" } });
+    return instruction;
+  }
+
+  it("sends a selected range to this agent and clears the draft", async () => {
+    useConnection.setState({ agents: { a1: idle } });
+    await annotateLine();
+    fireEvent.click(screen.getByRole("button", { name: "Send annotations" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Annotations sent.");
+    expect(posts).toContain(`annotations ${JSON.stringify({ annotations: [{ ...draft, instruction: "rename this" }], target: { kind: "self" } })}`);
+    expect(useAnnotationStore.getState().bySource.a1).toBeUndefined();
+    expect(screen.queryByRole("region", { name: "Annotate and assign" })).toBeNull();
+  });
+
+  it("keeps the draft and shows the Mac's reason when delivery fails", async () => {
+    annotationStatus = 409;
+    const other: AgentState = { ...idle, agent_id: "a2", name: "reviewer-1", role: "reviewer" };
+    useConnection.setState({ agents: { a1: idle, a2: other } });
+    const instruction = await annotateLine();
+    fireEvent.click(screen.getByRole("radio", { name: "Another agent" }));
+    fireEvent.change(screen.getByLabelText("Agent"), { target: { value: "a2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send annotations" }));
+    expect(await screen.findByText("the recipient agent is not running")).toBeInTheDocument();
+    expect(posts).toContain(`annotations ${JSON.stringify({ annotations: [{ ...draft, instruction: "rename this" }], target: { kind: "agent", agent_id: "a2" } })}`);
+    expect(instruction).toHaveValue("rename this");
+    expect(useAnnotationStore.getState().bySource.a1).toEqual([{ ...draft, instruction: "rename this" }]);
+  });
+
+  it("launches a new task with the source's role and project, then assigns to it", async () => {
+    useConnection.setState({ agents: { a1: idle } });
+    await annotateLine();
+    fireEvent.click(screen.getByRole("radio", { name: "New task" }));
+    expect(screen.getByText(/Launches a new implementer agent in my-app/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send annotations" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Annotations sent.");
+    expect(posts).toEqual([
+      `launch ${JSON.stringify({ role: "implementer", project: "my-app" })}`,
+      `annotations ${JSON.stringify({ annotations: [{ ...draft, instruction: "rename this" }], target: { kind: "agent", agent_id: "a3" } })}`,
+    ]);
   });
 });

@@ -5,7 +5,14 @@ import { clipAnnotationExcerpt } from "../../../lib/annotations";
 import { diffTheme } from "../../../presentation/integrations";
 import type { FileLink } from "./filePath";
 
-export function DiffBlock({ event, onAnnotate, onOpenFile }: { event: TranscriptEvent; onAnnotate: (draft: AnnotationDraft) => void; onOpenFile?: (link: FileLink) => void }) {
+// selectHint lets a touch surface word the line-number selection affordance
+// for taps; the desktop keeps its click copy (FS-13.R17, FS-20.R32).
+export function DiffBlock({ event, onAnnotate, onOpenFile, selectHint = "Click line numbers to select a range." }: {
+  event: TranscriptEvent;
+  onAnnotate: (draft: AnnotationDraft) => void;
+  onOpenFile?: (link: FileLink) => void;
+  selectHint?: string;
+}) {
   const [selection, setSelection] = useState<{ side: "old" | "new"; start: number; end: number } | null>(null);
   const chooseLine = (lineId: string) => {
     const match = /^([LR])-(\d+)$/.exec(lineId);
@@ -31,7 +38,7 @@ export function DiffBlock({ event, onAnnotate, onOpenFile }: { event: Transcript
           <button type="button" className="file-link" data-file-path={String(event.path)} onClick={() => onOpenFile({ path: String(event.path) })}><strong>{String(event.path)}</strong></button>
         ) : (
           <strong>{String(event.path ?? "diff")}</strong>
-        )}<small>Click line numbers to select a range.</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
+        )}<small>{selectHint}</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
       <ReactDiffViewer oldValue={String(event.old_text ?? event.old ?? "")} newValue={String(event.new_text ?? event.new ?? "")} splitView={false} styles={diffTheme} onLineNumberClick={chooseLine} />
     </article>
   );

@@ -120,6 +120,44 @@ func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T)
 	}
 }
 
+// FS-20.R32 and TS-13.R16: a paired phone assigns diff-line annotations through
+// the shared FS-13 handler; the tailnet chain rejects any body field the phone
+// form does not send before the handler runs.
+func TestRemoteAnnotationUsesSharedDelivery(t *testing.T) {
+	srv := testServer(t, true)
+	source, target := writeAnnotationPair(t, srv)
+	h := srv.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, srv, "d1", "n")
+	path := "/api/sessions/" + source.AgentID + "/annotations"
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, path, `{"annotations":[{"seq":4,"excerpt":"x"}],"target":{"kind":"self"},"interface":"terminal"}`, token))
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
+		t.Fatalf("extra field = %d %s", rec.Code, rec.Body)
+	}
+	// The shared validation still owns nested limits (FS-13.R11).
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, path, `{"annotations":[{"seq":4,"excerpt":"x","instruction":" "}],"target":{"kind":"agent","agent_id":"a_target"}}`, token))
+	if rec.Code != http.StatusUnprocessableEntity || errorCode(t, rec) != "validation" {
+		t.Fatalf("blank instruction = %d %s", rec.Code, rec.Body)
+	}
+
+	body := `{"annotations":[{"seq":4,"path":"main.go","side":"new","start_line":9,"end_line":10,"excerpt":"phone phrase","instruction":"tighten this"}],"target":{"kind":"agent","agent_id":"` + target.AgentID + `"}}`
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, path, body, token))
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("phone annotation = %d %s", rec.Code, rec.Body)
+	}
+	mail, err := srv.stateStore.ListMessages(target.AgentID, true, 10)
+	if err != nil || len(mail) != 1 || mail[0].FromAgent != "user" || !strings.Contains(mail[0].Body, "phone phrase") {
+		t.Fatalf("delivered mail = %+v, %v", mail, err)
+	}
+	events, err := transcript.ReadFile(srv.configStore.Home(), source.AgentID, transcript.ReadOptions{})
+	if err != nil || len(events) != 1 || events[0].Type != runtime.EvAnnotation {
+		t.Fatalf("source annotation event = %#v, %v", events, err)
+	}
+}
+
 // FS-13.R5 and invariant §15: the durable source event precedes delivery. A
 // failed append must leave nothing delivered, because the tray is preserved on
 // failure (FS-13.R3) and the natural retry would otherwise insert a second copy

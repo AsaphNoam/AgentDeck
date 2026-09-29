@@ -43,6 +43,9 @@ var remoteAllowed = map[string][]string{
 	"POST /api/sessions/{id}/stop":       nil,
 	"POST /api/sessions/{id}/resume":     nil,
 	"POST /api/sessions/{id}/permission": nil,
+	// Diff-line annotate-and-assign (FS-20.R32, TS-13.R16); nested anchors,
+	// limits, and targets are validated by the shared FS-13 handler.
+	"POST /api/sessions/{id}/annotations": {"annotations", "overall_instruction", "target"},
 
 	"GET /api/tasks":              nil,
 	"POST /api/tasks":             {"project", "display_name", "instruction", "target_kind", "role"},
@@ -83,8 +86,8 @@ var remoteDenied = map[string]bool{
 	"POST /api/pipelines":                 true, "POST /api/pipelines/validate": true,
 	"PUT /api/pipelines/{id}": true, "DELETE /api/pipelines/{id}": true,
 	"DELETE /api/pipeline-runs/{id}": true, "DELETE /api/tasks/{id}": true,
-	"POST /api/signals":                   true,
-	"POST /api/sessions/{id}/annotations": true, "POST /api/sessions/{id}/rename": true,
+	"POST /api/signals":                true,
+	"POST /api/sessions/{id}/rename":   true,
 	"POST /api/sessions/{id}/identity": true, "POST /api/sessions/{id}/background-task-stop": true,
 	"POST /api/sessions/{id}/clone": true, "POST /api/sessions/{id}/archive": true,
 	"POST /api/sessions/{id}/restore": true, "POST /api/sessions/{id}/switch-runtime": true,

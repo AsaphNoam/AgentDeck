@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AgentState } from "../api/types";
+import { useAnnotationStore } from "../store/annotationStore";
 import { checkPaired, MacUnreachableError, PhoneAPIError } from "./api";
 
 // The phone's view of its link to the Mac (FS-20 §3). A plain EventSource with
@@ -110,6 +111,8 @@ export function connect() {
       else hydratingAgents[agent.agent_id] = agent;
       return;
     }
+    // A deleted agent can no longer be an annotation source (FS-13.R16).
+    if (agent.removed) useAnnotationStore.getState().discard(agent.agent_id);
     useConnection.setState((state) => {
       const agents = { ...state.agents };
       if (agent.removed) delete agents[agent.agent_id];
