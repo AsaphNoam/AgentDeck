@@ -18,8 +18,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28; its first review closed
-  2026-09-29, and a requested second-pass review reopened it for `/fix` the same day.
+- **Active change:** none. `add-mobile-remote-control` finished 2026-09-28; its first and
+  second-pass reviews both closed 2026-09-29.
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -30,8 +30,6 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   commits are `0b31c9a`, `ddab692` and the closure commit named
   `Finish shared workspace acceptance and reduced-motion fallback` (base `f79fb97`).
   Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
-  `add-mobile-remote-control` was reviewed again 2026-09-29 across its implementation and first
-  review fix; the second-pass findings remain open below.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` and
@@ -45,8 +43,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `docs/ideas.md` was pruned 2026-09-28: shipped agent re-arm/retry/inspection, fixed chat-reload,
   pagination and ACP-readiness items, and nudge-era liveness items were removed; small related
   entries were merged.
-- **Open findings:** the combined Studio unit has one Must-fix and one Worth-fixing finding below;
-  `add-mobile-remote-control` has two remaining Must-fix findings below. The injected-steer lifetime
+- **Open findings:** the combined Studio unit has one Must-fix and one Worth-fixing finding below.
+  The injected-steer lifetime
   edge case is still named in prose but was never recorded as a finding; it needs `/investigate-bug`
   before `/fix` can take it.
   FilesTab and CommandsTab still copy silently via bare `writeText`.
@@ -59,10 +57,13 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 ## Active change
 
 None. **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
-real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
+real Android phone and iPhone, `pmset -g assertions`); FS-20.A9's fakeACP phone-size browser pass
+(Re-arm editor, runtime picker, diff annotation, **Show earlier**); a PNG touch icon for iPhone
+Home Screen.
 Local phone passes: `AGENTDECK_DEV_FAKE_TAILNET=localhost:4529 go run -tags dev
 ./scripts/stress-fixture`, then `PUT /api/remote {"enabled":true}` on loopback (TS-13 §5).
-Observed pre-existing flake: `TestContextSharingStartsNoModelTurn` under full `go test ./...` load.
+Observed pre-existing flakes under full `go test ./...` load: `TestContextSharingStartsNoModelTurn`
+and `TestStoppedRecipientKeepsContextAcrossResume` (both pass in isolation).
 
 **Owed from archived entries** ([`HANDOFF-through-2026-09-25`](../archive/state/HANDOFF-through-2026-09-25.md)):
 A46's real-browser J14 pass; the credentialed Codex 1.12.0 receipt (TS-06.R26) gating
@@ -88,7 +89,7 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take `add-mobile-remote-control` or the combined Studio unit;
+**Available by role:** `/fix` may take the combined Studio unit;
 `/review` may take `share-creative-workspace-layout`.
 `/work` may take `rename-product-to-deckhand` or `drop-pipeline-recipient-refusal`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
@@ -126,17 +127,6 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   almost doubled background treatment on every open canvas. Bring the opacity near `0.10` and add
   a rendered or independent CSS-contract check so the visual value cannot drift again.
 
-### add-mobile-remote-control, second pass (2026-09-29) — **Fix model:** difficult — Codex Sol.
-
-- **Must fix** — confirmed unbounded normal-use path; FS-20.R13, INV §16.
-  `ui/src/remote/AgentScreen.tsx:138-155`, `internal/server/sessions.go:407-426`, and
-  `internal/transcript/reader.go:39-57` read, decode, retain, normalize, and copy the complete
-  durable transcript on every phone refresh, then limit only the rendered tail. Long-lived agents
-  can therefore make one ordinary phone conversation request consume unbounded server and browser
-  memory. Give the remote transcript surface a byte/event-bounded window with continuation, keep
-  permission/latest-message derivation correct at the boundary, and cover a transcript larger than
-  the window.
-
 ## Design consistency notes
 
 - The paused direct-action change cites `TS-04.R32–R40`, while TS-01.R25 and TS-03.R32 cite
@@ -158,7 +148,8 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   and diff checks pass. The broader server package reached only the already-documented
   `TestContextSharingStartsNoModelTurn` full-load flake.
 
-- **2026-09-29 — Fix add-mobile-remote-control second-pass review (in progress).** Task controls
+- **2026-09-29 — Fix add-mobile-remote-control second-pass review (INV §1, §2, §5, §8, §10,
+  §14–§16).** Closed all seven Must-fix and two Worth-fixing findings and the unit. Task controls
   now come from one shared FS-16.R22/R23 eligibility helper on desktop and phone (INV §2/§8/§10).
   The phone Re-arm editor (FS-20.R30, TS-13.R17) edits task, run, outcome and signal prerequisites,
   keeps its draft on refusal, and the tailnet route accepts only `arms` (INV §8/§10). Push rereads
@@ -170,9 +161,13 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   shared FS-13 drafts, batch builder and allowlisted handler (FS-20.R32, TS-13.R16; INV §2/§8/§10).
   The phone Replace orchestrator form chooses from the secret-free `GET /api/remote/runtime-options`
   catalog and the shared validator rejects stale or unsupported choices (FS-20.R31, TS-13.R15, now
-  Current; INV §8/§14). Next: the transcript-window finding is implemented but unverified in
-  `.claude/worktrees/agent-ac206cab6badccde4`; review, verify and bring it over, then run the
-  closure matrix and close the unit.
+  Current; INV §8/§14). Phone transcript reads are windowed (150 events default, 500 max, ~1 MiB)
+  with `before_seq` continuation, and the pending permission and latest reply are derived from the
+  whole session (FS-20.R13, new TS-13.R18; INV §16). `make build`, the sqlite_fts5 Go variant, UI
+  532 tests and UI build pass; the plain variant passed on rerun after the full-load flake
+  `TestStoppedRecipientKeepsContextAcrossResume` (untouched context-sharing code, passes 5/5
+  alone); focused repair/pairing/push `-race` passes. A9's phone-size browser pass and the real
+  device gates remain owed.
 
 - **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
   TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from
