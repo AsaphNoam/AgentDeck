@@ -114,8 +114,32 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 - **R16 — Desktop-only surfaces stay on the desktop.** The phone offers no terminal,
   Settings, roles/projects/backends editing, federation, annotate-and-assign, worktree creation or
   cleanup, clone, switch runtime, rename, archive search, dashboard layout, skins, or onboarding.
+  Planned R30–R32 supersede this restriction only for task-prerequisite editing, pipeline
+  replacement runtime choices, and diff annotation-and-assignment; the other listed surfaces stay
+  desktop-only.
 - **R17 — The app is live while open.** Every view updates without refreshing while the
   phone is connected, and catches up to current state after reconnecting.
+- **R30 (planned) — Re-arm can edit prerequisites on the phone.** On an `armed`, `ready`, or
+  `dependency_failed` task, the Re-arm flow starts from the task's current arms and lets the person
+  add, remove, or change work-result and named-signal prerequisites before submitting the complete
+  replacement set. The Mac applies the same project, source, outcome, cycle, cardinality, and state
+  validation as the desktop under FS-16.R5/R15/R23; the phone receives the same typed refusal and
+  preserves the draft when validation fails. This supersedes R14's former reuse-or-remove-only
+  mobile restriction.
+- **R31 (planned) — Replacing an orchestrator can choose its runtime.** The phone's Replace
+  orchestrator flow shows the Mac's configured backend/model choices and each model's allowed
+  effort and fast-mode values, preselected to the run's standing assignment. The person may change
+  those values for the replacement; the Mac validates the submitted assignment against its current
+  configuration before launching it. Backend/model environment, credentials, configuration, and
+  editing remain desktop-only. This is the one runtime-choice exception to R15/R16; new agents,
+  tasks, and pipeline starts still use their configured defaults.
+- **R32 (planned) — A phone can annotate and assign a diff.** In a chat-interface agent's phone
+  conversation, selecting a contiguous diff-line range opens a phone-sized form for the required
+  instruction and the FS-13 targets: the current agent, another running chat agent, or a new task.
+  The structured anchor, excerpt clipping, bounded browser-local drafts, delivery, durable source
+  event, failure preservation, and target validation are the same as FS-13.R2–R9/R11–R17. Terminal
+  agents remain ineligible. This supersedes R16's blanket annotate-and-assign exclusion only for
+  live diff lines; other transcript-event and archive annotation interactions remain desktop-only.
 
 ### 2.4 Phone notifications
 
@@ -208,6 +232,11 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - **A8 (planned)** (all) — Real end-to-end journey: pair an Android phone and an iPhone over a real
   tailnet off the home network, receive a permission notification, approve it with details, reply
   to a question, start a task, then revoke one phone. — manual gate.
+- **A9 (planned)** (R30–R32) — At a 390px phone viewport, edit an eligible task from one valid
+  prerequisite set to another, replace a pipeline orchestrator with a different configured
+  model/effort/fast selection, and annotate diff lines to each supported target; invalid arms and
+  runtime choices are rejected without mutation, and a failed annotation send preserves its draft.
+  — server and UI tests plus a fakeACP browser pass at phone size.
 
 ## 6. Deviations & open decisions
 
@@ -218,6 +247,9 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or
   `pmset -g assertions` check has run. Their automated halves pass.
+- R30–R32 and A9 are approved but unshipped. The current phone offers only reusing or removing task
+  prerequisites, has no replacement-runtime picker or safe runtime catalog, and renders a diff
+  annotation action whose callback is a no-op.
 
 ## 7. Traceability
 

@@ -118,12 +118,13 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   memory. Give the remote transcript surface a byte/event-bounded window with continuation, keep
   permission/latest-message derivation correct at the boundary, and cover a transcript larger than
   the window.
-- **Must fix** — confirmed unavailable-action defect; FS-20.R16, INV §8.
+- **Must fix** — confirmed partial planned capability; FS-20.R32, TS-13.R16, INV §8/§10.
   `ui/src/remote/AgentScreen.tsx:105-116` passes a no-op annotation callback into the shared diff,
   while `ui/src/components/chat/renderers/DiffBlock.tsx:8-35` still tells phone users to select
-  lines and presents an **Annotate lines** button. The visible action silently does nothing even
-  though annotate-and-assign is desktop-only. Make annotation capability explicit in the shared
-  renderer, hide its selection affordance on phone, and add a phone diff regression.
+  lines and presents an **Annotate lines** button; the tailnet route table also denies the shared
+  annotation endpoint. Implement the approved phone-sized diff annotation-and-assignment flow,
+  allowlist its bounded shared mutation, and test successful delivery plus preserved drafts on
+  failure.
 - **Must fix** — confirmed task-state contract defect; FS-20.R14, FS-16.R22/R23, INV §8/§10.
   `ui/src/remote/WorkScreens.tsx:71-138` offers **Record result** for every unfinished task although
   only `running` and `interrupted` accept it, and offers **Re-arm** only for `dependency_failed`
@@ -141,20 +142,18 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   desktop/phone repairs, or one stale phone request, can mutate cleanup and then return
   `revision_conflict`. Claim or revalidate the run generation durably before any member mutation or
   external effect, and add a concurrent regression proving the losing request performs no effects.
-- **Must fix** — confirmed remote runtime-policy bypass; FS-20.R14/R16, TS-13.R5/R6, INV §14.
-  `internal/server/remote_routes.go:55-62,237-251` applies its runtime filter only to pipeline start,
-  while `internal/server/pipeline_handlers.go:262-279` accepts the replacement orchestrator's
-  backend, model, effort, and fast values verbatim. A crafted paired phone can select arbitrary
-  replacement runtime settings even though runtime choices are desktop-only. Resolve the standing
-  assignment server-side or require an exact match before handler work, and test changed and
-  unknown nested fields leave the run untouched.
-- **Must fix** — confirmed remote dependency-authority bypass; FS-20.R14, TS-13.R6, INV §14.
-  `internal/server/remote_routes.go:47-53,237-251` sends phone re-arm requests directly to
-  `internal/server/task_handlers.go:507-527`, whose shared contract accepts any valid arm set. A
-  crafted paired phone can therefore rewrite a task onto different prerequisites rather than only
-  reuse its current prerequisites or remove them. Accept only an empty set or an exact structural
-  match to the persisted arms, and test that a changed task, signal, or outcome arm is rejected
-  without mutating the task.
+- **Must fix** — confirmed partial planned capability; FS-20.R31, TS-13.R15, INV §8/§14.
+  `internal/server/pipeline_handlers.go:262-279` already accepts a replacement orchestrator's
+  backend, model, effort, and fast values, but the phone has neither a runtime picker nor a safe
+  catalog from which to choose them. Add the secret-free runtime-options projection and visible
+  replacement controls, retain shared current-configuration validation, and test a valid changed
+  assignment plus rejected stale/unsupported choices without exposing backend secrets.
+- **Must fix** — confirmed partial planned capability; FS-20.R30, TS-13.R17, INV §8/§10.
+  `internal/server/task_handlers.go:507-527` already accepts any valid replacement arm set from a
+  paired phone, but `ui/src/remote/WorkScreens.tsx:96-105` exposes only the current set or no arms.
+  Add the phone Re-arm prerequisite editor over the existing shared graph/state validation, preserve
+  its draft and typed errors on refusal, and test changing task, outcome, and named-signal arms as
+  well as rejecting an invalid graph without mutation.
 - **Worth fixing** — confirmed request-bound gap; TS-13.R5/R6, INV §16.
   `internal/server/remote_routes.go:24-62,392-418` bounds only routes with a field list (plus
   pipeline start); prompt, steer, permission, task controls, and pipeline controls use unbounded
@@ -176,6 +175,12 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Broaden the approved mobile control contract.** FS-20.R30–R32/A9 and
+  TS-13.R15–R17 now specify phone prerequisite editing, pipeline replacement runtime selection from
+  a secret-free catalog, and diff annotation-and-assignment. The three related review findings are
+  reframed as missing/partial supported capabilities rather than forbidden-capability bypasses;
+  the finding count and difficult fix model are unchanged. No product code changed.
 
 - **2026-09-29 — Re-review add-mobile-remote-control (INV §1, §5, §8, §10, §14–§16).** Seven
   Must-fix and two Worth-fixing findings reopened the unit: unbounded transcript retrieval, a dead

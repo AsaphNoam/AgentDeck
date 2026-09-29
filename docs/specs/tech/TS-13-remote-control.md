@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -69,6 +69,8 @@ the installed app on iOS.
   and the Mac resolves the defaults the desktop New Agent form preselects. A test enumerates the
   loopback route inventory and fails when a route is neither allowlisted nor explicitly denied
   (INV §10). Unauthenticated GETs outside `/api/` reach only the phone app's static files (R14).
+  Planned R15–R17 supersede only the annotation, pipeline-replacement-runtime, and re-arm-value
+  restrictions in this item; the full backend catalog and its secrets remain denied.
 - **R6 — Remote requests cannot widen permission policy.** A launch or task-creation body
   arriving on the tailnet listener may not carry a per-launch permission-bypass override or any
   field the phone's FS-20.R15 forms do not set; such a body is rejected with
@@ -143,6 +145,22 @@ the installed app on iOS.
   phone's files. The phone
   app reuses `ui/src/api` schemas and client (TS-02.R11 lockstep) and uses a plain `EventSource`
   with its cookie; it does not use the desktop SharedWorker.
+- **R15 (planned) — Runtime choices use a secret-free phone projection.** A paired phone may read
+  `GET /api/remote/runtime-options`, which projects only configured backend ids/names and model
+  ids/names with their allowed efforts, default effort, and fast-mode support. It never projects
+  backend type, environment, credentials, executable paths, credential-check detail, or federation
+  configuration. The phone may submit one of those assignments to pipeline orchestrator
+  replacement; the shared launch validator re-reads current configuration and rejects an unknown or
+  unsupported backend/model/effort/fast combination before changing the run (FS-20.R31).
+- **R16 (planned) — Annotation delivery is allowlisted for paired phones.** The tailnet route table
+  includes the existing `POST /api/sessions/{id}/annotations` handler for FS-20.R32. The remote
+  chain bounds and schema-validates its body before the shared FS-13 validation and commit-before-
+  delivery path; it adds no phone-only annotation representation or delivery mechanism.
+- **R17 (planned) — Remote Re-arm has the desktop's value authority.** A paired phone may submit
+  any complete arm set that the existing `POST /api/tasks/{id}/rearm` handler accepts under
+  FS-16.R15/R23, not only the current set or an empty set. The remote chain bounds and
+  schema-validates the request, while the shared handler remains the one graph/state validator
+  (FS-20.R30).
 
 ## 3. Interfaces & data shapes
 
@@ -162,6 +180,11 @@ agent|task|run, id, title, project, state, reason, agent_id?, stage?, outcome?, 
 summaries carry `stage_number`/`stage_count` for the stage position. `GET /api/remote/self` →
 `{id, name, notifications, vapid_public_key}`.
 
+Planned phone capability additions: `GET /api/remote/runtime-options` → `{backends: [{id, name,
+models: [{id, name, efforts, default_effort?, fast}]}]}`; the existing annotation, task Re-arm, and
+pipeline Replace request/response shapes remain shared with loopback and gain only the R4 guard,
+device authentication, allowlist, and bounded-body enforcement on the tailnet listener.
+
 Persistence is defined in TS-02.R37; route inventory in TS-03.R46; security boundary in TS-05.R23;
 build and dependency pinning in TS-06.R27; the phone bundle in TS-08.R73.
 
@@ -175,6 +198,9 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
 
+- R15–R17 are approved but unshipped. Until they land, no secret-free runtime-options route exists,
+  annotations remain remote-denied, and the phone UI does not expose the broader Replace/Re-arm
+  choices even though their shared handlers already accept those request values.
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.
 - Face ID or fingerprint app lock and native apps are out of scope (FS-20 §6).
