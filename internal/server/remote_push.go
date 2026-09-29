@@ -28,11 +28,14 @@ var (
 const pushQueueSize = 64
 
 // pushNote is one notification before encryption: only FS-20.R19's fields.
+// muteTypes keeps each covered item's mute type so the worker can reread
+// mutes at send time; it is unexported and never leaves the Mac.
 type pushNote struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
-	Tag   string `json:"tag"`
-	URL   string `json:"url"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	Tag       string `json:"tag"`
+	URL       string `json:"url"`
+	muteTypes []string
 }
 
 // pushSendFunc is the delivery seam; tests replace it so no suite contacts a
@@ -115,17 +118,34 @@ func pushTag(it attentionItem) string {
 	return "project:" + it.Project
 }
 
-// pushMuted applies the desktop per-type mutes (FS-02.R24) to an item.
-func pushMuted(it attentionItem, muted map[string]bool) bool {
+// pushMuteType names the desktop per-type mute (FS-02.R24) covering an item,
+// or "" when none does.
+func pushMuteType(it attentionItem) string {
 	switch {
 	case it.Kind == "agent" && it.Reason == reasonPermission:
-		return muted["permission_required"]
+		return "permission_required"
 	case it.Kind == "agent" && it.Reason == reasonQuestion:
-		return muted["waiting_input"]
+		return "waiting_input"
 	case it.Kind == "run":
-		return muted["pipeline_needs_attention"]
+		return "pipeline_needs_attention"
 	}
-	return false
+	return ""
+}
+
+// pushMuted applies the desktop per-type mutes (FS-02.R24) to an item.
+func pushMuted(it attentionItem, muted map[string]bool) bool {
+	t := pushMuteType(it)
+	return t != "" && muted[t]
+}
+
+// noteMuted reports whether every item a notification covers is now muted.
+func noteMuted(note pushNote, muted map[string]bool) bool {
+	for _, t := range note.muteTypes {
+		if t == "" || !muted[t] {
+			return false
+		}
+	}
+	return len(note.muteTypes) > 0
 }
 
 // noteFor builds the minimal notification for one item: who, where, and what
@@ -146,7 +166,7 @@ func noteFor(it attentionItem) pushNote {
 	case "run":
 		path = "/run/"
 	}
-	return pushNote{Title: "AgentDeck", Body: who + " " + reason, Tag: pushTag(it), URL: path + it.ID}
+	return pushNote{Title: "AgentDeck", Body: who + " " + reason, Tag: pushTag(it), URL: path + it.ID, muteTypes: []string{pushMuteType(it)}}
 }
 
 type pushWindowState struct {
@@ -228,7 +248,11 @@ func (s *Server) runPushSender(ctx context.Context) {
 				if first.Kind == "run" {
 					where = first.Title
 				}
-				enqueue(pushNote{Title: "AgentDeck", Body: fmt.Sprintf("%d items in %s need you", len(w.pending), where), Tag: tag, URL: "/"})
+				var types []string
+				for _, it := range w.pending {
+					types = append(types, pushMuteType(it))
+				}
+				enqueue(pushNote{Title: "AgentDeck", Body: fmt.Sprintf("%d items in %s need you", len(w.pending), where), Tag: tag, URL: "/", muteTypes: types})
 			}
 		}
 	}
@@ -256,9 +280,10 @@ func (s *Server) runPushSender(ctx context.Context) {
 	}
 }
 
-// pushWorker is the one sender. Mutes and per-device switches are read at send
-// time; a 404/410 expires the subscription; other failures retry with bounded
-// backoff, then drop and log without the payload (TS-13.R11).
+// pushWorker is the one sender. Remote enablement, mutes, and per-device
+// switches are read before every send attempt; a 404/410 expires the
+// subscription; other failures retry with bounded backoff, then drop and log
+// without the payload (TS-13.R11).
 func (s *Server) pushWorker(ctx context.Context, queue <-chan pushNote) {
 	for {
 		select {
@@ -293,6 +318,9 @@ func (s *Server) deliverPush(ctx context.Context, note pushNote) {
 		}
 		sub := remote.PushSubscription{Endpoint: d.PushEndpoint, P256dh: d.PushP256dh, Auth: d.PushAuth}
 		for attempt := 0; ; attempt++ {
+			if !s.pushAllowed(note, d.ID, d.PushEndpoint) {
+				break
+			}
 			status, err := s.pushSend(ctx, keys, sub, payload, remote.PushTopic(note.Tag))
 			if err == nil && status >= 200 && status < 300 {
 				break
@@ -317,4 +345,25 @@ func (s *Server) deliverPush(ctx context.Context, note pushNote) {
 			}
 		}
 	}
+}
+
+// pushAllowed rereads the send-time policy for one attempt: Remote is on, the
+// note's types are not all muted (FS-02.R24), and the device still has this
+// subscription switched on and active (TS-13.R11).
+func (s *Server) pushAllowed(note pushNote, deviceID, endpoint string) bool {
+	cfg, err := s.configStore.ReadConfig()
+	if err != nil || !cfg.RemoteEnabled || noteMuted(note, cfg.Notifications.Muted) {
+		return false
+	}
+	devices, err := s.stateStore.ListRemoteDevices()
+	if err != nil {
+		s.log.Warn("remote push: list devices", "err", err)
+		return false
+	}
+	for _, d := range devices {
+		if d.ID == deviceID {
+			return d.PushEnabled && d.PushEndpoint == endpoint && d.PushState == "active"
+		}
+	}
+	return false
 }

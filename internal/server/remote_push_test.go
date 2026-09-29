@@ -150,6 +150,67 @@ func TestPushSenderNotifiesAttentionOnce(t *testing.T) {
 	}
 }
 
+// TS-13.R11: a queued notification, and each retry, rechecks Remote and the
+// type's mute at send time.
+func TestPushDeliveryRechecksPolicyEachAttempt(t *testing.T) {
+	oldRetry := pushRetryDelays
+	pushRetryDelays = []time.Duration{time.Millisecond, time.Millisecond}
+	t.Cleanup(func() { pushRetryDelays = oldRetry })
+
+	s := testServer(t, true)
+	putRemote(t, s.routes(), `{"enabled":false}`)
+	pairTestDevice(t, s, "d1", "n")
+	if err := s.stateStore.SetRemoteDevicePush("d1", "https://fcm.googleapis.com/fcm/send/x", "k", "a"); err != nil {
+		t.Fatal(err)
+	}
+	setPolicy := func(enabled bool, muted map[string]bool) {
+		t.Helper()
+		cfg, _ := s.configStore.ReadConfig()
+		cfg.RemoteEnabled, cfg.Notifications.Muted = enabled, muted
+		if err := s.configStore.WriteConfig(cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	calls := 0
+	var onFail func()
+	s.pushSend = func(context.Context, remote.VAPIDKeys, remote.PushSubscription, []byte, string) (int, error) {
+		calls++
+		if onFail != nil {
+			onFail()
+		}
+		return http.StatusInternalServerError, nil
+	}
+	note := noteFor(attentionItem{Kind: "agent", ID: "a1", Title: "implementer@my-app", Project: "my-app", Reason: reasonPermission})
+
+	// Retries run to the bound while the policy allows sending.
+	setPolicy(true, nil)
+	s.deliverPush(context.Background(), note)
+	if calls != 1+len(pushRetryDelays) {
+		t.Fatalf("allowed attempts = %d", calls)
+	}
+
+	for name, change := range map[string]func(){
+		"remote disabled": func() { setPolicy(false, nil) },
+		"type muted":      func() { setPolicy(true, map[string]bool{"permission_required": true}) },
+	} {
+		// Changed while queued: nothing sends.
+		setPolicy(true, nil)
+		change()
+		calls, onFail = 0, nil
+		s.deliverPush(context.Background(), note)
+		if calls != 0 {
+			t.Fatalf("%s while queued: sent %d", name, calls)
+		}
+		// Changed between a failed attempt and its retry: the retry does not send.
+		setPolicy(true, nil)
+		calls, onFail = 0, change
+		s.deliverPush(context.Background(), note)
+		if calls != 1 {
+			t.Fatalf("%s before retry: sent %d", name, calls)
+		}
+	}
+}
+
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
