@@ -170,6 +170,14 @@ the installed app on iOS.
   FS-16.R15/R23, not only the current set or an empty set. The remote chain bounds and
   schema-validates the request, while the shared handler remains the one graph/state validator
   (FS-20.R30).
+- **R18 — Phone transcript reads are windowed.** `GET /api/sessions/{id}/transcript` accepts
+  `limit` (clamped to 500) and `before_seq`; a windowed read streams the file and retains at most
+  that many events and about 1 MiB of event payload, answering `{agent_id, events, has_more,
+  pending_permission, latest_assistant}`. The newest unresolved permission request and the latest
+  top-level assistant reply are derived from the whole session in constant space, so they survive
+  the window boundary. A tailnet read is always windowed (150 events by default); a loopback read
+  without `limit` or `before_seq` keeps the unwindowed `{agent_id, events}` shape (FS-20.R13,
+  INV §16).
 
 ## 3. Interfaces & data shapes
 
@@ -226,7 +234,8 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 - Runtime options (R15): `handleRemoteRuntimeOptions` in `internal/server/remote_home.go`; tests
   `TestRemoteRuntimeOptionsAreSecretFree`, `TestRemoteReplaceValidatesChosenRuntime`. Annotation
   (R16): `TestRemoteAnnotationUsesSharedDelivery`. Re-arm (R17):
-  `TestRemoteRearmHasDesktopValueAuthority`.
+  `TestRemoteRearmHasDesktopValueAuthority`. Transcript window (R18):
+  `internal/server/transcript_window.go`; tests in `transcript_window_test.go`.
 - Push: `internal/remote/push.go`, `internal/server/remote_push.go`.
 - Keep-awake: `internal/remote/keepawake.go`, `internal/server/keepawake.go`.
 - Phone app: `ui/remote.html`, `ui/public/remote-*`, `ui/src/remote/`, `ui/src/styles/remote.css`.

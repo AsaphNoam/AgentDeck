@@ -415,9 +415,34 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeValidation, "since_seq must be an integer"))
 		return
 	}
+	limit, err := parseInt64Query(r, "limit")
+	if err != nil || limit < 0 {
+		writeAPIError(w, apiError(runtime.CodeValidation, "limit must be a positive integer"))
+		return
+	}
+	beforeSeq, err := parseInt64Query(r, "before_seq")
+	if err != nil || beforeSeq < 0 {
+		writeAPIError(w, apiError(runtime.CodeValidation, "before_seq must be a positive integer"))
+		return
+	}
+	includeMeta := r.URL.Query().Get("include_meta") == "true"
+	// A tailnet read is always windowed, even when the phone names no limit
+	// (FS-20.R13); loopback callers opt in with limit or before_seq.
+	if limit > 0 || beforeSeq > 0 || remoteFrom(r.Context()) != nil {
+		tw := &transcriptWindow{sinceSeq: sinceSeq, beforeSeq: beforeSeq, limit: transcriptWindowDefault}
+		if limit > 0 {
+			tw.limit = int(min(limit, transcriptWindowMax))
+		}
+		if err := transcript.ForEachFile(s.configStore.Home(), id, transcript.ReadOptions{IncludeMeta: includeMeta}, tw.visit); err != nil {
+			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, tw.response(id))
+		return
+	}
 	events, err := transcript.ReadFile(s.configStore.Home(), id, transcript.ReadOptions{
 		SinceSeq:    sinceSeq,
-		IncludeMeta: r.URL.Query().Get("include_meta") == "true",
+		IncludeMeta: includeMeta,
 	})
 	if err != nil {
 		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))

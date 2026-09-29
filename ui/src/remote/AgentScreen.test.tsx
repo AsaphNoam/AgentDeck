@@ -33,9 +33,17 @@ const events = [
   { agent_id: "a1", seq: 3, type: "permission_request", ts: "", data: { tool_call_id: "t1", name: "Bash", reason: "", args: { command: "rm -rf dist" } } },
   { agent_id: "a1", seq: 4, type: "diff", ts: "", data: { path: "main.go", old_text: "first\nsecond\nthird", new_text: "replacement" } },
 ];
+const fullWindow = { agent_id: "a1", events, has_more: false, pending_permission: events[2], latest_assistant: "I will remove the dist folder." };
+let live: Record<string, unknown> = fullWindow;
+let earlierPage: Record<string, unknown> = {};
+const reads: string[] = [];
 
 const server = setupServer(
-  http.get("/api/sessions/a1/transcript", () => HttpResponse.json({ agent_id: "a1", events })),
+  http.get("/api/sessions/a1/transcript", ({ request }) => {
+    const url = new URL(request.url);
+    reads.push(url.search);
+    return HttpResponse.json(url.searchParams.has("before_seq") ? earlierPage : live);
+  }),
   http.get("/api/sessions/a1/prompt", () => HttpResponse.json({ error: { code: "not_found", message: "none" } }, { status: 404 })),
   http.post("/api/sessions/a1/permission", async ({ request }) => {
     posts.push(`permission ${JSON.stringify(await request.json())}`);
@@ -67,6 +75,8 @@ beforeEach(() => {
   promptStatus = 200;
   annotationStatus = 202;
   posts.length = 0;
+  reads.length = 0;
+  live = fullWindow;
   useConnection.setState({ link: "connected", agents: { a1: agent }, transcriptRev: {} });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
 });
@@ -127,6 +137,51 @@ describe("AgentScreen", () => {
     await screen.findByRole("region", { name: "Permission request" });
     act(() => useConnection.setState({ link: "unreachable" }));
     for (const name of ["Approve", "Deny", "Stop"]) expect(screen.getByRole("button", { name })).toBeDisabled();
+  });
+
+  it("shows a pending permission and latest reply that fall before the window", async () => {
+    live = {
+      agent_id: "a1",
+      events: [
+        { agent_id: "a1", seq: 900, type: "permission_resolved", ts: "", data: { tool_call_id: "t0", decision: "approve" } },
+        { agent_id: "a1", seq: 901, type: "tool_call", ts: "", data: { tool_call_id: "c1", name: "Read" } },
+      ],
+      has_more: true,
+      pending_permission: events[2],
+      latest_assistant: "Reply from before the window",
+    };
+    renderScreen();
+    const card = await screen.findByRole("region", { name: "Permission request" });
+    expect(card).toHaveTextContent("rm -rf dist");
+    expect(card).toHaveTextContent("Reply from before the window");
+    expect(reads[0]).toContain("limit=150");
+  });
+
+  it("loads earlier windows on request and keeps them contiguous with the live one", async () => {
+    live = {
+      agent_id: "a1",
+      events: [{ agent_id: "a1", seq: 151, type: "user_text", ts: "", data: { text: "Newest question" } }],
+      has_more: true,
+      pending_permission: null,
+      latest_assistant: "",
+    };
+    earlierPage = {
+      agent_id: "a1",
+      events: [{ agent_id: "a1", seq: 150, type: "user_text", ts: "", data: { text: "Older question" } }],
+      has_more: false,
+      pending_permission: null,
+      latest_assistant: "",
+    };
+    renderScreen();
+    await screen.findByText("Newest question");
+    expect(screen.queryByRole("region", { name: "Permission request" })).toBeNull();
+    live = { ...live, has_more: false };
+    fireEvent.click(screen.getByRole("button", { name: "Show earlier" }));
+    expect(await screen.findByText("Older question")).toBeInTheDocument();
+    expect(reads).toContain("?limit=150&before_seq=151");
+    await waitFor(() => expect(reads).toContain("?limit=150&since_seq=150"));
+    expect(screen.getByText("Newest question")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show earlier" })).toBeNull();
   });
 
   it("shows only status for a terminal agent", async () => {

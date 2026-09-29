@@ -36,6 +36,23 @@ export function getTranscript(agentId: string, includeMeta = false) {
   return json<{ agent_id: string; events: TranscriptEvent[] }>(`/api/sessions/${agentId}/transcript${suffix}`);
 }
 
+/** A bounded transcript window (FS-20.R13); the pending permission and latest
+ * reply are derived from the whole session, so they hold before the window. */
+export interface TranscriptWindow {
+  agent_id: string;
+  events: TranscriptEvent[];
+  has_more: boolean;
+  pending_permission: TranscriptEvent | null;
+  latest_assistant: string;
+}
+
+export function getTranscriptWindow(agentId: string, window: { limit: number; beforeSeq?: number; sinceSeq?: number }) {
+  const params = new URLSearchParams({ limit: String(window.limit) });
+  if (window.beforeSeq) params.set("before_seq", String(window.beforeSeq));
+  if (window.sinceSeq) params.set("since_seq", String(window.sinceSeq));
+  return json<TranscriptWindow>(`/api/sessions/${agentId}/transcript?${params}`);
+}
+
 // launchAgent POSTs a new session (techspec §7.1). Used by Clone to spin up a new
 // agent from an existing one's config; the server auto-suggests a name when omitted.
 export function launchAgent(body: {

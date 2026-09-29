@@ -82,7 +82,7 @@ export function PhoneApp() {
 
 function screenFor(path: string) {
   const agentId = match(path, "agent");
-  if (agentId) return <AgentScreen agentId={agentId} />;
+  if (agentId) return <AgentScreen key={agentId} agentId={agentId} />;
   const taskId = match(path, "task");
   if (taskId) return <TaskScreen taskId={taskId} />;
   const runId = match(path, "run");

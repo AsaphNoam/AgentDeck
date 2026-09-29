@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelTurn,
   decidePermission,
   getHeldPrompt,
-  getTranscript,
+  getTranscriptWindow,
   resumeAgent,
   sendPrompt,
   steerPrompt,
@@ -21,7 +21,10 @@ import { shouldRenderToolResult, ToolResult } from "../components/chat/renderers
 import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection } from "./connection";
 
-const TRANSCRIPT_TAIL = 150;
+// The phone reads a bounded window and keeps at most EARLIER_PAGES older ones
+// (FS-20.R13).
+const TRANSCRIPT_PAGE = 150;
+const EARLIER_PAGES = 3;
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 export function agentTitle(agent: Pick<AgentState, "name" | "role" | "project">) {
@@ -137,12 +140,23 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const chat = agent?.interface !== "terminal";
   const addAnnotation = useAnnotationStore((state) => state.add);
 
+  // Older windows cover seqs before `anchor`; while they are shown, the live
+  // window reads from the anchor so the two stay contiguous.
+  const [earlier, setEarlier] = useState<{ anchor: number; events: TranscriptEvent[]; pages: number; hasMore: boolean } | null>(null);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+
   const transcript = useQuery({
-    queryKey: ["transcript", agentId, rev],
-    queryFn: () => getTranscript(agentId),
+    queryKey: ["transcript", agentId, rev, earlier?.anchor],
+    queryFn: () => getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, sinceSeq: earlier ? earlier.anchor - 1 : undefined }),
     enabled: chat,
     placeholderData: (prev) => prev,
   });
+  // More than a window arrived after the anchor: the older pages no longer
+  // adjoin the live window, so drop them rather than show a gap.
+  const gap = !!earlier && !transcript.isPlaceholderData && !!transcript.data?.has_more;
+  useEffect(() => {
+    if (gap) setEarlier(null);
+  }, [gap]);
   const held = useQuery({
     queryKey: ["held", agentId, rev, agent?.state],
     queryFn: () => getHeldPrompt(agentId).catch(() => null),
@@ -150,12 +164,36 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   });
 
   const events = useMemo(
-    () => withResolutions((transcript.data?.events ?? []).map((event) => normalizeEvent(event as TranscriptEvent))),
-    [transcript.data],
+    () => withResolutions([...(earlier?.events ?? []), ...(transcript.data?.events ?? [])].map((event) => normalizeEvent(event))),
+    [earlier, transcript.data],
   );
-  const pending = [...events].reverse().find((event) => event.kind === "permission_request" && !event.resolved);
-  const latest = String([...events].reverse().find((event) => event.kind === "assistant_text")?.text ?? "");
+  // The server derives both from the whole session, so they hold when the
+  // request or the reply falls before the window.
+  const pendingEvent = transcript.data?.pending_permission;
+  const pending = pendingEvent ? normalizeEvent(pendingEvent) : undefined;
+  const latest = transcript.data?.latest_assistant ?? "";
   const refresh = () => void client.invalidateQueries({ queryKey: ["transcript", agentId] });
+  const olderAvailable = earlier ? earlier.hasMore : !!transcript.data?.has_more;
+
+  const showEarlier = async () => {
+    const anchor = earlier?.anchor ?? transcript.data?.events[0]?.seq;
+    const before = earlier?.events[0]?.seq ?? anchor;
+    if (!anchor || !before) return;
+    setLoadingEarlier(true);
+    try {
+      const page = await getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, beforeSeq: before });
+      setEarlier((prev) => ({
+        anchor,
+        events: [...page.events, ...(prev?.events ?? [])],
+        pages: (prev?.pages ?? 0) + 1,
+        hasMore: page.has_more,
+      }));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setLoadingEarlier(false);
+    }
+  };
 
   if (!agent) return <p className="phone-empty">This agent is not on the Mac any more.</p>;
 
@@ -197,8 +235,16 @@ export function AgentScreen({ agentId }: { agentId: string }) {
         <p className="phone-empty">This is a terminal agent. Its terminal is on the Mac; the phone shows its status only.</p>
       ) : (
         <>
+          {olderAvailable &&
+            ((earlier?.pages ?? 0) < EARLIER_PAGES ? (
+              <button type="button" className="phone-link" disabled={offline || loadingEarlier} onClick={() => void showEarlier()}>
+                Show earlier
+              </button>
+            ) : (
+              <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
+            ))}
           <ol className="phone-transcript" aria-label="Conversation">
-            {events.slice(-TRANSCRIPT_TAIL).map((event) => (
+            {events.map((event) => (
               <li key={`${event.seq}:${event.kind}`}>
                 <EventRow event={event} onAnnotate={annotate} />
               </li>
