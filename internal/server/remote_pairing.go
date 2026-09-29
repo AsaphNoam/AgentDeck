@@ -28,6 +28,7 @@ const (
 	pairCodeMaxFailures = 5
 	pairPeerMaxFailures = 10
 	pairPeerWindow      = 5 * time.Minute
+	pairPeerMaxTracked  = 256 // failing tailnet nodes remembered at once (INV §16)
 	pairWaitTimeout     = 20 * time.Second
 	remoteNameMax       = 64
 
@@ -220,6 +221,35 @@ func qrSVG(text string) string {
 	return b.String()
 }
 
+// pruneFailuresLocked drops every per-peer failure window that has expired.
+func (p *remotePairing) pruneFailuresLocked(now time.Time) {
+	for id, f := range p.failures {
+		if now.Sub(f.since) > pairPeerWindow {
+			delete(p.failures, id)
+		}
+	}
+}
+
+// recordFailureLocked counts a failed claim for peer. Bounded: at most
+// pairPeerMaxTracked nodes, evicting the oldest window when full (INV §16).
+func (p *remotePairing) recordFailureLocked(peer string, now time.Time) {
+	f := p.failures[peer]
+	if f == nil {
+		if len(p.failures) >= pairPeerMaxTracked {
+			oldest := ""
+			for id, o := range p.failures {
+				if oldest == "" || o.since.Before(p.failures[oldest].since) {
+					oldest = id
+				}
+			}
+			delete(p.failures, oldest)
+		}
+		f = &peerFailures{since: now}
+		p.failures[peer] = f
+	}
+	f.count++
+}
+
 type pairClaimBody struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
@@ -243,12 +273,8 @@ func (s *Server) handlePairClaim(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	p := s.remotePairing
 	p.mu.Lock()
-	f := p.failures[rr.peer.StableID]
-	if f != nil && now.Sub(f.since) > pairPeerWindow {
-		delete(p.failures, rr.peer.StableID)
-		f = nil
-	}
-	if f != nil && f.count >= pairPeerMaxFailures {
+	p.pruneFailuresLocked(now)
+	if f := p.failures[rr.peer.StableID]; f != nil && f.count >= pairPeerMaxFailures {
 		p.mu.Unlock()
 		writeRemoteError(w, http.StatusTooManyRequests, codeRemoteRateLimited, "too many attempts; wait a few minutes")
 		return
@@ -261,12 +287,7 @@ func (s *Server) handlePairClaim(w http.ResponseWriter, r *http.Request) {
 				p.code = nil
 			}
 		}
-		if f == nil {
-			// Bounded: one entry per failing tailnet node, expired by the window.
-			f = &peerFailures{since: now}
-			p.failures[rr.peer.StableID] = f
-		}
-		f.count++
+		p.recordFailureLocked(rr.peer.StableID, now)
 		p.mu.Unlock()
 		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
 		return

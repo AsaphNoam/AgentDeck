@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -213,6 +214,27 @@ func TestRemotePairingDeclineExpiryAndLimits(t *testing.T) {
 	_ = json.Unmarshal(doGET(t, loop, "/api/remote").Body.Bytes(), &view)
 	if view.PendingPairing != nil {
 		t.Fatal("pending pairing survived disable")
+	}
+}
+
+// Failures from many distinct nodes stay bounded: expired windows are pruned
+// and a full table evicts its oldest window (TS-13.R8, INV §16).
+func TestRemotePairingFailureTrackingIsBounded(t *testing.T) {
+	p := &remotePairing{failures: map[string]*peerFailures{}}
+	start := time.Now()
+	for i := 0; i < pairPeerMaxTracked+10; i++ {
+		p.recordFailureLocked(fmt.Sprintf("node-%d", i), start.Add(time.Duration(i)*time.Millisecond))
+	}
+	if len(p.failures) != pairPeerMaxTracked {
+		t.Fatalf("tracked %d peers, cap %d", len(p.failures), pairPeerMaxTracked)
+	}
+	if p.failures["node-0"] != nil || p.failures[fmt.Sprintf("node-%d", pairPeerMaxTracked+9)] == nil {
+		t.Fatal("eviction did not drop the oldest window")
+	}
+
+	p.pruneFailuresLocked(start.Add(pairPeerWindow + time.Hour))
+	if len(p.failures) != 0 {
+		t.Fatalf("expired windows survived pruning: %d", len(p.failures))
 	}
 }
 
