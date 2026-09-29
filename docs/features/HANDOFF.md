@@ -18,8 +18,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Current position
 
-- **Active change:** `centralize-launch-support` (in progress since 2026-09-29; see **Active
-  change**). `add-mobile-remote-control` finished 2026-09-28; its reviews closed 2026-09-29.
+- **Active change:** none. `centralize-launch-support` finished 2026-09-29.
+  `add-mobile-remote-control` finished 2026-09-28; its reviews closed 2026-09-29.
 - **Release:** `v0.6.0` is tagged and published; **Release state** carries its contents. `v0.5.0` and earlier
   are in the state archive, as are the units, findings and bug reports it closed.
 - **Review units:** `add-studio-skin` (finished 2026-09-23) and `complete-studio-composition`
@@ -29,9 +29,10 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   closed. Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
   `drop-pipeline-recipient-refusal` (finished and reviewed 2026-09-29) is closed with no findings.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
-  instruction; it can be added later.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start; `centralize-launch-support.md`
-  is in progress.
+  instruction; it can be added later. **Available:** `centralize-launch-support` (finished
+  2026-09-29; `internal/backend` launch support, `/api/backends` `backend_support`, New Agent,
+  Switch runtime and Settings consumers).
+- **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
   uncommitted Cursor backend draft on 2026-09-23); `New ideas`
@@ -56,22 +57,11 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-**`centralize-launch-support`** ([change](../ready-changes/centralize-launch-support.md);
-FS-09.R60–R63/A30–A32, TS-01.R36, TS-03.R47). Plan: (1) `internal/backend` `LaunchSupport` +
-per-adapter interface declaration; server Terminal gate and `SupportsEffort`/`SupportsFast` derive
-from it; (2) `backend_support` on GET/PUT `/api/backends` via one builder + tolerant browser parse;
-(3) New Agent + CardContextMenu Switch runtime consume it, `lib/backendTypes.terminalSupported`
-removed; (4) Settings ModelRow repair path; (5) rendered journeys + closure matrix.
-Done: slices 1–2 — `backend.Support`/`Implements`/`SupportsTerminal`, `newBackendsResponse` (all
-three GET/PUT paths), `ui/src/schemas/backends.ts` `parseBackendSupport`/`launchSupportFor`/
-`withBackendSupport`/`editableBackendsConfig` (PUT body), MSW wire fixture
-`ui/src/test/backendSupport.ts`. Tests: `TestLaunchSupportMatrix`,
-`TestGetBackendsReportsLaunchSupport`, `TestPutBackendsIgnoresEchoedLaunchSupport`,
-`schemas/backends.test.ts`. Slice 3 done: New Agent and CardContextMenu Switch runtime use
-`launchSupportFor` + host availability, missing metadata offers Retry (backends `refetch`) and
-withholds unverified Terminal/effort/fast; `lib/backendTypes.terminalSupported` removed. Specs stay
-`(planned)` until consumers ship. Next: slice 4 (Settings; drafted by a delegated Sonnet agent,
-uncommitted in `ui/src/features/settings`, needs review), then slice 5.
+None. **Review note (`centralize-launch-support`):** the Settings slice was drafted by a delegated
+agent and reviewed here; a Settings model row with an unsupported declaration now opens itself
+(found in the rendered pass) — confirm that is the intended repair affordance. Rendered journeys
+ran headless against `go run ./scripts/stress-fixture --port 4399` (after `make embed`; kill any
+earlier fixture first — a stale process served an old bundle once).
 
 **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
@@ -103,8 +93,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` has no recorded findings and no `/review` unit is pending. `/work` may
-take `rename-product-to-deckhand` or resume `centralize-launch-support`;
+**Available by role:** `/fix` has no recorded findings; `/review` may take
+`centralize-launch-support`. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -139,6 +129,16 @@ browser re-check of the four fixes passed the same day (third pass).
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Work: `centralize-launch-support` finished.** `internal/backend` owns
+  `LaunchSupport` (per-adapter `Implements` + existing effort/fast delivery); the server Terminal gate
+  and catalog helpers derive from it. `/api/backends` GET/PUT carry read-only `backend_support`
+  through `newBackendsResponse`; the browser parses it tolerantly and PUT sends only the editable
+  catalog. New Agent, Switch runtime and Settings consume it with missing-metadata Retry; the
+  browser Terminal allowlist is gone. FS-09.R60–R63/A30–A32, TS-01.R36, TS-03.R47 shipped.
+  Closure: `make test`, `make build`, UI suite (65 files, 551 tests), UI build, `git diff --check`;
+  headless rendered New Agent, Switch runtime and Settings type-change→clear→save journeys pass.
+  INV 1/2/3/8/10/11/13/17 apply; 4–7, 9, 12, 14–16 have no changed surface.
 
 - **2026-09-29 — Review: stale pipeline-stage recipient refusal removal.** No findings; the change
   matches FS-06.R37/A26 and TS-04.R67. The focused messaging/server tests pass, and the new

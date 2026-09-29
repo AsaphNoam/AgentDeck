@@ -547,3 +547,4 @@ the old behavior before relying on it.
 | `notificationPayload` | `internal/bus/` | all notification payloads (§8) |
 | `fakeacp` test double | `internal/runtime/testdata/fakeacp` | env-driven protocol-level repros (`FAKEACP_LOAD_DUMP`, `FAKEACP_PROTO_VERSION`, `ignore_cancel`); it drops out-of-schema session-request members like the pinned peer (§17) |
 | `backend.Types` | `internal/backend/adapter.go` | enumerating every backend type instead of restating the union (§2, §17) |
+| `backend.Support` / `launchSupportFor` | `internal/backend/adapter.go`, `ui/src/schemas/backends.ts` | every interface/effort/fast launch-support decision; never a browser or server backend-type allowlist (§2, §10) |

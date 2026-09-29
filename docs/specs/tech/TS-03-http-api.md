@@ -613,7 +613,7 @@ cross the API. Child tool, result, diff and permission payloads carry Runtime's 
 `tool_call_id`; the existing permission endpoint accepts that opaque value unchanged, so no provider
 child-session id or second decision route reaches HTTP.
 
-**R47 (planned) — Backend responses project adapter launch support without extending editable
+**R47 (shipped 2026-09-29) — Backend responses project adapter launch support without extending editable
 configuration.** `GET /api/backends` and successful `PUT /api/backends` responses add
 `backend_support`, a non-null object keyed by every registered backend type, independently of
 configured backend instances. Each value contains explicit `chat` and `terminal` objects with

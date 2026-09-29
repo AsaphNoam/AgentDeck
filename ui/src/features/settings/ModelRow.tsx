@@ -81,6 +81,9 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
     : "This backend type doesn't support this.";
   const clearEfforts = () => onChange({ ...model, efforts: [], default_effort: undefined });
   const clearFast = () => onChange({ ...model, fast: false });
+  // Keep an unsupported declaration in view rather than behind a collapsed row.
+  const needsRepair = (hasEffort && !capability.effortAllowed) || (hasFast && !capability.fastAllowed);
+  const showEditor = expanded || needsRepair;
 
   return (
     <div className="model-row">
@@ -108,11 +111,11 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
         <code className="config-slug">{modelId}</code>
         {isDefault && <span className="config-badge">default</span>}
         <button type="button" className="btn-link" onClick={() => setExpanded((x) => !x)}>
-          {expanded ? "▴ env" : `▾ env (${pairs.length})`}
+          {showEditor ? "▴ env" : `▾ env (${pairs.length})`}
         </button>
         <button type="button" className="btn-danger btn-sm" onClick={onRemove}>Remove</button>
       </div>
-      {expanded && (
+      {showEditor && (
         <div className="model-env-editor">
           {(capability.effortAllowed || hasEffort) && (
             <label className="form-field">

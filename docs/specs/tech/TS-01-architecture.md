@@ -466,7 +466,7 @@ best-effort through the same ACP session owner before the error returns (INV §4
 background processes never transfer; copied open task state is terminally fenced at the clone
 boundary.
 
-**R36 (planned) — Adapter launch support has one owner and remains separate from session
+**R36 (shipped 2026-09-29) — Adapter launch support has one owner and remains separate from session
 capabilities.** `internal/backend` owns a typed `LaunchSupport` value with `Available`, `Effort`
 and `Fast` booleans for a backend type and interface. Each registered adapter explicitly declares
 which of the existing `chat` and `terminal` interfaces it implements. One pure helper derives effort

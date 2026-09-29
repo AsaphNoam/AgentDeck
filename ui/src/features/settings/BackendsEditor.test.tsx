@@ -377,6 +377,19 @@ describe("BackendsEditor", () => {
     expect(savedModel.fast).toBe(false);
   });
 
+  it("shows a collapsed model's now-unsupported declaration without expanding it", async () => {
+    server.use(http.get("/api/backends", () => HttpResponse.json({
+      version: 2,
+      backend_support: BACKEND_SUPPORT_WIRE,
+      backends: { claude: { ...defaultBackendsDoc.backends.claude, models: { sonnet: { name: "Sonnet", model: "s", efforts: ["low", "high"], default_effort: "low" } } } },
+    })));
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    expect(screen.queryByText("Clear effort levels")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue(/Claude \(claude-acp\)/), { target: { value: "opencode-acp" } });
+    expect(await screen.findByText("Clear effort levels")).toBeInTheDocument();
+  });
+
   it("retains unsupported values when switching back to a supporting type before clearing", async () => {
     renderWithQuery(<BackendsEditor />);
     await screen.findByDisplayValue("Claude");

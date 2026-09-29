@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-29 · **Baseline:** `367a433`
 **State:** Assessment accepted 2026-09-29; retained rationale, not an authoritative specification.
-The bounded design is now [ready to start](../ready-changes/centralize-launch-support.md), governed
-by FS-09.R60–R63, TS-01.R36 and TS-03.R47. Implementation has not started. The promotion call-site
+The bounded design shipped 2026-09-29 as `centralize-launch-support`, governed
+by FS-09.R60–R63, TS-01.R36 and TS-03.R47. The promotion call-site
 check also included the dashboard Switch runtime dialog, which shares the browser Terminal rule;
 the baseline assessment below predates that additional consumer check.
 **Origin:** Operator requested a skeptical assessment of an AI-generated architecture suggestion.
