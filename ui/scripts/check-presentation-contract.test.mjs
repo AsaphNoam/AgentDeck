@@ -87,6 +87,44 @@ test("keeps the Studio canvas dot grid at its specified low contrast", () => {
   assert.match(ornament, /opacity:\s*0\.1(?:0)?\s*;/);
 });
 
+function featureRule(file, selector) {
+  const css = fs.readFileSync(path.join(process.cwd(), "src", "styles", "features", file), "utf8");
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [...css.matchAll(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`, "g"))].map((match) => match[1]).join("\n");
+}
+
+test("keeps finished task rows at full token contrast", () => {
+  const tasks = fs.readFileSync(path.join(process.cwd(), "src", "styles", "features", "tasks.css"), "utf8");
+  const finished = [...tasks.matchAll(/\.task-row\[data-state="finished"\][^{]*\{([^}]*)\}/g)].map((match) => match[1]).join("\n");
+
+  assert.doesNotMatch(finished, /opacity|filter|transparent/);
+
+  const luminance = (hex) => [1, 3, 5]
+    .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  for (const [prefix, file] of [["core", "tokens.css"], ["studio", "skins/studio.css"], ["sky-grove", "skins/sky-grove.css"]]) {
+    const css = fs.readFileSync(path.join(process.cwd(), "src", "styles", file), "utf8");
+    const raw = (name) => css.match(new RegExp(`--ad-${prefix}-${name}:\\s*(#[0-9a-f]{6});`, "i"))?.[1];
+    const [muted, canvas] = [luminance(raw("muted")), luminance(raw("canvas"))];
+    assert.ok((Math.max(muted, canvas) + 0.05) / (Math.min(muted, canvas) + 0.05) >= 4.5, `${prefix} muted text on canvas`);
+  }
+});
+
+test("promotes the shared soft overlay and message geometry to every appearance", () => {
+  for (const [file, selector] of [
+    ["shell.css", ".toast"],
+    ["agent.css", ".permission-prompt"],
+    ["agent.css", ".user-message"],
+    ["dashboard.css", ".context-menu"],
+  ]) {
+    const rule = featureRule(file, selector);
+    assert.match(rule, /border-radius:\s*var\(--ad-radius-large\);/, selector);
+    assert.doesNotMatch(rule, /--ad-border-thick|\b8px solid/, selector);
+  }
+  assert.match(featureRule("pipelines.css", ".pipeline-run-title h2"), /font-size:\s*1\.875rem;/);
+});
+
 test("rejects implementation classes in production skin selectors", () => {
   expectFailure(fixture({
     skins: ["sky-grove"],

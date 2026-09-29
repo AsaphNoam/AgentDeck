@@ -404,7 +404,7 @@
 .user-message {
   background: var(--ad-highlight);
   border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small) var(--ad-radius-large);
+  border-radius: var(--ad-radius-large);
   font-weight: 560;
   margin-left: auto;
   max-width: 64ch;
@@ -495,8 +495,9 @@
 
 .permission-prompt {
   background: color-mix(in srgb, var(--ad-state-waiting) 8%, var(--ad-surface-panel));
-  border: var(--ad-border-thick) solid var(--ad-state-waiting);
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  border: var(--ad-border-thin) solid var(--ad-state-waiting);
+  border-inline-start-width: 4px;
+  border-radius: var(--ad-radius-large);
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2);

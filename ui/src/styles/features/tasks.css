@@ -183,8 +183,10 @@
   padding-inline: var(--ad-space-4);
 }
 
-.task-row[data-state="finished"] {
-  opacity: 0.78;
+/* Finished rows recede through type emphasis, never alpha, so muted text keeps its token contrast. */
+.task-row[data-state="finished"] .task-name {
+  color: var(--ad-text-secondary);
+  font-weight: 500;
 }
 
 .task-row-top {

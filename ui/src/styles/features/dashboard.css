@@ -527,8 +527,8 @@
 
 .context-menu {
   background: var(--ad-surface-raised);
-  border: var(--ad-border-thick) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-large);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
   box-shadow: var(--ad-shadow-offset);
   display: grid;
   /* A menu taller than the short viewport is clamped to the top margin by

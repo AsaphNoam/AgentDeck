@@ -317,7 +317,7 @@
 .pipeline-run-kicker { align-items: center; display: flex; gap: var(--ad-space-3); justify-content: space-between; }
 .pipeline-run-kicker code { color: var(--ad-technical-muted); font-size: 0.68rem; }
 .pipeline-run-title { align-items: end; display: grid; gap: var(--ad-space-6); grid-template-columns: minmax(0, 2fr) minmax(180px, 0.8fr); }
-.pipeline-run-title h2 { color: var(--ad-technical-text); font-size: clamp(2.2rem, 5vw, 4.5rem); letter-spacing: -0.055em; line-height: 0.9; }
+.pipeline-run-title h2 { color: var(--ad-technical-text); font-size: 1.875rem; line-height: 1.1; }
 .pipeline-run-title p { color: var(--ad-technical-muted); font-size: 1.05rem; line-height: 1.45; margin-top: var(--ad-space-3); max-width: 900px; }
 .pipeline-live-stage { border-left: var(--ad-border-thin) solid var(--ad-technical-muted); display: grid; gap: var(--ad-space-1); padding-left: var(--ad-space-4); }
 .pipeline-live-stage small,

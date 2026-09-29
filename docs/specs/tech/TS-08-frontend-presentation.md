@@ -209,7 +209,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   | Role | Value |
   |---|---|
   | Canvas / panel / raised | `#e8f4f8` / `#f4fafb` / `#ffffff` |
-  | Primary / secondary / muted text | `#17332f` / `#34524e` / `#697e7b` |
+  | Primary / secondary / muted text | `#17332f` / `#34524e` / `#5c716e` |
   | Default / strong border | `#bed5d9` / `#3a675f` |
   | Primary action / secondary action / highlight | `#2f7058` / `#287a9b` / `#d5e9c6` |
   | Busy / idle / waiting / done / error / unknown | `#b46b1e` / `#687d7a` / `#287a9b` / `#2f7d5c` / `#b8454d` / `#829491` |

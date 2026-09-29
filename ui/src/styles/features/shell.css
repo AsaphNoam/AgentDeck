@@ -288,9 +288,9 @@
 .toast {
   align-items: start;
   background: var(--ad-surface-raised);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-left: 8px solid var(--ad-state-busy);
-  border-radius: var(--ad-radius-small) var(--ad-radius-large) var(--ad-radius-large) var(--ad-radius-small);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-left: 4px solid var(--ad-state-busy);
+  border-radius: var(--ad-radius-large);
   box-shadow: var(--ad-shadow-offset);
   color: var(--ad-text-primary);
   display: grid;
