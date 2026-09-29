@@ -27,9 +27,9 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   closed. Evidence: `docs/archive/reviews/implementation-studio-acceptance-2026-09-29.md`.
   `share-creative-workspace-layout` (finished 2026-09-28, reviewed and fixed 2026-09-29) is
   closed. Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
+  `drop-pipeline-recipient-refusal` (finished and reviewed 2026-09-29) is closed with no findings.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
-  instruction; it can be added later. **Available:** `drop-pipeline-recipient-refusal`
-  (finished 2026-09-29; `create_task`/`send_message` refusal path in `internal/messaging`).
+  instruction; it can be added later.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start; `centralize-launch-support.md`
   is in progress.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
@@ -99,9 +99,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` has no recorded findings; `/review` may take
-`drop-pipeline-recipient-refusal`. `/work` may take `rename-product-to-deckhand` or resume
-`centralize-launch-support`;
+**Available by role:** `/fix` has no recorded findings and no `/review` unit is pending. `/work` may
+take `rename-product-to-deckhand` or resume `centralize-launch-support`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -136,6 +135,12 @@ browser re-check of the four fixes passed the same day (third pass).
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-29 — Review: stale pipeline-stage recipient refusal removal.** No findings; the change
+  matches FS-06.R37/A26 and TS-04.R67. The focused messaging/server tests pass, and the new
+  snapshot-less recipient test fails against the pre-fix handlers with the obsolete pipeline/Resume
+  wording. INV 2/8/10/11/17 apply and pass; classes 1, 3–7, 9, and 12–16 have no applicable changed
+  surface. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna (no fixes required).
 
 - **2026-09-29 — Usability review, third phone pass (390px re-check of the four fixes).** Against
   the dev fixture at `367a433`: a stopped task's agent is listed once on Home; Re-arm confirms the
