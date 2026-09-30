@@ -36,13 +36,12 @@ None.
 
 ## Blocked on human
 
-- **Conversation file-viewer scope:** the reported “path outside this agent's working directory”
-  refusal is confirmed works-as-specified, not a code defect. FS-03.R55, TS-03.R40, and TS-05.R21
-  deliberately make the session working directory the only readable root, and the focused server
-  containment tests pass. The requested broader behavior needs a product/security decision before
-  feature design: should the viewer read every file the AgentDeck process can read, or only the
-  session's explicitly authorized roots (`cwd` plus `add_dirs`)? No fix unit or model recommendation
-  was created.
+- **Unrestricted conversation file viewing:** feature behavior is drafted in FS-03.R64/A45 after
+  the operator chose every OS-readable file rather than `cwd` plus `add_dirs`. Before technical
+  design, confirm the explicit consequence: a hand-edited local API request has the same direct
+  arbitrary-file-read authority as a clicked agent-authored link, including outside projects and
+  inside `.git`, without a per-read confirmation. Existing type/size limits remain and remote
+  control gains no file-read route.
 
 ## Review findings
 

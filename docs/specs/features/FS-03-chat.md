@@ -452,6 +452,21 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   row, transcript event, archive content, search document, or browser-stored value is added, and no
   agent-facing surface changes — an agent cannot open the viewer, be shown it, or learn it exists.
 
+- **R64 `(planned)` — Conversation file reads are unrestricted by project roots.** This supersedes
+  R55's working-directory and `.git` containment when it ships. A local filesystem link may name
+  any regular UTF-8 file the AgentDeck process can read, including a file outside every configured
+  project or `add_dirs`, a path reached through a symlink, and a file inside `.git`. Relative paths
+  still resolve from the session's recorded working directory; absolute and `file://` paths need no
+  session-root authorization. The viewer shows the effective path it read, keeps the path in
+  `?file=` so reload and browser history still work, and reads only on open or explicit **Reload**.
+  A hand-edited local request has the same reach as a clicked agent-authored link: no confirmation
+  or transcript-origin check is added. The read stays bounded, read-only, and text-only; missing or
+  unreadable files, directories, sockets, FIFOs, other non-regular files, and non-UTF-8 content keep
+  their stated refusals, while an oversized text file keeps its labelled partial result. Composer
+  file search remains working-directory-confined under R34, no directory browsing or path
+  discovery is added, no remote-control route gains file-reading authority, and no file content or
+  access history becomes durable AgentDeck state.
+
 - **R56 — A steer that loses the active turn remains host-owned.** If the
   adapter handles a Steer request after no provider turn is still active, it returns a
   no-consumption `promptRequired` outcome instead of launching a detached turn. AgentDeck then sends
@@ -840,6 +855,18 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   writes the exact selection and does not create a draft, while Annotate keeps the clipped selected
   excerpt. With no selection only whole-event annotation appears, and annotations-disabled events
   retain the native context menu. *Verify:* `TranscriptView.test.tsx`.
+
+- **A45 `(planned)` (R64)** — From a live or archived conversation, absolute, `file://`, symlinked,
+  and rendered-Markdown links each open a regular UTF-8 file outside the session working directory;
+  a `.git` file opens too. A hand-edited `?file=` address reopens the same outside file, and an
+  absolute file remains readable when the archived session's working directory is gone. The viewer
+  displays the effective path and preserves line selection, explicit reload, read timestamp,
+  truncation labelling, Markdown source/rendered modes, and replacement by the next file. Relative
+  links still use the session working directory and fail with `workspace_unavailable` when that
+  base is gone. Directory, socket, FIFO, non-UTF-8, missing, and unreadable targets retain their
+  typed refusals; composer search and the remote-control listener cannot discover or read an outside
+  path. *Verify by* focused server route tests, file-link and viewer component tests, the remote
+  allowlist test, and journey J3 with one outside-workspace link.
 
 
 ## 6. Deviations & open decisions

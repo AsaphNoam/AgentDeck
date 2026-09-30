@@ -38,10 +38,15 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Read files from configured additional project directories.** Let an operator open files under
-  explicitly configured project `add_dirs`, not arbitrary host paths. Define whether the readable
-  roots come from the frozen session snapshot, how symlinks and `.git` paths are handled, and how
-  the existing type/size limits and browser-facing path security boundary apply.
+- **Open any local text file from a conversation link.** A field report showed that links outside
+  the session working directory always fail with “path outside this agent's working directory.” The
+  operator chose unrestricted viewing rather than limiting the expansion to configured `add_dirs`:
+  a clicked link or direct local API request may name any regular UTF-8 file the AgentDeck process
+  can read, including paths outside projects and inside `.git`. Preserve the viewer's read-only,
+  bounded-content behavior and its refusals for directories, special files, binary content,
+  missing files, and unreadable files; do not broaden composer file search or add file browsing.
+  Feature scope is awaiting confirmation of the direct arbitrary-file-read consequence before
+  technical design.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,
