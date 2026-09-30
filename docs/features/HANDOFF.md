@@ -41,7 +41,47 @@ None.
 
 ## Review findings
 
-None.
+**`open-and-annotate-any-local-file` — Fix model: medium — Codex Terra or Claude Opus.**
+
+- **Must fix** (FS-03.R64/A45, FS-13.R25; INV §1/§10) —
+  `ui/src/components/chat/FileViewer.tsx:70-84,102` uses the server's normalized `file.path` for
+  rendered-file links and annotation anchors, but still shows `link.path`, and no loaded response
+  republishes the normalized spelling to the route. Normal trigger: open
+  `?file=./docs/../README.md` or an absolute path with dot segments. The server reads and returns the
+  normalized file, while the header and browser history keep the raw spelling and a resulting
+  annotation names a path the person was not shown. Render the loaded path and synchronize it
+  through `onOpenFile` while preserving the cited line; cover header, URL, reload, and draft-anchor
+  agreement for relative and absolute dot segments.
+
+- **Worth fixing** (FS-03.R64, TS-03.R48; INV §8) —
+  `internal/server/fileread.go:96-104` applies `strings.TrimSpace` to the path before resolution.
+  A valid file whose name begins or ends with whitespace is silently redirected to a different
+  pathname (and may display that other file) or reported missing, despite the contract admitting
+  any readable regular UTF-8 file. Use trimming only to recognize an all-whitespace missing value,
+  preserve the supplied path for resolution, and add leading/trailing-space filename cases.
+
+- **Worth fixing** (TS-03.R48; INV §8/§14) —
+  `ui/src/components/chat/renderers/filePath.ts:30-56` accepts every `file://` authority. For example,
+  `file://server/share/note.md` becomes the relative local path `server/share/note.md` and opens the
+  viewer, although only empty-host and `localhost` file URLs are local targets. Parse the URL,
+  reject non-local or malformed authorities, and pin empty-host, `localhost`, remote-host, and
+  percent-escaped cases independently.
+
+- **Worth fixing** (TS-05.R24, TS-13.R5; INV §14/§17) —
+  `internal/server/remote_routes_test.go:152-175` tests representative denied routes but never sends
+  an authenticated tailnet request to `/api/sessions/{id}/file`; the inventory test proves only
+  that the route appears in `remoteDenied`. Add the required behavioral denial test and assert
+  `404 remote_route_not_available` with no file content returned.
+
+- **Worth fixing** (FS-03.A46, FS-13.A16, TS-02.R38, TS-03.R49, TS-08.R80; INV §11/§17) —
+  `ui/src/components/chat/FileViewer.test.tsx:125-146` stops at the callback seam, while
+  `internal/server/annotations_test.go:88-145` checks constructed validation/formatter inputs and
+  mail substrings. Nothing proves the `TranscriptView` menu/store/wire integration, a mixed
+  transcript/file tray through reload/edit/remove/send, the exact persisted file anchor and
+  live/replay card, or unchanged legacy serialization/rendering. A break in the shared wiring or
+  additive payload can therefore leave all current tests green. Add integration and round-trip
+  fixtures at those boundaries, including invalid-anchor tray preservation and the mixed J13
+  journey the shipped acceptance item names.
 
 ## Decisions needing your input
 
@@ -61,6 +101,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Review: `open-and-annotate-any-local-file`.** One Must-fix path-identity defect and
+  four Worth-fixing edge/verification gaps keep the unit open. The unrestricted route otherwise
+  retains regular-file, descriptor, UTF-8, size, loopback, remote-inventory, persistence-order, and
+  legacy-shape protections. INV 1/2/3/7/8/10/11/13–17 were reviewed; 4–6, 9, and 12 had no
+  applicable changed surface. The focused server/runtime/transcript/index suites, four focused UI
+  files (40 tests), style/presentation contract, spec checks, and diff check pass; the first Go runs
+  were sandbox-blocked on test sockets and the authorized rerun passed.
 
 - **2026-09-30 — Feature design: exact context and expanded-card runtime metadata.** Specified an
   additive optional used/total token pair through ACP, durable status/session state, AgentState SSE,
