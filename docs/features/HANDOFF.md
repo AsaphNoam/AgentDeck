@@ -16,7 +16,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   archive asset. The release audit changed no operator guidance or pinned component version.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review and fix units:** none available.
+- **Review and fix units:** `claude-model-switch-resume` is available with one confirmed Must-fix
+  finding and a skipped reproduction test.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -45,7 +46,37 @@ None.
 
 ## Review findings
 
-None.
+### claude-model-switch-resume — **Fix model:** medium — Codex Terra or Claude Opus.
+
+From the 2026-09-30 investigation of Claude same-backend model switching.
+
+**Report (verbatim).** “switching between Claude models doesn't work (whichever model you swap to,
+it changes to sonnet 5), unless you move from codex to that Claude model, then it works, but
+changing again from sonnet to opus will go to sonnet, and specifically sonnet 5 even though the
+backend is configured with sonnet5.5.” No AgentDeck version, separate log, or fuller environment
+description was supplied. The current checkout pins `claude-agent-acp` 0.75.1.
+
+- **Must fix** (confirmed) (FS-01.R13–R15/A8, FS-09.R21/R29, TS-04.R13/R47;
+  INV §1/§2/§11/§12/§17) — a Claude-to-Claude model switch persists and reports the requested model
+  but resumes the provider session on its previous model. `internal/backend/adapter.go:188-195` says
+  Claude can switch model on native resume, so `internal/server/switch.go:148-162` preserves the
+  prior native session and `internal/runtime/chat.go:1203-1266` drives `session/load`. AgentDeck
+  includes the requested model in Claude's `_meta` options, but its shared post-session configuration
+  step at `internal/runtime/chat.go:2430-2436` applies the model only for `codex-acp`. The bundled
+  adapter proves why that is insufficient: `acp-agent.js:5708-5735` loads the transcript's model
+  hint, `:5960-5965` passes AgentDeck's options into SDK construction, then `:7217-7265` explicitly
+  chooses the resumed transcript model and skips `setModel` when no environment/settings override
+  exists. Normal-use trigger: select another model for any running Claude chat agent. The dashboard
+  records the new identity while the provider keeps the old model; a prior `sonnet` alias therefore
+  resolves back to Sonnet 5 even when the selected catalog entry points elsewhere. Codex-to-Claude
+  works because it has no compatible native session and takes the fresh `session/new` path instead.
+  Existing switch/parameter tests pass because they assert persisted identity and request shape, not
+  the adapter's applied model. The skipped
+  `internal/runtime/chat_test.go:TestResumeClaudeAppliesRequestedModelAfterSessionLoad` reproduces
+  the missing post-load model call and fails when unskipped. Fix at the existing session-configuration
+  seam: after a successful Claude load, apply and verify the selected model before effort/fast, or
+  deliberately use the primer path if native model change cannot be honored; update TS-04's stale
+  claim that Claude gains nothing from post-session model delivery.
 
 ## Decisions needing your input
 
@@ -65,6 +96,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Bug investigation: Claude same-backend model switching.** Confirmed that
+  same-backend Claude switches resume the transcript's prior provider model while AgentDeck records
+  the newly selected one. Cross-backend Codex-to-Claude switches work because they create a fresh
+  Claude session. Added a skipped regression that fails on the missing post-load model-setting call;
+  no product code or specification changed.
 
 - **2026-09-30 — Bug investigation: conversation links outside the working directory.** Confirmed
   the refusal is the shipped security contract rather than a regression: the request supplies only

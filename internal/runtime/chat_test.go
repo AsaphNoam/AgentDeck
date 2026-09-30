@@ -770,6 +770,41 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	}
 }
 
+// Reproduction for the 2026-09-30 Claude model-switch finding: the pinned
+// adapter restores the transcript's previous model on session/load. AgentDeck
+// must explicitly apply the newly selected model after that load succeeds; the
+// _meta option used to construct the resumed SDK query is not sufficient.
+func TestResumeClaudeAppliesRequestedModelAfterSessionLoad(t *testing.T) {
+	t.Skip("BUG: Claude session/load resumes on the transcript model without a post-load model setting")
+
+	c, spec := newChatTest(t, "stream_text")
+	ctx := context.Background()
+	configLog := filepath.Join(t.TempDir(), "config.ndjson")
+	spec.ModelID = "opus"
+	spec.Env = append(spec.Env, "FAKEACP_CONFIG_LOG="+configLog)
+
+	h, err := c.Resume(ctx, spec, "prior-sonnet-session")
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	t.Cleanup(func() { c.Stop(ctx, h.AgentID) })
+
+	raw, err := os.ReadFile(configLog)
+	if err != nil {
+		t.Fatalf("read config log (model setting not invoked?): %v", err)
+	}
+	var call struct {
+		ConfigID string `json:"configId"`
+		Value    string `json:"value"`
+	}
+	if err := json.Unmarshal([]byte(strings.Split(strings.TrimSpace(string(raw)), "\n")[0]), &call); err != nil {
+		t.Fatalf("unmarshal config call: %v\n%s", err, raw)
+	}
+	if call.ConfigID != "model" || call.Value != "opus" {
+		t.Fatalf("first config call = %+v, want configId=model value=opus", call)
+	}
+}
+
 // Regression for the confirmed resume-history finding: ACP session/load does
 // not return a new sessionId. The requested id remains authoritative, so an
 // empty success result must be treated as ownership of that id — never mistaken
