@@ -29,9 +29,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   closed. Evidence: `docs/archive/reviews/implementation-share-creative-workspace-2026-09-28.md`.
   `drop-pipeline-recipient-refusal` (finished and reviewed 2026-09-29) is closed with no findings.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
-  instruction; it can be added later. **Available:** `centralize-launch-support` (finished
-  2026-09-29; `internal/backend` launch support, `/api/backends` `backend_support`, New Agent,
-  Switch runtime and Settings consumers).
+  instruction; it can be added later. `centralize-launch-support` (finished 2026-09-29; reviewed
+  2026-09-30) remains open on two partial-metadata findings in New Agent and Settings.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -57,11 +56,8 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
 
 ## Active change
 
-None. **Review note (`centralize-launch-support`):** the Settings slice was drafted by a delegated
-agent and reviewed here; a Settings model row with an unsupported declaration now opens itself
-(found in the rendered pass) — confirm that is the intended repair affordance. Rendered journeys
-ran headless against `go run ./scripts/stress-fixture --port 4399` (after `make embed`; kill any
-earlier fixture first — a stale process served an old bundle once).
+None. The `centralize-launch-support` review confirmed that automatically opening a Settings model
+row with an unsupported declaration is the intended repair affordance recorded by FS-09 §6.
 
 **Owed from `add-mobile-remote-control`:** FS-20.A1/A5/A6/A8 manual gates (real tailnet,
 real Android phone and iPhone, `pmset -g assertions`); a PNG touch icon for iPhone Home Screen.
@@ -93,8 +89,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` has no recorded findings; `/review` may take
-`centralize-launch-support`. `/work` may take `rename-product-to-deckhand`;
+**Available by role:** `/fix` may take the two `centralize-launch-support` findings; `/review` has no
+available unit. `/work` may take `rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -112,8 +108,25 @@ correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
 
-None open. The 2026-09-29 usability review's second phone pass closed 2026-09-29; its 390px
-browser re-check of the four fixes passed the same day (third pass).
+### `centralize-launch-support` — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+- **Must fix** — `ui/src/features/launch/NewAgentModal.tsx:138`: when one interface has valid
+  launch support and the other interface is missing or malformed, `supportMissing` treats both as
+  unverified. A valid chat effort choice is then blocked by a bad Terminal entry, and a verified
+  Terminal selection is blocked by a bad chat entry; the warning also says every option is
+  unavailable while unaffected controls can still be shown. This violates FS-09.R61/A30/A31 and
+  TS-03.R47's per-interface tolerant boundary (INV §8/§10/§11/§17). Track unavailable metadata per
+  interface/control, and add New Agent tests for valid-chat/malformed-terminal and the inverse.
+- **Must fix** — `ui/src/features/settings/BackendsEditor.tsx:118`: `modelCapability` calls the
+  whole backend type known whenever either interface parsed. If chat is malformed but Terminal is
+  valid, fast support is silently treated as unsupported; if either interface is malformed while
+  the other lacks effort, effort is also treated as known unsupported. Settings hides the affected
+  declarations and retry affordance or gives an existing declaration the wrong reason, contrary
+  to FS-09.R62/A30/A32 and TS-03.R47 (INV §8/§10/§11/§17). Represent effort and fast uncertainty
+  separately and test each one-valid/one-malformed combination.
+
+The 2026-09-29 usability review's second phone pass closed 2026-09-29; its 390px browser re-check of
+the four fixes passed the same day (third pass).
 
 ## Design consistency notes
 
@@ -129,6 +142,16 @@ browser re-check of the four fixes passed the same day (third pass).
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-30 — Review: `centralize-launch-support`.** Two Must-fix partial-metadata findings keep
+  the unit open: New Agent couples chat and Terminal metadata when gating a selected option, and
+  Settings collapses per-interface uncertainty into one backend-wide known/unknown bit. The shared
+  owner, server projection, Terminal switch, editable PUT projection and automatic opening of an
+  unsupported Settings declaration match FS-09.R60–R63, TS-01.R36 and TS-03.R47. INV 1/2/3/7/8/10,
+  11/13/14/17 were reviewed; 4–6, 9, 12 and 15–16 had no applicable changed surface. The focused
+  backend/server checks, all 65 UI files (551 tests), presentation contract and spec checks pass;
+  the first server attempt was sandbox-blocked and its authorized rerun passed. **Fix model:**
+  trivial/easy — Claude Sonnet or Codex Luna.
 
 - **2026-09-29 — Work: `centralize-launch-support` finished.** `internal/backend` owns
   `LaunchSupport` (per-adapter `Implements` + existing effort/fast delivery); the server Terminal gate
