@@ -315,6 +315,76 @@ describe("NewAgentModal", () => {
     expect(screen.queryByLabelText(/Fast mode/)).not.toBeInTheDocument();
   });
 
+  it("keeps verified Chat choices usable when Terminal support is malformed", async () => {
+    let posted: Record<string, unknown> | undefined;
+    server.use(
+      http.get("/api/backends", () => {
+        const doc = backendsFixture();
+        doc.backend_support = {
+          ...BACKEND_SUPPORT_WIRE,
+          "claude-acp": {
+            chat: { available: true, effort: true, fast: true },
+            terminal: { available: "bad", effort: true, fast: false },
+          },
+        };
+        return HttpResponse.json(doc);
+      }),
+      http.post("/api/sessions", async ({ request }) => {
+        posted = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ agent: { agent_id: "a4", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
+
+    expect(await screen.findByLabelText("Effort")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Terminal/i })).toBeDisabled();
+    expect(screen.getByText(/Launch options could not be loaded for Terminal/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(posted).toBeDefined());
+    expect(posted).toMatchObject({ interface: "chat", effort: "medium", fast: false });
+  });
+
+  it("keeps verified Terminal choices usable when Chat support is malformed", async () => {
+    let posted: Record<string, unknown> | undefined;
+    server.use(
+      http.get("/api/backends", () => {
+        const doc = backendsFixture();
+        doc.backend_support = {
+          ...BACKEND_SUPPORT_WIRE,
+          "claude-acp": {
+            chat: { available: true, effort: "bad", fast: true },
+            terminal: { available: true, effort: true, fast: false },
+          },
+        };
+        return HttpResponse.json(doc);
+      }),
+      http.post("/api/sessions", async ({ request }) => {
+        posted = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ agent: { agent_id: "a5", name: "Atlas" } }, { status: 201 });
+      }),
+    );
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    openOptions();
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
+    const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
+    await waitFor(() => expect(terminalRadio).toBeEnabled());
+    fireEvent.click(terminalRadio);
+
+    expect(await screen.findByLabelText("Effort")).toBeInTheDocument();
+    expect(screen.getByText(/Launch options could not be loaded for Chat/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launch" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(posted).toBeDefined());
+    expect(posted).toMatchObject({ interface: "terminal", effort: "medium", fast: false });
+  });
+
   it("withholds Terminal when the host lacks it even if the backend supports it", async () => {
     server.use(http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: false } })));
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);

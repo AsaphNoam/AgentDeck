@@ -113,15 +113,17 @@ function entriesToConfig(entries: BackendEntry[], defaultId: string): BackendsCo
 // modelCapability derives what NEW model declarations a backend's current
 // type may offer (FS-09.R62): effort needs at least one available interface
 // that supports it, fast needs chat support specifically (terminal never
-// supports fast). `unknown` means neither interface's support could be
-// parsed at all, which is distinct from a type known to lack the capability.
+// supports fast). Uncertainty is tracked per declaration so malformed support
+// for one interface cannot hide known support for the other.
 function modelCapability(support: BackendSupport | undefined, type: Backend["type"]): ModelCapability {
   const chat = launchSupportFor(support, type, "chat");
   const terminal = launchSupportFor(support, type, "terminal");
+  const effortAllowed = Boolean((chat?.available && chat.effort) || (terminal?.available && terminal.effort));
   return {
-    unknown: chat === undefined && terminal === undefined,
-    effortAllowed: Boolean((chat?.available && chat.effort) || (terminal?.available && terminal.effort)),
+    effortAllowed,
+    effortUnknown: !effortAllowed && (chat === undefined || terminal === undefined),
     fastAllowed: Boolean(chat?.available && chat.fast),
+    fastUnknown: chat === undefined,
   };
 }
 
@@ -344,11 +346,12 @@ export function BackendsEditor() {
             <div className="backend-models-header">
               <strong>Models</strong>
             </div>
-            {capability.unknown && (
+            {(capability.effortUnknown || capability.fastUnknown) && (
               <p className="config-notice model-capability-note" role="status">
-                Launch options for this backend type could not be loaded, so new effort or fast
-                declarations are unavailable until they can be checked. Existing declarations can
-                still be cleared.
+                {[
+                  capability.effortUnknown && "Effort support could not be loaded.",
+                  capability.fastUnknown && "Fast support could not be loaded.",
+                ].filter(Boolean).join(" ")} New declarations for those options are unavailable until they can be checked. Existing declarations can still be cleared.
                 <button type="button" className="btn-link" onClick={() => void refetch()}>Retry</button>
               </p>
             )}

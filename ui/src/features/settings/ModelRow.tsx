@@ -2,13 +2,13 @@ import { useState } from "react";
 import type { Model } from "../../schemas/backends";
 
 // ModelCapability tells the row whether the owning backend's current type
-// supports NEW effort/fast declarations (FS-09.R62). `unknown` means launch
-// support metadata could not be loaded for that type at all (as opposed to a
-// type that is known to lack the capability) and changes the reason shown.
+// supports NEW effort/fast declarations (FS-09.R62), including per-option
+// uncertainty when interface metadata is missing.
 export interface ModelCapability {
   effortAllowed: boolean;
   fastAllowed: boolean;
-  unknown: boolean;
+  effortUnknown: boolean;
+  fastUnknown: boolean;
 }
 
 interface ModelRowProps {
@@ -76,8 +76,11 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
   // clearing fast just turns it off.
   const hasEffort = (model.efforts ?? []).length > 0;
   const hasFast = model.fast === true;
-  const capabilityReason = capability.unknown
-    ? "Launch options for this backend type could not be loaded."
+  const effortReason = capability.effortUnknown
+    ? "Effort support could not be loaded."
+    : "This backend type doesn't support this.";
+  const fastReason = capability.fastUnknown
+    ? "Fast support could not be loaded."
     : "This backend type doesn't support this.";
   const clearEfforts = () => onChange({ ...model, efforts: [], default_effort: undefined });
   const clearFast = () => onChange({ ...model, fast: false });
@@ -125,7 +128,7 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
               ) : (
                 <span className="model-capability-note">
                   <input value={(model.efforts ?? []).join(", ")} disabled />
-                  <span className="model-capability-reason">{capabilityReason}</span>
+                  <span className="model-capability-reason">{effortReason}</span>
                   <button type="button" className="btn-link" onClick={clearEfforts}>Clear effort levels</button>
                 </span>
               )}
@@ -151,7 +154,7 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
               ) : (
                 <span className="model-capability-note">
                   <input type="checkbox" checked disabled />
-                  <span className="model-capability-reason">{capabilityReason}</span>
+                  <span className="model-capability-reason">{fastReason}</span>
                   <button type="button" className="btn-link" onClick={clearFast}>Clear fast mode</button>
                 </span>
               )}

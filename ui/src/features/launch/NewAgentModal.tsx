@@ -138,14 +138,18 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const chatSupport = launchSupportFor(support, selectedBackend?.type, "chat");
   const terminalSupport = launchSupportFor(support, selectedBackend?.type, "terminal");
   const interfaceSupport = agentInterface === "terminal" ? terminalSupport : chatSupport;
-  const supportMissing = !!selectedBackend && (!chatSupport || !terminalSupport);
+  const chatSupportMissing = !!selectedBackend && !chatSupport;
+  const terminalSupportMissing = !!selectedBackend && !terminalSupport;
+  const supportMissing = chatSupportMissing || terminalSupportMissing;
   const canTerminal = terminalAvailable && !!terminalSupport?.available;
   const offerEffort = effortLevels.length > 0 && !!interfaceSupport?.effort;
   const offerFast = !!selectedModel?.fast && !!interfaceSupport?.fast;
   const defaultEffort = selectedModel?.default_effort ?? "";
   // A non-default choice made before support went missing must be re-verified
   // or cleared; an ordinary chat launch with defaults is never gated.
-  const unverifiedSelection = supportMissing && (agentInterface === "terminal" || fast || effort !== defaultEffort);
+  const unverifiedSelection =
+    (agentInterface === "terminal" && terminalSupportMissing) ||
+    (agentInterface === "chat" && chatSupportMissing && (fast || effort !== defaultEffort));
 
   // A known-unsupported Terminal must not leave a stale selection; unknown
   // support keeps it for re-verification instead of silently changing it.
@@ -305,7 +309,10 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
             {supportMissing && (
               <div className="form-warning" role="status">
                 <p>
-                  Launch options could not be loaded, so Terminal, effort and fast mode are not offered.
+                  Launch options could not be loaded for {[
+                    chatSupportMissing ? "Chat" : "",
+                    terminalSupportMissing ? "Terminal" : "",
+                  ].filter(Boolean).join(" and ")}. Optional choices for those interfaces are unavailable.
                   {unverifiedSelection && " Retry to verify your selected options, or clear them to launch with defaults."}
                 </p>
                 <button type="button" onClick={() => void refetchBackends()} disabled={backendsFetching}>

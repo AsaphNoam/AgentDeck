@@ -30,7 +30,7 @@ requirements they name. Settled state is archived in `../archive/state/`: the da
   `drop-pipeline-recipient-refusal` (finished and reviewed 2026-09-29) is closed with no findings.
   `stop-telling-agents-to-poll` shipped outside this queue on the operator's explicit 2026-09-10
   instruction; it can be added later. `centralize-launch-support` (finished 2026-09-29; reviewed
-  2026-09-30) remains open on two partial-metadata findings in New Agent and Settings.
+  and fixed 2026-09-30) is closed.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Design units:** `Ideas being defined` entries may resume (the operator deleted the
@@ -89,8 +89,8 @@ range changed nothing an operating agent must know, so `operating-agentdeck` is 
 unreviewed on the operator's explicit decision. Owed: the credentialed Claude and Codex
 login/chat gates (TS-06.R21) and every real-browser journey; none may be described as verified.
 
-**Available by role:** `/fix` may take the two `centralize-launch-support` findings; `/review` has no
-available unit. `/work` may take `rename-product-to-deckhand`;
+**Available by role:** `/fix` and `/review` have no available unit. `/work` may take
+`rename-product-to-deckhand`;
 `/design-feature` may choose an available or resumable idea. Queues are independent.
 
 ## Decisions needing your input
@@ -107,23 +107,6 @@ None for shared creative-workspace implementation. Its approved system check pas
 correcting reduced-motion selector priority, and Reduce Motion was restored off.
 
 ## Review findings
-
-### `centralize-launch-support` — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Must fix** — `ui/src/features/launch/NewAgentModal.tsx:138`: when one interface has valid
-  launch support and the other interface is missing or malformed, `supportMissing` treats both as
-  unverified. A valid chat effort choice is then blocked by a bad Terminal entry, and a verified
-  Terminal selection is blocked by a bad chat entry; the warning also says every option is
-  unavailable while unaffected controls can still be shown. This violates FS-09.R61/A30/A31 and
-  TS-03.R47's per-interface tolerant boundary (INV §8/§10/§11/§17). Track unavailable metadata per
-  interface/control, and add New Agent tests for valid-chat/malformed-terminal and the inverse.
-- **Must fix** — `ui/src/features/settings/BackendsEditor.tsx:118`: `modelCapability` calls the
-  whole backend type known whenever either interface parsed. If chat is malformed but Terminal is
-  valid, fast support is silently treated as unsupported; if either interface is malformed while
-  the other lacks effort, effort is also treated as known unsupported. Settings hides the affected
-  declarations and retry affordance or gives an existing declaration the wrong reason, contrary
-  to FS-09.R62/A30/A32 and TS-03.R47 (INV §8/§10/§11/§17). Represent effort and fast uncertainty
-  separately and test each one-valid/one-malformed combination.
 
 The 2026-09-29 usability review's second phone pass closed 2026-09-29; its 390px browser re-check of
 the four fixes passed the same day (third pass).
@@ -142,6 +125,13 @@ the four fixes passed the same day (third pass).
   currently reads as covering a section that also contains planned R13–R19 boundaries.
 
 ## Changelog
+
+- **2026-09-30 — Fix: partial launch-support metadata stays scoped to the affected interface or
+  control (FS-09.R61–R62/A30–A32, TS-03.R47; INV §8/§10/§11/§17).** New Agent no longer blocks a
+  verified Chat choice because Terminal metadata is malformed, or the inverse; its retry warning
+  names only the affected interface. Settings now tracks effort and fast uncertainty separately,
+  preserving known support and the correct repair reason when only one interface parses. Both
+  one-valid/one-malformed combinations have regressions. Closes `centralize-launch-support`.
 
 - **2026-09-30 — Review: `centralize-launch-support`.** Two Must-fix partial-metadata findings keep
   the unit open: New Agent couples chat and Terminal metadata when gating a selected option, and

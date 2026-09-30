@@ -320,6 +320,46 @@ describe("BackendsEditor", () => {
     return screen.getByText("Fast mode capability").parentElement!.querySelector("input") as HTMLInputElement;
   }
 
+  it("keeps fast known when chat is valid and terminal metadata is malformed", async () => {
+    server.use(http.get("/api/backends", () => HttpResponse.json({
+      ...defaultBackendsDoc,
+      backend_support: {
+        "claude-acp": {
+          chat: { available: true, effort: false, fast: true },
+          terminal: { available: true, effort: "invalid", fast: false },
+        },
+      },
+    })));
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    expect(screen.getByRole("status").textContent).toContain("Effort support could not be loaded.");
+    expect(screen.getByRole("status").textContent).not.toContain("Fast support could not be loaded.");
+    expect(screen.queryByPlaceholderText("low, medium, high")).not.toBeInTheDocument();
+    expect(fastCheckbox().disabled).toBe(false);
+  });
+
+  it("keeps effort known when terminal is valid and chat metadata is malformed", async () => {
+    server.use(http.get("/api/backends", () => HttpResponse.json({
+      ...defaultBackendsDoc,
+      backend_support: {
+        "claude-acp": {
+          chat: { available: true, effort: "invalid", fast: false },
+          terminal: { available: true, effort: true, fast: false },
+        },
+      },
+    })));
+    renderWithQuery(<BackendsEditor />);
+    await screen.findByDisplayValue("Claude");
+    fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
+
+    expect(screen.getByRole("status").textContent).not.toContain("Effort support could not be loaded.");
+    expect(screen.getByRole("status").textContent).toContain("Fast support could not be loaded.");
+    expect(screen.getByPlaceholderText("low, medium, high")).toBeInTheDocument();
+    expect(screen.queryByText("Fast mode capability")).not.toBeInTheDocument();
+  });
+
   it("lets a supported Claude model gain effort and fast declarations", async () => {
     renderWithQuery(<BackendsEditor />);
     await screen.findByDisplayValue("Claude");
