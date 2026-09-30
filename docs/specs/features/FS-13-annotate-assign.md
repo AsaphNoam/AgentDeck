@@ -164,6 +164,21 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   follow an annotation event, and a prompt following an annotation event that was sent to a
   different target all render normally — including the message a person types straight after
   assigning a batch to another agent.
+- **R25 `(planned)` — A loaded conversation file is a first-class annotation source.** This
+  supersedes R13's file exclusion when it ships; terminal agents, screenshots, and unrelated web
+  pages remain excluded. A file annotation is anchored to the effective path shown by the viewer,
+  not to the transcript event that happened to open it, so a link, a rendered-file link, a reload,
+  and a hand-edited `?file=` address produce the same record. Source-mode capture adds the
+  contiguous 1-based line range containing the exact selection; rendered-Markdown capture keeps
+  the path and selected excerpt but no line range. Neither invents a transcript-event sequence or
+  a diff side, and neither offers whole-file capture. File drafts join the source session's existing
+  bounded browser-local tray and use every existing edit, target, send, failure, retention, and
+  archive rule unchanged. The captured excerpt and anchor are point-in-time under R12: reload,
+  replacement, file edits, deletion, or losing read access never changes or invalidates a draft.
+  Sending makes the selected excerpt and path durable in the source transcript's annotation event,
+  makes the excerpt and instruction searchable under R10, and exposes the record to the chosen
+  target through the existing prompt or mail delivery; the file itself is never reread and
+  unselected content is never persisted.
 
 ## 5. Acceptance criteria
 
@@ -221,6 +236,15 @@ Each acceptance item names its delivered verification.
   after highlighting captures the highlighted text, a right-click with no highlight captures the
   whole event, and a non-annotatable transcript keeps the browser menu:
   `ui/src/components/chat/TranscriptView.test.tsx`.
+- **A16 `(planned)` (R2–R12, R16, R19–R23, R25)** — Source and rendered-Markdown file selections
+  create path/line and path-only drafts respectively in the same tray as transcript drafts; the
+  mixed batch survives reload, edits and removes normally, preserves excerpts when the file changes
+  or disappears, and sends through the existing self, other-agent, and new-task paths. Its durable
+  annotation card, agent block, mail, and archive replay name a file anchor rather than `Event 0`,
+  while existing transcript and diff records remain byte-compatible and render unchanged. Empty or
+  invalid file anchors return the structured validation error with the tray preserved. *Verify by*
+  file-viewer/tray/store tests, annotation endpoint and formatter compatibility tests, transcript
+  live/replay tests, and journey J13 with a mixed transcript/file batch.
 
 ## 6. Deviations & open decisions
 

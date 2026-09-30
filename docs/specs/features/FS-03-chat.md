@@ -467,6 +467,18 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   discovery is added, no remote-control route gains file-reading authority, and no file content or
   access history becomes durable AgentDeck state.
 
+- **R65 `(planned)` — Loaded file text joins the existing annotation interaction.** In a live or
+  archived chat session, selecting text in the file viewer and right-clicking offers **Copy
+  selection** and **Annotate selection** through the same context-menu behavior as a transcript
+  selection (FS-13.R19/R25). Annotating adds a draft to that session's existing pending tray; it
+  does not create a file-specific tray or delivery flow. In source mode the draft names the file
+  and the contiguous 1-based line range containing the exact selected excerpt. In rendered
+  Markdown the draft names the file and excerpt without claiming a source-line range. There is no
+  whole-file annotation action: without a non-whitespace selection, the viewer keeps the browser's
+  native context menu. The file viewer remains the left column and the shared pending tray remains
+  the right column, so both can stay open around the transcript without overlaying each other when
+  the region has room.
+
 - **R56 — A steer that loses the active turn remains host-owned.** If the
   adapter handles a Steer request after no provider turn is still active, it returns a
   no-consumption `promptRequired` outcome instead of launching a detached turn. AgentDeck then sends
@@ -867,6 +879,17 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   typed refusals; composer search and the remote-control listener cannot discover or read an outside
   path. *Verify by* focused server route tests, file-link and viewer component tests, the remote
   allowlist test, and journey J3 with one outside-workspace link.
+
+- **A46 `(planned)` (R65, FS-13.R25)** — In source mode, right-clicking a selection spanning part
+  of one line or several lines offers Copy and Annotate, copies the exact text without a draft, and
+  adds an annotation draft with the displayed file path, containing 1-based line range, clipped
+  excerpt, and empty instruction. In rendered Markdown the same action records the displayed path
+  and excerpt without line numbers. Empty, whitespace-only, cross-surface, loading, and refusal
+  selections create no draft and keep the native menu. A file draft and transcript draft appear in
+  one pending tray; replacing or reloading the file leaves both point-in-time drafts unchanged.
+  The live and archived viewer forms behave alike, with the existing archived-target restrictions.
+  *Verify by* file-viewer, transcript-composition, tray, and annotation-store component tests plus
+  journey J13 extended with a loaded-file selection.
 
 
 ## 6. Deviations & open decisions

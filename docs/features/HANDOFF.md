@@ -18,7 +18,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review and fix units:** `claude-model-switch-resume` is available with one confirmed Must-fix
   finding and a skipped reproduction test.
-- **Design units:** available and resumable entries remain in `docs/ideas.md`.
+- **Design units:** unrestricted conversation file viewing and annotation is being defined;
+  available and other resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
@@ -37,12 +38,13 @@ None.
 
 ## Blocked on human
 
-- **Unrestricted conversation file viewing:** feature behavior is drafted in FS-03.R64/A45 after
-  the operator chose every OS-readable file rather than `cwd` plus `add_dirs`. Before technical
-  design, confirm the explicit consequence: a hand-edited local API request has the same direct
-  arbitrary-file-read authority as a clicked agent-authored link, including outside projects and
-  inside `.git`, without a per-read confirmation. Existing type/size limits remain and remote
-  control gains no file-read route.
+- **Unrestricted conversation file viewing and annotation:** the operator confirmed that a
+  hand-edited local request may read any OS-readable regular text file without per-read
+  confirmation, then added file annotations through the existing tray. FS-03.R64–R65/A45–A46 and
+  FS-13.R25/A16 draft the combined behavior. Before technical design, confirm that a file
+  annotation is a first-class path/line anchor with no required transcript-event sequence; rendered
+  Markdown records path plus excerpt without a synthetic line; and sending durably copies the
+  selected path and excerpt into the source transcript/search and chosen prompt or mail target.
 
 ## Review findings
 
