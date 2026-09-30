@@ -775,8 +775,6 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 // must explicitly apply the newly selected model after that load succeeds; the
 // _meta option used to construct the resumed SDK query is not sufficient.
 func TestResumeClaudeAppliesRequestedModelAfterSessionLoad(t *testing.T) {
-	t.Skip("BUG: Claude session/load resumes on the transcript model without a post-load model setting")
-
 	c, spec := newChatTest(t, "stream_text")
 	ctx := context.Background()
 	configLog := filepath.Join(t.TempDir(), "config.ndjson")

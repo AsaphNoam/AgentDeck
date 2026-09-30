@@ -359,9 +359,11 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R29** — `claude-acp` launches `claude-agent-acp` from the pinned official
   `@agentclientprotocol/claude-agent-acp` package, strips inherited `CLAUDECODE`, supplies the
   composed system prompt, model, additional directories and MCP registrations through the
-  adapter's ACP session metadata, and preserves native same-backend resume/model switch. Chat
-  status remains ACP-derived; Claude terminal launches continue to invoke the interactive Claude
-  executable directly with their generated `--settings` hook file.
+  adapter's ACP session metadata, and after `session/new` or `session/load` explicitly applies and
+  verifies the selected model through the adapter's advertised configuration option. This preserves
+  native same-backend resume/model switch even when the loaded transcript carries the prior model.
+  Chat status remains ACP-derived; Claude terminal launches continue to invoke the interactive
+  Claude executable directly with their generated `--settings` hook file.
 - **R30 — retired 2026-07-22:** Credential readiness limited Codex to `OPENAI_API_KEY`. Replaced
   by the native-sign-in-or-API-key behavior in R34.
 - **R31** — A hand-edited `backends.json` that is syntactically valid but structurally incomplete
@@ -542,10 +544,12 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A27** (R58) — A `codex-acp` chat launch, resume, and switch each
   deliver the selected model and effort as post-session configuration and send no model in the
   session-creation request; the resulting agent's recorded model and effort match what was selected
-  rather than the adapter's reported default; and a `claude-acp` launch is byte-identical to today,
-  still carrying its model through session-creation metadata. *Verify by* runtime parameter tests
-  pinning both adapters' composed calls, and a `fakeacp` Codex scenario that reports a different
-  default model than the one requested — which fails against today's delivery and passes after it.
+  rather than the adapter's reported default. A `claude-acp` launch and resume keep carrying their
+  model through session metadata and also apply it through the advertised post-session model option,
+  so loading a transcript on its prior model cannot override a same-backend model switch. *Verify
+  by* runtime parameter tests pinning both adapters' composed calls, a `fakeacp` Codex scenario that
+  reports a different default model than the one requested, and a Claude load-path regression that
+  requires the selected model to be the first configuration call.
 - **A25** (R52, R56) — A terminal launch requesting fast mode is rejected
   before any process starts; and a switch-runtime request neither accepts nor alters fast mode — an
   agent running fast that switches model within its backend is still running fast afterwards, and a

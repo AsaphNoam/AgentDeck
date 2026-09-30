@@ -2429,7 +2429,7 @@ type sessionConfigResult struct {
 // and recomputes fast capability, so either applied first is silently discarded.
 func applySessionConfig(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string, advertised sessionConfigAdvertisement) (sessionConfigResult, error) {
 	modelID, effortID, fastID := ad.SessionConfigIDs()
-	if spec.BackendType == "codex-acp" && spec.ModelID != "" {
+	if (spec.BackendType == "codex-acp" || spec.BackendType == "claude-acp") && spec.ModelID != "" {
 		if err := applyRequiredOption(ctx, transport, sessionID, modelID, spec.ModelID, advertised); err != nil {
 			return sessionConfigResult{}, err
 		}

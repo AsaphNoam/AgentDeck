@@ -202,8 +202,10 @@ and the pinned `codex-acp` reads none, deriving the session's model and reasonin
 thread-start response. A live check against the pinned adapter confirmed a session requesting one
 model at one level came up on the local Codex default instead, and that both values applied cleanly
 as configuration options afterwards. So AgentDeck was sending an out-of-schema parameter into a void;
-`claude-acp` was unaffected only because it receives its model through `_meta`, the extensibility
-channel the protocol does define and its adapter documents and reads.
+`claude-acp` also receives its model through `_meta`, the extensibility channel the protocol defines
+and its adapter documents and reads, but a successful `session/load` restores the transcript's prior
+model after reading that metadata. It therefore needs the same post-session application to make a
+same-backend model switch effective.
 
 Model, effort, and fast mode therefore reach a chat session through one shared helper that applies
 them **in that order** after `session/new` or `session/load` returns, consumed by launch, resume, and
@@ -216,8 +218,9 @@ and `fast-mode`; `claude-acp` uses `model`, `effort`, and `fast`.
 
 The three keep their own failure postures inside the shared step, and the helper must not flatten
 them: effort stays fail-closed under R19 and FS-09.R40, model failure fails the launch for the same
-reason, and fast mode stays fail-open under R45. `claude-acp` keeps `_meta` model delivery unchanged
-and gains nothing here. `opencode-acp` and `openhands-acp` keep today's parameter unchanged, because
+reason, and fast mode stays fail-open under R45. `claude-acp` keeps `_meta` model delivery and also
+applies and verifies the advertised model option after new or load. `opencode-acp` and
+`openhands-acp` keep today's parameter unchanged, because
 whether their pinned adapters read it is unverified and changing delivery on an unverified adapter
 would trade a known-good path for an assumption — INV §12's rule, and the same rule that makes this
 requirement cite a live check rather than a code reading alone. "Unchanged" is not "working": both
