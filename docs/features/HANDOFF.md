@@ -14,10 +14,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and the macOS installer workflow passed. The GitHub Release carries the 293,094,990-byte
   `darwin-arm64` archive, `install.sh`, and a `0.7.0` manifest whose size and SHA-256 match the
   archive asset. The release audit changed no operator guidance or pinned component version.
-- **Work units:** `open-and-annotate-any-local-file.md` and `rename-product-to-deckhand.md` are
-  Waiting to start.
+- **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review and fix units:** none available.
+- **Review units:** `open-and-annotate-any-local-file` is available.
+- **Fix units:** none available.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -61,6 +61,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Implementation: open and annotate any local text file.** The conversation file
+  viewer now accepts absolute, traversal, symlinked, and `.git` paths under the approved local trust
+  policy while keeping regular-file, UTF-8, size, local-origin, and remote-route bounds. Source and
+  rendered file selections join the existing annotation tray as backward-compatible file anchors;
+  cards, transcript persistence, search, self/agent delivery, reload, and legacy annotations keep
+  one shared path. Both Go test modes, the production Go build, all 556 UI tests, the UI build, and
+  an isolated real-browser outside-file selection/send passed with no console errors.
 
 - **2026-09-30 — Feature design: unrestricted conversation file viewing and annotation.** Specified
   the operator-approved local trust policy: absolute file links and direct local requests may read

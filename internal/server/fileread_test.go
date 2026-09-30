@@ -133,16 +133,16 @@ func TestFileReadServesTextInsideWorkingDirectory(t *testing.T) {
 	}
 }
 
-// TestFileReadAcceptsAbsolutePathInsideRoot proves an absolute path is accepted
-// only by resolving to the same relative form (TS-03.R40).
+// TestFileReadAcceptsAbsolutePathInsideRoot proves an absolute path preserves
+// its cleaned absolute display identity (TS-03.R48).
 func TestFileReadAcceptsAbsolutePathInsideRoot(t *testing.T) {
 	srv := testServer(t, false)
 	root := seedReadableWorkspace(t, srv, "a_abs")
 	h := srv.routes()
 
 	got := readFileOK(t, h, "a_abs", filepath.Join(root, "main.go"))
-	if got.Path != "main.go" {
-		t.Fatalf("path = %q, want the relative form", got.Path)
+	if got.Path != filepath.ToSlash(filepath.Join(root, "main.go")) {
+		t.Fatalf("path = %q, want the absolute form", got.Path)
 	}
 }
 
@@ -163,11 +163,9 @@ func TestFileReadAcceptsCaseVariantOfRoot(t *testing.T) {
 	h := srv.routes()
 
 	got := readFileOK(t, h, "a_case", filepath.Join(variant, "internal", "state", "messages.go"))
-	if got.Path != "internal/state/messages.go" {
-		t.Fatalf("path = %q, want the relative form", got.Path)
+	if got.Path != filepath.ToSlash(filepath.Join(variant, "internal", "state", "messages.go")) {
+		t.Fatalf("path = %q, want the requested absolute form", got.Path)
 	}
-	readFileRefused(t, h, "a_case", filepath.Join(variant, "..", "x"), runtime.CodePathRefused, http.StatusUnprocessableEntity)
-	readFileRefused(t, h, "a_case", filepath.Join(variant+"x", "main.go"), runtime.CodePathRefused, http.StatusUnprocessableEntity)
 }
 
 // TestFileReadLogsRefusal proves a refused read leaves the requested path and
@@ -179,10 +177,10 @@ func TestFileReadLogsRefusal(t *testing.T) {
 	srv.log = slog.New(slog.NewTextHandler(&buf, nil))
 	h := srv.routes()
 
-	readFileRefused(t, h, "a_log", "../escape.md", runtime.CodePathRefused, http.StatusUnprocessableEntity)
+	readFileRefused(t, h, "a_log", "missing.md", runtime.CodeNotFound, http.StatusNotFound)
 	logs := buf.String()
-	if !strings.Contains(logs, "file read refused") || !strings.Contains(logs, "path=../escape.md") ||
-		!strings.Contains(logs, "code="+runtime.CodePathRefused) {
+	if !strings.Contains(logs, "file read refused") || !strings.Contains(logs, "path=missing.md") ||
+		!strings.Contains(logs, "code="+runtime.CodeNotFound) {
 		t.Fatalf("refusal not logged with path and code: %s", logs)
 	}
 }
@@ -200,33 +198,24 @@ func TestFileReadServesGitIgnoredFile(t *testing.T) {
 	}
 }
 
-// TestFileReadRefusesEscapes is the adversarial set TS-05.R11 requires:
-// traversal, absolute-path escape, and `.git` are each refused on the path's
-// form, before any filesystem access (TS-05.R21, FS-03.A37).
-func TestFileReadRefusesEscapes(t *testing.T) {
+// TestFileReadAcceptsUnrestrictedPaths covers absolute, traversal, and .git
+// admission under the explicit local trust policy (TS-05.R24, FS-03.A45).
+func TestFileReadAcceptsUnrestrictedPaths(t *testing.T) {
 	srv := testServer(t, false)
 	root := seedReadableWorkspace(t, srv, "a_escape")
 	outside := filepath.Join(filepath.Dir(root), "outside-secret.txt")
 	writeFile(t, outside, "secret\n")
 	h := srv.routes()
 
-	for _, path := range []string{
-		"../outside-secret.txt",
-		"internal/../../outside-secret.txt",
-		"..",
-		outside,
-		"/etc/passwd",
-		".git/config",
-		"internal/.git/config",
-	} {
-		readFileRefused(t, h, "a_escape", path, runtime.CodePathRefused, http.StatusUnprocessableEntity)
+	for _, path := range []string{"../outside-secret.txt", outside, ".git/config"} {
+		got := readFileOK(t, h, "a_escape", path)
+		if got.Content == "" {
+			t.Fatalf("path %q returned no content", path)
+		}
 	}
 }
 
-// TestFileReadRefusesEscapeWithoutProbingExistence proves the form-first refusal
-// does not distinguish an existing outside file from an absent one, so the route
-// cannot be used to test what exists elsewhere on the machine (TS-05.R21).
-func TestFileReadRefusesEscapeWithoutProbingExistence(t *testing.T) {
+func TestFileReadAbsoluteMissingIsTyped(t *testing.T) {
 	srv := testServer(t, false)
 	root := seedReadableWorkspace(t, srv, "a_probe")
 	existing := filepath.Join(filepath.Dir(root), "exists.txt")
@@ -234,18 +223,13 @@ func TestFileReadRefusesEscapeWithoutProbingExistence(t *testing.T) {
 	absent := filepath.Join(filepath.Dir(root), "absent.txt")
 	h := srv.routes()
 
-	present := readFileResponse(t, h, "a_probe", existing)
-	missing := readFileResponse(t, h, "a_probe", absent)
-	if present.Code != missing.Code || present.Body.String() != missing.Body.String() {
-		t.Fatalf("outside-path responses differ: %d %s vs %d %s",
-			present.Code, present.Body.String(), missing.Code, missing.Body.String())
+	if got := readFileOK(t, h, "a_probe", existing); got.Content != "here\n" {
+		t.Fatalf("content = %q", got.Content)
 	}
+	readFileRefused(t, h, "a_probe", absent, runtime.CodeNotFound, http.StatusNotFound)
 }
 
-// TestFileReadRefusesSymlinkEscape proves the resolve-and-recheck containment
-// shared with file-search: a symlink that lives inside the root but points out
-// of it is refused (TS-05.R21, INV §2).
-func TestFileReadRefusesSymlinkEscape(t *testing.T) {
+func TestFileReadAcceptsSymlinkOutsideWorkspace(t *testing.T) {
 	srv := testServer(t, false)
 	root := seedReadableWorkspace(t, srv, "a_symlink")
 	outside := filepath.Join(filepath.Dir(root), "outside-target.txt")
@@ -255,7 +239,9 @@ func TestFileReadRefusesSymlinkEscape(t *testing.T) {
 	}
 	h := srv.routes()
 
-	readFileRefused(t, h, "a_symlink", "escape.txt", runtime.CodePathRefused, http.StatusUnprocessableEntity)
+	if got := readFileOK(t, h, "a_symlink", "escape.txt"); got.Content != "secret\n" {
+		t.Fatalf("content = %q", got.Content)
+	}
 }
 
 // TestFileReadRefusesTargetReplacedBeforeOpen proves containment is enforced by
@@ -278,11 +264,8 @@ func TestFileReadRefusesTargetReplacedBeforeOpen(t *testing.T) {
 			t.Skipf("symlink unsupported: %v", err)
 		}
 	})
-	if apiErr == nil {
-		t.Fatalf("replacement read succeeded with content %q", got.Content)
-	}
-	if apiErr.Code != runtime.CodePathRefused {
-		t.Fatalf("code = %q, want %q", apiErr.Code, runtime.CodePathRefused)
+	if apiErr != nil || got.Content != "secret\n" {
+		t.Fatalf("replacement read = %q, %v", got.Content, apiErr)
 	}
 }
 
@@ -361,10 +344,15 @@ func TestFileReadLabelsPartialRead(t *testing.T) {
 func TestFileReadRefusesMissingWorkspace(t *testing.T) {
 	srv := testServer(t, false)
 	gone := filepath.Join(t.TempDir(), "removed")
+	abs := filepath.Join(t.TempDir(), "outside.txt")
+	writeFile(t, abs, "outside\n")
 	seedArchivedChatSession(t, srv, "a_gone", gone)
 	h := srv.routes()
 
 	readFileRefused(t, h, "a_gone", "main.go", runtime.CodeWorkspaceUnavailable, http.StatusUnprocessableEntity)
+	if got := readFileOK(t, h, "a_gone", abs); got.Content != "outside\n" {
+		t.Fatalf("absolute content = %q", got.Content)
+	}
 
 	seedArchivedChatSession(t, srv, "a_nocwd", "")
 	readFileRefused(t, h, "a_nocwd", "main.go", runtime.CodeWorkspaceUnavailable, http.StatusUnprocessableEntity)

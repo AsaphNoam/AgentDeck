@@ -452,7 +452,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   row, transcript event, archive content, search document, or browser-stored value is added, and no
   agent-facing surface changes — an agent cannot open the viewer, be shown it, or learn it exists.
 
-- **R64 `(planned)` — Conversation file reads are unrestricted by project roots.** This supersedes
+- **R64 (shipped 2026-09-30) — Conversation file reads are unrestricted by project roots.** This supersedes
   R55's working-directory and `.git` containment when it ships. A local filesystem link may name
   any regular UTF-8 file the AgentDeck process can read, including a file outside every configured
   project or `add_dirs`, a path reached through a symlink, and a file inside `.git`. Relative paths
@@ -468,7 +468,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   discovery is added, no remote-control route gains file-reading authority, and no file content or
   access history becomes durable AgentDeck state.
 
-- **R65 `(planned)` — Loaded file text joins the existing annotation interaction.** In a live or
+- **R65 (shipped 2026-09-30) — Loaded file text joins the existing annotation interaction.** In a live or
   archived chat session, selecting text in the file viewer and right-clicking offers **Copy
   selection** and **Annotate selection** through the same context-menu behavior as a transcript
   selection (FS-13.R19/R25). Annotating adds a draft to that session's existing pending tray; it
@@ -869,7 +869,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   excerpt. With no selection only whole-event annotation appears, and annotations-disabled events
   retain the native context menu. *Verify:* `TranscriptView.test.tsx`.
 
-- **A45 `(planned)` (R64)** — From a live or archived conversation, absolute, `file://`, symlinked,
+- **A45 (shipped 2026-09-30) (R64)** — From a live or archived conversation, absolute, `file://`, symlinked,
   and rendered-Markdown links each open a regular UTF-8 file outside the session working directory;
   a `.git` file opens too. A hand-edited `?file=` address reopens the same outside file, and an
   absolute file remains readable when the archived session's working directory is gone. The viewer
@@ -881,7 +881,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   path. *Verify by* focused server route tests, file-link and viewer component tests, the remote
   allowlist test, and journey J3 with one outside-workspace link.
 
-- **A46 `(planned)` (R65, FS-13.R25)** — In source mode, right-clicking a selection spanning part
+- **A46 (shipped 2026-09-30) (R65, FS-13.R25)** — In source mode, right-clicking a selection spanning part
   of one line or several lines offers Copy and Annotate, copies the exact text without a draft, and
   adds an annotation draft with the displayed file path, containing 1-based line range, clipped
   excerpt, and empty instruction. In rendered Markdown the same action records the displayed path

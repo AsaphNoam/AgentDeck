@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -23,7 +24,7 @@ import (
 const fileReadLimit = 512 * 1024
 
 // fileContent is the success payload of GET /api/sessions/{id}/file (TS-03.R40).
-// Path is the slash-separated relative form the viewer displays; Language is a
+// Path is the normalized requested spelling the viewer displays; Language is a
 // highlighting hint derived from the extension alone, never from sniffing.
 type fileContent struct {
 	AgentID   string `json:"agent_id"`
@@ -37,9 +38,8 @@ type fileContent struct {
 }
 
 // handleFileRead serves GET /api/sessions/{id}/file?path=<p> for the chat file
-// viewer (TS-03.R40, TS-05.R21, FS-03.R52/R55). The readable root is the working
-// directory recorded on that agent's own session snapshot: the caller supplies a
-// path and can never supply or influence a root. Unlike file-search this read is
+// viewer (TS-03.R48, TS-05.R24, FS-03.R64). Absolute paths are opened directly;
+// relative paths use the working directory recorded on the session. Unlike file-search this read is
 // not gated on a running record, because an archived session's links must still
 // work (FS-03.R55); it is gated on the session row that records the directory.
 func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
@@ -76,17 +76,12 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 		s.log.Info("file read refused", "agent_id", id, "path", requested, "code", apiErr.Code)
 		writeAPIError(w, apiErr)
 	}
-	root, apiErr := resolveWorkspaceRoot(snap.Cwd)
+	path, display, apiErr := resolveFileReadPath(snap.Cwd, requested)
 	if apiErr != nil {
 		refuse(apiErr)
 		return
 	}
-	rel, apiErr := relativeReadPath(snap.Cwd, root, requested)
-	if apiErr != nil {
-		refuse(apiErr)
-		return
-	}
-	out, apiErr := readWorkspaceFile(root, rel)
+	out, apiErr := readLocalFile(path, display)
 	if apiErr != nil {
 		refuse(apiErr)
 		return
@@ -95,111 +90,29 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// relativeReadPath decides the request's path on its own form, without ever
-// touching that path on disk, so the route cannot report whether a file exists
-// outside the working directory (TS-05.R21). It returns the cleaned
-// slash-separated relative path. cwd and root are used only to re-express an
-// absolute request path; neither the request's path nor its target is opened here.
-func relativeReadPath(cwd, root, raw string) (string, *runtime.APIError) {
+// resolveFileReadPath preserves a relative request as the display identity while
+// resolving it from the recorded workspace. Absolute paths are authority in
+// themselves and do not require an available workspace (TS-03.R48).
+func resolveFileReadPath(cwd, raw string) (string, string, *runtime.APIError) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", apiError(runtime.CodeValidation, "path is required")
+		return "", "", apiError(runtime.CodeValidation, "path is required")
 	}
 	if strings.ContainsRune(raw, 0) {
-		return "", apiError(runtime.CodeValidation, "path is malformed")
+		return "", "", apiError(runtime.CodeValidation, "path is malformed")
 	}
-	p := filepath.FromSlash(raw)
-	if filepath.IsAbs(p) {
-		rebased, ok := rebaseAbsolute(cwd, root, p)
-		if !ok {
-			return "", apiError(runtime.CodePathRefused, "that path is outside this agent's working directory")
-		}
-		p = rebased
+	path := filepath.Clean(filepath.FromSlash(raw))
+	if path == "." || path == string(filepath.Separator) {
+		return "", "", apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
 	}
-	rel := filepath.Clean(p)
-	if rel == "." || rel == string(filepath.Separator) {
-		return "", apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
+	if filepath.IsAbs(path) {
+		return path, filepath.ToSlash(path), nil
 	}
-	if escapesRoot(rel) {
-		return "", apiError(runtime.CodePathRefused, "that path is outside this agent's working directory")
+	root, apiErr := resolveWorkspaceRoot(cwd)
+	if apiErr != nil {
+		return "", "", apiErr
 	}
-	if namesGitDir(rel) {
-		return "", apiError(runtime.CodePathRefused, "the .git directory is not readable")
-	}
-	return filepath.ToSlash(rel), nil
-}
-
-// rebaseAbsolute expresses an absolute request path relative to the working
-// directory. Both the recorded form and the symlink-resolved form are accepted
-// bases, because an agent writes the path it saw: on macOS a recorded `/var/...`
-// directory resolves to `/private/var/...`, and a link written against either
-// spelling names the same file. The result is still lexical and is re-checked
-// against the resolved root after symlink resolution.
-func rebaseAbsolute(cwd, root, abs string) (string, bool) {
-	abs = filepath.Clean(abs)
-	bases := []string{root}
-	if expanded, err := config.ExpandTilde(strings.TrimSpace(cwd)); err == nil {
-		bases = append(bases, filepath.Clean(expanded))
-	}
-	for _, base := range bases {
-		if base == "" || base == "." || !filepath.IsAbs(base) {
-			continue
-		}
-		rel, err := filepath.Rel(base, abs)
-		if err == nil && !escapesRoot(rel) {
-			return rel, true
-		}
-		if rel, ok := rebaseCaseVariant(base, abs); ok {
-			return rel, true
-		}
-	}
-	return "", false
-}
-
-// rebaseCaseVariant accepts an absolute path whose leading components spell the
-// base in another case (`/users/me/proj/a.md` against `/Users/me/proj`), as an
-// agent that took its root from git or realpath may write on macOS's
-// case-insensitive disk. The variant is accepted only when it names the same
-// directory on disk as the base; only that case-variant of the working directory
-// is ever stat'ed, never the requested target, so a refusal still says nothing
-// about what exists elsewhere (TS-05.R21).
-func rebaseCaseVariant(base, abs string) (string, bool) {
-	sep := string(filepath.Separator)
-	if len(abs) <= len(base) || !strings.EqualFold(abs[:len(base)], base) ||
-		!strings.HasPrefix(abs[len(base):], sep) {
-		return "", false
-	}
-	variant, err := os.Stat(abs[:len(base)])
-	if err != nil {
-		return "", false
-	}
-	recorded, err := os.Stat(base)
-	if err != nil || !os.SameFile(variant, recorded) {
-		return "", false
-	}
-	rel := filepath.Clean(strings.TrimPrefix(abs[len(base):], sep))
-	if escapesRoot(rel) {
-		return "", false
-	}
-	return rel, true
-}
-
-// escapesRoot reports whether a cleaned relative path leaves its root.
-func escapesRoot(rel string) bool {
-	if filepath.IsAbs(rel) {
-		return true
-	}
-	return rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-// namesGitDir reports whether any segment of a cleaned relative path is `.git`.
-func namesGitDir(rel string) bool {
-	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
-		if seg == ".git" {
-			return true
-		}
-	}
-	return false
+	return filepath.Join(root, path), filepath.ToSlash(path), nil
 }
 
 // resolveWorkspaceRoot resolves the session's recorded working directory to its
@@ -224,14 +137,10 @@ func resolveWorkspaceRoot(cwd string) (string, *runtime.APIError) {
 	return root, nil
 }
 
-// readWorkspaceFile classifies rel through the already-resolved root, opens it
-// inside that root, and returns its bounded text. Every resolution goes through
-// the root handle, so neither the kind check nor the open can leave the working
-// directory; size, modification time, and content come from the opened
-// descriptor, so a replacement between the two cannot redirect the read
-// (TS-05.R21).
+// readWorkspaceFile is retained for focused kind/race tests; production resolves
+// both relative and absolute requests through readLocalFile (TS-05.R24).
 func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
-	return readWorkspaceFileAfterClassification(root, rel, nil)
+	return readLocalFileAfterClassification(filepath.Join(root, filepath.FromSlash(rel)), rel, nil)
 }
 
 // readWorkspaceFileAfterClassification exposes the instant between classifying
@@ -239,18 +148,23 @@ func readWorkspaceFile(root, rel string) (fileContent, *runtime.APIError) {
 // survive — for the deterministic replacement regression. Production callers
 // never supply a hook.
 func readWorkspaceFileAfterClassification(root, rel string, afterClassification func()) (fileContent, *runtime.APIError) {
-	dir, err := os.OpenRoot(root)
-	if err != nil {
-		return fileContent{}, apiError(runtime.CodeWorkspaceUnavailable, "this agent's working directory is no longer available")
-	}
-	defer dir.Close()
-	name := filepath.FromSlash(rel)
-	// Classify the target's kind through the root before opening it. Opening is
+	return readLocalFileAfterClassification(filepath.Join(root, filepath.FromSlash(rel)), rel, afterClassification)
+}
+
+func readLocalFile(path, display string) (fileContent, *runtime.APIError) {
+	return readLocalFileAfterClassification(path, display, nil)
+}
+
+// readLocalFileAfterClassification checks both before and after open: the first
+// check avoids opening known special files, and the descriptor check rejects a
+// target replaced during the check/open window (TS-05.R24).
+func readLocalFileAfterClassification(path, display string, afterClassification func()) (fileContent, *runtime.APIError) {
+	// Classify the target's kind before opening it. Opening is
 	// what distinguishes a non-regular file on some platforms but not others: a
 	// socket refuses the open on Linux and accepts it on macOS, and a FIFO would
-	// block the open until a writer appears. Stat resolves symlinks inside the
-	// root and refuses ones that leave it, so containment is unchanged.
-	if info, statErr := dir.Stat(name); statErr == nil && !info.Mode().IsRegular() {
+	// block the open until a writer appears, so the descriptor is opened
+	// non-blocking and classified again before any read.
+	if info, statErr := os.Stat(path); statErr == nil && !info.Mode().IsRegular() {
 		if info.IsDir() {
 			return fileContent{}, apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
 		}
@@ -259,20 +173,17 @@ func readWorkspaceFileAfterClassification(root, rel string, afterClassification 
 	if afterClassification != nil {
 		afterClassification()
 	}
-	f, err := dir.Open(name)
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
 		}
-		// A file the root resolves but refuses to open is inside the workspace, so
-		// saying it is outside would misdirect the person to a containment problem
-		// that does not exist; only the root's own escape refusal is path_refused
-		// (INV §8).
 		if errors.Is(err, fs.ErrPermission) {
 			return fileContent{}, apiError(runtime.CodeFileUnreadable, "that file could not be read")
 		}
-		return fileContent{}, apiError(runtime.CodePathRefused, "that path is outside this agent's working directory")
+		return fileContent{}, apiError(runtime.CodeFileUnreadable, "that file could not be read")
 	}
+	f := os.NewFile(uintptr(fd), path)
 	defer f.Close()
 	info, err := f.Stat()
 	if err != nil {
@@ -306,13 +217,13 @@ func readWorkspaceFileAfterClassification(root, rel string, afterClassification 
 	}
 	text := string(body)
 	return fileContent{
-		Path:      rel,
+		Path:      display,
 		Size:      info.Size(),
 		ModTime:   info.ModTime().UTC().Format(time.RFC3339),
 		LineCount: countLines(text),
 		Content:   text,
 		Truncated: truncated,
-		Language:  languageForPath(rel),
+		Language:  languageForPath(display),
 	}, nil
 }
 

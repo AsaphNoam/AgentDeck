@@ -18,6 +18,11 @@ export function clipAnnotationExcerpt(value: string, limit = annotationExcerptLi
 // annotationAnchor is the label a pending draft shows for where it points
 // (FS-13.R22): file and line range for diff lines, otherwise the event.
 export function annotationAnchor(draft: AnnotationDraft) {
+  if (draft.anchor_kind === "file") {
+    if (!draft.start_line) return `File ${draft.path}`;
+    const range = draft.end_line && draft.end_line !== draft.start_line ? `–${draft.end_line}` : "";
+    return `File ${draft.path}:${draft.start_line}${range}`;
+  }
   if (!draft.path) return `Event ${draft.seq}`;
   const range = draft.end_line && draft.end_line !== draft.start_line ? `–${draft.end_line}` : "";
   return `${draft.path}:${draft.start_line}${range}`;

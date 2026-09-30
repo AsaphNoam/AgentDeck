@@ -578,7 +578,7 @@ reloads the collections through this route rather than reconstructing them from 
   already refuses one. No route is added for directory listing, writing, or downloading, and the
   existing tracking and search routes are unchanged.
 
-**R48 `(planned)` — The existing file read deliberately accepts unrestricted local paths.** This
+**R48 (shipped 2026-09-30) — The existing file read deliberately accepts unrestricted local paths.** This
 supersedes R40's working-directory containment when it ships without adding or renaming a route.
 `GET /api/sessions/{id}/file?path=<p>` still requires a known chat session, still serves archived
 sessions, and still returns R40's JSON shape. A relative path is cleaned and resolved from the
@@ -603,7 +603,7 @@ confirmation is added. File search and tracking keep their existing session-scop
 The loopback route remains behind `localOnly` and explicitly denied by the tailnet route inventory
 (TS-05.R24, TS-13.R5, INV §14).
 
-**R49 `(planned)` — The annotation endpoint accepts one additive file-anchor variant.** The
+**R49 (shipped 2026-09-30) — The annotation endpoint accepts one additive file-anchor variant.** The
 existing `POST /api/sessions/{id}/annotations` request, response, limits, target validation,
 append-before-delivery ordering, SSE projection, and error envelope remain R14's single contract.
 Each annotation with omitted `anchor_kind` is validated exactly as today: `seq` is positive, and

@@ -145,7 +145,8 @@ type AnnotationData struct {
 }
 
 type Annotation struct {
-	Seq         int64  `json:"seq"`
+	AnchorKind  string `json:"anchor_kind,omitempty"`
+	Seq         int64  `json:"seq,omitempty"`
 	Path        string `json:"path,omitempty"`
 	Side        string `json:"side,omitempty"` // "old" | "new" for diff-line captures
 	StartLine   int    `json:"start_line,omitempty"`
@@ -166,15 +167,26 @@ func FormatAnnotationBlock(data AnnotationData) string {
 	var b strings.Builder
 	b.WriteString("[AgentDeck annotations]\n")
 	for i, a := range data.Annotations {
-		fmt.Fprintf(&b, "\n%d. Transcript event %d", i+1, a.Seq)
-		if a.Path != "" {
-			fmt.Fprintf(&b, " — %s", a.Path)
+		if a.AnchorKind == "file" {
+			fmt.Fprintf(&b, "\n%d. File %s", i+1, a.Path)
 			if a.StartLine > 0 {
-				fmt.Fprintf(&b, " (%s lines %d", a.Side, a.StartLine)
+				fmt.Fprintf(&b, " (lines %d", a.StartLine)
 				if a.EndLine > a.StartLine {
 					fmt.Fprintf(&b, "–%d", a.EndLine)
 				}
 				b.WriteString(")")
+			}
+		} else {
+			fmt.Fprintf(&b, "\n%d. Transcript event %d", i+1, a.Seq)
+			if a.Path != "" {
+				fmt.Fprintf(&b, " — %s", a.Path)
+				if a.StartLine > 0 {
+					fmt.Fprintf(&b, " (%s lines %d", a.Side, a.StartLine)
+					if a.EndLine > a.StartLine {
+						fmt.Fprintf(&b, "–%d", a.EndLine)
+					}
+					b.WriteString(")")
+				}
 			}
 		}
 		b.WriteString("\nExcerpt:\n---\n")

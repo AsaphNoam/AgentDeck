@@ -8,7 +8,9 @@ export function AnnotationCard({ event }: { event: TranscriptEvent }) {
       <header><strong>Annotations assigned</strong><span>{target?.kind === "self" ? "Current agent" : target?.agent_id ? `Agent ${String(target.agent_id)}` : "Agent"}</span></header>
       {annotations.map((annotation, index) => (
         <section key={index}>
-          <p>{annotation.path ? `${String(annotation.path)}:${String(annotation.start_line ?? "")}${annotation.end_line && annotation.end_line !== annotation.start_line ? `–${String(annotation.end_line)}` : ""}` : `Event ${String(annotation.seq ?? "")}`}</p>
+          <p>{annotation.anchor_kind === "file"
+            ? `File ${String(annotation.path ?? "")}${annotation.start_line ? `:${String(annotation.start_line)}${annotation.end_line && annotation.end_line !== annotation.start_line ? `–${String(annotation.end_line)}` : ""}` : ""}`
+            : annotation.path ? `${String(annotation.path)}:${String(annotation.start_line ?? "")}${annotation.end_line && annotation.end_line !== annotation.start_line ? `–${String(annotation.end_line)}` : ""}` : `Event ${String(annotation.seq ?? "")}`}</p>
           <blockquote>{String(annotation.excerpt ?? "")}</blockquote>
           <p><strong>Instruction:</strong> {String(annotation.instruction ?? "")}</p>
         </section>

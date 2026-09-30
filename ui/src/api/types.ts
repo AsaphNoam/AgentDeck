@@ -126,15 +126,26 @@ export interface TranscriptEvent {
 
 export type PermissionResolution = "approve" | "deny" | "cancelled" | "timeout";
 
-export interface AnnotationDraft {
-  seq: number;
+interface AnnotationDraftBase {
   excerpt: string;
   instruction: string;
+}
+
+export type AnnotationDraft = AnnotationDraftBase & ({
+  anchor_kind: "file";
+  seq?: never;
+  path: string;
+  side?: never;
+  start_line?: number;
+  end_line?: number;
+} | {
+  anchor_kind?: never;
+  seq: number;
   path?: string;
   side?: "old" | "new";
   start_line?: number;
   end_line?: number;
-}
+});
 
 export interface AnnotationTarget {
   kind: "self" | "agent";

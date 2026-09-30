@@ -122,6 +122,29 @@ describe("FileViewer", () => {
     expect(screen.queryByRole("button", { name: "Rendered" })).not.toBeInTheDocument();
   });
 
+  it("reports source selections with file lines and rendered selections without them", async () => {
+    const onSelectionMenu = vi.fn();
+    const view = render(<FileViewer agentId="a_1" link={{ path: "docs/notes.md" }} onClose={vi.fn()} onSelectionMenu={onSelectionMenu} />);
+    const heading = await screen.findByRole("heading", { name: "Title" });
+    selectContents(heading);
+    fireEvent.contextMenu(heading.closest(".file-viewer-body") as HTMLElement, { clientX: 8, clientY: 9 });
+    expect(onSelectionMenu).toHaveBeenLastCalledWith(expect.objectContaining({
+      text: "Title",
+      draft: { anchor_kind: "file", path: "docs/notes.md", excerpt: "Title", instruction: "" },
+    }));
+
+    onSelectionMenu.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    await waitFor(() => expect(document.querySelector('[data-file-line="1"]')).not.toBeNull());
+    const first = document.querySelector('[data-file-line="1"]') as HTMLElement;
+    const third = document.querySelector('[data-file-line="3"]') as HTMLElement;
+    selectBetween(first, third);
+    fireEvent.contextMenu(view.container.querySelector(".file-viewer-body") as HTMLElement, { clientX: 10, clientY: 11 });
+    expect(onSelectionMenu).toHaveBeenLastCalledWith(expect.objectContaining({
+      draft: expect.objectContaining({ anchor_kind: "file", path: "docs/notes.md", start_line: 1, end_line: 3 }),
+    }));
+  });
+
   // BR-6: a link inside a rendered Markdown file resolves against that file's own directory, so
   // `../archive/x.md` from `docs/features/notes.md` is not refused as outside the working
   // directory and a sibling link reads the sibling.
@@ -198,6 +221,23 @@ describe("FileViewer", () => {
     expect(screen.getByText(/FRESH/)).toBeInTheDocument();
   });
 });
+
+function selectContents(element: HTMLElement) {
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
+function selectBetween(start: HTMLElement, end: HTMLElement) {
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.setStart(start, 0);
+  range.setEnd(end, end.childNodes.length);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
 
 // FS-03.A36 (R53, R54) — the address is the open-file state, and the two layout
 // forms are one component in two CSS states.

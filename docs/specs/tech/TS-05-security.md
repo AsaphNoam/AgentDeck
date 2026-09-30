@@ -193,7 +193,7 @@ sensitive-context sharing is a practical problem.
   fixture needs a path short enough for `sun_path`, and the FIFO open needs a bounded wait so a
   restored open-then-classify order fails instead of hanging the suite (`INV §17`).
 
-- **R24 `(planned)` — File viewing intentionally trusts any local caller with the process's file
+- **R24 (shipped 2026-09-30) — File viewing intentionally trusts any local caller with the process's file
   authority.** This supersedes R21's readable-root policy when FS-03.R64 ships. The path supplied to
   the existing loopback file route is authority: after relative-path resolution against the
   session working directory, the server may read any regular file its OS identity can read,

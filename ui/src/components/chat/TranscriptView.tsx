@@ -120,7 +120,19 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   return (
     <div className="transcript-wrap" data-ui="transcript">
       {openFile && onOpenFile && (
-        <FileViewer agentId={agentId} link={openFile} onClose={() => onOpenFile(null)} onOpenFile={onOpenFile} />
+        <FileViewer
+          agentId={agentId}
+          link={openFile}
+          onClose={() => onOpenFile(null)}
+          onOpenFile={onOpenFile}
+          onSelectionMenu={annotationsEnabled ? ({ x, y, text, draft }) => setMenu({
+            x,
+            y,
+            label: "Annotate selection",
+            copy: () => copyText(text, pushError),
+            annotate: () => addAnnotation(agentId, draft),
+          }) : undefined}
+        />
       )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
         {renderEvents(nestActivities(withReasoning(events, reasoning)), [], 1)}

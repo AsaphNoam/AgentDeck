@@ -1,6 +1,6 @@
 # Open and annotate any local text file
 
-**State:** Waiting to start
+**State:** Finished
 **Why:** Direct operator request after investigating the shipped outside-workspace refusal; the
 operator explicitly accepted unrestricted local API reads and durable annotation capture.
 **Relevant requirements:** FS-03.R64–R65/A45–A46, FS-13.R25/A16, TS-02.R38, TS-03.R48–R49,

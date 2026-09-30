@@ -272,15 +272,20 @@ func validateAnnotations(data *runtime.AnnotationData) error {
 	}
 	for i := range data.Annotations {
 		a := &data.Annotations[i]
-		if a.Seq < 1 || strings.TrimSpace(a.Excerpt) == "" || strings.TrimSpace(a.Instruction) == "" {
-			return fmt.Errorf("annotation %d needs an event, excerpt, and instruction", i+1)
+		if strings.TrimSpace(a.Excerpt) == "" || strings.TrimSpace(a.Instruction) == "" {
+			return fmt.Errorf("annotation %d needs an anchor, excerpt, and instruction", i+1)
 		}
 		if runeCount(a.Instruction) > maxAnnotationChars {
 			return fmt.Errorf("annotation %d instruction must be at most %d characters", i+1, maxAnnotationChars)
 		}
-		if (a.StartLine > 0 || a.EndLine > 0 || a.Side != "") &&
-			(a.Path == "" || (a.Side != "old" && a.Side != "new") || a.StartLine < 1 || a.EndLine < a.StartLine) {
-			return fmt.Errorf("annotation %d has an invalid diff anchor", i+1)
+		if a.AnchorKind == "file" {
+			if a.Seq != 0 || strings.TrimSpace(a.Path) == "" || a.Side != "" ||
+				((a.StartLine == 0) != (a.EndLine == 0)) || a.StartLine < 0 || a.EndLine < a.StartLine {
+				return fmt.Errorf("annotation %d has an invalid file anchor", i+1)
+			}
+		} else if a.AnchorKind != "" || a.Seq < 1 || ((a.StartLine > 0 || a.EndLine > 0 || a.Side != "") &&
+			(a.Path == "" || (a.Side != "old" && a.Side != "new") || a.StartLine < 1 || a.EndLine < a.StartLine)) {
+			return fmt.Errorf("annotation %d has an invalid transcript anchor", i+1)
 		}
 		a.Excerpt = clipAnnotationExcerpt(a.Excerpt, maxAnnotationChars)
 		a.Instruction = strings.TrimSpace(a.Instruction)

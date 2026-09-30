@@ -601,7 +601,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   registered `file-viewer` component in `contract.json` carrying no `data-variant` for the
   docked-versus-reflowed form, since nothing in the client observes which form is on screen (R53,
   R8, R14).
-- **R80 `(planned)` — File annotations extend the transcript's existing selection machinery.**
+- **R80 (shipped 2026-09-30) — File annotations extend the transcript's existing selection machinery.**
   `TranscriptView` remains the composition owner for one annotation menu, one `annotationStore`
   tray, and the file viewer. A loaded `FileViewer` reports a valid selection into that shared seam;
   it does not mount its own tray, store, or delivery client. The selected excerpt goes through the

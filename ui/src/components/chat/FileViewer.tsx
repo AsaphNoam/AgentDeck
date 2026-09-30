@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { getFileContent } from "../../api/client";
 import type { FileContent } from "../../api/types";
 import { CodeBlock } from "./renderers/CodeBlock";
 import { SanitizedMarkdown } from "./renderers/SanitizedMarkdown";
 import { resolveFromFile, type FileLink } from "./renderers/filePath";
+import type { AnnotationDraft } from "../../api/types";
+import { clipAnnotationExcerpt } from "../../lib/annotations";
 
 // The read-only, one-file viewer that opens beside the transcript (FS-03.R52).
 // It holds no durable state: `?file=`/`?fileLine=` on the route are the open
@@ -17,11 +19,12 @@ type ViewState =
   | { status: "error"; reason: string }
   | { status: "loaded"; file: FileContent; readAt: Date };
 
-export function FileViewer({ agentId, link, onClose, onOpenFile }: {
+export function FileViewer({ agentId, link, onClose, onOpenFile, onSelectionMenu }: {
   agentId: string;
   link: FileLink;
   onClose: () => void;
   onOpenFile?: (link: FileLink) => void;
+  onSelectionMenu?: (selection: { x: number; y: number; text: string; draft: AnnotationDraft }) => void;
 }) {
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [rendered, setRendered] = useState(true);
@@ -68,6 +71,31 @@ export function FileViewer({ agentId, link, onClose, onOpenFile }: {
     ? (target: FileLink) => onOpenFile({ ...target, path: resolveFromFile(view.file.path, target.path) })
     : onOpenFile;
 
+  const openSelectionMenu = (event: MouseEvent<HTMLDivElement>) => {
+    if (!onSelectionMenu || view.status !== "loaded") return;
+    const selection = window.getSelection();
+    const host = bodyRef.current;
+    if (!selection || selection.rangeCount === 0 || !host || !selection.anchorNode || !selection.focusNode ||
+      !host.contains(selection.anchorNode) || !host.contains(selection.focusNode)) return;
+    const text = selection.toString();
+    if (!text.trim()) return;
+    const draft: AnnotationDraft = {
+      anchor_kind: "file",
+      path: view.file.path,
+      excerpt: clipAnnotationExcerpt(text.trim()),
+      instruction: "",
+    };
+    if (!showRendered) {
+      const start = fileLineForNode(selection.getRangeAt(0).startContainer, host);
+      const end = fileLineForNode(selection.getRangeAt(0).endContainer, host);
+      if (!start || !end) return;
+      draft.start_line = Math.min(start, end);
+      draft.end_line = Math.max(start, end);
+    }
+    event.preventDefault();
+    onSelectionMenu({ x: event.clientX, y: event.clientY, text, draft });
+  };
+
   return (
     <aside className="file-viewer" data-ui="file-viewer" data-state={view.status}>
       <header className="file-viewer-header" data-slot="header">
@@ -92,7 +120,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile }: {
           <time dateTime={view.readAt.toISOString()}>{view.readAt.toLocaleTimeString()}</time>
         </p>
       )}
-      <div className="file-viewer-body" data-slot="content" ref={bodyRef}>
+      <div className="file-viewer-body" data-slot="content" ref={bodyRef} onContextMenu={openSelectionMenu}>
         {view.status === "loading" && <p className="tab-placeholder">Reading…</p>}
         {view.status === "error" && <p className="file-viewer-error" role="alert">{view.reason}</p>}
         {view.status === "loaded" && (showRendered ? (
@@ -107,4 +135,12 @@ export function FileViewer({ agentId, link, onClose, onOpenFile }: {
       </div>
     </aside>
   );
+}
+
+function fileLineForNode(node: Node, host: HTMLElement): number | null {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement;
+  const line = element?.closest<HTMLElement>("[data-file-line]");
+  if (!line || !host.contains(line)) return null;
+  const value = Number(line.dataset.fileLine);
+  return value > 0 ? value : null;
 }

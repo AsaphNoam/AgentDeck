@@ -87,7 +87,7 @@ per-agent transcript writer and sequence allocation, for active and inactive ses
 instruction and excerpt text joins the session's indexed content (R9) so FS-13.R10 search works;
 payload fields are append-only once shipped.
 
-**R38 `(planned)` — File annotations extend the existing transcript payload additively.** The
+**R38 (shipped 2026-09-30) — File annotations extend the existing transcript payload additively.** The
 `annotation` event keeps one list and one event kind. An omitted `anchor_kind` preserves R14's
 shipped transcript/diff shape and requires its positive `seq`; `anchor_kind:"file"` instead omits
 `seq` and `side`, requires a path, and carries either no line fields or a valid 1-based

@@ -164,7 +164,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   follow an annotation event, and a prompt following an annotation event that was sent to a
   different target all render normally — including the message a person types straight after
   assigning a batch to another agent.
-- **R25 `(planned)` — A loaded conversation file is a first-class annotation source.** This
+- **R25 (shipped 2026-09-30) — A loaded conversation file is a first-class annotation source.** This
   supersedes R13's file exclusion when it ships; terminal agents, screenshots, and unrelated web
   pages remain excluded. A file annotation is anchored to the normalized path shown by the viewer,
   not to the transcript event that happened to open it, so a link, a rendered-file link, a reload,
@@ -236,7 +236,7 @@ Each acceptance item names its delivered verification.
   after highlighting captures the highlighted text, a right-click with no highlight captures the
   whole event, and a non-annotatable transcript keeps the browser menu:
   `ui/src/components/chat/TranscriptView.test.tsx`.
-- **A16 `(planned)` (R2–R12, R16, R19–R23, R25)** — Source and rendered-Markdown file selections
+- **A16 (shipped 2026-09-30) (R2–R12, R16, R19–R23, R25)** — Source and rendered-Markdown file selections
   create path/line and path-only drafts respectively in the same tray as transcript drafts; the
   mixed batch survives reload, edits and removes normally, preserves excerpts when the file changes
   or disappears, and sends through the existing self, other-agent, and new-task paths. Its durable

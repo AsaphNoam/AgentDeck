@@ -85,13 +85,37 @@ func TestValidateAnnotationsClipsLongExcerptAndRejectsEmptyInstruction(t *testin
 	}
 }
 
+func TestValidateAnnotationsAcceptsFileAnchorsAndRejectsMixedShapes(t *testing.T) {
+	valid := runtime.AnnotationData{Annotations: []runtime.Annotation{{AnchorKind: "file", Path: "/tmp/note.md", StartLine: 2, EndLine: 4, Excerpt: "selected", Instruction: "revise"}}}
+	if err := validateAnnotations(&valid); err != nil {
+		t.Fatalf("valid file anchor: %v", err)
+	}
+	if block := runtime.FormatAnnotationBlock(valid); !strings.Contains(block, "File /tmp/note.md (lines 2–4)") || strings.Contains(block, "event 0") {
+		t.Fatalf("file annotation block = %q", block)
+	}
+	for _, annotation := range []runtime.Annotation{
+		{AnchorKind: "file", Seq: 1, Path: "note.md", Excerpt: "x", Instruction: "y"},
+		{AnchorKind: "file", Path: "note.md", Side: "new", Excerpt: "x", Instruction: "y"},
+		{AnchorKind: "file", Path: "note.md", StartLine: 2, Excerpt: "x", Instruction: "y"},
+		{AnchorKind: "other", Path: "note.md", Excerpt: "x", Instruction: "y"},
+	} {
+		data := runtime.AnnotationData{Annotations: []runtime.Annotation{annotation}}
+		if err := validateAnnotations(&data); err == nil {
+			t.Fatalf("accepted mixed file anchor: %+v", annotation)
+		}
+	}
+}
+
 // FS-13.A3/A5 and FS-06.A10: an inactive source can assign annotations to a
 // running chat agent; the source event is durable/indexed and user mail neither
 // impersonates an agent nor creates a turn-budget row.
 func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T) {
 	srv := testServer(t, true)
 	source, target := writeAnnotationPair(t, srv)
-	body := runtime.AnnotationData{Annotations: []runtime.Annotation{{Seq: 4, Path: "main.go", Side: "new", StartLine: 9, EndLine: 10, Excerpt: "target phrase", Instruction: "review this branch"}}, Target: runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID}}
+	body := runtime.AnnotationData{Annotations: []runtime.Annotation{
+		{Seq: 4, Path: "main.go", Side: "new", StartLine: 9, EndLine: 10, Excerpt: "target phrase", Instruction: "review this branch"},
+		{AnchorKind: "file", Path: "/tmp/notes.md", StartLine: 2, EndLine: 2, Excerpt: "point in time", Instruction: "clarify this"},
+	}, Target: runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID}}
 	raw, _ := json.Marshal(body)
 	req := newLocalRequest(http.MethodPost, "/api/sessions/a_source/annotations", bytes.NewReader(raw))
 	rec := httptest.NewRecorder()
@@ -103,7 +127,7 @@ func TestAnnotationAgentDeliveryPersistsUserMailAndTranscriptEvent(t *testing.T)
 	if err != nil || len(mail) != 1 {
 		t.Fatalf("ListMessages = %d, %v; want 1", len(mail), err)
 	}
-	if mail[0].FromAgent != "user" || mail[0].FromAddress != "user@dashboard" || !strings.Contains(mail[0].Body, "target phrase") {
+	if mail[0].FromAgent != "user" || mail[0].FromAddress != "user@dashboard" || !strings.Contains(mail[0].Body, "target phrase") || !strings.Contains(mail[0].Body, "File /tmp/notes.md (lines 2)") {
 		t.Fatalf("unexpected reserved-sender mail: %+v", mail[0])
 	}
 	var budgetRows int
