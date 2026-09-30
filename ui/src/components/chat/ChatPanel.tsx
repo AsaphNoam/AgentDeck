@@ -117,9 +117,9 @@ export function ChatPanel() {
   // reopens it and browser Back closes it (FS-03.R54). Opening from the Files tab
   // also switches to the transcript, where the viewer's grid track lives.
   const openFile = fileLinkFromParams(params);
-  const openFileInViewer = (link: FileLink | null) => {
+  const openFileInViewer = (link: FileLink | null, options?: { replace?: boolean }) => {
     setTab("transcript");
-    setParams((current) => writeFileLinkParams(current, link));
+    setParams((current) => writeFileLinkParams(current, link), options);
   };
 
   // Reveal a transcript event from the Files tab's "Diff" action: switch to the

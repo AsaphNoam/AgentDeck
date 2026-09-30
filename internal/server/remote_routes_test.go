@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -146,6 +147,23 @@ func TestRemoteCookieIsHostScopedAndSliding(t *testing.T) {
 	devices, _ := s.stateStore.ListRemoteDevices()
 	if time.Since(devices[0].LastSeenAt) > time.Minute {
 		t.Fatalf("last seen not recorded: %v", devices[0].LastSeenAt)
+	}
+}
+
+// An authenticated tailnet device cannot read conversation files, even one the
+// local route would serve (FS-03.R64, TS-05.R24).
+func TestRemoteDeniesFileRead(t *testing.T) {
+	s := testServer(t, true)
+	root := seedReadableWorkspace(t, s, "a_remote")
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+
+	for _, path := range []string{"main.go", root + "/main.go"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/sessions/a_remote/file?path="+url.QueryEscape(path), "", token))
+		if rec.Code != 404 || errorCode(t, rec) != codeRemoteRouteNotAvailable || strings.Contains(rec.Body.String(), "package main") {
+			t.Fatalf("path %q = %d %s", path, rec.Code, rec.Body)
+		}
 	}
 }
 

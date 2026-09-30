@@ -48,10 +48,15 @@ export function classifyFileLink(href: string | undefined): FileLink | null {
 }
 
 // fromFileURL turns `file:///a/b.go` or `file://localhost/a/b.go` into `/a/b.go`,
-// decoding percent-escapes. A malformed URL yields "" and stays a plain link.
+// decoding percent-escapes. Only an empty or `localhost` authority names this
+// machine; any other host, or a malformed URL, yields "" and stays a plain link.
 function fromFileURL(url: string): string {
-  const withoutScheme = url.replace(/^file:(\/\/)?/i, "");
-  const path = withoutScheme.replace(/^localhost(?=\/)/i, "");
+  let path = url.replace(/^file:/i, "");
+  if (path.startsWith("//")) {
+    const authority = /^\/\/([^/?#]*)(?=\/|$)/.exec(path);
+    if (!authority || !/^(localhost)?$/i.test(authority[1])) return "";
+    path = path.slice(authority[0].length);
+  }
   try {
     return decodeURIComponent(path);
   } catch {

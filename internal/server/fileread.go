@@ -94,8 +94,9 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 // resolving it from the recorded workspace. Absolute paths are authority in
 // themselves and do not require an available workspace (TS-03.R48).
 func resolveFileReadPath(cwd, raw string) (string, string, *runtime.APIError) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	// Whitespace alone is a missing value; otherwise the supplied spelling is kept,
+	// because a real filename may begin or end with spaces (FS-03.R64).
+	if strings.TrimSpace(raw) == "" {
 		return "", "", apiError(runtime.CodeValidation, "path is required")
 	}
 	if strings.ContainsRune(raw, 0) {

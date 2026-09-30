@@ -16,8 +16,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   archive asset. The release audit changed no operator guidance or pinned component version.
 - **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** `open-and-annotate-any-local-file` is available.
-- **Fix units:** none available.
+- **Review units:** none available.
+- **Fix units:** `open-and-annotate-any-local-file` is in progress (one Worth-fixing test gap left).
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -42,36 +42,6 @@ None.
 ## Review findings
 
 **`open-and-annotate-any-local-file` — Fix model: medium — Codex Terra or Claude Opus.**
-
-- **Must fix** (FS-03.R64/A45, FS-13.R25; INV §1/§10) —
-  `ui/src/components/chat/FileViewer.tsx:70-84,102` uses the server's normalized `file.path` for
-  rendered-file links and annotation anchors, but still shows `link.path`, and no loaded response
-  republishes the normalized spelling to the route. Normal trigger: open
-  `?file=./docs/../README.md` or an absolute path with dot segments. The server reads and returns the
-  normalized file, while the header and browser history keep the raw spelling and a resulting
-  annotation names a path the person was not shown. Render the loaded path and synchronize it
-  through `onOpenFile` while preserving the cited line; cover header, URL, reload, and draft-anchor
-  agreement for relative and absolute dot segments.
-
-- **Worth fixing** (FS-03.R64, TS-03.R48; INV §8) —
-  `internal/server/fileread.go:96-104` applies `strings.TrimSpace` to the path before resolution.
-  A valid file whose name begins or ends with whitespace is silently redirected to a different
-  pathname (and may display that other file) or reported missing, despite the contract admitting
-  any readable regular UTF-8 file. Use trimming only to recognize an all-whitespace missing value,
-  preserve the supplied path for resolution, and add leading/trailing-space filename cases.
-
-- **Worth fixing** (TS-03.R48; INV §8/§14) —
-  `ui/src/components/chat/renderers/filePath.ts:30-56` accepts every `file://` authority. For example,
-  `file://server/share/note.md` becomes the relative local path `server/share/note.md` and opens the
-  viewer, although only empty-host and `localhost` file URLs are local targets. Parse the URL,
-  reject non-local or malformed authorities, and pin empty-host, `localhost`, remote-host, and
-  percent-escaped cases independently.
-
-- **Worth fixing** (TS-05.R24, TS-13.R5; INV §14/§17) —
-  `internal/server/remote_routes_test.go:152-175` tests representative denied routes but never sends
-  an authenticated tailnet request to `/api/sessions/{id}/file`; the inventory test proves only
-  that the route appears in `remoteDenied`. Add the required behavioral denial test and assert
-  `404 remote_route_not_available` with no file content returned.
 
 - **Worth fixing** (FS-03.A46, FS-13.A16, TS-02.R38, TS-03.R49, TS-08.R80; INV §11/§17) —
   `ui/src/components/chat/FileViewer.test.tsx:125-146` stops at the callback seam, while
@@ -101,6 +71,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Fix (partial): `open-and-annotate-any-local-file`.** Closed the Must-fix
+  path-identity defect (INV §1/§10: the viewer now shows and republishes the server's normalized
+  path with `replace`, preserving the cited line, so header, address, reload, and anchors agree),
+  preserved leading/trailing filename whitespace (INV §8), limited `file://` links to empty/localhost
+  authorities (INV §8/§14), and added the remote file-read denial test (INV §14/§17). The
+  integration/round-trip test gap remains open.
 
 - **2026-09-30 — Review: `open-and-annotate-any-local-file`.** One Must-fix path-identity defect and
   four Worth-fixing edge/verification gaps keep the unit open. The unrestricted route otherwise

@@ -215,6 +215,26 @@ func TestFileReadAcceptsUnrestrictedPaths(t *testing.T) {
 	}
 }
 
+// A filename that begins or ends with spaces is read as spelled, not redirected
+// to the trimmed name; whitespace alone is still a missing path (FS-03.R64).
+func TestFileReadKeepsSurroundingWhitespaceInFilename(t *testing.T) {
+	srv := testServer(t, false)
+	root := seedReadableWorkspace(t, srv, "a_space")
+	writeFile(t, filepath.Join(root, " lead.txt"), "lead\n")
+	writeFile(t, filepath.Join(root, "trail.txt "), "trail\n")
+	writeFile(t, filepath.Join(root, "lead.txt"), "decoy\n")
+	h := srv.routes()
+
+	if got := readFileOK(t, h, "a_space", " lead.txt"); got.Content != "lead\n" || got.Path != " lead.txt" {
+		t.Fatalf("leading space read %q as %q", got.Path, got.Content)
+	}
+	if got := readFileOK(t, h, "a_space", filepath.Join(root, "trail.txt ")); got.Content != "trail\n" {
+		t.Fatalf("trailing space content = %q", got.Content)
+	}
+	readFileRefused(t, h, "a_space", "trail.txt", runtime.CodeNotFound, http.StatusNotFound)
+	readFileRefused(t, h, "a_space", "   ", runtime.CodeValidation, http.StatusUnprocessableEntity)
+}
+
 func TestFileReadAbsoluteMissingIsTyped(t *testing.T) {
 	srv := testServer(t, false)
 	root := seedReadableWorkspace(t, srv, "a_probe")

@@ -19,11 +19,12 @@ type ViewState =
   | { status: "error"; reason: string }
   | { status: "loaded"; file: FileContent; readAt: Date };
 
-export function FileViewer({ agentId, link, onClose, onOpenFile, onSelectionMenu }: {
+export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved, onSelectionMenu }: {
   agentId: string;
   link: FileLink;
   onClose: () => void;
   onOpenFile?: (link: FileLink) => void;
+  onPathResolved?: (path: string) => void;
   onSelectionMenu?: (selection: { x: number; y: number; text: string; draft: AnnotationDraft }) => void;
 }) {
   const [view, setView] = useState<ViewState>({ status: "loading" });
@@ -38,13 +39,26 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onSelectionMenu
   // Content is read when the file is opened and when Reload is chosen. There is
   // deliberately no watching and no polling, so the panel keeps showing the text
   // it read until someone reloads it (FS-03.R52).
+  // The server returns the normalized path it actually read. Publishing that
+  // spelling back to the route makes header, URL, reload, and annotation anchors
+  // name the same file (FS-03.R64); the matching route change is not a new read.
+  const republished = useRef<string | null>(null);
   useEffect(() => {
+    if (republished.current === link.path) {
+      republished.current = null;
+      return;
+    }
+    republished.current = null;
     const token = ++readToken.current;
     setView({ status: "loading" });
     getFileContent(agentId, link.path)
       .then((file) => {
         if (readToken.current !== token) return;
         setView({ status: "loaded", file, readAt: new Date() });
+        if (file.path !== link.path && onPathResolved) {
+          republished.current = file.path;
+          onPathResolved(file.path);
+        }
       })
       .catch((error: unknown) => {
         if (readToken.current !== token) return;
@@ -63,6 +77,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onSelectionMenu
     else host.scrollTop = 0;
   }, [view, link.line, rendered]);
 
+  const shownPath = view.status === "loaded" ? view.file.path : link.path;
   const isMarkdown = view.status === "loaded" && MARKDOWN_LANGUAGES.has(view.file.language);
   const showRendered = isMarkdown && rendered;
   // A rendered file's own links are relative to that file, not to the working
@@ -99,7 +114,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onSelectionMenu
   return (
     <aside className="file-viewer" data-ui="file-viewer" data-state={view.status}>
       <header className="file-viewer-header" data-slot="header">
-        <span className="file-viewer-path" title={link.path}>{link.path}</span>
+        <span className="file-viewer-path" title={shownPath}>{shownPath}</span>
         <div className="file-viewer-actions" data-slot="actions">
           {isMarkdown && (
             <div className="file-viewer-form" role="group" aria-label="Markdown display">

@@ -16,6 +16,18 @@ describe("classifyFileLink", () => {
     expect(classifyFileLink("vscode:open")).toBeNull();
     expect(classifyFileLink("https://example.com:8080")).toBeNull();
   });
+
+  // TS-03.R48: only an empty or localhost authority is a local file URL.
+  it("accepts local file URLs and rejects other hosts", () => {
+    expect(classifyFileLink("file:///repo/a.go:7")).toEqual({ path: "/repo/a.go", line: 7 });
+    expect(classifyFileLink("file://localhost/repo/a.go")).toEqual({ path: "/repo/a.go" });
+    expect(classifyFileLink("file://LOCALHOST/repo/a.go")).toEqual({ path: "/repo/a.go" });
+    expect(classifyFileLink("file:///repo/my%20notes.md")).toEqual({ path: "/repo/my notes.md" });
+    expect(classifyFileLink("file://server/share/note.md")).toBeNull();
+    expect(classifyFileLink("file://localhost.evil/x.md")).toBeNull();
+    expect(classifyFileLink("file://user@localhost/x.md")).toBeNull();
+    expect(classifyFileLink("file:///repo/bad%zz.md")).toBeNull();
+  });
 });
 
 describe("resolveFromFile", () => {

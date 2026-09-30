@@ -23,7 +23,8 @@ export function ArchiveAgentPage() {
   // An archived session reads from the working directory it recorded, so its file
   // links open the same viewer through the same address (FS-03.R54/R55).
   const openFile = fileLinkFromParams(params);
-  const openFileInViewer = (link: FileLink | null) => setParams((current) => writeFileLinkParams(current, link));
+  const openFileInViewer = (link: FileLink | null, options?: { replace?: boolean }) =>
+    setParams((current) => writeFileLinkParams(current, link), options);
   const archivedName = textField(metadata?.name) || "Archived session";
   const project = textField(metadata?.project);
   const backend = textField(metadata?.backend);

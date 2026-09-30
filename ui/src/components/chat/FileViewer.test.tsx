@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { FileViewer } from "./FileViewer";
 import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
 
@@ -143,6 +144,46 @@ describe("FileViewer", () => {
     expect(onSelectionMenu).toHaveBeenLastCalledWith(expect.objectContaining({
       draft: expect.objectContaining({ anchor_kind: "file", path: "docs/notes.md", start_line: 1, end_line: 3 }),
     }));
+  });
+
+  // FS-03.R64: dot-segment spellings are normalized by the server, and the viewer
+  // publishes that spelling so header, address, reload, and annotation anchor agree.
+  it.each([
+    ["./docs/../notes.go", "notes.go"],
+    ["/work/docs/../notes.go", "/work/notes.go"],
+  ])("republishes the normalized path for %s", async (requested, normalized) => {
+    server.use(http.get("/api/sessions/:id/file", ({ request }) => {
+      reads.push(new URL(request.url).searchParams.get("path") ?? "");
+      return HttpResponse.json(fileBody({ path: normalized }));
+    }));
+    const onSelectionMenu = vi.fn();
+    let location = "";
+    function Harness() {
+      const [params, setParams] = useSearchParams();
+      const link = fileLinkFromParams(params);
+      location = params.toString();
+      if (!link) return null;
+      return <FileViewer agentId="a_1" link={link} onClose={vi.fn()} onSelectionMenu={onSelectionMenu}
+        onPathResolved={(path) => setParams((current) => writeFileLinkParams(current, { ...link, path }), { replace: true })} />;
+    }
+    const url = `/?${new URLSearchParams({ file: requested, fileLine: "2" })}`;
+    const view = render(<MemoryRouter initialEntries={[url]}><Harness /></MemoryRouter>);
+
+    await waitFor(() => expect(new URLSearchParams(location).get("file")).toBe(normalized));
+    expect(new URLSearchParams(location).get("fileLine")).toBe("2");
+    expect(screen.getByText(normalized, { selector: ".file-viewer-path" })).toBeInTheDocument();
+    expect(reads).toEqual([requested]);
+
+    const first = document.querySelector('[data-file-line="1"]') as HTMLElement;
+    selectBetween(first, first);
+    fireEvent.contextMenu(view.container.querySelector(".file-viewer-body") as HTMLElement);
+    expect(onSelectionMenu).toHaveBeenLastCalledWith(expect.objectContaining({
+      draft: expect.objectContaining({ path: normalized }),
+    }));
+
+    // A reload of the page reads the address, which now holds the normalized path.
+    fireEvent.click(screen.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(reads).toEqual([requested, normalized]));
   });
 
   // BR-6: a link inside a rendered Markdown file resolves against that file's own directory, so

@@ -33,7 +33,7 @@ import { useUiStore } from "../../store/uiStore";
 // which is that pane's existing route to the full surface (FS-03.R53).
 // taskControl offers targeted background-task Stop; only a live session whose
 // runtime negotiated it passes true, and the archive never does (FS-03.R59).
-export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile, taskControl = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null) => void; taskControl?: boolean }) {
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile, taskControl = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null, options?: { replace?: boolean }) => void; taskControl?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -125,6 +125,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
           link={openFile}
           onClose={() => onOpenFile(null)}
           onOpenFile={onOpenFile}
+          onPathResolved={(path) => onOpenFile({ ...openFile, path }, { replace: true })}
           onSelectionMenu={annotationsEnabled ? ({ x, y, text, draft }) => setMenu({
             x,
             y,
