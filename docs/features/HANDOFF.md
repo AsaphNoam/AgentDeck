@@ -36,7 +36,13 @@ None.
 
 ## Blocked on human
 
-None.
+- **Conversation file-viewer scope:** the reported “path outside this agent's working directory”
+  refusal is confirmed works-as-specified, not a code defect. FS-03.R55, TS-03.R40, and TS-05.R21
+  deliberately make the session working directory the only readable root, and the focused server
+  containment tests pass. The requested broader behavior needs a product/security decision before
+  feature design: should the viewer read every file the AgentDeck process can read, or only the
+  session's explicitly authorized roots (`cwd` plus `add_dirs`)? No fix unit or model recommendation
+  was created.
 
 ## Review findings
 
@@ -60,6 +66,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Bug investigation: conversation links outside the working directory.** Confirmed
+  the refusal is the shipped security contract rather than a regression: the request supplies only
+  a path, the server derives the sole readable root from the session working directory, and existing
+  tests prove absolute, traversal, and symlink escapes are refused. Broadening the viewer is a new
+  feature/security-policy change; its readable-root scope is awaiting the operator's decision.
 
 - **2026-09-30 — Release preparation: v0.7.0.** Confirmed the minor version and audited the
   `v0.6.0..main` range. The shipped `operating-agentdeck` package already matches the agent-facing
