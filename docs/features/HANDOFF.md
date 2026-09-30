@@ -8,12 +8,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 ## Current position
 
 - **Active change:** none.
-- **Release:** `v0.7.0` is confirmed and being prepared from `v0.6.0..main` (73 commits). The
-  release audit found no open review unit or finding and no stale release-matched operator guidance,
-  README install claim, or pinned component version. `make test`, the UI suite (65 files, 555
-  tests), and `make dist VERSION=0.7.0` pass; the arm64 distributable reports `0.7.0` and carries
-  the `sqlite_fts5` build tag. The local tag, publication, and publication confirmation remain
-  pending.
+- **Release:** `v0.7.0` is tagged at `1fe78c1` and published. The 74-commit range from `v0.6.0`
+  shipped mobile remote control, shared creative-workspace composition, reliable file links and
+  shared-stream recovery, pipeline-recipient cleanup, and centralized launch-support choices. CI
+  and the macOS installer workflow passed. The GitHub Release carries the 293,094,990-byte
+  `darwin-arm64` archive, `install.sh`, and a `0.7.0` manifest whose size and SHA-256 match the
+  archive asset. The release audit changed no operator guidance or pinned component version.
 - **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review and fix units:** none available.
@@ -66,3 +66,8 @@ None.
   behavior; README install claims and pinned release components remain current. Archived the prior
   live handoff epoch. Both Go test variants, all 555 UI tests, the presentation contract and the
   versioned arm64 `sqlite_fts5` distributable pass. Credentialed and real-device gates remain owed.
+
+- **2026-09-30 — Release: v0.7.0 published.** CI and the macOS release workflow passed. The
+  published archive, installer and manifest are attached to the GitHub Release, and the manifest's
+  archive size and SHA-256 match GitHub's asset metadata. Credentialed provider and real-device
+  gates remain owed and are not represented as verified.
