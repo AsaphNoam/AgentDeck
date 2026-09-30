@@ -824,6 +824,24 @@ pipeline-association lookup and no second resolution over the context-recipient 
 pipeline-stage wording is removed (FS-06.R37). Ambiguity, retry classification and the context
 plane's resolver are unchanged.
 
+**R68** `(planned)` — **ACP context usage preserves the raw pair it already reports.** The sole ACP
+decode boundary normalizes an accepted `usage_update` into one value containing `used`, `size`, and
+the capped `context_pct`: `used` must be non-negative, `size` positive, and values outside the host
+integer range or a malformed/missing pair reject the entire update without disturbing the last-known
+reading. `used > size` retains the reported integers while capping the percentage at one, matching
+R25. The live runtime stores that normalized value and one renamed shared republish helper writes
+percentage and optional raw pair together through the existing status write-and-touch seam, leaving
+state, detail, trace, and `busy_since` untouched. Turn-end rollup, stop, resume, switch, and restart
+use TS-02.R39's same tuple; no second percentage derivation or raw-count store is introduced
+(INV §1/§2/§11/§16).
+
+Prompt-result token accounting still cannot produce context usage because it declares no window.
+A percentage-only hook report remains compatible and makes the raw pair unavailable for that newer
+reading; a hook event with no context field preserves the tuple. Terminal and older producers gain
+no inferred counts. The fake ACP adapter and mapping tests exercise the real `used`/`size` wire
+shape, invalid pairs, zero, over-window usage, and mid-turn republish independently of the runtime
+helper (FS-02.R62, TS-04.R25, INV §17).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

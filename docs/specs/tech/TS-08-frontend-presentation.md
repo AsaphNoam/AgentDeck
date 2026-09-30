@@ -620,6 +620,24 @@ primitive seam; the rejected alternatives are recorded in §5.
   while tray caps/expiry/deletion, send behavior, and the three-column file/transcript/tray grid
   remain the shipped implementations. Focused tests drive actual selection ranges and the wire
   body rather than a helper-shaped fixture (INV §17).
+- **R81** `(planned)` — **Context and runtime metadata extend the existing card composition.**
+  `ContextBar` remains the only component that clamps and rounds `context_pct`, selects its tone,
+  and composes its accessible label. It additionally accepts the optional TS-03.R50 raw pair and,
+  only when both values are present, formats the exact unabridged integers with digit grouping as
+  `used / total tokens` beside the existing percentage; compact and full forms consume that same
+  output, and a missing pair leaves their shipped percentage-only label. No caller derives counts
+  from the percentage or formats a second label (FS-02.R62, FS-03.R66, INV §2/§11).
+
+  The expanded `AgentCard` reuses its existing backend/model/effort string and the registered
+  `agent-card` `metadata` slot rather than creating a second runtime projection or control. The
+  identity/name and quiet technical metadata occupy the header's content side; context, state, and
+  Collapse remain a distinct action/status side that may wrap without overlap at the supported
+  desktop floor. Empty effort produces no separator, long technical values wrap or clip within the
+  card, and the fixed expanded height plus conversation scroll ownership from R75 remain unchanged.
+  The existing `context-meter` label and `agent-card` metadata hooks are sufficient, so this adds no
+  token, public hook, inline-style exception, skin branch, motion, or component framework. Focused
+  component tests plus matched Core, Sky & Grove, and Studio matrix/browser views cover zero,
+  unknown, long, and live-updating values (FS-02.R63/A44–A45; INV §8/§10/§13/§17).
 - **R58 — Browser-local identifiers rename with a one-time copy-forward.** (planned) With
   FS-00.R16 the document title, the header wordmark component, the built-in skin name, and every
   on-screen product string say Deckhand. The identifiers the browser itself keys on rename too:

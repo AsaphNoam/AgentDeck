@@ -97,6 +97,19 @@ existing transcript projection continues indexing only excerpts and instructions
 reindex accept both shapes permanently, so a new file annotation and an old transcript annotation
 can share one durable batch without changing either record's meaning (INV §11).
 
+**R39** `(planned)` — **Exact context usage is one nullable pair beside the existing percentage.** One
+forward-only migration adds nullable integer `context_used` and `context_size` columns to `status`
+and nullable `last_context_used` and `last_context_size` columns to `sessions`; it does not reinterpret
+or replace `context_pct` / `last_context_pct`. The pair is either wholly absent or contains a
+non-negative used count and positive window size. Existing rows migrate to the absent pair, which
+means “raw counts unknown,” not zero. Status writes, turn rollups, session snapshots, launch/resume/
+switch composition, and runtime restoration carry the percentage and optional pair together through
+their existing shared shapes, so a process or server restart cannot retain one without the other.
+Unrelated status writes preserve the current pair; an authoritative percentage-only context report
+clears it rather than displaying stale counts beside a newer percentage. This is last-known runtime
+state, not a transcript event, search document, configuration field, or new retention category
+(FS-02.R62; INV §1/§2/§9/§11).
+
 **R15 — User-originated mail rows.** The messages table accepts rows whose sender is the
 reserved user identity (FS-06.R21), written only through `internal/state` by the server-side
 annotation delivery path. The insert updates unread/indicator state in the same transaction but

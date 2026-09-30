@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -484,6 +484,24 @@ project that is not repo-backed, or is archived, shows no such action.
   track; the proportional bar itself is not required at that size. The agent screen's own context
   meter (FS-12.R12) is unchanged, and no context data is fetched or retained differently.
 
+- **R62** `(planned)` — A context-usage report that includes both the current token count and the
+  context-window size exposes those two exact non-negative integers with the live agent state and
+  retains them as the agent's last-known context reading alongside `context_pct`. The expanded-card
+  context figure renders the reading as, for example,
+  **12,345 / 200,000 tokens · 6% context used**, using digit grouping without abbreviating either
+  number. A zero count is shown as zero; when either raw number is unavailable, the figure keeps the
+  existing percentage-only label and does not invent `0 / 0` or infer integers from the rounded
+  percentage. Raw counts update and survive reload, server restart, stop, and resume on the same
+  last-known basis as the percentage. Collapsed cards remain without context usage under R59, and
+  project-summary cards gain no per-agent or aggregate context figure.
+
+- **R63** `(planned)` — An expanded agent card on a scoped project dashboard shows the same compact
+  runtime identity already present on its collapsed form: backend, model, and resolved reasoning
+  effort in that order, omitting only an empty effort. The identity is quiet technical metadata
+  associated with the agent name rather than a new control; long values remain readable without
+  displacing the state badge, context figure, or Collapse action. This adds no runtime picker to the
+  card and changes no launch, switch, expansion, or project-summary behavior.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -757,6 +775,22 @@ picker and launches with the route project's id; the general modal continues to 
   `observed`/`observedSeq` update-order index beside `agents`, preserving the store's single-writer
   role (TS-08.R49). The reflow and the visibility of the eviction are J5's, because jsdom evaluates
   no layout.
+
+- **A44** `(planned)` (R62) — A fake runtime reporting `used: 12345` and `size: 200000` makes the
+  expanded-card figure state **12,345 / 200,000 tokens · 6% context used**, then replaces both
+  numbers and the percentage on a later mid-turn report. Zero renders as zero, while an existing
+  percentage-only status renders no fabricated token fraction. Reload, server restart, stop, and
+  resume preserve the last-known raw reading; a collapsed card and a project-summary card render no
+  context figure. *Verify:* ACP mapping and state persistence/projection tests, `ContextBar` and
+  `AgentCard` component tests, plus J5 in a real browser.
+
+- **A45** `(planned)` (R63) — Expanding an agent card on a scoped project dashboard keeps its
+  backend, model, and non-empty effort visible; an empty effort leaves no dangling separator. Long
+  runtime values at the supported desktop floor do not overlap or displace the state badge, context
+  figure, or Collapse action in Core, Sky & Grove, or Studio. The metadata is not interactive and
+  the project-summary card is unchanged. *Verify:* `AgentCard` component tests, the deterministic
+  three-appearance visual matrix, and a focused real-browser check at the desktop floor and a wider
+  viewport.
 
 ## 6. Deviations & open decisions
 

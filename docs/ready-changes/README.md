@@ -43,6 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`show-exact-context-and-runtime-metadata.md`](show-exact-context-and-runtime-metadata.md) — show
+  exact used/total context tokens beside the percentage and keep model/effort visible when a scoped
+  project agent card expands.
 - [`open-and-annotate-any-local-file.md`](open-and-annotate-any-local-file.md) — let conversation
   links open any process-readable local text file and feed file selections into the existing
   annotation tray and assignment flow.

@@ -621,6 +621,14 @@ to reach the shared annotation endpoint under TS-13.R16 and may carry the additi
 handler never reads or validates the named file: it persists and delivers the supplied point-in-time
 path/excerpt under FS-13.R12/R25, so this adds no remote file-reading authority.
 
+**R50** `(planned)` — **Agent state exposes optional exact context counts additively.** Every full
+`AgentState` projection used by the hydration burst and subsequent `state_update` events carries
+`context_used` and `context_size` together when TS-02.R39 has a known pair, and omits both otherwise;
+`context_pct` remains required and keeps its shipped meaning. The Go projection, TypeScript
+`AgentState`, SSE fixtures, shared-worker retained snapshot, and UI consumers change in lockstep.
+No route or event type is added, and older percentage-only producers and clients remain valid
+(FS-02.R62, TS-03.R7–R8/R11, INV §10/§11).
+
 **R41 — The steer route preserves one host-owned lifecycle.** When the
 adapter returns `promptRequired`, `POST /api/sessions/{id}/steer` submits the unchanged text through
 the ordinary prompt path exactly once and returns the existing `202 {accepted, agent_id,

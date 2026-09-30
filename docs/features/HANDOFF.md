@@ -62,6 +62,14 @@ None.
 
 ## Changelog
 
+- **2026-09-30 — Feature design: exact context and expanded-card runtime metadata.** Specified an
+  additive optional used/total token pair through ACP, durable status/session state, AgentState SSE,
+  and the shared context meter, with truthful percentage-only fallback. Expanded scoped-project
+  agent cards reuse their existing backend/model/effort metadata without adding controls or changing
+  project summaries. The incumbent expanded-card fixture confirmed the header needs a separate,
+  wrapping metadata line rather than a denser action row. The change is waiting to start; no product
+  code changed. Spec, twin-skill, and whitespace checks pass.
+
 - **2026-09-30 — Implementation: open and annotate any local text file.** The conversation file
   viewer now accepts absolute, traversal, symlinked, and `.git` paths under the approved local trust
   policy while keeping regular-file, UTF-8, size, local-origin, and remote-route bounds. Source and
