@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -318,5 +319,126 @@ func TestSelfAnnotationTranscriptStillReturnsThePromptEvent(t *testing.T) {
 			t.Fatalf("transcript never carried both the annotation event and its prompt: %#v", events)
 		}
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// TS-02.R38/TS-03.R49/TS-08.R80: a mixed batch's exact fields must survive the
+// full HTTP round trip unchanged, and the event the bus publishes live must be
+// byte-for-byte the same annotation the archive replays from disk — a card
+// drawn live and a card drawn after reload must never disagree (INV §2).
+func TestAnnotationRoundTripMatchesLiveAndReplayedEventForMixedAnchors(t *testing.T) {
+	srv := testServer(t, true)
+	source, target := writeAnnotationPair(t, srv)
+	ch, unsub := srv.eventBus.Subscribe()
+	defer unsub()
+
+	sent := runtime.AnnotationData{
+		Annotations: []runtime.Annotation{
+			{Seq: 3, Path: "diff.go", Side: "old", StartLine: 5, EndLine: 6, Excerpt: "transcript excerpt", Instruction: "check the diff"},
+			{AnchorKind: "file", Path: "/tmp/anchor.md", StartLine: 10, EndLine: 12, Excerpt: "file excerpt", Instruction: "check the file"},
+		},
+		OverallInstruction: "review both",
+		Target:             runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID},
+	}
+	raw, err := json.Marshal(sent)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	req := newLocalRequest(http.MethodPost, "/api/sessions/"+source.AgentID+"/annotations", bytes.NewReader(raw))
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("annotation status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var live runtime.AnnotationData
+	select {
+	case ev := <-ch:
+		if ev.Type != "new_message" {
+			t.Fatalf("published event type = %q, want new_message", ev.Type)
+		}
+		runtimeEv, ok := ev.Data.(runtime.Event)
+		if !ok || runtimeEv.Type != runtime.EvAnnotation {
+			t.Fatalf("published event data = %#v, want a runtime.Event annotation", ev.Data)
+		}
+		if err := json.Unmarshal(runtimeEv.Data, &live); err != nil {
+			t.Fatalf("decode live annotation: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no live annotation event published on the bus")
+	}
+
+	events, err := transcript.ReadFile(srv.configStore.Home(), source.AgentID, transcript.ReadOptions{})
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	var replayed runtime.AnnotationData
+	var found bool
+	for _, ev := range events {
+		if ev.Type != runtime.EvAnnotation {
+			continue
+		}
+		if err := json.Unmarshal(ev.Data, &replayed); err != nil {
+			t.Fatalf("decode replayed annotation: %v", err)
+		}
+		found = true
+	}
+	if !found {
+		t.Fatalf("no annotation event in replayed transcript: %#v", events)
+	}
+
+	want := runtime.AnnotationData{
+		Annotations: []runtime.Annotation{
+			{Seq: 3, Path: "diff.go", Side: "old", StartLine: 5, EndLine: 6, Excerpt: "transcript excerpt", Instruction: "check the diff"},
+			{AnchorKind: "file", Path: "/tmp/anchor.md", StartLine: 10, EndLine: 12, Excerpt: "file excerpt", Instruction: "check the file"},
+		},
+		OverallInstruction: "review both",
+		Target:             runtime.AnnotationTarget{Kind: "agent", AgentID: target.AgentID},
+	}
+	if !reflect.DeepEqual(live, want) {
+		t.Fatalf("live annotation = %#v, want %#v", live, want)
+	}
+	if !reflect.DeepEqual(replayed, want) {
+		t.Fatalf("replayed annotation = %#v, want %#v", replayed, want)
+	}
+	if !reflect.DeepEqual(live, replayed) {
+		t.Fatalf("live annotation %#v disagrees with replayed annotation %#v", live, replayed)
+	}
+}
+
+// TS-08.R80: a legacy transcript-only annotation (no anchor_kind, the shape
+// sent before file anchors existed) must serialize to disk identically to how
+// it always did — no anchor_kind/path/side/start_line/end_line fields
+// appearing where none were sent — so an old draft renders exactly as before.
+func TestLegacyTranscriptOnlyAnnotationSerializesUnchanged(t *testing.T) {
+	srv := testServer(t, true)
+	source, target := writeAnnotationPair(t, srv)
+
+	legacyBody := `{"annotations":[{"seq":5,"excerpt":"legacy excerpt","instruction":"legacy instruction"}],"target":{"kind":"agent","agent_id":"` + target.AgentID + `"}}`
+	req := newLocalRequest(http.MethodPost, "/api/sessions/"+source.AgentID+"/annotations", strings.NewReader(legacyBody))
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("annotation status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	events, err := transcript.ReadFile(srv.configStore.Home(), source.AgentID, transcript.ReadOptions{})
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	var raw json.RawMessage
+	var found bool
+	for _, ev := range events {
+		if ev.Type == runtime.EvAnnotation {
+			raw = ev.Data
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("no annotation event in transcript: %#v", events)
+	}
+	want := `{"annotations":[{"seq":5,"excerpt":"legacy excerpt","instruction":"legacy instruction"}],"target":{"kind":"agent","agent_id":"` + target.AgentID + `"}}`
+	if string(raw) != want {
+		t.Fatalf("legacy annotation serialized as %s, want %s", raw, want)
 	}
 }

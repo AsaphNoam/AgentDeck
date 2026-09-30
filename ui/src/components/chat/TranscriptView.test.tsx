@@ -1,13 +1,20 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { setupServer } from "msw/node";
+import { http, HttpResponse } from "msw";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import * as client from "../../api/client";
+import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useHeldStore } from "../../store/heldStore";
 import { foldTranscript, useTranscriptStore } from "../../store/transcriptStore";
 import { annotationBlockSentinel } from "../../lib/annotations";
 import { TranscriptView } from "./TranscriptView";
+
+const mswServer = setupServer();
+beforeAll(() => mswServer.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => mswServer.close());
 
 afterEach(() => {
   cleanup();
@@ -15,6 +22,8 @@ afterEach(() => {
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
   useTranscriptStore.setState({ byAgent: {}, rawByAgent: {}, pending: {} });
   useHeldStore.setState({ byAgent: {}, afterSeqByAgent: {} });
+  useAgentStore.setState({ agents: {} });
+  mswServer.resetHandlers();
 });
 
 const events = [{ kind: "assistant_text", seq: 7, text: "First line\nSecond line" }];
@@ -262,5 +271,161 @@ describe("TranscriptView pending follow-up", () => {
     expect(await screen.findByText("Could not withdraw — it may already have been sent.")).toBeInTheDocument();
     expect(useHeldStore.getState().byAgent.a1).toBe("still queued");
     failing.mockRestore();
+  });
+});
+
+// FS-03.A46, FS-13.A16 (J13): the file viewer's own selection menu is reached
+// through TranscriptView's shared annotate-selection entry point, and the
+// draft it hands the store must carry the file's exact anchor.
+describe("TranscriptView file annotation integration (J13)", () => {
+  function selectBetween(start: Element, end: Element) {
+    const range = document.createRange();
+    range.setStart(start, 0);
+    range.setEnd(end, end.childNodes.length);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+
+  it("captures the file's exact anchor when a selection is annotated through the menu", async () => {
+    mswServer.use(
+      http.get("/api/sessions/:id/file", () =>
+        HttpResponse.json({
+          agent_id: "a1",
+          path: "internal/state/messages.go",
+          size: 30,
+          mod_time: "2026-09-10T10:00:00Z",
+          line_count: 3,
+          content: "package state\n\nfunc Read() {}\n",
+          truncated: false,
+          language: "go",
+        }),
+      ),
+    );
+    const onOpenFile = vi.fn();
+    const client_ = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(
+      <QueryClientProvider client={client_}>
+        <TranscriptView
+          agentId="a1"
+          events={events}
+          sourceActive
+          annotationsEnabled
+          openFile={{ path: "internal/state/messages.go" }}
+          onOpenFile={onOpenFile}
+        />
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText("internal/state/messages.go");
+    const first = await waitFor(() => document.querySelector('[data-file-line="1"]') as HTMLElement);
+    const second = document.querySelector('[data-file-line="2"]') as HTMLElement;
+    selectBetween(first, second);
+    fireEvent.contextMenu(document.querySelector(".file-viewer-body") as HTMLElement, { clientX: 5, clientY: 6 });
+    fireEvent.click(await screen.findByRole("button", { name: "Annotate selection" }));
+
+    expect(useAnnotationStore.getState().bySource.a1).toEqual([
+      expect.objectContaining({ anchor_kind: "file", path: "internal/state/messages.go", start_line: 1, end_line: 2, instruction: "" }),
+    ]);
+  });
+});
+
+// FS-13.A16, TS-02.R38, TS-03.R49, TS-08.R80 (J13): the tray holds a
+// transcript-anchored and a file-anchored draft together, survives being
+// mounted fresh (what a reload restores from the persisted store), and can
+// still be edited, have one draft removed, and send the exact remaining
+// batch as the wire payload.
+describe("TranscriptView mixed annotation tray (J13)", () => {
+  function seedMixedTray() {
+    useAnnotationStore.setState({
+      bySource: {
+        a1: [
+          { seq: 7, excerpt: "transcript excerpt", instruction: "initial instruction" },
+          { anchor_kind: "file", path: "src/a.go", start_line: 2, end_line: 4, excerpt: "file excerpt", instruction: "" },
+        ],
+      },
+      overallBySource: {},
+      editedAt: { a1: Date.now() },
+      collapsedBySource: {},
+    });
+  }
+
+  // A page reload: keep only what persist wrote to storage, then rehydrate.
+  async function reloadTrays() {
+    const key = useAnnotationStore.persist.getOptions().name as string;
+    const saved = localStorage.getItem(key) as string;
+    useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
+    localStorage.setItem(key, saved);
+    await useAnnotationStore.persist.rehydrate();
+  }
+
+  function renderMixed() {
+    const client_ = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    return render(
+      <QueryClientProvider client={client_}>
+        <TranscriptView agentId="a1" events={events} sourceActive annotationsEnabled />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("preserves both drafts across a fresh mount, then edits, removes, and sends the exact remaining batch", async () => {
+    seedMixedTray();
+    await reloadTrays();
+    renderMixed();
+
+    // What a reload restores: both anchors are still present and readable.
+    expect(screen.getByText("transcript excerpt")).toBeInTheDocument();
+    expect(screen.getByText("file excerpt")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "File src/a.go:2–4" })).toBeInTheDocument();
+
+    // Edit the file draft's instruction.
+    const fileRow = screen.getByRole("heading", { name: "File src/a.go:2–4" }).closest(".annotation-draft") as HTMLElement;
+    fireEvent.change(within(fileRow).getByLabelText("Instruction"), { target: { value: "tighten this excerpt" } });
+    expect(useAnnotationStore.getState().bySource.a1[1].instruction).toBe("tighten this excerpt");
+
+    // Remove the transcript draft, leaving only the edited file draft.
+    const transcriptRow = screen.getByText("transcript excerpt").closest(".annotation-draft") as HTMLElement;
+    fireEvent.click(within(transcriptRow).getByRole("button", { name: "Remove" }));
+    expect(useAnnotationStore.getState().bySource.a1).toHaveLength(1);
+
+    let sentBody: unknown = null;
+    mswServer.use(
+      http.post("/api/sessions/a1/annotations", async ({ request }) => {
+        sentBody = await request.json();
+        return HttpResponse.json({ accepted: true, seq: 99 }, { status: 202 });
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send annotations" }));
+
+    await waitFor(() => expect(useAnnotationStore.getState().bySource.a1).toBeUndefined());
+    expect(sentBody).toEqual({
+      annotations: [
+        { anchor_kind: "file", path: "src/a.go", start_line: 2, end_line: 4, excerpt: "file excerpt", instruction: "tighten this excerpt" },
+      ],
+      target: { kind: "self" },
+    });
+  });
+
+  // A file annotation persisted with an anchor the server would reject (a
+  // start_line with no end_line) must stay in the tray rather than being
+  // silently dropped on the next mount — only Remove or Send should end it.
+  it("preserves a persisted file annotation with an invalid anchor rather than dropping it", async () => {
+    useAnnotationStore.setState({
+      bySource: {
+        a1: [
+          { anchor_kind: "file", path: "src/broken.go", start_line: 5, excerpt: "broken anchor", instruction: "note" },
+        ],
+      },
+      overallBySource: {},
+      editedAt: { a1: Date.now() },
+      collapsedBySource: {},
+    });
+    await reloadTrays();
+    renderMixed();
+
+    expect(screen.getByText("broken anchor")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "File src/broken.go:5" })).toBeInTheDocument();
+    expect(useAnnotationStore.getState().bySource.a1).toHaveLength(1);
   });
 });

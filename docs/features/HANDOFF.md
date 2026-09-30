@@ -17,7 +17,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** none available.
-- **Fix units:** `open-and-annotate-any-local-file` is in progress (one Worth-fixing test gap left).
+- **Fix units:** none available.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -41,17 +41,7 @@ None.
 
 ## Review findings
 
-**`open-and-annotate-any-local-file` — Fix model: medium — Codex Terra or Claude Opus.**
-
-- **Worth fixing** (FS-03.A46, FS-13.A16, TS-02.R38, TS-03.R49, TS-08.R80; INV §11/§17) —
-  `ui/src/components/chat/FileViewer.test.tsx:125-146` stops at the callback seam, while
-  `internal/server/annotations_test.go:88-145` checks constructed validation/formatter inputs and
-  mail substrings. Nothing proves the `TranscriptView` menu/store/wire integration, a mixed
-  transcript/file tray through reload/edit/remove/send, the exact persisted file anchor and
-  live/replay card, or unchanged legacy serialization/rendering. A break in the shared wiring or
-  additive payload can therefore leave all current tests green. Add integration and round-trip
-  fixtures at those boundaries, including invalid-anchor tray preservation and the mixed J13
-  journey the shipped acceptance item names.
+None.
 
 ## Decisions needing your input
 
@@ -71,6 +61,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Fix closed: `open-and-annotate-any-local-file`.** Closed the remaining
+  integration gap (INV §11/§17): TranscriptView menu→store file-anchor capture, a mixed tray
+  through persisted-storage rehydrate/edit/remove/exact send payload, invalid-anchor preservation,
+  exact live/replayed annotation data for mixed anchors, and byte-identical legacy serialization.
+  The unit is closed. `make test`, `make build`, UI tests/build, and focused `-race` pass.
 
 - **2026-09-30 — Fix (partial): `open-and-annotate-any-local-file`.** Closed the Must-fix
   path-identity defect (INV §1/§10: the viewer now shows and republishes the server's normalized
