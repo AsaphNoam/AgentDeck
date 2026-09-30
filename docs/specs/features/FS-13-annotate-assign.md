@@ -166,7 +166,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   assigning a batch to another agent.
 - **R25 `(planned)` — A loaded conversation file is a first-class annotation source.** This
   supersedes R13's file exclusion when it ships; terminal agents, screenshots, and unrelated web
-  pages remain excluded. A file annotation is anchored to the effective path shown by the viewer,
+  pages remain excluded. A file annotation is anchored to the normalized path shown by the viewer,
   not to the transcript event that happened to open it, so a link, a rendered-file link, a reload,
   and a hand-edited `?file=` address produce the same record. Source-mode capture adds the
   contiguous 1-based line range containing the exact selection; rendered-Markdown capture keeps

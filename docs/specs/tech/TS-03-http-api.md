@@ -578,6 +578,49 @@ reloads the collections through this route rather than reconstructing them from 
   already refuses one. No route is added for directory listing, writing, or downloading, and the
   existing tracking and search routes are unchanged.
 
+**R48 `(planned)` — The existing file read deliberately accepts unrestricted local paths.** This
+supersedes R40's working-directory containment when it ships without adding or renaming a route.
+`GET /api/sessions/{id}/file?path=<p>` still requires a known chat session, still serves archived
+sessions, and still returns R40's JSON shape. A relative path is cleaned and resolved from the
+session's recorded working directory, so an unavailable recorded directory still returns
+`workspace_unavailable`; an absolute path is cleaned and opened directly and therefore does not
+require that directory to exist. The Markdown link classifier converts only local `file:///...`
+and `file://localhost/...` URLs to that absolute form; a non-local or malformed file URL is not a
+local file-viewer target. Success returns the normalized requested spelling in `path` —
+slash-separated workspace-relative for relative input and cleaned absolute for absolute/file-URL
+input — rather than resolving symlinks to a different display identity. Rendered-file relative
+links resolve from that returned spelling.
+
+The route follows symlinks and admits `.git` exactly like any other path. It classifies the target
+before opening so an already-known directory, socket, FIFO, or other non-regular file is never
+opened, then verifies the opened descriptor is still regular before reading it. The explicit
+`fileReadLimit+1` admission bound, UTF-8 validation, truncation label, metadata source, JSON-only
+response, language-by-extension hint, and per-refusal local log stay unchanged (INV §8/§16).
+`path_refused` is no longer an outside-workspace or `.git` outcome; missing, unreadable,
+non-regular, non-text, malformed, and relative-without-workspace cases retain R40's typed errors.
+No directory listing, browsing, writing, download, watch, polling, origin proof, or per-read
+confirmation is added. File search and tracking keep their existing session-scoped policies.
+The loopback route remains behind `localOnly` and explicitly denied by the tailnet route inventory
+(TS-05.R24, TS-13.R5, INV §14).
+
+**R49 `(planned)` — The annotation endpoint accepts one additive file-anchor variant.** The
+existing `POST /api/sessions/{id}/annotations` request, response, limits, target validation,
+append-before-delivery ordering, SSE projection, and error envelope remain R14's single contract.
+Each annotation with omitted `anchor_kind` is validated exactly as today: `seq` is positive, and
+optional diff location fields require path, side `old`/`new`, and a valid line range. An annotation
+with `anchor_kind:"file"` instead requires no `seq`, a non-empty path, no diff side, and either no
+line fields or both `start_line >= 1` and `end_line >= start_line`; any other discriminator or mixed
+shape is `422 validation`. The TypeScript request/event shape makes `seq` optional only for that
+tagged variant and ships in lockstep with Go (INV §11).
+
+The shared annotation formatter gains one branch: a file anchor is rendered as `File <path>` with
+its line or line range when present and never as `Transcript event 0`; its legacy transcript/diff
+output remains unchanged. The annotation card and pending-tray label consume the same anchor
+semantics rather than formatting a second variant independently (INV §2). Paired phones continue
+to reach the shared annotation endpoint under TS-13.R16 and may carry the additive variant, but the
+handler never reads or validates the named file: it persists and delivers the supplied point-in-time
+path/excerpt under FS-13.R12/R25, so this adds no remote file-reading authority.
+
 **R41 — The steer route preserves one host-owned lifecycle.** When the
 adapter returns `promptRequired`, `POST /api/sessions/{id}/steer` submits the unchanged text through
 the ordinary prompt path exactly once and returns the existing `202 {accepted, agent_id,

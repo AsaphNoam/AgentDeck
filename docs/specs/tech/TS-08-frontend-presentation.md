@@ -601,6 +601,25 @@ primitive seam; the rejected alternatives are recorded in §5.
   registered `file-viewer` component in `contract.json` carrying no `data-variant` for the
   docked-versus-reflowed form, since nothing in the client observes which form is on screen (R53,
   R8, R14).
+- **R80 `(planned)` — File annotations extend the transcript's existing selection machinery.**
+  `TranscriptView` remains the composition owner for one annotation menu, one `annotationStore`
+  tray, and the file viewer. A loaded `FileViewer` reports a valid selection into that shared seam;
+  it does not mount its own tray, store, or delivery client. The selected excerpt goes through the
+  existing `clipAnnotationExcerpt` helper, Copy goes through `copyText` and its visible-error path,
+  and the shared menu adds the same draft action transcript selections use (INV §2/§8). With no
+  non-whitespace selection wholly inside the loaded viewer, the handler does not prevent the native
+  context menu and creates no draft.
+
+  Source mode derives the containing 1-based range from `CodeBlock`'s shipped `data-file-line`
+  nodes and emits one tagged file anchor with the exact selected text; rendered Markdown uses the
+  same sanitized output and emits the tagged path-only form because rendered DOM text has no
+  stable source-line mapping. Loading, error, and refusal states expose no annotation action.
+  Reloading or replacing the viewer cannot mutate a captured draft, whose excerpt and displayed
+  path are already point-in-time browser state. `AnnotationDraft`, the server payload, annotation
+  cards, and tray labels gain the same additive discriminator in lockstep (TS-03.R49, INV §11),
+  while tray caps/expiry/deletion, send behavior, and the three-column file/transcript/tray grid
+  remain the shipped implementations. Focused tests drive actual selection ranges and the wire
+  body rather than a helper-shaped fixture (INV §17).
 - **R58 — Browser-local identifiers rename with a one-time copy-forward.** (planned) With
   FS-00.R16 the document title, the header wordmark component, the built-in skin name, and every
   on-screen product string say Deckhand. The identifiers the browser itself keys on rename too:

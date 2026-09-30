@@ -14,11 +14,11 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and the macOS installer workflow passed. The GitHub Release carries the 293,094,990-byte
   `darwin-arm64` archive, `install.sh`, and a `0.7.0` manifest whose size and SHA-256 match the
   archive asset. The release audit changed no operator guidance or pinned component version.
-- **Work units:** `rename-product-to-deckhand.md` is Waiting to start.
+- **Work units:** `open-and-annotate-any-local-file.md` and `rename-product-to-deckhand.md` are
+  Waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review and fix units:** none available.
-- **Design units:** unrestricted conversation file viewing and annotation is being defined;
-  available and other resumable entries remain in `docs/ideas.md`.
+- **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
@@ -37,13 +37,7 @@ None.
 
 ## Blocked on human
 
-- **Unrestricted conversation file viewing and annotation:** the operator confirmed that a
-  hand-edited local request may read any OS-readable regular text file without per-read
-  confirmation, then added file annotations through the existing tray. FS-03.R64–R65/A45–A46 and
-  FS-13.R25/A16 draft the combined behavior. Before technical design, confirm that a file
-  annotation is a first-class path/line anchor with no required transcript-event sequence; rendered
-  Markdown records path plus excerpt without a synthetic line; and sending durably copies the
-  selected path and excerpt into the source transcript/search and chosen prompt or mail target.
+None.
 
 ## Review findings
 
@@ -67,6 +61,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-09-30 — Feature design: unrestricted conversation file viewing and annotation.** Specified
+  the operator-approved local trust policy: absolute file links and direct local requests may read
+  any regular UTF-8 file AgentDeck can read, while relative links keep the session working directory
+  and the tailnet route stays denied. File selections now have a ready design as backward-compatible
+  path/line annotations through the existing tray, transcript event, search and delivery flow;
+  rendered Markdown keeps a path-only anchor. No product code changed.
 
 - **2026-09-30 — Review fix: Claude same-backend model switching (INV §1/§2/§11/§12/§17).**
   Claude chat now explicitly applies and verifies the selected model after `session/new` or

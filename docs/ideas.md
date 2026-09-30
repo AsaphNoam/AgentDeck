@@ -38,17 +38,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Open and annotate any local text file from a conversation.** A field report showed that links outside
-  the session working directory always fail with “path outside this agent's working directory.” The
-  operator chose unrestricted viewing rather than limiting the expansion to configured `add_dirs`:
-  a clicked link or direct local API request may name any regular UTF-8 file the AgentDeck process
-  can read, including paths outside projects and inside `.git`. Preserve the viewer's read-only,
-  bounded-content behavior and its refusals for directories, special files, binary content,
-  missing files, and unreadable files; do not broaden composer file search or add file browsing.
-  The operator confirmed the direct arbitrary-file-read consequence, then added annotations on
-  loaded files through the existing pending tray and assignment flow. Feature scope is awaiting
-  confirmation that file annotations are first-class path/line anchors and durably retain the
-  selected excerpt and path like existing transcript annotations.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

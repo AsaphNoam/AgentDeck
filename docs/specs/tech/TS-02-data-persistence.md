@@ -87,6 +87,16 @@ per-agent transcript writer and sequence allocation, for active and inactive ses
 instruction and excerpt text joins the session's indexed content (R9) so FS-13.R10 search works;
 payload fields are append-only once shipped.
 
+**R38 `(planned)` — File annotations extend the existing transcript payload additively.** The
+`annotation` event keeps one list and one event kind. An omitted `anchor_kind` preserves R14's
+shipped transcript/diff shape and requires its positive `seq`; `anchor_kind:"file"` instead omits
+`seq` and `side`, requires a path, and carries either no line fields or a valid 1-based
+`start_line`/`end_line` pair. Existing transcript records are not rewritten, and no SQLite or index
+migration is added: the append-only JSON payload gains one optional discriminator, while the
+existing transcript projection continues indexing only excerpts and instructions. Replay and
+reindex accept both shapes permanently, so a new file annotation and an old transcript annotation
+can share one durable batch without changing either record's meaning (INV §11).
+
 **R15 — User-originated mail rows.** The messages table accepts rows whose sender is the
 reserved user identity (FS-06.R21), written only through `internal/state` by the server-side
 annotation delivery path. The insert updates unread/indicator state in the same transaction but

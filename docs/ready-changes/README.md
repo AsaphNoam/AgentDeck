@@ -43,6 +43,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`open-and-annotate-any-local-file.md`](open-and-annotate-any-local-file.md) — let conversation
+  links open any process-readable local text file and feed file selections into the existing
+  annotation tray and assignment flow.
 - [`share-creative-workspace-layout.md`](share-creative-workspace-layout.md) — finish Figma-directed
   composition, project tabs and status badges, then share the layout across all three palettes.
 

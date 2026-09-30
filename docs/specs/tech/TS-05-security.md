@@ -193,6 +193,28 @@ sensitive-context sharing is a practical problem.
   fixture needs a path short enough for `sun_path`, and the FIFO open needs a bounded wait so a
   restored open-then-classify order fails instead of hanging the suite (`INV §17`).
 
+- **R24 `(planned)` — File viewing intentionally trusts any local caller with the process's file
+  authority.** This supersedes R21's readable-root policy when FS-03.R64 ships. The path supplied to
+  the existing loopback file route is authority: after relative-path resolution against the
+  session working directory, the server may read any regular file its OS identity can read,
+  including a path outside every project, inside `.git`, or reached through a symlink. Absolute
+  paths need no available working directory, and the route does not prove that a path came from a
+  transcript or require a per-read confirmation. This is an explicit same-machine trust decision:
+  another local process able to call AgentDeck can use the route as a direct reader for the
+  AgentDeck user's text files, including secrets. OS permissions are the only filesystem
+  authorization for an absolute target.
+
+  The widened authority changes none of the content-safety or network boundaries. The response is
+  still bounded UTF-8 JSON for a verified regular descriptor, never caller-typed file bytes;
+  directories and special files are refused without a content read, and no listing, browsing,
+  writing, execution, durable access history, or automatic agent-visible content is added. The
+  whole loopback mux remains behind `localOnly`, so R2 still rejects DNS-rebinding Host values and
+  cross-origin browser requests, while TS-13.R5's separately authenticated tailnet chain keeps the
+  file route in `remoteDenied`. Adversarial coverage proves absolute and relative resolution,
+  symlink and `.git` admission, missing-workspace behavior, non-regular refusal without blocking,
+  post-open descriptor classification, bounded/UTF-8 reads, local Host/Origin rejection, and remote
+  denial independently (INV §14/§17).
+
 - **R22 (shipped 2026-09-13) — Run work authority is bounded by durable membership.** On the existing
   per-launch token/identity boundary, only the standing run orchestrator assigned the current
   authoritative stage task may list/read and

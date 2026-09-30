@@ -456,8 +456,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   R55's working-directory and `.git` containment when it ships. A local filesystem link may name
   any regular UTF-8 file the AgentDeck process can read, including a file outside every configured
   project or `add_dirs`, a path reached through a symlink, and a file inside `.git`. Relative paths
-  still resolve from the session's recorded working directory; absolute and `file://` paths need no
-  session-root authorization. The viewer shows the effective path it read, keeps the path in
+  still resolve from the session's recorded working directory; absolute and local `file://` paths need no
+  session-root authorization. The viewer shows the normalized path spelling used for the read —
+  absolute for an absolute or local `file://` link and workspace-relative for a relative link — and keeps it in
   `?file=` so reload and browser history still work, and reads only on open or explicit **Reload**.
   A hand-edited local request has the same reach as a clicked agent-authored link: no confirmation
   or transcript-origin check is added. The read stays bounded, read-only, and text-only; missing or
