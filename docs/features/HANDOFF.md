@@ -1,19 +1,19 @@
 # AgentDeck — Implementation handoff
 
 **Live agent state.** Read **Current position** and **Active change**, then open the requirements
-they name. Settled state through 2026-09-30 is archived in
-[`HANDOFF-through-2026-09-30`](../archive/state/HANDOFF-through-2026-09-30.md); older epochs remain
+they name. Settled state through 2026-10-01 is archived in
+[`HANDOFF-through-2026-10-01`](../archive/state/HANDOFF-through-2026-10-01.md); older epochs remain
 beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
 - **Active change:** none.
-- **Release:** `v0.7.0` is tagged at `1fe78c1` and published. The 74-commit range from `v0.6.0`
-  shipped mobile remote control, shared creative-workspace composition, reliable file links and
-  shared-stream recovery, pipeline-recipient cleanup, and centralized launch-support choices. CI
-  and the macOS installer workflow passed. The GitHub Release carries the 293,094,990-byte
-  `darwin-arm64` archive, `install.sh`, and a `0.7.0` manifest whose size and SHA-256 match the
-  archive asset. The release audit changed no operator guidance or pinned component version.
+- **Release:** `v0.8.0` is prepared locally from the 13-commit range after `v0.7.0`. It ships
+  unrestricted on-demand local text-file viewing and file-selection annotations in chat, plus
+  reliable Claude model application after resume. The operator skill now explains the file-viewer
+  boundary; README claims and pinned release components remain current. Full Go tests, all 562 UI
+  tests, the presentation contract, and the versioned `sqlite_fts5` distributable pass. Publication
+  is awaiting authorization.
 - **Work units:** `show-exact-context-and-runtime-metadata.md` and
   `rename-product-to-deckhand.md` are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
@@ -38,7 +38,8 @@ None.
 
 ## Blocked on human
 
-None.
+- Publishing `v0.8.0` requires explicit authorization to push every unpushed `main` commit and the
+  annotated tag.
 
 ## Review findings
 
@@ -60,78 +61,3 @@ None.
   scope FS-17 section 6's opening sentence to the intended planned boundary.
 - The injected-steer lifetime edge case needs `/investigate-bug` before `/fix`; FilesTab and
   CommandsTab still copy silently through bare `writeText`.
-
-## Changelog
-
-- **2026-09-30 — Fix closed: `open-and-annotate-any-local-file`.** Closed the remaining
-  integration gap (INV §11/§17): TranscriptView menu→store file-anchor capture, a mixed tray
-  through persisted-storage rehydrate/edit/remove/exact send payload, invalid-anchor preservation,
-  exact live/replayed annotation data for mixed anchors, and byte-identical legacy serialization.
-  The unit is closed. `make test`, `make build`, UI tests/build, and focused `-race` pass.
-
-- **2026-09-30 — Fix (partial): `open-and-annotate-any-local-file`.** Closed the Must-fix
-  path-identity defect (INV §1/§10: the viewer now shows and republishes the server's normalized
-  path with `replace`, preserving the cited line, so header, address, reload, and anchors agree),
-  preserved leading/trailing filename whitespace (INV §8), limited `file://` links to empty/localhost
-  authorities (INV §8/§14), and added the remote file-read denial test (INV §14/§17). The
-  integration/round-trip test gap remains open.
-
-- **2026-09-30 — Review: `open-and-annotate-any-local-file`.** One Must-fix path-identity defect and
-  four Worth-fixing edge/verification gaps keep the unit open. The unrestricted route otherwise
-  retains regular-file, descriptor, UTF-8, size, loopback, remote-inventory, persistence-order, and
-  legacy-shape protections. INV 1/2/3/7/8/10/11/13–17 were reviewed; 4–6, 9, and 12 had no
-  applicable changed surface. The focused server/runtime/transcript/index suites, four focused UI
-  files (40 tests), style/presentation contract, spec checks, and diff check pass; the first Go runs
-  were sandbox-blocked on test sockets and the authorized rerun passed.
-
-- **2026-09-30 — Feature design: exact context and expanded-card runtime metadata.** Specified an
-  additive optional used/total token pair through ACP, durable status/session state, AgentState SSE,
-  and the shared context meter, with truthful percentage-only fallback. Expanded scoped-project
-  agent cards reuse their existing backend/model/effort metadata without adding controls or changing
-  project summaries. The incumbent expanded-card fixture confirmed the header needs a separate,
-  wrapping metadata line rather than a denser action row. The change is waiting to start; no product
-  code changed. Spec, twin-skill, and whitespace checks pass.
-
-- **2026-09-30 — Implementation: open and annotate any local text file.** The conversation file
-  viewer now accepts absolute, traversal, symlinked, and `.git` paths under the approved local trust
-  policy while keeping regular-file, UTF-8, size, local-origin, and remote-route bounds. Source and
-  rendered file selections join the existing annotation tray as backward-compatible file anchors;
-  cards, transcript persistence, search, self/agent delivery, reload, and legacy annotations keep
-  one shared path. Both Go test modes, the production Go build, all 556 UI tests, the UI build, and
-  an isolated real-browser outside-file selection/send passed with no console errors.
-
-- **2026-09-30 — Feature design: unrestricted conversation file viewing and annotation.** Specified
-  the operator-approved local trust policy: absolute file links and direct local requests may read
-  any regular UTF-8 file AgentDeck can read, while relative links keep the session working directory
-  and the tailnet route stays denied. File selections now have a ready design as backward-compatible
-  path/line annotations through the existing tray, transcript event, search and delivery flow;
-  rendered Markdown keeps a path-only anchor. No product code changed.
-
-- **2026-09-30 — Review fix: Claude same-backend model switching (INV §1/§2/§11/§12/§17).**
-  Claude chat now explicitly applies and verifies the selected model after `session/new` or
-  `session/load`, so native resume cannot restore the transcript's prior model over a same-backend
-  switch. Activated the load-path regression and aligned FS-09/TS-04 with the adapter contract.
-  `make test` and `make build` pass; the `claude-model-switch-resume` review unit is closed.
-
-- **2026-09-30 — Bug investigation: Claude same-backend model switching.** Confirmed that
-  same-backend Claude switches resume the transcript's prior provider model while AgentDeck records
-  the newly selected one. Cross-backend Codex-to-Claude switches work because they create a fresh
-  Claude session. Added a skipped regression that fails on the missing post-load model-setting call;
-  no product code or specification changed.
-
-- **2026-09-30 — Bug investigation: conversation links outside the working directory.** Confirmed
-  the refusal is the shipped security contract rather than a regression: the request supplies only
-  a path, the server derives the sole readable root from the session working directory, and existing
-  tests prove absolute, traversal, and symlink escapes are refused. Broadening the viewer is a new
-  feature/security-policy change; its readable-root scope is awaiting the operator's decision.
-
-- **2026-09-30 — Release preparation: v0.7.0.** Confirmed the minor version and audited the
-  `v0.6.0..main` range. The shipped `operating-agentdeck` package already matches the agent-facing
-  behavior; README install claims and pinned release components remain current. Archived the prior
-  live handoff epoch. Both Go test variants, all 555 UI tests, the presentation contract and the
-  versioned arm64 `sqlite_fts5` distributable pass. Credentialed and real-device gates remain owed.
-
-- **2026-09-30 — Release: v0.7.0 published.** CI and the macOS release workflow passed. The
-  published archive, installer and manifest are attached to the GitHub Release, and the manifest's
-  archive size and SHA-256 match GitHub's asset metadata. Credentialed provider and real-device
-  gates remain owed and are not represented as verified.
