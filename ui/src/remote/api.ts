@@ -67,7 +67,8 @@ export interface RuntimeOptions {
     id: string;
     name: string;
     default?: boolean;
-    models: { id: string; name: string; efforts: string[]; default_effort?: string; default_model?: boolean; fast: boolean }[];
+    default_model?: string;
+    models: { id: string; name: string; efforts: string[]; default_effort?: string; fast: boolean }[];
   }[];
 }
 

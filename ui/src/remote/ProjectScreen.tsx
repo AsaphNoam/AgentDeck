@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { launchAgent } from "../api/client";
 import { listPipelineTemplates, pipelineDiagnostics, sharedWorkspaceConflicts, startPipelineRun } from "../api/pipelines";
@@ -7,6 +7,7 @@ import { deriveDashboardProjects } from "../features/dashboard/projectDashboardD
 import { getHome, getRuntimeOptions, phoneFetch } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
+import { useSuggestedName } from "../features/launch/useSuggestedName";
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 
@@ -14,10 +15,10 @@ function RuntimeFields({ value, onChange }: { value: { backend: string; model: s
   const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
   const backends = options.data?.backends ?? [];
   const backend = backends.find((item) => item.id === value.backend) ?? backends.find((item) => item.default) ?? backends[0];
-  const model = backend?.models.find((item) => item.id === value.model) ?? backend?.models.find((item) => item.default_model) ?? backend?.models[0];
+  const model = backend?.models.find((item) => item.id === value.model) ?? backend?.models.find((item) => item.id === backend.default_model) ?? backend?.models[0];
   const pickBackend = (backendID: string) => {
     const next = backends.find((item) => item.id === backendID);
-    const nextModel = next?.models.find((item) => item.default_model) ?? next?.models[0];
+    const nextModel = next?.models.find((item) => item.id === next.default_model) ?? next?.models[0];
     onChange({ backend: backendID, model: nextModel?.id ?? "", effort: nextModel?.default_effort ?? "", fast: false });
   };
   const pickModel = (modelID: string) => {
@@ -35,12 +36,19 @@ function RuntimeFields({ value, onChange }: { value: { backend: string; model: s
 function NewAgent({ project, onClose }: { project: string; onClose: () => void }) {
   const offline = useConnection((state) => state.link !== "connected");
   const roles = useQuery({ queryKey: ["roles"], queryFn: () => phoneFetch<Record<string, { title: string }>>("/api/roles") });
-  const [role, setRole] = useState(""); const [name, setName] = useState("");
+  const config = useQuery({ queryKey: ["config"], queryFn: () => phoneFetch<{ default_role?: string }>("/api/config") });
+  const [role, setRole] = useState("");
+  const [name, setName] = useSuggestedName(role);
   const [runtime, setRuntime] = useState({ backend: "", model: "", effort: "", fast: false });
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const roleID = role || Object.keys(roles.data ?? {}).filter((id) => id !== "agentdecker")[0] || "";
+  useEffect(() => {
+    if (role || !roles.data) return;
+    const available = Object.keys(roles.data).filter((id) => id !== "agentdecker");
+    setRole(config.data?.default_role && available.includes(config.data.default_role) ? config.data.default_role : available[0] ?? "");
+  }, [config.data?.default_role, role, roles.data]);
   const submit = async () => { setBusy(true); setError(""); try { const result = await launchAgent({ project, role: roleID, name: name.trim() || undefined, ...runtime }); navigate(`/agent/${encodeURIComponent(result.agent.agent_id)}`); } catch (err) { setError(errorText(err)); } finally { setBusy(false); } };
-  return <form className="phone-card phone-form" aria-label="New agent" onSubmit={(event) => { event.preventDefault(); void submit(); }}><h2>New agent</h2><label className="phone-field">Role<select value={roleID} onChange={(event) => setRole(event.target.value)}>{Object.keys(roles.data ?? {}).filter((id) => id !== "agentdecker").map((id) => <option key={id} value={id}>{roles.data?.[id]?.title || id}</option>)}</select></label><label className="phone-field">Name <input value={name} placeholder="Suggested by AgentDeck" onChange={(event) => setName(event.target.value)} /></label><RuntimeFields value={runtime} onChange={setRuntime} />{error && <p className="phone-error">{error}</p>}<div className="phone-actions"><button type="button" onClick={onClose}>Cancel</button><button className="phone-primary" type="submit" disabled={offline || busy || !roleID}>Create agent</button></div></form>;
+  return <form className="phone-card phone-form" aria-label="New agent" onSubmit={(event) => { event.preventDefault(); void submit(); }}><h2>New agent</h2><label className="phone-field">Role<select value={roleID} onChange={(event) => setRole(event.target.value)}>{Object.keys(roles.data ?? {}).filter((id) => id !== "agentdecker").map((id) => <option key={id} value={id}>{roles.data?.[id]?.title || id}</option>)}</select></label><label className="phone-field">Name <input value={name} onChange={(event) => setName(event.target.value)} /></label><RuntimeFields value={runtime} onChange={setRuntime} />{error && <p className="phone-error">{error}</p>}<div className="phone-actions"><button type="button" onClick={onClose}>Cancel</button><button className="phone-primary" type="submit" disabled={offline || busy || !roleID}>Create agent</button></div></form>;
 }
 
 function StartPipeline({ project, onClose }: { project: string; onClose: () => void }) {

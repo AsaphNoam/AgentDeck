@@ -67,6 +67,8 @@ const server = setupServer(
   http.post("/api/sessions/a1/steer", () => HttpResponse.json({ accepted: true, outcome: "steered" })),
   http.post("/api/sessions/a1/cancel", () => HttpResponse.json({})),
   http.post("/api/sessions/a1/stop", () => HttpResponse.json({})),
+  http.post("/api/sessions/a1/archive", () => HttpResponse.json({})),
+  http.get("/api/remote/runtime-options", () => HttpResponse.json({ backends: [] })),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -215,6 +217,14 @@ describe("AgentScreen", () => {
     // Terminal agents are not an annotation surface (FS-13.R13, FS-20.R32).
     expect(screen.queryByText("Tap line numbers to select a range.")).toBeNull();
     expect(screen.queryByRole("button", { name: /Annotate lines/ })).toBeNull();
+  });
+
+  it("uses an inline archive confirmation that says restore is desktop-only", async () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Manage" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
+    expect(screen.getByText("Archive this agent? Restore is available on the desktop.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Archive agent" })).toBeInTheDocument();
   });
 });
 
