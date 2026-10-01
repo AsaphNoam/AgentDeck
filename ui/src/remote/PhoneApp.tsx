@@ -5,7 +5,7 @@ import { PairScreen, UnpairedScreen } from "./PairScreen";
 import { match, navigate, usePath } from "./router";
 import { AgentScreen } from "./AgentScreen";
 import { PhoneSettings } from "./PhoneSettings";
-import { RunScreen } from "./WorkScreens";
+import { RunScreen } from "./RunScreen";
 import { ProjectScreen } from "./ProjectScreen";
 
 function Banner() {
