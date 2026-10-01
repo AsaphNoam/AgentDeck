@@ -43,7 +43,7 @@ const json = (method: string, body?: unknown): RequestInit => ({
 });
 
 export interface AttentionItem {
-  kind: "agent" | "task" | "run";
+  kind: "agent" | "run";
   id: string;
   title: string;
   project: string;

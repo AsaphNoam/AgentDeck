@@ -148,7 +148,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   event, failure preservation, and target validation are the same as FS-13.R2–R9/R11–R17. Terminal
   agents remain ineligible. This supersedes R16's blanket annotate-and-assign exclusion only for
   live diff lines; other transcript-event and archive annotation interactions remain desktop-only.
-- **R33 (planned) — The phone follows the desktop's dashboard → project → chat flow.** Home
+- **R33 (shipped 2026-10-02) — The phone follows the desktop's dashboard → project → chat flow.** Home
   is the phone form of the desktop project dashboard (FS-02.R29/R30): every active configured
   project, including one with no agents, plus an unavailable-project entry for a force-deleted
   project still referenced by a non-archived agent, each showing its title and color (or durable id),
@@ -157,7 +157,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   oldest first, each opening its card or conversation; it is hidden when empty. R11's **Moving** and
   **Since you last looked** sections leave the phone. Archived projects and agents do not appear;
   archive browsing and search stay desktop-only. This supersedes R11's Home layout.
-- **R34 (planned) — A project page lists its agents.** Selecting a project opens its phone
+- **R34 (shipped 2026-10-02) — A project page lists its agents.** Selecting a project opens its phone
   project page, the phone form of `/project/:project-id` (FS-02.R31): one row per non-archived agent
   with its name, role, backend · model, state badge, and single-line preview (FS-02.R2/R3/R5),
   running agents first and stopped agents dimmed (FS-02.R6/R45); the project's pipeline runs that
@@ -165,7 +165,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   Selecting an agent opens its phone conversation (R13);
   a stopped agent offers Resume under FS-01.R10/R31. Agents launched for tasks appear here as
   ordinary agents.
-- **R35 (planned) — New agent starts work from a project page.** **New agent** on a project
+- **R35 (shipped 2026-10-02) — New agent starts work from a project page.** **New agent** on a project
   page asks for a role, shows a suggested editable name (FS-01.R1/R4), and offers the runtime choice
   of R31 — the Mac's configured backend/model and each model's allowed effort and fast-mode values,
   preselected to the defaults the desktop New Agent form would choose (FS-01.R5/R30/R35). It has no
@@ -175,7 +175,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   reason and keeps every entered value (R27). The global **New work** screen — Ask AgentDecker, New
   task, and its Start pipeline — leaves the phone; R41 moves Start pipeline to the project page.
   This supersedes R15 and R31's defaults-only rule for new agents.
-- **R36 (planned) — Agent management actions on the phone.** An agent's phone screen offers,
+- **R36 (shipped 2026-10-02) — Agent management actions on the phone.** An agent's phone screen offers,
   each under its desktop rules and only where the desktop would offer it:
   - **Rename** (FS-01.R4 name contract);
   - **Effort** and **Fast mode** on a running chat agent, applied without a restart (FS-03.R45/R47);
@@ -187,7 +187,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
     phone asks once to confirm and says that restore is on the desktop; the agent then leaves every
     phone list and its open phone screen returns to its project.
   This supersedes R16 for rename, clone, and switch runtime, and for archive of a single agent.
-- **R37 (planned) — The phone shows what an agent changed and ran.** An agent's phone screen
+- **R37 (shipped 2026-10-02) — The phone shows what an agent changed and ran.** An agent's phone screen
   has **Files** and **Commands** views of its FS-05.R15/R16 tracking: each changed file with its
   edit count and last-touched time, and each command with its exit status, newest first. A changed
   file with a diff opens that diff in the conversation; **Open file** shows the file's current
@@ -196,9 +196,9 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   files, or reads a file reached through a symbolic link at the tracked path. Annotating opened file
   text stays desktop-only. This is the one remote exception to FS-03.R64's statement that no
   remote-control route gains file-reading authority.
-- **R38 (planned) — Agent mail stays off the phone.** The phone offers no mailbox reading or
+- **R38 (shipped 2026-10-02) — Agent mail stays off the phone.** The phone offers no mailbox reading or
   mail sending; agent mail remains agent-to-agent (FS-06).
-- **R40 (planned) — Tasks leave the phone.** The phone has no task screen, task list, task
+- **R40 (shipped 2026-10-02) — Tasks leave the phone.** The phone has no task screen, task list, task
   rows, or task controls: Retry, Re-arm and its prerequisite editor (R30), Record result, Cancel, and
   New task become desktop-only. Tasks in `interrupted` or `dependency_failed` no longer appear in
   **Needs you** and no longer notify phones; the agents those tasks launched remain ordinary agents
@@ -206,7 +206,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   task link, such as an older notification, shows Home. Diff annotation's new-task target (R32)
   stays, because it opens the launched agent rather than a task page. This supersedes R11, R14, and
   R18 for tasks and supersedes R30.
-- **R41 (planned) — Start pipeline from a project page.** **Start pipeline** on a project page
+- **R41 (shipped 2026-10-02) — Start pipeline from a project page.** **Start pipeline** on a project page
   is the former New work pipeline flow with that project fixed: a valid existing template, an
   optional display name, the run goal, and the template's required inputs, using the configured
   stage runtimes and the same shared-workspace acknowledgment as the desktop (FS-14.R3/R80). The new
@@ -267,7 +267,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - **R27 — Refused actions explain themselves.** An action the Mac refuses (for example
   Steer on a runtime without steering, Resume on an archived agent, Re-arm in a disallowed state)
   shows the same reason the desktop would, and the composer keeps the person's typed text.
-- **R39 (planned) — Phone screens follow archival and removal.** When an agent is archived or
+- **R39 (shipped 2026-10-02) — Phone screens follow archival and removal.** When an agent is archived or
   its project archived from either device, it leaves every phone list and an open phone screen for it
   shows **Archived on the Mac** with a way back to its project or Home; when a project is archived,
   its open project screen says so and returns to Home.
@@ -341,9 +341,9 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 
 ## 6. Deviations & open decisions
 
-- R33–R35 and R40 restructure shipped phone behavior: when they ship, R11's Moving and Since you
+- R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of
-  R18 and A3/A4/A9 are retired or narrowed in the same change.
+  R18 and A3/A4/A9 were retired or narrowed in the same change.
 
 - The phone's pairing credential lives in the installed app's browser storage (R9); a Face ID or
   fingerprint app lock is not part of this version.

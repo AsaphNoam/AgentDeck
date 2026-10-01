@@ -1,6 +1,6 @@
 # Phone desktop flow and agent management
 
-**State:** In progress
+**State:** Finished
 **Why:** Direct operator request (2026-10-01): the phone app is too lean for remote work; it should
 show projects, open a project, open its agents, and create agents. The operator then directed the
 phone to follow the desktop flow (dashboard → project page → agent chat), drop the phone's task

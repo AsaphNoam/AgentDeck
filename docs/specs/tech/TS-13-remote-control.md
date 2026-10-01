@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -180,7 +180,7 @@ the installed app on iOS.
   the window boundary. A tailnet read is always windowed (150 events by default); a loopback read
   without `limit` or `before_seq` keeps the unwindowed `{agent_id, events}` shape (FS-20.R13,
   INV §16).
-- **R19 (planned) — The phone mirrors the desktop dashboard from existing data.** Phone routes
+- **R19 (shipped 2026-10-02) — The phone mirrors the desktop dashboard from existing data.** Phone routes
   are `/` (project dashboard), `/project/{id}`, `/agent/{id}`, `/run/{id}`, `/phone`, and `/pair`;
   `/new`, `/task/{id}`, and any other path render Home. Home and the project page are derived in the
   browser from the SSE agent snapshot the phone already hydrates, `GET /api/projects`, and R20's
@@ -192,7 +192,7 @@ the installed app on iOS.
   (`name`, `role`, `backend`, `model`, `state`, `detail`, `running`, `archived`, `clone`,
   `fast_available`); an agent or project that becomes archived or removed in that snapshot drives
   FS-20.R39's state on an open screen (FS-20.R33/R34/R39).
-- **R20 (planned) — Home attention narrows to agents and runs.** R10's single helper keeps
+- **R20 (shipped 2026-10-02) — Home attention narrows to agents and runs.** R10's single helper keeps
   classifying agent and pipeline-run attention but no longer reads tasks, and stops producing the
   agent/task **Moving** and every **Since you last looked** item. `GET /api/remote/home` takes no
   `since` and returns `{needs_you, active_runs}`: `needs_you` as before minus task items, and
@@ -201,7 +201,7 @@ the installed app on iOS.
   helper, so task `interrupted`/`dependency_failed` transitions stop producing pushes and no push
   URL names `/task/`; agent and run pushes are unchanged (FS-20.R18/R33/R40, INV §2). The phone
   drops its stored `homeSeenAt` key.
-- **R21 (planned) — The tailnet allowlist follows the new phone surface.** R5's table changes
+- **R21 (shipped 2026-10-02) — The tailnet allowlist follows the new phone surface.** R5's table changes
   as follows; every change keeps the existing guard, device authentication, 1 MiB body bound, and
   shared handler, and the inventory test continues to fail on an unclassified route (INV §10):
   - `POST /api/sessions` admits `role`, `project`, `name`, `backend`, `model`, `effort`, and
@@ -223,7 +223,7 @@ the installed app on iOS.
     `file-search`, `available-commands`, archive reads, worktree routes, and the backend catalog
     (FS-20.R16/R38).
   Each accepted remote mutation stays attributed to its device id in the server log (R6).
-- **R22 (planned) — Remote file reads are limited to the agent's tracked paths.** The tailnet
+- **R22 (shipped 2026-10-02) — Remote file reads are limited to the agent's tracked paths.** The tailnet
   chain wraps the shared `handleFileRead` with a filter that answers `404
   remote_file_not_tracked` unless the `path` query is byte-equal to the `path` column of a
   `tracked_files` row for that `{id}` — the value `GET /api/sessions/{id}/files` returned. The
@@ -234,7 +234,7 @@ the installed app on iOS.
   resolve. All other refusals, the chat-interface gate, size limit, UTF-8 check, and response shape
   stay those of TS-03.R48/TS-05.R24. The filter reads only the tracked-path index, never the
   filesystem, before deciding; it adds no durable access record (FS-20.R37).
-- **R23 (planned) — Runtime options carry the desktop defaults.** R15's projection adds
+- **R23 (shipped 2026-10-02) — Runtime options carry the desktop defaults.** R15's projection adds
   `default` (true on the one backend the launch resolver treats as default, FS-01.R5) and
   `default_model` on each backend, still projecting no type, environment, credential, path, or
   federation data. The phone's New agent and Switch runtime pickers preselect from these values and
@@ -260,7 +260,7 @@ agent|task|run, id, title, project, state, reason, agent_id?, stage?, outcome?, 
 summaries carry `stage_number`/`stage_count` for the stage position. `GET /api/remote/self` →
 `{id, name, notifications, vapid_public_key}`.
 
-Planned (R20): `GET /api/remote/home` → `{needs_you, active_runs}` with the same item shape and no
+Shipped (R20): `GET /api/remote/home` → `{needs_you, active_runs}` with the same item shape and no
 `since` parameter.
 
 `GET /api/remote/runtime-options` → `{backends: [{id, name, default? (planned, R23),

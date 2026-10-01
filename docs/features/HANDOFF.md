@@ -7,10 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `phone-desktop-flow-and-agent-management.md` — in progress. Planned slices:
-  shared desktop/phone project derivation and narrowed home data; remote route/filter and tracked-file
-  security contracts; phone dashboard/project/launch/pipeline flow; phone agent management and
-  Files/Commands; removal of phone task/New work surfaces; final browser and closure verification.
+- **Active change:** none.
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -23,42 +20,26 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
 - **Work units:** `show-exact-context-and-runtime-metadata.md` and
-  `rename-product-to-deckhand.md` are waiting to start. `phone-desktop-flow-and-agent-management.md`
-  is in progress.
+  `rename-product-to-deckhand.md` are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes and
+  `phone-desktop-flow-and-agent-management.md` are available.
 - **Fix units:** none available.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
 
-### Phone desktop flow and agent management
-
-- **Direction:** experienced remote operators need the dashboard → project → chat path to make the
-  next agent-level action fastest. Home reads Needs you first, then a dense project list; project
-  pages put New agent and Start pipeline together above ordered agents and active runs. Lifecycle
-  state, runtime identity, and tracked work are the AgentDeck-specific proof, while configuration,
-  task UI, mail, and arbitrary files stay quiet or absent. Reuse the compact phone shell and shared
-  chat primitives; no new skin, motion system, or desktop behavior. Use no decorative motion.
-- **UX risk:** removing New work/tasks must leave old links and notifications with a clear Home
-  recovery; rejected launches and pipeline starts must preserve entered values; archive must state
-  that restore remains desktop-only.
-- **Next:** implement the shared derivations and narrowed server projections first, with focused
-  tests, then checkpoint before adding phone routes and controls.
-- **Verified checkpoint:** tailnet Home/push now exclude tasks and expose active runs; runtime
-  defaults, approved agent-management and tracking routes, complete task-route denial, and exact
-  tracked-path file reads with final-component no-follow are implemented. `go test
-  ./internal/server -count=1` passes. The phone/dashboard UI slice is committed separately; its
-  runtime-default and archive-confirmation integration fixes remain in progress.
-- **Next:** close the phone UI integration findings, retire superseded source/tests, then run the
-  combined browser and closure matrix.
+None.
 
 ## Acceptance gates still owed
 
 - FS-20.A1/A5/A6/A8: real tailnet, Android, iPhone, and `pmset -g assertions` checks. The iPhone
   Home Screen experience also still lacks a PNG touch icon. The 390px fake-provider browser pass
   covered A3/A4/A7/A9, except the fast-mode picker and Continue on an approval pause.
+- FS-20.A10–A13: the server and UI acceptance suites pass; the combined 390px fake-provider browser
+  journey for the new dashboard, project, agent-management, Files/Commands, and retired task flow
+  remains owed.
 - TS-06.R21: credentialed Claude and Codex login/chat checks.
 - TS-06.R26: the credentialed Codex 1.12.0 receipt gating FS-03.A41/A42 and FS-01.A20.
 - FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove

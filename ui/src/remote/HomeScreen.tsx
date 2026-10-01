@@ -9,7 +9,6 @@ const DEBOUNCE_MS = 400;
 
 /** itemPath is where a Home row opens. */
 export function itemPath(item: AttentionItem): string {
-  if (item.kind === "task") return `/task/${encodeURIComponent(item.id)}`;
   if (item.kind === "run") return `/run/${encodeURIComponent(item.id)}`;
   return `/agent/${encodeURIComponent(item.id)}`;
 }
@@ -67,7 +66,7 @@ export function HomeScreen() {
   }
   return (
     <>
-      {home.data.needs_you.length > 0 && <Section title="Needs you" items={home.data.needs_you.filter((item) => item.kind !== "task")} empty="" />}
+      {home.data.needs_you.length > 0 && <Section title="Needs you" items={home.data.needs_you} empty="" />}
       <Projects />
     </>
   );
