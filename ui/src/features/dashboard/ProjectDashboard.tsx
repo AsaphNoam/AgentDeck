@@ -15,6 +15,7 @@ import { WorktreeForkDialog } from "./WorktreeForkDialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ProjectResponse } from "../../schemas/project";
 import type { MouseEvent } from "react";
+import { deriveDashboardProjects } from "./projectDashboardData";
 
 type ProjectEdit = { id: string; project: Omit<ProjectResponse, "project"> };
 type ProjectMenu = { id: string; x: number; y: number };
@@ -52,8 +53,7 @@ export function ProjectDashboard() {
     },
     onError: (err) => { const message = err instanceof Error ? err.message : String(err); setArchiveError(message); pushError("Archive project failed", message); },
   });
-  const active = useMemo(() => Object.entries(projects.data ?? {}).filter(([, project]) => !project.archived), [projects.data]);
-  const unavailable = useMemo(() => [...new Set(Object.values(agents).filter((agent) => !agent.archived && !projects.data?.[agent.project]).map((agent) => agent.project))], [agents, projects.data]);
+  const dashboardProjects = useMemo(() => deriveDashboardProjects(projects.data, agents), [agents, projects.data]);
   useEffect(() => {
     if (!contextMenu && !bgMenu) return;
     const close = () => { setContextMenu(null); setBgMenu(null); };
@@ -106,17 +106,15 @@ export function ProjectDashboard() {
         <button type="button" onClick={openCreate}>New project</button>
       </div>
       <div className="project-card-grid">
-        {active.map(([id, project]) => {
-          const projectAgents = Object.values(agents).filter((agent) => agent.project === id && !agent.archived);
-          const stateSummary = Object.entries(projectAgents.reduce<Record<string, number>>((counts, agent) => ({ ...counts, [agent.state]: (counts[agent.state] ?? 0) + 1 }), {})).map(([state, count]) => `${count} ${state}`).join(" · ") || "No agents";
-          return <article className="project-card" key={id} style={{ "--ad-project-accent": `rgb(${project.color.join(",")})` } as React.CSSProperties} onClick={() => navigate(`/project/${id}`)} onContextMenu={(event: MouseEvent) => { event.preventDefault(); setBgMenu(null); setContextMenu({ id, x: event.clientX, y: event.clientY }); }}>
-            <span className="project-card-color" style={{ background: `rgb(${project.color[0]}, ${project.color[1]}, ${project.color[2]})` }} aria-label="Project color" />
+        {dashboardProjects.map((project) => {
+          const configured = projects.data?.[project.id];
+          return <article className={`project-card${project.unavailable ? " unavailable" : ""}`} key={project.id} style={project.color ? { "--ad-project-accent": `rgb(${project.color.join(",")})` } as React.CSSProperties : undefined} onClick={() => navigate(`/project/${project.id}`)} onContextMenu={(event: MouseEvent) => { if (project.unavailable) return; event.preventDefault(); setBgMenu(null); setContextMenu({ id: project.id, x: event.clientX, y: event.clientY }); }}>
+            {project.color && <span className="project-card-color" style={{ background: `rgb(${project.color.join(",")})` }} aria-label="Project color" />}
             <strong>{project.title}</strong>
-            {project.worktree?.owned && <span className="project-card-branch" title={`Worktree on ${project.worktree.branch}`}>⑂ {project.worktree.branch}</span>}
-            <span>{projectAgents.length} agents</span><small>{stateSummary}</small>
+            {configured?.worktree?.owned && <span className="project-card-branch" title={`Worktree on ${configured.worktree.branch}`}>⑂ {configured.worktree.branch}</span>}
+            <span>{project.unavailable ? "Project unavailable" : `${project.agents.length} agents`}</span><small>{project.unavailable ? "" : project.stateSummary}</small>
           </article>;
         })}
-        {unavailable.map((id) => <article className="project-card unavailable" key={id} onClick={() => navigate(`/project/${id}`)}><strong>{id}</strong><span>Project unavailable</span></article>)}
       </div>
       {contextMenu && projects.data?.[contextMenu.id] && createPortal(
         <div className="context-menu" data-ui="context-menu" role="menu" ref={cardMenuPlacement.ref} style={cardMenuPlacement.style}>

@@ -58,8 +58,7 @@ export interface AttentionItem {
 
 export interface HomeLists {
   needs_you: AttentionItem[];
-  moving: AttentionItem[];
-  since_last: AttentionItem[];
+  active_runs: AttentionItem[];
 }
 
 /** The Mac's secret-free runtime catalog for Replace orchestrator (TS-13.R15). */
@@ -67,12 +66,13 @@ export interface RuntimeOptions {
   backends: {
     id: string;
     name: string;
-    models: { id: string; name: string; efforts: string[]; default_effort?: string; fast: boolean }[];
+    default?: boolean;
+    models: { id: string; name: string; efforts: string[]; default_effort?: string; default_model?: boolean; fast: boolean }[];
   }[];
 }
 
 export const getRuntimeOptions = () => phoneFetch<RuntimeOptions>("/api/remote/runtime-options");
-export const getHome = (since: string) => phoneFetch<HomeLists>(`/api/remote/home?since=${encodeURIComponent(since)}`);
+export const getHome = () => phoneFetch<HomeLists>("/api/remote/home");
 export const checkPaired = () => phoneFetch<unknown>("/api/health");
 export const claimPairing = (code: string, name: string) =>
   phoneFetch<{ pending_id: string }>("/api/remote/pair", json("POST", { code, name }));

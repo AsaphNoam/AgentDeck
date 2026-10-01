@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getHome, type AttentionItem } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
-
-const SEEN_KEY = "agentdeck.homeSeenAt";
+import { phoneFetch } from "./api";
+import { deriveDashboardProjects } from "../features/dashboard/projectDashboardData";
 const DEBOUNCE_MS = 400;
 
 /** itemPath is where a Home row opens. */
@@ -53,13 +53,6 @@ function Section({ title, items, empty }: { title: string; items: AttentionItem[
 }
 
 export function HomeScreen() {
-  // "Since you last looked" compares with the previous time this phone opened
-  // Home; that time lives only in the phone's storage (TS-13.R10).
-  const [since] = useState(() => {
-    const previous = localStorage.getItem(SEEN_KEY) ?? new Date(Date.now() - 24 * 3600_000).toISOString();
-    localStorage.setItem(SEEN_KEY, new Date().toISOString());
-    return previous;
-  });
   const revision = useConnection((state) => state.revision);
   const [debounced, setDebounced] = useState(revision);
   useEffect(() => {
@@ -67,37 +60,23 @@ export function HomeScreen() {
     return () => window.clearTimeout(timer);
   }, [revision]);
 
-  const home = useQuery({ queryKey: ["home", since, debounced], queryFn: () => getHome(since), placeholderData: (prev) => prev });
-
-  const moving = useMemo(() => {
-    const groups = new Map<string, AttentionItem[]>();
-    for (const item of home.data?.moving ?? []) groups.set(item.project, [...(groups.get(item.project) ?? []), item]);
-    return [...groups.entries()];
-  }, [home.data]);
+  const home = useQuery({ queryKey: ["home", debounced], queryFn: getHome, placeholderData: (prev) => prev });
 
   if (!home.data) {
     return <p className="phone-empty">{home.isError ? "Could not load what needs you." : "Loading…"}</p>;
   }
   return (
     <>
-      <Section title="Needs you" items={home.data.needs_you} empty="Nothing needs you right now." />
-      <section className="phone-section" aria-label="Moving">
-        <h2>
-          Moving <span className="phone-count">{home.data.moving.length}</span>
-        </h2>
-        {moving.length === 0 && <p className="phone-empty">Nothing is running.</p>}
-        {moving.map(([project, items]) => (
-          <div key={project} className="phone-group">
-            <h3>{project}</h3>
-            <ul className="phone-list">
-              {items.map((item) => (
-                <Row key={`${item.kind}:${item.id}`} item={item} />
-              ))}
-            </ul>
-          </div>
-        ))}
-      </section>
-      <Section title="Since you last looked" items={home.data.since_last} empty="Nothing finished since you last looked." />
+      {home.data.needs_you.length > 0 && <Section title="Needs you" items={home.data.needs_you.filter((item) => item.kind !== "task")} empty="" />}
+      <Projects />
     </>
   );
+}
+
+function Projects() {
+  const agents = useConnection((state) => state.agents);
+  const projects = useQuery({ queryKey: ["projects"], queryFn: () => phoneFetch<Record<string, { title: string; color: [number, number, number]; archived?: boolean }>>("/api/projects") });
+  if (!projects.data) return <p className="phone-empty">Loading projects…</p>;
+  const entries = deriveDashboardProjects(projects.data, agents);
+  return <section className="phone-section" aria-label="Projects"><h2>Projects</h2><ul className="phone-list">{entries.map((project) => <li key={project.id}><button type="button" className="phone-row" onClick={() => navigate(`/project/${encodeURIComponent(project.id)}`)}><span className="phone-row-title">{project.title}</span><span className="phone-row-reason">{project.unavailable ? "Project unavailable" : `${project.agents.length} agents · ${project.stateSummary}`}</span></button></li>)}</ul></section>;
 }

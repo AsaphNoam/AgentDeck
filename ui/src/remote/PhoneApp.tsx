@@ -4,9 +4,9 @@ import { HomeScreen } from "./HomeScreen";
 import { PairScreen, UnpairedScreen } from "./PairScreen";
 import { match, navigate, usePath } from "./router";
 import { AgentScreen } from "./AgentScreen";
-import { NewWorkScreen } from "./NewWorkScreen";
 import { PhoneSettings } from "./PhoneSettings";
-import { RunScreen, TaskScreen } from "./WorkScreens";
+import { RunScreen } from "./WorkScreens";
+import { ProjectScreen } from "./ProjectScreen";
 
 function Banner() {
   const link = useConnection((state) => state.link);
@@ -36,9 +36,6 @@ function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
           <>
             <span className="phone-brand">AgentDeck</span>
             <span className="phone-header-actions">
-              <button type="button" onClick={() => navigate("/new")}>
-                New work
-              </button>
               <button type="button" aria-label="This phone" onClick={() => navigate("/phone")}>
                 ⚙
               </button>
@@ -83,11 +80,10 @@ export function PhoneApp() {
 function screenFor(path: string) {
   const agentId = match(path, "agent");
   if (agentId) return <AgentScreen key={agentId} agentId={agentId} />;
-  const taskId = match(path, "task");
-  if (taskId) return <TaskScreen taskId={taskId} />;
+  const projectId = match(path, "project");
+  if (projectId) return <ProjectScreen key={projectId} projectID={projectId} />;
   const runId = match(path, "run");
   if (runId) return <RunScreen runId={runId} />;
-  if (path === "/new") return <NewWorkScreen />;
   if (path === "/phone") return <PhoneSettings />;
   return <HomeScreen />;
 }

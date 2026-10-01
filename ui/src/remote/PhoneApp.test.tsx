@@ -36,10 +36,9 @@ const home: HomeLists = {
   needs_you: [
     { kind: "agent", id: "a1", title: "implementer@my-app", project: "my-app", state: "waiting_input", reason: "needs permission", agent_id: "a1", since: new Date().toISOString() },
   ],
-  moving: [
+  active_runs: [
     { kind: "run", id: "r1", title: "Ship it", project: "my-app", state: "running", reason: "running", stage_number: 2, stage_count: 4, since: new Date().toISOString() },
   ],
-  since_last: [],
 };
 
 const server = setupServer(
@@ -47,6 +46,7 @@ const server = setupServer(
     paired ? HttpResponse.json({ status: "ok" }) : HttpResponse.json({ error: { code: "remote_unpaired", message: "pair" } }, { status: 401 }),
   ),
   http.get("/api/remote/home", () => HttpResponse.json(home)),
+  http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My app", color: [1, 2, 3] } })),
   http.post("/api/remote/pair", async ({ request }) => {
     claims++;
     const body = (await request.json()) as { code: string };
@@ -94,8 +94,9 @@ describe("PhoneApp", () => {
     renderApp();
     expect(await screen.findByText("implementer@my-app")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Needs you" })).toHaveTextContent("needs permission");
-    expect(screen.getByRole("region", { name: "Moving" })).toHaveTextContent("Stage 2 of 4");
-    expect(screen.getByRole("region", { name: "Since you last looked" })).toHaveTextContent("Nothing finished");
+    expect(await screen.findByRole("region", { name: "Projects" })).toHaveTextContent("My app");
+    expect(screen.queryByRole("region", { name: "Moving" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Since you last looked" })).toBeNull();
   });
 
   it("pairs from the QR link's code once the Mac allows it", async () => {

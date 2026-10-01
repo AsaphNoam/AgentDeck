@@ -209,11 +209,27 @@ body {
 }
 
 .phone-agent,
+.phone-project,
 .phone-composer,
 .phone-transcript {
   display: grid;
   gap: var(--ad-space-3);
   min-width: 0;
+}
+
+.phone-tabs {
+  display: grid;
+  gap: var(--ad-space-1);
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.phone-tabs button {
+  min-height: 40px;
+  padding-inline: var(--ad-space-1);
+}
+
+.phone-row-stopped {
+  opacity: 0.65;
 }
 
 .phone-agent-header h1 {

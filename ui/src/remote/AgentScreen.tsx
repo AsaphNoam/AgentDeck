@@ -2,13 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelTurn,
+  archiveAgent,
+  cloneAgent,
   decidePermission,
+  getFileContent,
   getHeldPrompt,
+  getTrackedCommands,
+  getTrackedFiles,
+  renameAgent,
   getTranscriptWindow,
   resumeAgent,
   sendPrompt,
+  setSessionConfig,
   steerPrompt,
   stopAgent,
+  switchRuntime,
   withdrawPrompt,
 } from "../api/client";
 import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types";
@@ -21,6 +29,8 @@ import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
 import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection } from "./connection";
+import { getRuntimeOptions } from "./api";
+import { navigate } from "./router";
 
 // The phone reads a bounded window and keeps at most EARLIER_PAGES older ones
 // (FS-20.R13).
@@ -138,7 +148,13 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"chat" | "files" | "commands" | "manage">("chat");
+  const [rename, setRename] = useState("");
+  const [filePath, setFilePath] = useState<string | null>(null);
   const chat = agent?.interface !== "terminal";
+  const files = useQuery({ queryKey: ["tracked-files", agentId, rev], queryFn: () => getTrackedFiles(agentId), enabled: tab === "files" });
+  const commands = useQuery({ queryKey: ["tracked-commands", agentId, rev], queryFn: () => getTrackedCommands(agentId), enabled: tab === "commands" });
+  const file = useQuery({ queryKey: ["tracked-file", agentId, filePath], queryFn: () => getFileContent(agentId, filePath!), enabled: !!filePath });
   const addAnnotation = useAnnotationStore((state) => state.add);
 
   // Older windows cover seqs before `anchor`; while they are shown, the live
@@ -231,6 +247,13 @@ export function AgentScreen({ agentId }: { agentId: string }) {
           {agent.detail ? ` · ${clip(agent.detail, 80)}` : ""}
         </p>
       </header>
+      <div className="phone-actions phone-tabs" role="tablist" aria-label="Agent views">
+        {(["chat", "files", "commands", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}
+      </div>
+      {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
+      {tab === "commands" && <section className="phone-section" aria-label="Commands"><h2>Commands</h2>{commands.isError ? <p className="phone-error">{errorText(commands.error)}</p> : <ul className="phone-list">{(commands.data?.commands ?? []).map((command) => <li key={`${command.seq}:${command.command}`}><div className="phone-row"><span className="phone-row-title">{command.command}</span><span className="phone-row-meta">{command.exit_status || "Running"}{command.exit_error ? ` · ${command.exit_error}` : ""}</span></div></li>)}</ul>}</section>}
+      {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} />}
+      {tab === "chat" && <>
       {pending && <PermissionCard agent={agent} event={pending} latest={latest} disabled={offline} onSettled={refresh} />}
       {!chat ? (
         <p className="phone-empty">This is a terminal agent. Its terminal is on the Mac; the phone shows its status only.</p>
@@ -323,6 +346,16 @@ export function AgentScreen({ agentId }: { agentId: string }) {
           </button>
         )}
       </div>
+      </>}
     </div>
   );
+}
+
+function AgentManagement({ agent, offline, busy, act, rename, setRename }: { agent: AgentState; offline: boolean; busy: boolean; act: (fn: () => Promise<unknown>, clears?: boolean, after?: (result: unknown) => void) => void; rename: string; setRename: (value: string) => void }) {
+  const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
+  const [runtime, setRuntime] = useState({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" });
+  const backend = options.data?.backends.find((item) => item.id === runtime.backend);
+  const model = backend?.models.find((item) => item.id === runtime.model);
+  const disable = offline || busy || !agent.running || agent.interface !== "chat";
+  return <section className="phone-section" aria-label="Agent management"><form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}><label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label><button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button></form>{agent.running && agent.interface === "chat" && <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}><p className="phone-card-kicker">Runtime</p><label className="phone-field">Backend<select value={runtime.backend} onChange={(event) => { const next = options.data?.backends.find((item) => item.id === event.target.value); const selected = next?.models.find((item) => item.default_model) ?? next?.models[0]; setRuntime({ backend: event.target.value, model: selected?.id ?? "", effort: selected?.default_effort ?? "" }); }}><option value="">Choose…</option>{(options.data?.backends ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label><label className="phone-field">Model<select value={runtime.model} onChange={(event) => setRuntime({ ...runtime, model: event.target.value })}>{(backend?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>{(model?.efforts.length ?? 0) > 0 && <label className="phone-field">Effort<select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<button type="submit" disabled={disable || !runtime.backend || !runtime.model}>Switch runtime</button></form>}{agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}{agent.running && agent.interface === "chat" && (model?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<div className="phone-card"><button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>{agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}<button type="button" className="phone-danger" disabled={offline || busy} onClick={() => { if (window.confirm("Archive this agent? Restore is available on the desktop.")) act(() => archiveAgent(agent.agent_id), false, () => navigate(`/project/${encodeURIComponent(agent.project)}`)); }}>Archive</button></div></section>;
 }
