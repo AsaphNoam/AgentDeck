@@ -8,12 +8,13 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 ## Current position
 
 - **Active change:** none.
-- **Release:** `v0.8.0` is prepared locally from the 13-commit range after `v0.7.0`. It ships
-  unrestricted on-demand local text-file viewing and file-selection annotations in chat, plus
-  reliable Claude model application after resume. The operator skill now explains the file-viewer
-  boundary; README claims and pinned release components remain current. Full Go tests, all 562 UI
-  tests, the presentation contract, and the versioned `sqlite_fts5` distributable pass. Publication
-  is awaiting authorization.
+- **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
+  ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
+  plus reliable Claude model application after resume. The operator skill explains the file-viewer
+  boundary; README claims and pinned release components remain current. The macOS release workflow
+  passed. CI's first run hit one non-reproducing context-sharing timing assertion; the full rerun
+  passed. The GitHub Release carries the 293,072,856-byte `darwin-arm64` archive, `install.sh`, and
+  a `0.8.0` manifest whose size and SHA-256 match the archive asset.
 - **Work units:** `show-exact-context-and-runtime-metadata.md` and
   `rename-product-to-deckhand.md` are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
@@ -38,8 +39,7 @@ None.
 
 ## Blocked on human
 
-- Publishing `v0.8.0` requires explicit authorization to push every unpushed `main` commit and the
-  annotated tag.
+None.
 
 ## Review findings
 
