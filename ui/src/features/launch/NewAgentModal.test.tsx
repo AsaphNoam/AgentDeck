@@ -84,7 +84,13 @@ function renderWithQuery(ui: React.ReactElement) {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
-function openOptions() {
+async function openOptions() {
+  // Roles, projects, and backends load independently. Wait until the selected
+  // backend's default model has reached component state before changing runtime
+  // controls; the model select can display its first option while modelId is
+  // still empty, and the pending defaulting effect would then overwrite a test
+  // change made in that window.
+  await screen.findByText("Sonnet 4.6", { selector: ".new-agent-runtime span" });
   fireEvent.click(screen.getByText("Options"));
 }
 
@@ -98,7 +104,7 @@ describe("NewAgentModal", () => {
   it("warns before launch when the Codex cache is newer than the packaged runtime", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     const backendSelect = screen.getByLabelText("Backend");
     fireEvent.change(backendSelect, { target: { value: "codex" } });
     expect(await screen.findByText(/Codex runtime 0\.144\.0/)).toHaveTextContent("Model auto-sync skipped cache from 0.153.4");
@@ -183,7 +189,7 @@ describe("NewAgentModal", () => {
   it("model select shows only models for the chosen backend", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     // Default backend is "claude" with sonnet and haiku.
     expect(screen.getByLabelText("Model")).toHaveTextContent("Sonnet 4.6");
     expect(screen.getByLabelText("Model")).not.toHaveTextContent("GPT-4o");
@@ -192,7 +198,7 @@ describe("NewAgentModal", () => {
   it("changing backend resets model to that backend's default", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     // Change backend to codex
     const backendSelect = screen.getByLabelText("Backend");
@@ -207,7 +213,7 @@ describe("NewAgentModal", () => {
   it("shows an effort control preselecting the model's default_effort", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     // Sonnet declares no efforts → no control until a model with efforts is picked.
     expect(screen.queryByText("Effort")).toBeNull();
@@ -223,7 +229,7 @@ describe("NewAgentModal", () => {
   it("hides the effort control for a model that declares no efforts", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     // Reveal it on haiku, then switch back to effort-less sonnet: it disappears.
     const modelSelect = screen.getByLabelText("Model");
@@ -236,7 +242,7 @@ describe("NewAgentModal", () => {
   it("resets effort to the new model's default when the model changes", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     // Switch backend to codex → gpt-4o defaults its effort to "high".
     const backendSelect = screen.getByLabelText("Backend");
@@ -249,7 +255,7 @@ describe("NewAgentModal", () => {
   it("terminal interface option is enabled when capabilities allow it", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
     await waitFor(() => expect(terminalRadio).toBeEnabled());
@@ -258,7 +264,7 @@ describe("NewAgentModal", () => {
   it("disables the Terminal option for a non-claude backend", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
     // Default backend is claude-acp → terminal enabled.
@@ -273,7 +279,7 @@ describe("NewAgentModal", () => {
   it("resets a terminal selection to chat when switching to a non-claude backend", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
 
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
     const chatRadio = screen.getByRole("radio", { name: /Chat/i }) as HTMLInputElement;
@@ -304,7 +310,7 @@ describe("NewAgentModal", () => {
     }));
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
     await waitFor(() => expect(terminalRadio).toBeEnabled());
@@ -336,7 +342,7 @@ describe("NewAgentModal", () => {
     );
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
 
     expect(await screen.findByLabelText("Effort")).toBeInTheDocument();
@@ -370,7 +376,7 @@ describe("NewAgentModal", () => {
     );
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i });
     await waitFor(() => expect(terminalRadio).toBeEnabled());
@@ -389,7 +395,7 @@ describe("NewAgentModal", () => {
     server.use(http.get("/api/capabilities", () => HttpResponse.json({ terminal: { available: false } })));
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     await waitFor(() => expect(screen.getByRole("radio", { name: /Terminal/i })).toBeDisabled());
   });
 
@@ -407,7 +413,7 @@ describe("NewAgentModal", () => {
     );
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
     expect(await screen.findByText(/Launch options could not be loaded/)).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Terminal/i })).toBeDisabled();
@@ -430,7 +436,7 @@ describe("NewAgentModal", () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={qc}><NewAgentModal open={true} onClose={() => {}} /></QueryClientProvider>);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Kept" } });
     fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
     const terminalRadio = screen.getByRole("radio", { name: /Terminal/i }) as HTMLInputElement;
@@ -543,7 +549,7 @@ describe("NewAgentModal", () => {
 
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
-    openOptions();
+    await openOptions();
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Custom Worker" } });
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
     fireEvent.change(screen.getByLabelText("Effort"), { target: { value: "low" } });
