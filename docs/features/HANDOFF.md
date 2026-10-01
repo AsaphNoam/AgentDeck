@@ -47,7 +47,53 @@ None.
 
 ## Review findings
 
-None.
+### Claude 5.5 launch compatibility — reported 2026-10-01 — **Fix model:** medium — Codex Terra or Claude Opus.
+
+**Report (verbatim).** “claude can't deploy opus5.5 or sonnet 5.5. Setting backend to sonnet / opus defaults to version
+  5, setting to claude-sonnet- 5-5 or claude-opus-5-5 both fail runtime: provider rejected the
+  setting: model: Internal error. After launching claude opus 5 I can run /model
+  claude-sonnet-5-5 and it works, but running /model claude-opus-5-5 returns API error: 400
+  {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Claude Code
+  2.1.257 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or
+  update the Claude desktop app, then try again.\",\"details\":{\"error_code\":
+  \"claude_code_version_too_old\"}},\"request_id\":\"req_011Cfb3xhNe67bnHyTaUpWs5\"}. My local
+  CLI version is 2.1.286, checked in the same terminal running agentdeck before starting the
+  dashboard. Asking the claude within agentdeck revealed that the agentdeck bundle is at 2.1.257.
+  Why did we choose to bundle versions separately and not use what the user has installed locally?”
+  AgentDeck version was not stated; the current shipped release is v0.8.0. No separate log file was
+supplied.
+
+- **Must fix** — Claude model rejection discards the actionable provider reason (**confirmed code
+  defect**). **Where:** `@agentclientprotocol/claude-agent-acp` 0.75.1 converts a failed SDK
+  `query.setModel` into JSON-RPC `Internal error` with the original message under `error.data`;
+  `internal/runtime/jsonrpc.go:24-31` decodes that data, but `rpcError.Error` returns only `Message`,
+  and `internal/runtime/chat.go:2379-2385` therefore surfaces only `provider rejected the setting:
+  model: Internal error`. **Normal-use trigger:** launch a Claude chat with an explicit model that
+  the packaged Claude executable rejects, including `claude-opus-5-5` under the shipped 2.1.257
+  executable. **Why it matters:** the person is told neither that AgentDeck is running a different
+  Claude version nor the provider's minimum-version recovery, so `claude update` appears ineffective
+  and the launch is not an honest, actionable compatibility failure. **Requirement:** TS-04.R9/R22,
+  INV §8/§12. **Suggested fix/test:** preserve a bounded, sanitized provider detail for recognized
+  session-configuration failures and add a launch regression whose ACP error carries
+  `claude_code_version_too_old`, asserting that the response identifies the packaged runtime and
+  required update without leaking arbitrary provider data.
+- **Worth fixing** — the packaged Claude runtime lags the minimum needed for Opus 5.5, with no
+  version disclosure analogous to packaged Codex (**confirmed specification gap and compatibility
+  limitation**). **Where:** `scripts/release/package.json:10` pins `claude-agent-acp` 0.75.1, whose
+  locked `@anthropic-ai/claude-agent-sdk` 0.3.257 embeds Claude Code 2.1.257; the release wrapper
+  prepends that private adapter to PATH. FS-09.R29 and TS-04.R13 deliberately make that adapter own
+  the chat executable, while FS-09.R59 exposes exact packaged-runtime/cache compatibility only for
+  Codex. **Normal-use trigger:** the local Claude CLI is new enough for a newly available model, but
+  a chat launch uses the older immutable release runtime. **Why it matters:** exact model selectors
+  can be configured and passed verbatim yet remain unusable until AgentDeck ships a dependency
+  bump, and the UI gives no way to distinguish that state from the user's installed CLI. The moving
+  `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
+  translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
+  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:** decide explicitly
+  whether Claude chat remains release-pinned or gains a reviewed local-CLI override; at minimum bump
+  the official adapter to a version embedding Claude Code 2.1.280+ after its credentialed
+  compatibility gate, expose the effective packaged Claude/adapter versions before launch, and test
+  that release PATH selection cannot be mistaken for the ambient CLI.
 
 ## Decisions needing your input
 
