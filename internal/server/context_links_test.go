@@ -89,7 +89,7 @@ func TestContextSharingStartsNoModelTurn(t *testing.T) {
 	promptAndWaitTurnEnd(t, srv, ts, sharer, secret)
 	// The finished turn is shareable only from inside a later turn started for
 	// an independent reason (TS-04.R28), so hold one open across the share.
-	startHeldTurn(t, srv, ts, sharer, hold, "keep working")
+	startHeldTurn(t, srv, ts, sharer, hold, promptLog, "keep working")
 
 	baseline := promptCount(t, promptLog)
 	if baseline == 0 {
@@ -160,7 +160,7 @@ func TestStoppedRecipientKeepsContextAcrossResume(t *testing.T) {
 	sharer := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	recipient := launchThenStop(t, srv, ts)
 	promptAndWaitTurnEnd(t, srv, ts, sharer, "durable conclusion")
-	startHeldTurn(t, srv, ts, sharer, hold, "keep working")
+	startHeldTurn(t, srv, ts, sharer, hold, promptLog, "keep working")
 
 	baseline := promptCount(t, promptLog)
 	if baseline == 0 {
@@ -219,8 +219,9 @@ func heldTurnServer(t *testing.T) (*Server, *httptest.Server, string, string) {
 // startHeldTurn sends a prompt the fake adapter will not finish until the hold
 // file returns, and waits until that turn has durable transcript content — the
 // live "inside a later turn" state a completed-turn share requires.
-func startHeldTurn(t *testing.T, srv *Server, ts *httptest.Server, agentID, hold, text string) {
+func startHeldTurn(t *testing.T, srv *Server, ts *httptest.Server, agentID, hold, promptLog, text string) {
 	t.Helper()
+	before := promptCount(t, promptLog)
 	if err := os.Remove(hold); err != nil {
 		t.Fatalf("block the next turn: %v", err)
 	}
@@ -235,6 +236,11 @@ func startHeldTurn(t *testing.T, srv *Server, ts *httptest.Server, agentID, hold
 			open = ev.Type != runtime.EvTurnEnd && ev.Type != runtime.EvSessionMeta
 		}
 		if open {
+			// Transcript persistence precedes provider delivery. Wait for the held
+			// prompt to cross the provider wire before callers take a no-new-turn
+			// baseline, or a slow adapter can make this expected prompt look like a
+			// context-operation leak.
+			waitPrompts(t, promptLog, before+1)
 			return
 		}
 		if time.Now().After(deadline) {

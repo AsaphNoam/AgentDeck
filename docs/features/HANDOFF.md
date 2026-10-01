@@ -13,12 +13,14 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
   boundary; README claims and pinned release components remain current. The macOS release workflow
   passed. CI's first run hit one non-reproducing context-sharing timing assertion; the full rerun
-  passed. The GitHub Release carries the 293,072,856-byte `darwin-arm64` archive, `install.sh`, and
-  a `0.8.0` manifest whose size and SHA-256 match the archive asset.
+  passed. A post-release test-only fix now waits for the held prompt at the fake-provider wire before
+  measuring that context operations add no turns. The GitHub Release carries the 293,072,856-byte
+  `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the
+  archive asset.
 - **Work units:** `show-exact-context-and-runtime-metadata.md` and
   `rename-product-to-deckhand.md` are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** none available.
+- **Review units:** the test-only `context-sharing-test-synchronization` fix is available.
 - **Fix units:** none available.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
