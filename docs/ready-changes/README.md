@@ -58,6 +58,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 - [`add-mobile-remote-control.md`](add-mobile-remote-control.md) — pair phones over the person's
   tailnet and supervise, answer, redirect and start work from an installable phone web app.
+- [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
+  give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,
+  project-page pipeline start, agent management, and tracked-file views; remove phone task UI.
 
 ## Paused changes
 

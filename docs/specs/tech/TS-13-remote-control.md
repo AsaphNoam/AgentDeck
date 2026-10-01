@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -180,6 +180,66 @@ the installed app on iOS.
   the window boundary. A tailnet read is always windowed (150 events by default); a loopback read
   without `limit` or `before_seq` keeps the unwindowed `{agent_id, events}` shape (FS-20.R13,
   INV §16).
+- **R19 (planned) — The phone mirrors the desktop dashboard from existing data.** Phone routes
+  are `/` (project dashboard), `/project/{id}`, `/agent/{id}`, `/run/{id}`, `/phone`, and `/pair`;
+  `/new`, `/task/{id}`, and any other path render Home. Home and the project page are derived in the
+  browser from the SSE agent snapshot the phone already hydrates, `GET /api/projects`, and R20's
+  home response; no new server read is added. The desktop's project-card derivation in
+  `ui/src/features/dashboard/ProjectDashboard.tsx` — active-project filtering, unavailable-project
+  detection, agent counts, per-state summary, and project ordering — and the card grid's agent
+  ordering (FS-02.R45) move into one pure helper under `ui/src/` used by both entries, so the phone
+  cannot drift from the desktop's rules (INV §2). Agent rows reuse `AgentState` fields
+  (`name`, `role`, `backend`, `model`, `state`, `detail`, `running`, `archived`, `clone`,
+  `fast_available`); an agent or project that becomes archived or removed in that snapshot drives
+  FS-20.R39's state on an open screen (FS-20.R33/R34/R39).
+- **R20 (planned) — Home attention narrows to agents and runs.** R10's single helper keeps
+  classifying agent and pipeline-run attention but no longer reads tasks, and stops producing the
+  agent/task **Moving** and every **Since you last looked** item. `GET /api/remote/home` takes no
+  `since` and returns `{needs_you, active_runs}`: `needs_you` as before minus task items, and
+  `active_runs` the non-terminal runs R10 classified as moving, each with its project and stage
+  position, which the project page filters by project. The push sender keeps using the same
+  helper, so task `interrupted`/`dependency_failed` transitions stop producing pushes and no push
+  URL names `/task/`; agent and run pushes are unchanged (FS-20.R18/R33/R40, INV §2). The phone
+  drops its stored `homeSeenAt` key.
+- **R21 (planned) — The tailnet allowlist follows the new phone surface.** R5's table changes
+  as follows; every change keeps the existing guard, device authentication, 1 MiB body bound, and
+  shared handler, and the inventory test continues to fail on an unclassified route (INV §10):
+  - `POST /api/sessions` admits `role`, `project`, `name`, `backend`, `model`, `effort`, and
+    `fast`; `interface`, `driver`, `group`, permission-bypass, resume, and every other field stay
+    `remote_field_not_allowed`. The shared launch validator resolves omitted runtime fields to the
+    desktop defaults and rejects an unknown or unsupported backend/model/effort/fast combination
+    before any process work (FS-20.R35, R6);
+  - added: `POST /api/sessions/{id}/rename` admitting `name`; `POST
+    /api/sessions/{id}/session-config` admitting `effort` and `fast`; `POST
+    /api/sessions/{id}/switch-runtime` admitting `backend`, `model`, and `effort` (never `interface`
+    or `driver`); bodiless `POST /api/sessions/{id}/clone` and `POST /api/sessions/{id}/archive`
+    with no field filter, like `stop`; `GET /api/sessions/{id}/files` and `GET
+    /api/sessions/{id}/commands`; and `GET /api/sessions/{id}/file` behind R22 (FS-20.R36/R37);
+  - moved to the denied set: every `/api/tasks` route (`GET` list/detail and `POST` create,
+    `cancel`, `result`, `retry`, `rearm`), superseding R17 and R5's task entries (FS-20.R40).
+    Annotation's new-task target keeps working because the shared annotation handler creates its
+    task server-side;
+  - still denied: `POST /api/sessions/{id}/restore`, `GET /api/sessions/{id}/messages`,
+    `file-search`, `available-commands`, archive reads, worktree routes, and the backend catalog
+    (FS-20.R16/R38).
+  Each accepted remote mutation stays attributed to its device id in the server log (R6).
+- **R22 (planned) — Remote file reads are limited to the agent's tracked paths.** The tailnet
+  chain wraps the shared `handleFileRead` with a filter that answers `404
+  remote_file_not_tracked` unless the `path` query is byte-equal to the `path` column of a
+  `tracked_files` row for that `{id}` — the value `GET /api/sessions/{id}/files` returned. The
+  filter marks the request no-follow; the shared reader then opens the final path component with
+  `O_NOFOLLOW` and classifies with `Lstat`, so a symbolic link at the tracked path is refused as
+  `remote_file_not_tracked` without reading, while loopback reads keep FS-03.R64's link-following
+  behaviour. Directory symlinks above the tracked file (for example `/var` → `/private/var`) still
+  resolve. All other refusals, the chat-interface gate, size limit, UTF-8 check, and response shape
+  stay those of TS-03.R48/TS-05.R24. The filter reads only the tracked-path index, never the
+  filesystem, before deciding; it adds no durable access record (FS-20.R37).
+- **R23 (planned) — Runtime options carry the desktop defaults.** R15's projection adds
+  `default` (true on the one backend the launch resolver treats as default, FS-01.R5) and
+  `default_model` on each backend, still projecting no type, environment, credential, path, or
+  federation data. The phone's New agent and Switch runtime pickers preselect from these values and
+  the agent's current runtime respectively; effort defaults to the model's `default_effort`
+  (FS-20.R35/R36).
 
 ## 3. Interfaces & data shapes
 
@@ -200,8 +260,11 @@ agent|task|run, id, title, project, state, reason, agent_id?, stage?, outcome?, 
 summaries carry `stage_number`/`stage_count` for the stage position. `GET /api/remote/self` →
 `{id, name, notifications, vapid_public_key}`.
 
-`GET /api/remote/runtime-options` → `{backends: [{id, name,
-models: [{id, name, efforts, default_effort?, fast}]}]}`, sorted by id; the existing annotation, task Re-arm, and
+Planned (R20): `GET /api/remote/home` → `{needs_you, active_runs}` with the same item shape and no
+`since` parameter.
+
+`GET /api/remote/runtime-options` → `{backends: [{id, name, default? (planned, R23),
+default_model? (planned, R23), models: [{id, name, efforts, default_effort?, fast}]}]}`, sorted by id; the existing annotation, task Re-arm, and
 pipeline Replace request/response shapes remain shared with loopback and gain only the R4 guard,
 device authentication, allowlist, and bounded-body enforcement on the tailnet listener.
 

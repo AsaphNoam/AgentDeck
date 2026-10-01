@@ -19,8 +19,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   they now wait for that rendered default first. The GitHub Release carries the 293,072,856-byte
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
-- **Work units:** `show-exact-context-and-runtime-metadata.md` and
-  `rename-product-to-deckhand.md` are waiting to start.
+- **Work units:** `show-exact-context-and-runtime-metadata.md`,
+  `rename-product-to-deckhand.md`, and `phone-desktop-flow-and-agent-management.md` (designed
+  2026-10-02: phone dashboard → project → chat, New agent with runtime choice, project-page pipeline
+  start, agent management, tracked-file reads, phone task UI removed) are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
 - **Fix units:** none available.

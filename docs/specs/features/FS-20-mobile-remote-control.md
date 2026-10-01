@@ -118,8 +118,10 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 - **R16 — Desktop-only surfaces stay on the desktop.** The phone offers no terminal,
   Settings, roles/projects/backends editing, federation, annotate-and-assign, worktree creation or
   cleanup, clone, switch runtime, rename, archive search, dashboard layout, skins, or onboarding.
-  R30–R32 supersede this restriction only for task-prerequisite editing, pipeline
-  replacement runtime choices, and diff annotation-and-assignment; the other listed surfaces stay
+  R30–R32 and R35–R37 supersede this restriction only for task-prerequisite editing, pipeline
+  replacement runtime choices, diff annotation-and-assignment, new-agent runtime choice, rename,
+  clone, chat backend/model/effort switching, single-agent archive, and tracked-file reads (R40
+  later removes the task-prerequisite editing exception); the other listed surfaces stay
   desktop-only.
 - **R17 — The app is live while open.** Every view updates without refreshing while the
   phone is connected, and catches up to current state after reconnecting.
@@ -146,6 +148,70 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   event, failure preservation, and target validation are the same as FS-13.R2–R9/R11–R17. Terminal
   agents remain ineligible. This supersedes R16's blanket annotate-and-assign exclusion only for
   live diff lines; other transcript-event and archive annotation interactions remain desktop-only.
+- **R33 (planned) — The phone follows the desktop's dashboard → project → chat flow.** Home
+  is the phone form of the desktop project dashboard (FS-02.R29/R30): every active configured
+  project, including one with no agents, plus an unavailable-project entry for a force-deleted
+  project still referenced by a non-archived agent, each showing its title and color (or durable id),
+  its agent count, and its live per-state summary, ordered as the desktop orders them. Above the
+  projects, a compact **Needs you** list keeps R11's attention items for agents and pipeline runs,
+  oldest first, each opening its card or conversation; it is hidden when empty. R11's **Moving** and
+  **Since you last looked** sections leave the phone. Archived projects and agents do not appear;
+  archive browsing and search stay desktop-only. This supersedes R11's Home layout.
+- **R34 (planned) — A project page lists its agents.** Selecting a project opens its phone
+  project page, the phone form of `/project/:project-id` (FS-02.R31): one row per non-archived agent
+  with its name, role, backend · model, state badge, and single-line preview (FS-02.R2/R3/R5),
+  running agents first and stopped agents dimmed (FS-02.R6/R45); the project's pipeline runs that
+  are not terminal; and two separate actions, **New agent** (R35) and **Start pipeline** (R41).
+  Selecting an agent opens its phone conversation (R13);
+  a stopped agent offers Resume under FS-01.R10/R31. Agents launched for tasks appear here as
+  ordinary agents.
+- **R35 (planned) — New agent starts work from a project page.** **New agent** on a project
+  page asks for a role, shows a suggested editable name (FS-01.R1/R4), and offers the runtime choice
+  of R31 — the Mac's configured backend/model and each model's allowed effort and fast-mode values,
+  preselected to the defaults the desktop New Agent form would choose (FS-01.R5/R30/R35). It has no
+  message field; the person writes to the agent in its conversation. The phone launches only the
+  chat interface; terminal agents, worktree forks, groups, and per-launch permission overrides stay
+  desktop-only. The new agent opens in its phone conversation. A rejected launch shows the desktop's
+  reason and keeps every entered value (R27). The global **New work** screen — Ask AgentDecker, New
+  task, and its Start pipeline — leaves the phone; R41 moves Start pipeline to the project page.
+  This supersedes R15 and R31's defaults-only rule for new agents.
+- **R36 (planned) — Agent management actions on the phone.** An agent's phone screen offers,
+  each under its desktop rules and only where the desktop would offer it:
+  - **Rename** (FS-01.R4 name contract);
+  - **Effort** and **Fast mode** on a running chat agent, applied without a restart (FS-03.R45/R47);
+  - **Switch runtime** — backend, model, and effort — on a running chat agent (FS-01.R13–R15),
+    choosing from R31's runtime options; switching the interface stays desktop-only;
+  - **Clone** under FS-01.R36, showing its unavailable reason when Clone is not available, and
+    opening the new agent;
+  - **Archive** under FS-05.R32. Because restoring an archived agent stays desktop-only (R33), the
+    phone asks once to confirm and says that restore is on the desktop; the agent then leaves every
+    phone list and its open phone screen returns to its project.
+  This supersedes R16 for rename, clone, and switch runtime, and for archive of a single agent.
+- **R37 (planned) — The phone shows what an agent changed and ran.** An agent's phone screen
+  has **Files** and **Commands** views of its FS-05.R15/R16 tracking: each changed file with its
+  edit count and last-touched time, and each command with its exit status, newest first. A changed
+  file with a diff opens that diff in the conversation; **Open file** shows the file's current
+  text read-only with the desktop's size, binary, and encoding limits (FS-03.R64). The phone opens
+  only paths in that agent's own changed-files list; it never opens an arbitrary path, searches
+  files, or reads a file reached through a symbolic link at the tracked path. Annotating opened file
+  text stays desktop-only. This is the one remote exception to FS-03.R64's statement that no
+  remote-control route gains file-reading authority.
+- **R38 (planned) — Agent mail stays off the phone.** The phone offers no mailbox reading or
+  mail sending; agent mail remains agent-to-agent (FS-06).
+- **R40 (planned) — Tasks leave the phone.** The phone has no task screen, task list, task
+  rows, or task controls: Retry, Re-arm and its prerequisite editor (R30), Record result, Cancel, and
+  New task become desktop-only. Tasks in `interrupted` or `dependency_failed` no longer appear in
+  **Needs you** and no longer notify phones; the agents those tasks launched remain ordinary agents
+  on their project pages, and their own attention states still appear and notify. Opening a former
+  task link, such as an older notification, shows Home. Diff annotation's new-task target (R32)
+  stays, because it opens the launched agent rather than a task page. This supersedes R11, R14, and
+  R18 for tasks and supersedes R30.
+- **R41 (planned) — Start pipeline from a project page.** **Start pipeline** on a project page
+  is the former New work pipeline flow with that project fixed: a valid existing template, an
+  optional display name, the run goal, and the template's required inputs, using the configured
+  stage runtimes and the same shared-workspace acknowledgment as the desktop (FS-14.R3/R80). The new
+  run opens on its phone run screen; a refused start shows the desktop's reason and keeps entered
+  values (R27).
 
 ### 2.4 Phone notifications
 
@@ -201,6 +267,10 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - **R27 — Refused actions explain themselves.** An action the Mac refuses (for example
   Steer on a runtime without steering, Resume on an archived agent, Re-arm in a disallowed state)
   shows the same reason the desktop would, and the composer keeps the person's typed text.
+- **R39 (planned) — Phone screens follow archival and removal.** When an agent is archived or
+  its project archived from either device, it leaves every phone list and an open phone screen for it
+  shows **Archived on the Mac** with a way back to its project or Home; when a project is archived,
+  its open project screen says so and returns to Home.
 - **R28 — Notification delivery failures are visible.** When a phone's notification
   permission is withdrawn or its subscription expires, the phone's desktop entry shows
   **Notifications off**, and the installed app offers to turn them back on.
@@ -237,14 +307,43 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   permission answers apply once and the loser sees what happened. — server and UI tests.
 - **A8 (planned)** (all) — Real end-to-end journey: pair an Android phone and an iPhone over a real
   tailnet off the home network, receive a permission notification, approve it with details, reply
-  to a question, start a task, then revoke one phone. — manual gate.
+  to a question, launch a new agent from a project page, then revoke one phone. — manual gate.
 - **A9 (planned)** (R30–R32) — At a 390px phone viewport, edit an eligible task from one valid
   prerequisite set to another, replace a pipeline orchestrator with a different configured
   model/effort/fast selection, and annotate diff lines to each supported target; invalid arms and
   runtime choices are rejected without mutation, and a failed annotation send preserves its draft.
   — server and UI tests plus a fakeACP browser pass at phone size.
+- **A10 (planned)** (R33–R35, R41) — At a 390px phone viewport with seeded projects (one empty, one
+  unavailable, one archived) and running, stopped, and archived agents: Home shows the Needs you
+  list and exactly the active and unavailable projects with desktop counts and per-state summaries,
+  updating live; a project page lists its non-archived agents in desktop order and its active runs,
+  opens an agent's conversation, and resumes a stopped agent; New agent launches a chat agent with a
+  non-default model/effort/fast selection; Start pipeline from that page starts a run in that
+  project; an invalid runtime choice or a permission-bypass or interface field is rejected without
+  launching, and a rejected launch keeps entered values; the global New work screen is gone. — server tests (launch body filter, shared
+  validator) and UI tests plus a fakeACP browser pass at phone size.
+- **A11 (planned)** (R36, R39) — From the phone: rename an agent, change effort and fast mode on a
+  running chat agent, switch its model, clone it at idle (and see the unavailable reason while a
+  turn is active), and archive it after the confirmation; the desktop shows each result; an
+  interface switch, a restore, and every refused action return the desktop's reason; archiving an
+  agent or its project on the desktop while its phone screen is open shows the archived state. —
+  server and UI tests plus the fakeACP browser pass.
+- **A12 (planned)** (R37, R38) — The phone lists an agent's changed files and commands, opens a
+  changed file's diff and current text; a request for an untracked path, another agent's tracked
+  path, a relative escape, or a tracked path replaced by a symbolic link is refused without reading
+  the file; file search and mailbox routes remain unreachable from the tailnet. — server tests on
+  the tailnet file filter and route inventory, UI tests.
+- **A13 (planned)** (R40) — The phone shows no task screen, row, control, or New task; an
+  `interrupted` task neither appears in Needs you nor notifies a phone, while its launched agent
+  appears on its project page and its own attention still notifies; a `/task/<id>` link opens Home;
+  every task route is unreachable from the tailnet. — server tests on attention, push, and the route
+  inventory; UI tests.
 
 ## 6. Deviations & open decisions
+
+- R33–R35 and R40 restructure shipped phone behavior: when they ship, R11's Moving and Since you
+  last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of
+  R18 and A3/A4/A9 are retired or narrowed in the same change.
 
 - The phone's pairing credential lives in the installed app's browser storage (R9); a Face ID or
   fingerprint app lock is not part of this version.
