@@ -73,6 +73,11 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 	// tied to the path that reached the server and the boundary it hit (INV §8).
 	requested := r.URL.Query().Get("path")
 	refuse := func(apiErr *runtime.APIError) {
+		if remoteNoFollowFileRead(r.Context()) && apiErr.Code == codeRemoteFileNotTracked {
+			s.log.Info("file read refused", "agent_id", id, "path", requested, "code", apiErr.Code)
+			writeRemoteError(w, http.StatusNotFound, codeRemoteFileNotTracked, "that file is not tracked by this agent")
+			return
+		}
 		s.log.Info("file read refused", "agent_id", id, "path", requested, "code", apiErr.Code)
 		writeAPIError(w, apiErr)
 	}
@@ -81,7 +86,7 @@ func (s *Server) handleFileRead(w http.ResponseWriter, r *http.Request) {
 		refuse(apiErr)
 		return
 	}
-	out, apiErr := readLocalFile(path, display)
+	out, apiErr := readLocalFileWithOptions(path, display, remoteNoFollowFileRead(r.Context()))
 	if apiErr != nil {
 		refuse(apiErr)
 		return
@@ -153,19 +158,34 @@ func readWorkspaceFileAfterClassification(root, rel string, afterClassification 
 }
 
 func readLocalFile(path, display string) (fileContent, *runtime.APIError) {
-	return readLocalFileAfterClassification(path, display, nil)
+	return readLocalFileWithOptions(path, display, false)
+}
+
+func readLocalFileWithOptions(path, display string, noFollow bool) (fileContent, *runtime.APIError) {
+	return readLocalFileAfterClassificationWithOptions(path, display, nil, noFollow)
 }
 
 // readLocalFileAfterClassification checks both before and after open: the first
 // check avoids opening known special files, and the descriptor check rejects a
 // target replaced during the check/open window (TS-05.R24).
 func readLocalFileAfterClassification(path, display string, afterClassification func()) (fileContent, *runtime.APIError) {
+	return readLocalFileAfterClassificationWithOptions(path, display, afterClassification, false)
+}
+
+func readLocalFileAfterClassificationWithOptions(path, display string, afterClassification func(), noFollow bool) (fileContent, *runtime.APIError) {
 	// Classify the target's kind before opening it. Opening is
 	// what distinguishes a non-regular file on some platforms but not others: a
 	// socket refuses the open on Linux and accepts it on macOS, and a FIFO would
 	// block the open until a writer appears, so the descriptor is opened
 	// non-blocking and classified again before any read.
-	if info, statErr := os.Stat(path); statErr == nil && !info.Mode().IsRegular() {
+	stat := os.Stat
+	if noFollow {
+		stat = os.Lstat
+	}
+	if info, statErr := stat(path); statErr == nil && !info.Mode().IsRegular() {
+		if noFollow && info.Mode()&os.ModeSymlink != 0 {
+			return fileContent{}, apiError(codeRemoteFileNotTracked, "that file is not tracked by this agent")
+		}
 		if info.IsDir() {
 			return fileContent{}, apiError(runtime.CodeNotAFile, "that path names a directory, not a file")
 		}
@@ -174,8 +194,15 @@ func readLocalFileAfterClassification(path, display string, afterClassification 
 	if afterClassification != nil {
 		afterClassification()
 	}
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NONBLOCK|syscall.O_CLOEXEC, 0)
+	flags := syscall.O_RDONLY | syscall.O_NONBLOCK | syscall.O_CLOEXEC
+	if noFollow {
+		flags |= syscall.O_NOFOLLOW
+	}
+	fd, err := syscall.Open(path, flags, 0)
 	if err != nil {
+		if noFollow && errors.Is(err, syscall.ELOOP) {
+			return fileContent{}, apiError(codeRemoteFileNotTracked, "that file is not tracked by this agent")
+		}
 		if os.IsNotExist(err) {
 			return fileContent{}, apiError(runtime.CodeNotFound, "that file no longer exists")
 		}

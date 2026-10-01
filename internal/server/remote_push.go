@@ -202,7 +202,7 @@ func (s *Server) runPushSender(ctx context.Context) {
 		if err != nil && !errors.Is(err, config.ErrNotFound) {
 			return
 		}
-		lists, err := s.attention(time.Now())
+		lists, err := s.attention()
 		if err != nil {
 			s.log.Warn("remote push: attention", "err", err)
 			return

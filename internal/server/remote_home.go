@@ -13,10 +13,10 @@ import (
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
-// attentionItem is one row of the phone's Home (FS-20.R11). Reason is a short,
+// attentionItem is one row of the phone's Home (FS-20.R33). Reason is a short,
 // in-vocabulary line; message, command, and diff text never appear here.
 type attentionItem struct {
-	Kind        string    `json:"kind"` // agent | task | run
+	Kind        string    `json:"kind"` // agent | run
 	ID          string    `json:"id"`
 	Title       string    `json:"title"`
 	Project     string    `json:"project"`
@@ -35,15 +35,12 @@ const (
 	reasonPermission = "needs permission"
 	reasonQuestion   = "is waiting for your reply"
 	reasonError      = "hit an error"
-	reasonTaskStuck  = "was interrupted"
-	reasonDepFailed  = "has a failed prerequisite"
 	reasonRunPaused  = "is paused"
 )
 
 type attentionLists struct {
-	NeedsYou  []attentionItem `json:"needs_you"`
-	Moving    []attentionItem `json:"moving"`
-	SinceLast []attentionItem `json:"since_last"`
+	NeedsYou   []attentionItem `json:"needs_you"`
+	ActiveRuns []attentionItem `json:"active_runs"`
 }
 
 const (
@@ -64,10 +61,11 @@ func (s *Server) agentHasPendingPermission(agentID string) bool {
 	return false
 }
 
-// attention is the one classification of what needs the person, what is
-// moving, and what finished after since (TS-13.R10).
-func (s *Server) attention(since time.Time) (attentionLists, error) {
-	out := attentionLists{NeedsYou: []attentionItem{}, Moving: []attentionItem{}, SinceLast: []attentionItem{}}
+// attention is the one classification of agent and pipeline-run attention
+// (TS-13.R20). It deliberately excludes tasks, moving agents, and terminal
+// history: those are no longer phone surfaces.
+func (s *Server) attention() (attentionLists, error) {
+	out := attentionLists{NeedsYou: []attentionItem{}, ActiveRuns: []attentionItem{}}
 
 	for _, a := range s.eventBus.Snapshot() {
 		if a.Removed || a.Archived {
@@ -85,41 +83,11 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 		case "error":
 			item.Reason = reasonError
 			out.NeedsYou = append(out.NeedsYou, item)
-		case "busy":
-			item.Reason = "working"
-			out.Moving = append(out.Moving, item)
-		case "done":
-			if at.After(since) {
-				item.Reason = "finished"
-				out.SinceLast = append(out.SinceLast, item)
-			}
-		}
-	}
-
-	tasks, err := s.stateStore.ListAttentionTasks(since, attentionListLimit)
-	if err != nil {
-		return out, err
-	}
-	for _, t := range tasks {
-		item := attentionItem{Kind: "task", ID: t.TaskID, Title: t.DisplayName, Project: t.Project, State: t.State, AgentID: t.AssignedAgentID, Since: t.UpdatedAt}
-		switch t.State {
-		case state.TaskInterrupted:
-			item.Reason = reasonTaskStuck
-			out.NeedsYou = append(out.NeedsYou, item)
-		case state.TaskDependencyFailed:
-			item.Reason = reasonDepFailed
-			out.NeedsYou = append(out.NeedsYou, item)
-		case state.TaskFinished:
-			item.Reason, item.Outcome = "finished", t.Outcome
-			out.SinceLast = append(out.SinceLast, item)
-		default:
-			item.Reason = "running"
-			out.Moving = append(out.Moving, item)
 		}
 	}
 
 	if s.pipelineMgr != nil {
-		runs, err := s.pipelineMgr.ListAttention(since, attentionListLimit)
+		runs, err := s.pipelineMgr.ListAttention(time.Time{}, attentionListLimit)
 		if err != nil {
 			return out, err
 		}
@@ -129,10 +97,6 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 			item.StageNumber, item.StageCount = r.StageNumber, r.StageCount
 			switch {
 			case r.State == "completed" || r.State == "stopped":
-				if updated.After(since) {
-					item.Reason, item.Outcome = r.State, r.FinalOutcome
-					out.SinceLast = append(out.SinceLast, item)
-				}
 			case r.State == "paused" || r.AttentionReason != "":
 				item.Reason = reasonRunPaused
 				if r.AttentionReason != "" {
@@ -141,36 +105,22 @@ func (s *Server) attention(since time.Time) (attentionLists, error) {
 				out.NeedsYou = append(out.NeedsYou, item)
 			default:
 				item.Reason = "running"
-				out.Moving = append(out.Moving, item)
+				out.ActiveRuns = append(out.ActiveRuns, item)
 			}
 		}
 	}
 
-	// A finished agent whose task or run needs the person is that item's
-	// conversation, not separate news: listing it as "finished" beside
-	// "was interrupted" contradicts the entry that needs action (FS-20.R11).
-	owned := map[string]bool{}
-	for _, item := range out.NeedsYou {
-		if item.Kind != "agent" && item.AgentID != "" {
-			owned[item.AgentID] = true
-		}
-	}
-	out.SinceLast = slices.DeleteFunc(out.SinceLast, func(item attentionItem) bool {
-		return item.Kind == "agent" && owned[item.AgentID]
-	})
-
-	// Needs you is oldest first; the other lists show the newest first.
+	// Needs you is oldest first; active runs are grouped by project and newest
+	// first within each project.
 	sort.SliceStable(out.NeedsYou, func(i, j int) bool { return out.NeedsYou[i].Since.Before(out.NeedsYou[j].Since) })
-	sort.SliceStable(out.Moving, func(i, j int) bool {
-		if out.Moving[i].Project != out.Moving[j].Project {
-			return out.Moving[i].Project < out.Moving[j].Project
+	sort.SliceStable(out.ActiveRuns, func(i, j int) bool {
+		if out.ActiveRuns[i].Project != out.ActiveRuns[j].Project {
+			return out.ActiveRuns[i].Project < out.ActiveRuns[j].Project
 		}
-		return out.Moving[i].Since.After(out.Moving[j].Since)
+		return out.ActiveRuns[i].Since.After(out.ActiveRuns[j].Since)
 	})
-	sort.SliceStable(out.SinceLast, func(i, j int) bool { return out.SinceLast[i].Since.After(out.SinceLast[j].Since) })
 	out.NeedsYou = boundItems(out.NeedsYou)
-	out.Moving = boundItems(out.Moving)
-	out.SinceLast = boundItems(out.SinceLast)
+	out.ActiveRuns = boundItems(out.ActiveRuns)
 	return out, nil
 }
 
@@ -190,15 +140,9 @@ func agentTitle(a state.AgentState) string {
 	return a.Role + "@" + a.Project
 }
 
-// handleRemoteHome implements tailnet-only GET /api/remote/home?since=<time>.
+// handleRemoteHome implements tailnet-only GET /api/remote/home.
 func (s *Server) handleRemoteHome(w http.ResponseWriter, r *http.Request) {
-	since := time.Now().Add(-24 * time.Hour)
-	if v := r.URL.Query().Get("since"); v != "" {
-		if t, err := time.Parse(time.RFC3339, v); err == nil {
-			since = t
-		}
-	}
-	lists, err := s.attention(since)
+	lists, err := s.attention()
 	if err != nil {
 		s.log.Error("remote: home", "err", err)
 		writeRemoteError(w, http.StatusInternalServerError, "internal", "internal error")
@@ -220,9 +164,11 @@ type remoteRuntimeModel struct {
 }
 
 type remoteRuntimeBackend struct {
-	ID     string               `json:"id"`
-	Name   string               `json:"name"`
-	Models []remoteRuntimeModel `json:"models"`
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Default      bool                 `json:"default"`
+	DefaultModel string               `json:"default_model"`
+	Models       []remoteRuntimeModel `json:"models"`
 }
 
 // handleRemoteRuntimeOptions implements tailnet-only GET
@@ -238,7 +184,7 @@ func (s *Server) handleRemoteRuntimeOptions(w http.ResponseWriter, _ *http.Reque
 	out := make([]remoteRuntimeBackend, 0, len(backends.Backends))
 	for _, id := range slices.Sorted(maps.Keys(backends.Backends)) {
 		backend := backends.Backends[id]
-		entry := remoteRuntimeBackend{ID: id, Name: backend.Name, Models: []remoteRuntimeModel{}}
+		entry := remoteRuntimeBackend{ID: id, Name: backend.Name, Default: backend.Default, DefaultModel: backend.DefaultModel, Models: []remoteRuntimeModel{}}
 		for _, modelID := range slices.Sorted(maps.Keys(backend.Models)) {
 			model := backend.Models[modelID]
 			entry.Models = append(entry.Models, remoteRuntimeModel{

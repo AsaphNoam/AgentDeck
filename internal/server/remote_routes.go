@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -32,29 +33,29 @@ var remoteAllowed = map[string][]string{
 	"GET /api/pipelines":      nil,
 	"GET /api/pipelines/{id}": nil,
 
-	"GET /api/sessions":                  nil,
-	"POST /api/sessions":                 {"role", "project"},
-	"GET /api/sessions/{id}":             nil,
-	"GET /api/sessions/{id}/transcript":  nil,
-	"POST /api/sessions/{id}/prompt":     nil,
-	"GET /api/sessions/{id}/prompt":      nil,
-	"DELETE /api/sessions/{id}/prompt":   nil,
-	"POST /api/sessions/{id}/steer":      nil,
-	"POST /api/sessions/{id}/cancel":     nil,
-	"POST /api/sessions/{id}/stop":       nil,
-	"POST /api/sessions/{id}/resume":     nil,
-	"POST /api/sessions/{id}/permission": nil,
+	"GET /api/sessions":                      nil,
+	"POST /api/sessions":                     {"role", "project", "name", "backend", "model", "effort", "fast"},
+	"GET /api/sessions/{id}":                 nil,
+	"GET /api/sessions/{id}/transcript":      nil,
+	"POST /api/sessions/{id}/prompt":         nil,
+	"GET /api/sessions/{id}/prompt":          nil,
+	"DELETE /api/sessions/{id}/prompt":       nil,
+	"POST /api/sessions/{id}/steer":          nil,
+	"POST /api/sessions/{id}/cancel":         nil,
+	"POST /api/sessions/{id}/stop":           nil,
+	"POST /api/sessions/{id}/rename":         {"name"},
+	"POST /api/sessions/{id}/clone":          nil,
+	"POST /api/sessions/{id}/archive":        nil,
+	"POST /api/sessions/{id}/switch-runtime": {"backend", "model", "effort"},
+	"POST /api/sessions/{id}/session-config": {"effort", "fast"},
+	"GET /api/sessions/{id}/files":           nil,
+	"GET /api/sessions/{id}/commands":        nil,
+	"GET /api/sessions/{id}/file":            nil,
+	"POST /api/sessions/{id}/resume":         nil,
+	"POST /api/sessions/{id}/permission":     nil,
 	// Diff-line annotate-and-assign (FS-20.R32, TS-13.R16); nested anchors,
 	// limits, and targets are validated by the shared FS-13 handler.
 	"POST /api/sessions/{id}/annotations": {"annotations", "overall_instruction", "target"},
-
-	"GET /api/tasks":              nil,
-	"POST /api/tasks":             {"project", "display_name", "instruction", "target_kind", "role"},
-	"GET /api/tasks/{id}":         nil,
-	"POST /api/tasks/{id}/cancel": nil,
-	"POST /api/tasks/{id}/result": nil,
-	"POST /api/tasks/{id}/retry":  nil,
-	"POST /api/tasks/{id}/rearm":  {"arms"},
 
 	"GET /api/pipeline-runs":                      nil,
 	"POST /api/pipeline-runs":                     {"request_id", "template_id", "display_name", "project", "goal", "inputs", "orchestrator", "dedicated_assignments", "acknowledge_shared_workspace"},
@@ -86,15 +87,15 @@ var remoteDenied = map[string]bool{
 	"DELETE /api/pipeline-proposals/{id}": true,
 	"POST /api/pipelines":                 true, "POST /api/pipelines/validate": true,
 	"PUT /api/pipelines/{id}": true, "DELETE /api/pipelines/{id}": true,
-	"DELETE /api/pipeline-runs/{id}": true, "DELETE /api/tasks/{id}": true,
+	"DELETE /api/pipeline-runs/{id}": true,
+	"GET /api/tasks":                 true, "POST /api/tasks": true, "GET /api/tasks/{id}": true,
+	"DELETE /api/tasks/{id}": true, "POST /api/tasks/{id}/cancel": true,
+	"POST /api/tasks/{id}/result": true, "POST /api/tasks/{id}/retry": true,
+	"POST /api/tasks/{id}/rearm":       true,
 	"POST /api/signals":                true,
-	"POST /api/sessions/{id}/rename":   true,
 	"POST /api/sessions/{id}/identity": true, "POST /api/sessions/{id}/background-task-stop": true,
-	"POST /api/sessions/{id}/clone": true, "POST /api/sessions/{id}/archive": true,
-	"POST /api/sessions/{id}/restore": true, "POST /api/sessions/{id}/switch-runtime": true,
-	"POST /api/sessions/{id}/session-config": true,
-	"GET /api/sessions/{id}/files":           true, "GET /api/sessions/{id}/commands": true,
-	"GET /api/sessions/{id}/file-search": true, "GET /api/sessions/{id}/file": true,
+	"POST /api/sessions/{id}/restore":           true,
+	"GET /api/sessions/{id}/file-search":        true,
 	"GET /api/sessions/{id}/available-commands": true, "GET /api/sessions/{id}/messages": true,
 	"POST /api/groups/{group}/release": true,
 	"GET /api/config-sources":          true, "POST /api/config-sources/preview": true,
@@ -114,6 +115,7 @@ const (
 	codeRemoteDeviceMismatch    = "remote_device_mismatch"
 	codeRemoteForbidden         = "remote_forbidden"
 	codeRemoteBodyTooLarge      = "remote_body_too_large"
+	codeRemoteFileNotTracked    = "remote_file_not_tracked"
 )
 
 // remoteDeviceCookie is the phone's credential cookie (TS-13.R7).
@@ -249,6 +251,9 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		var h http.Handler = e.handler
 		if e.pattern == "POST /api/pipeline-runs" {
 			h = s.remotePipelineRuntimeFilter(h)
+		}
+		if e.pattern == "GET /api/sessions/{id}/file" {
+			h = s.remoteTrackedFileFilter(h)
 		}
 		if fields != nil {
 			h = remoteFieldFilter(fields, h)
@@ -444,6 +449,34 @@ func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		next.ServeHTTP(w, r)
 	})
+}
+
+type remoteFileReadKey struct{}
+
+// remoteTrackedFileFilter grants a phone read only when the requested spelling
+// is one of that agent's tracked paths. It deliberately consults the durable
+// index only: the shared reader performs filesystem checks after this boundary.
+func (s *Server) remoteTrackedFileFilter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, path := r.PathValue("id"), r.URL.Query().Get("path")
+		var found int
+		err := s.stateStore.DB().QueryRow(`SELECT 1 FROM tracked_files WHERE agent_id = ? AND path = ? LIMIT 1`, id, path).Scan(&found)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeRemoteError(w, http.StatusNotFound, codeRemoteFileNotTracked, "that file is not tracked by this agent")
+			return
+		}
+		if err != nil {
+			s.log.Error("remote: tracked file", "err", err)
+			writeRemoteError(w, http.StatusInternalServerError, "internal", "internal error")
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), remoteFileReadKey{}, true)))
+	})
+}
+
+func remoteNoFollowFileRead(ctx context.Context) bool {
+	noFollow, _ := ctx.Value(remoteFileReadKey{}).(bool)
+	return noFollow
 }
 
 // remotePipelineRuntimeFilter keeps the desktop-owned runtime assignments at

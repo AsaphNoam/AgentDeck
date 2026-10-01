@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -150,20 +151,39 @@ func TestRemoteCookieIsHostScopedAndSliding(t *testing.T) {
 	}
 }
 
-// An authenticated tailnet device cannot read conversation files, even one the
-// local route would serve (FS-03.R64, TS-05.R24).
-func TestRemoteDeniesFileRead(t *testing.T) {
+// A phone may read only a path from its own tracked-files index, and a symlink
+// substituted at that path is refused without following it (TS-13.R22).
+func TestRemoteTrackedFileRead(t *testing.T) {
 	s := testServer(t, true)
 	root := seedReadableWorkspace(t, s, "a_remote")
+	if _, err := s.stateStore.DB().Exec(`INSERT INTO tracked_files(agent_id, path, abs_path, first_seq, last_seq, first_ts, last_ts) VALUES (?, ?, ?, 1, 1, ?, ?)`, "a_remote", "main.go", root+"/main.go", time.Now().UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339)); err != nil {
+		t.Fatal(err)
+	}
 	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
 	token := pairTestDevice(t, s, "d1", "n")
 
-	for _, path := range []string{"main.go", root + "/main.go"} {
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/sessions/a_remote/file?path=main.go", "", token))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "package main") {
+		t.Fatalf("tracked file = %d %s", rec.Code, rec.Body)
+	}
+	for _, path := range []string{root + "/main.go", "notes.md", "../main.go"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/sessions/a_remote/file?path="+url.QueryEscape(path), "", token))
-		if rec.Code != 404 || errorCode(t, rec) != codeRemoteRouteNotAvailable || strings.Contains(rec.Body.String(), "package main") {
+		if rec.Code != 404 || errorCode(t, rec) != codeRemoteFileNotTracked || strings.Contains(rec.Body.String(), "package main") {
 			t.Fatalf("path %q = %d %s", path, rec.Code, rec.Body)
 		}
+	}
+	if err := os.Remove(root + "/main.go"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(root+"/notes.md", root+"/main.go"); err != nil {
+		t.Fatal(err)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodGet, "/api/sessions/a_remote/file?path=main.go", "", token))
+	if rec.Code != 404 || errorCode(t, rec) != codeRemoteFileNotTracked || strings.Contains(rec.Body.String(), "# Notes") {
+		t.Fatalf("symlink tracked file = %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -176,8 +196,10 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 		{"GET", "/api/backends"},
 		{"GET", "/api/remote"},
 		{"PUT", "/api/config"},
-		{"POST", "/api/sessions/a/clone"},
-		{"POST", "/api/sessions/a/switch-runtime"},
+		{"POST", "/api/sessions/a/restore"},
+		{"GET", "/api/sessions/a/file-search"},
+		{"GET", "/api/tasks"},
+		{"POST", "/api/tasks"},
 		{"GET", "/api/sessions/a/terminal/ws"},
 		{"POST", "/mcp"},
 		{"POST", "/api/hook"},
@@ -195,16 +217,10 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	for _, c := range []struct{ path, body string }{
 		{"/api/sessions", `{"role":"agentdecker","project":"my-app","interface":"terminal"}`},
 		{"/api/sessions", `{"role":"agentdecker","project":"my-app","group":"g"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","backend":"codex"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","model":"gpt"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","effort":"high"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","fast":true}`},
-		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","arms":[]}`},
-		{"/api/tasks", `{"project":"my-app","target_kind":"agent","target_agent_id":"a"}`},
-		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","backend":"codex"}`},
-		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","model":"gpt"}`},
-		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","effort":"high"}`},
-		{"/api/tasks", `{"project":"my-app","display_name":"x","instruction":"y","fast":true}`},
+		{"/api/sessions", `{"role":"agentdecker","project":"my-app","resume":true}`},
+		{"/api/sessions/a/switch-runtime", `{"backend":"claude","interface":"terminal"}`},
+		{"/api/sessions/a/session-config", `{"effort":"high","backend":"claude"}`},
+		{"/api/sessions/a/rename", `{"name":"Atlas","role":"implementer"}`},
 		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","assignments":{"standing":{"backend":"codex"}}}`},
 		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","orchestrator":{"backend":"codex"}}`},
 		{"/api/pipeline-runs", `{"request_id":"r","template_id":"p","project":"my-app","goal":"x","orchestrator":{"backend":"","surprise":"codex"}}`},
@@ -218,10 +234,10 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 		}
 	}
 
-	// An allowed body reaches the shared handler (which then validates it).
+	// An allowed launch body reaches the shared handler (which then validates it).
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/tasks", `{"project":"nope","display_name":"x","instruction":"y"}`, token))
-	if code := errorCode(t, rec); code != "not_found" {
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions", `{"role":"agentdecker","project":"nope","name":"Phone","backend":"claude","model":"sonnet","effort":"high","fast":false}`, token))
+	if code := errorCode(t, rec); code == codeRemoteFieldNotAllowed {
 		t.Fatalf("allowed body blocked: %d %s", rec.Code, rec.Body)
 	}
 	// Allowlisted reads use the loopback handlers.
@@ -439,63 +455,21 @@ func TestRemoteStreamFilteringRevokeAndDisable(t *testing.T) {
 	}
 }
 
-// A paired phone may replace a task's prerequisites with any set the shared
-// Re-arm handler accepts, and that handler still refuses an invalid graph
-// without mutating the task (FS-20.R30, TS-13.R17).
-func TestRemoteRearmHasDesktopValueAuthority(t *testing.T) {
-	srv, ts := wakeTestServer(t)
-	h := srv.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
-	token := pairTestDevice(t, srv, "d1", "n")
-	waitOn := func(signal string) map[string]any {
-		body := launchTaskBody("waits on " + signal)
-		body["arms"] = []map[string]any{{"kind": "signal", "signal_name": signal}}
-		return body
-	}
-	first := createTaskHTTP(t, ts, waitOn("go"))
-	second := createTaskHTTP(t, ts, waitOn("later"))
-	rearm := func(id, body string) *httptest.ResponseRecorder {
+// Every task route is desktop-only (FS-20.R40, TS-13.R21).
+func TestRemoteDeniesEveryTaskRoute(t *testing.T) {
+	s := testServer(t, true)
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+	for _, request := range []struct{ method, path string }{
+		{http.MethodGet, "/api/tasks"}, {http.MethodPost, "/api/tasks"}, {http.MethodGet, "/api/tasks/t"},
+		{http.MethodDelete, "/api/tasks/t"}, {http.MethodPost, "/api/tasks/t/cancel"},
+		{http.MethodPost, "/api/tasks/t/result"}, {http.MethodPost, "/api/tasks/t/retry"}, {http.MethodPost, "/api/tasks/t/rearm"},
+	} {
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/tasks/"+id+"/rearm", body, token))
-		return rec
-	}
-
-	rec := rearm(first.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"`+second.TaskID+`","satisfying_outcomes":["success","blocked"]},{"kind":"signal","signal_name":"ci-green"}]}`)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("changed arm set from a phone = %d %s", rec.Code, rec.Body)
-	}
-	changed, err := srv.stateStore.ReadTask(first.TaskID)
-	if err != nil || len(changed.Arms) != 2 || changed.Arms[0].SourceID != second.TaskID || changed.Arms[1].SignalName != "ci-green" {
-		t.Fatalf("rearmed task = %+v, %v", changed.Arms, err)
-	}
-
-	// A cycle or an unusable source is refused by the shared validator with the
-	// typed code the phone turns into plain language, and changes nothing.
-	detailCode := func(rec *httptest.ResponseRecorder) string {
-		var envelope struct {
-			Error struct {
-				Details map[string]any `json:"details"`
-			} `json:"error"`
+		h.ServeHTTP(rec, phoneRequest(request.method, request.path, `{}`, token))
+		if rec.Code != http.StatusNotFound || errorCode(t, rec) != codeRemoteRouteNotAvailable {
+			t.Errorf("%s %s = %d %s", request.method, request.path, rec.Code, rec.Body)
 		}
-		_ = json.Unmarshal(rec.Body.Bytes(), &envelope)
-		code, _ := envelope.Error.Details["code"].(string)
-		return code
-	}
-	rec = rearm(second.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"`+first.TaskID+`","satisfying_outcomes":["success"]}]}`)
-	if rec.Code < 400 || detailCode(rec) != "dependency_cycle" {
-		t.Fatalf("cyclic arm set from a phone = %d %s", rec.Code, rec.Body)
-	}
-	rec = rearm(second.TaskID, `{"arms":[{"kind":"work_result","source_kind":"task","source_id":"no-such-task","satisfying_outcomes":["success"]}]}`)
-	if rec.Code < 400 || detailCode(rec) != "unusable_source" {
-		t.Fatalf("unusable source from a phone = %d %s", rec.Code, rec.Body)
-	}
-	// So is a body carrying anything but the arm set.
-	rec = rearm(second.TaskID, `{"arms":[],"state":"ready"}`)
-	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
-		t.Fatalf("extra Re-arm field = %d %s", rec.Code, rec.Body)
-	}
-	unchanged, err := srv.stateStore.ReadTask(second.TaskID)
-	if err != nil || unchanged.Revision != second.Revision || len(unchanged.Arms) != 1 || unchanged.Arms[0].SignalName != "later" {
-		t.Fatalf("refused Re-arm mutated the task: %+v, %v", unchanged, err)
 	}
 }
 
@@ -605,14 +579,19 @@ func TestRemoteRuntimeOptionsAreSecretFree(t *testing.T) {
 		t.Fatal(err)
 	}
 	var found *remoteRuntimeModel
+	var foundBackend *remoteRuntimeBackend
 	for _, b := range got.Backends {
+		if b.ID == "claude" {
+			foundBackend = &b
+		}
 		for i, m := range b.Models {
 			if b.ID == "claude" && m.ID == "sonnet" {
 				found = &b.Models[i]
 			}
 		}
 	}
-	if found == nil || len(found.Efforts) == 0 || found.DefaultEffort != sonnet.DefaultEffort {
+	if found == nil || foundBackend == nil || len(found.Efforts) == 0 || found.DefaultEffort != sonnet.DefaultEffort ||
+		foundBackend.Default != claude.Default || foundBackend.DefaultModel != claude.DefaultModel {
 		t.Fatalf("claude/sonnet missing or incomplete: %+v", got.Backends)
 	}
 }

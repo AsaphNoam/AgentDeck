@@ -7,7 +7,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `phone-desktop-flow-and-agent-management.md` — in progress. Planned slices:
+  shared desktop/phone project derivation and narrowed home data; remote route/filter and tracked-file
+  security contracts; phone dashboard/project/launch/pipeline flow; phone agent management and
+  Files/Commands; removal of phone task/New work surfaces; final browser and closure verification.
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -19,10 +22,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   they now wait for that rendered default first. The GitHub Release carries the 293,072,856-byte
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
-- **Work units:** `show-exact-context-and-runtime-metadata.md`,
-  `rename-product-to-deckhand.md`, and `phone-desktop-flow-and-agent-management.md` (designed
-  2026-10-02: phone dashboard → project → chat, New agent with runtime choice, project-page pipeline
-  start, agent management, tracked-file reads, phone task UI removed) are waiting to start.
+- **Work units:** `show-exact-context-and-runtime-metadata.md` and
+  `rename-product-to-deckhand.md` are waiting to start. `phone-desktop-flow-and-agent-management.md`
+  is in progress.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
 - **Fix units:** none available.
@@ -31,7 +33,26 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+### Phone desktop flow and agent management
+
+- **Direction:** experienced remote operators need the dashboard → project → chat path to make the
+  next agent-level action fastest. Home reads Needs you first, then a dense project list; project
+  pages put New agent and Start pipeline together above ordered agents and active runs. Lifecycle
+  state, runtime identity, and tracked work are the AgentDeck-specific proof, while configuration,
+  task UI, mail, and arbitrary files stay quiet or absent. Reuse the compact phone shell and shared
+  chat primitives; no new skin, motion system, or desktop behavior. Use no decorative motion.
+- **UX risk:** removing New work/tasks must leave old links and notifications with a clear Home
+  recovery; rejected launches and pipeline starts must preserve entered values; archive must state
+  that restore remains desktop-only.
+- **Next:** implement the shared derivations and narrowed server projections first, with focused
+  tests, then checkpoint before adding phone routes and controls.
+- **Verified checkpoint:** tailnet Home/push now exclude tasks and expose active runs; runtime
+  defaults, approved agent-management and tracking routes, complete task-route denial, and exact
+  tracked-path file reads with final-component no-follow are implemented. `go test
+  ./internal/server -count=1` passes. The phone/dashboard UI slice is committed separately; its
+  runtime-default and archive-confirmation integration fixes remain in progress.
+- **Next:** close the phone UI integration findings, retire superseded source/tests, then run the
+  combined browser and closure matrix.
 
 ## Acceptance gates still owed
 
