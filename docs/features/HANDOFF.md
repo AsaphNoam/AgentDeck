@@ -14,7 +14,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and the macOS installer workflow passed. The GitHub Release carries the 293,094,990-byte
   `darwin-arm64` archive, `install.sh`, and a `0.7.0` manifest whose size and SHA-256 match the
   archive asset. The release audit changed no operator guidance or pinned component version.
-- **Work units:** `rename-product-to-deckhand.md` is waiting to start.
+- **Work units:** `show-exact-context-and-runtime-metadata.md` and
+  `rename-product-to-deckhand.md` are waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** none available.
 - **Fix units:** none available.
