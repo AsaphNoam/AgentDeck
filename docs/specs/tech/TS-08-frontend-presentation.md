@@ -898,6 +898,74 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   distinction when the shared upgrade ships; other existing acceptance debt remains independently
   open until its evidence exists (INV §10/§13/§17).
 
+### 2.12 Tasks relationship view
+
+- **R82** `(planned)` — **Project sections reuse the task query family.** Implement FS-16.R41–R45
+  in the existing Tasks feature. Enumerate the existing project catalog, including archived project
+  definitions with retained work, and reuse `GET /api/tasks?project=` and `TASK_QUERY_KEYS.project`;
+  absence of the route's project parameter means All projects, not the first project. Share query
+  options between single-project and multi-project consumers rather than duplicating the request,
+  schema or cache. Admit at most four concurrent project task reads for this page, cancel queued
+  reads on scope change/unmount, and retain no second global task store or event history. Existing
+  React Query cache lifetime remains authoritative. Each section owns loading/error/stale feedback;
+  incomplete aggregate counts are labelled as such. Mutations invalidate their actual task project;
+  task events and reconnect reuse the existing task-family invalidation. A focused unknown project
+  is reported rather than replaced silently. No all-project endpoint, protocol change, persistence
+  migration, background polling, or history-retention change is introduced. Existing HTTP full-list
+  behavior is reused, not extended into recursive per-task or per-ancestor fetches.
+- **R83** `(planned)` — **The frontend preserves the existing task wire meaning.** Extend the shared
+  task schema with `waiting`, lineage (parent/run/stage/creation-attempt ids), result details/outputs,
+  timestamps, continuation/resume flags, pending yield/release and cleanup fields needed by this
+  view. Match the existing Go JSON shape, including omitted/null collections and optional fields
+  (TS-10.R25–R35; INV §11). A ready task with `continuation_pending` is ready-to-resume, not a new
+  durable state. Pending cleanup overrides a simplistic finished/waiting visual summary without
+  altering the immutable outcome. A waiting task's watch set is not present in the task-list
+  projection: say waiting for work updates, without claiming its arms or every child are the watched
+  set. The shared feature state/action projection consumes server `retry_eligible` and preserves
+  stage ownership restrictions; mere run lineage does not mean a task is the authoritative stage.
+  When detail opens for work with run lineage, reuse the existing run-detail query and match its
+  `stage_tasks[].task_id` before exposing stage-restricted Record result, Re-arm or Delete controls;
+  during unavailable ownership data show the run link and the reason those controls are withheld.
+  Do not load every run merely to render project rows. Keep unavailable metadata explicit and server
+  refusals visible rather than broadening eligibility.
+  Creator/assignee labels resolve through existing agent identity data when available, with stable
+  id fallback; never request every archived transcript to obtain a display name.
+- **R84** `(planned)` — **One feature-owned projection derives related-work groups.** Index each
+  project's task snapshot by stable id. Build typed prerequisite links from task work-result arms
+  (source → dependent), and delegation links from parent lineage (parent → child). Use undirected
+  connectivity of known same-project task nodes only for grouping; keep typed/directed relations
+  for display. Creator, pipeline id, and signal name are metadata, not extra graph edges. Dangling
+  references render as labelled unavailable relationships and never bridge projects or fabricate
+  task rows. Build indexes/components once per changed snapshot in O(tasks + links), using visited
+  sets rather than recursive path enumeration. Delegation and dependency together need not form
+  a DAG, so no combined-graph topological assumption is allowed. Order rows by prerequisite topology
+  with created-at/id tie breaks; delegation is a separate labelled relationship, not a false
+  chronology. Guard incomplete/invalid inputs with deterministic ordering and explicit missing data.
+  Each task has one row keyed by project/id, and branching/joining links reference that row.
+
+  Project headings use readable name/id order. Within a project, attention groups precede other
+  unfinished groups, with created-at/id tie breaks; settled history orders by latest available
+  finish timestamp. Groups use deterministic member identity and retain expanded task/draft state
+  by task id when membership changes. A selected task's group stays mounted while inspection or an
+  action is in progress, even when it becomes settled. Classification into history requires all
+  members finished and no pending release/yield or unresolved cleanup. No grouping result is stored
+  in the database or used to decide execution, cancellation scope or authority.
+- **R85** `(planned)` — **Connected rows belong to the shared presentation system.** Use semantic
+  lists, existing buttons/badges/disclosures, feature-owned `tasks.css`, and the existing tokens and
+  hooks across Core, Sky & Grove and Studio. Task title/state and wait explanation lead; shallow
+  connectors plus textual relationship references preserve branches and joins without infinite
+  indentation or a pan/zoom canvas. Task detail expands inline. Long settled stretches may use
+  counted disclosures, but all members remain reachable and boundary relationships stay legible.
+  Creation follows all project sections/history in DOM and keyboard order; existing form state,
+  validation, prerequisite picker and signal request semantics are reused with concrete project
+  ownership. This narrowly supersedes R76's unchanged Tasks reading-order clause, retaining its
+  styling seams and R69/R71 draft/picker rules. Do not add a graph/motion dependency, new skin,
+  synthetic progress percentage, ETA, or animated connector. State updates are immediate; do not
+  animate row reordering. Loading, empty, partial, stale, attention and settled states are explicit.
+  Projection fixtures cover branches/joins, mixed edge types, missing records, cleanup and duplicate
+  names; wire fixtures include Go-produced waiting/lineage shapes. Rendered acceptance follows
+  FS-16.A27–A29 before the planned tags are removed (INV §2/§7/§8/§10/§11/§13/§16/§17).
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

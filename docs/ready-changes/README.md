@@ -45,6 +45,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`notifications-open-conversation.md`](notifications-open-conversation.md) — clicking any agent
   toast or desktop notification opens that agent's conversation.
+- [`tasks-work-in-motion.md`](tasks-work-in-motion.md) — center Tasks on project-grouped active
+  relationships, retain completed context, and collapse manual creation at the bottom.
 - [`show-exact-context-and-runtime-metadata.md`](show-exact-context-and-runtime-metadata.md) — show
   exact used/total context tokens beside the percentage and keep model/effort visible when a scoped
   project agent card expands.

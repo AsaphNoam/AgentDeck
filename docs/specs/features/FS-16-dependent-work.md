@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -269,6 +269,63 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   keeps the user's draft and reports the server reason. Advanced disclosures retain their values
   and expose any field that needs correction. Existing task launch/runtime, retry and signal firing
   semantics remain unchanged.
+
+### 2.5 Project-grouped work in motion
+
+- **R41** `(planned)` — **Tasks opens on work in motion across projects.** The desktop Tasks
+  route defaults to All projects; an explicit project filter, including existing `?project=` links,
+  narrows it. Each project has a readable heading and counts of unfinished and attention tasks.
+  Related work appears as compact connected rows, with task name, state and a short explanation of
+  its wait or attention reason leading; creator and executing agent are separate secondary labels.
+  Projects with no retained tasks do not occupy empty sections in All projects. A focused empty
+  project and a globally empty page explain that agent-created tasks appear here, without making
+  manual creation the primary action. Per-project loading and read failures remain distinguishable
+  from an empty project and do not hide successfully loaded projects. This supersedes R14's
+  single-project presentation, not its control capabilities, and specializes FS-12.R49/R55 only
+  for this page's new hierarchy.
+- **R42** `(planned)` — **Groups express recorded relationships, not guessed workflows.** Within
+  a project, tasks connected by task-result prerequisites or recorded parent/delegation lineage
+  belong to one related-work group; unrelated tasks remain independent even when their creator is
+  the same agent. Prerequisite links say which result permits progress; delegation links describe
+  parentage and never imply a start condition. Branches and joins remain explicit without repeating
+  a task as separate work. Pipeline-run prerequisites and named signals appear as external waiting
+  conditions; common creator, signal, or pipeline identity alone does not invent task dependency
+  edges. Pipeline lineage offers a run link. A missing/deleted related record remains labelled
+  unavailable; it never becomes an inferred success, a fabricated task, or a cross-project group.
+  Future work means already-created successors, not predicted tasks or a promise they will run.
+- **R43** `(planned)` — **Active relationships retain useful history.** A group remains in the
+  primary view while any task is unfinished or has pending runtime cleanup. Completed predecessors
+  and other finished members stay available as quiet context alongside active and waiting work;
+  long completed stretches may collapse behind an explicit count, with their connections preserved.
+  Entirely finished groups with settled cleanup move into collapsed Completed history within their
+  project. History labels distinguish success, failure, blocked and cancelled outcomes rather than
+  showing all finished work as successful. Attention counts/reasons remain visible on collapsed
+  groups and history when applicable. Live updates preserve focus, open task details and mutation
+  drafts; a group being inspected may remain visibly marked finished in place until that inspection
+  closes, rather than disappearing mid-action. No task is archived, deleted, or completed by this
+  presentation rule.
+- **R44** `(planned)` — **State and detail explain progress and recovery.** Rows distinguish
+  armed prerequisites, ready admission, starting, running, durable waiting, ready-to-resume,
+  interrupted, dependency failure, and finishing/yielding cleanup using the authoritative task
+  state and available transition information. Readiness alone is not proof of capacity exhaustion;
+  show a specific cause only when reported. Detail exposes the instruction, current prerequisites,
+  recorded result and outputs when present, creator, assignee and related agent/run links. An
+  unavailable agent retains its identity without a misleading live-chat link. Existing eligible
+  Retry, Re-arm, Cancel, Record result and Delete controls remain available in task detail; owned
+  pipeline work directs the person to the run for operations forbidden by R36. Refused mutations
+  retain input and show their reason. Waiting and cleanup are not unexpected interruption and must
+  not offer an execution retry as cleanup repair. Reconnect/refetch refreshes the recorded truth;
+  failed refreshes mark retained data as stale rather than claiming it is live.
+- **R45** `(planned)` — **Human authoring is an exceptional bottom action.** Create task manually
+  is a labelled, keyboard-operable disclosure below project work and history, closed on entry.
+  Opening it exposes the existing form and prerequisite capacity under R39–R40, with an explicit
+  project selector in All projects and the focused project preselected otherwise. No task can be
+  submitted without a concrete project. Closing and reopening retains the in-page draft; changing
+  its project clears incompatible dependency choices as R40 requires. Validation reopens/focuses the
+  affected field and submission feedback remains visible. Signal firing is a secondary bottom
+  control with an explicit project and the existing project-wide release semantics; a signal wait
+  can link to that control without firing it. No new authoring API, graph editor, creator-grouping
+  mode, scheduling behavior, permission, retention policy or phone flow is introduced.
 
 ## 3. States & transitions
 
@@ -574,7 +631,33 @@ Each names the verification that demonstrates it.
   draft values, and all existing mutation errors remain visible. *Verify by* Tasks component tests
   using paginated API fixtures and the rendered setup pass.
 
+- **A27** `(planned)` (R41–R43) — In two projects, inspect a completed A → running B → armed C
+  chain, a branching/joining dependency group, parent/child delegation, and unrelated tasks from
+  the same creator. Identify the current work and C's release condition without opening an agent.
+  Every task appears once, dependency and delegation labels differ, and project filtering retains
+  the complete selected group's context. Missing predecessors and shared signal/run prerequisites
+  do not invent edges. *Verify by* projection/component fixtures and a rendered desktop journey.
+- **A28** `(planned)` (R43–R44) — Exercise running → finished while detail is open, durable wait
+  → ready-to-resume, interruption, impossible prerequisites, pending cleanup and cleanup attention.
+  Inspect the cause and use only eligible existing recovery; pipeline-owned work links to its run.
+  Once settled and no longer inspected, a finished group enters collapsed history with its real
+  outcomes; a completed predecessor of unfinished work stays in that active group. Refused actions
+  preserve drafts. *Verify by* producer-shaped state fixtures, mutation tests and a rendered
+  wait/recovery/completion journey.
+- **A29** `(planned)` (R41, R44–R45) — Open Tasks with no project and through `?project=`, then
+  exercise an empty project, one failed project among successful reads, stale refresh, reconnect,
+  unavailable creator/assignee, and a long chain. Manual creation stays closed below the work;
+  opening, closing and reopening preserves input, project changes clear only incompatible choices,
+  and rejected submission stays recoverable. Signal firing names its project and remains explicit.
+  *Verify by* query/component tests and rendered keyboard journeys at 1024px and a wider desktop
+  viewport in Core, Sky & Grove and Studio, checking long names, non-color state labels, bounded
+  indentation, focus retention and no page-level horizontal overflow. Implementation records the
+  incumbent and resulting views; this design does not claim rendered acceptance.
+
 ## 6. Deviations & open decisions
+
+- **Work-in-motion redesign.** R41–R45 and A27–A29 are approved behavior, pending implementation.
+  Existing task lifecycle, ownership and result contracts remain authoritative.
 
 - **Persistent pipeline orchestration.** R30–R38 and A20–A24 support FS-14.R61–R77. TS-10.R25–R37
   define the technical design and TS-05.R22 defines scoped work authority. Runtime continuity is

@@ -142,6 +142,13 @@ supplied.
   over the existing `agent_id` payload; `docs/ready-changes/notifications-open-conversation.md` is
   waiting to start; source idea promoted. No product code changed or active work selected.
 
+- **2026-10-02 — Design: Tasks as project-grouped work in motion.** User confirmed project-first
+  connected task rows with creator as supporting context. FS-16.R41–R45/A27–A29 and TS-08.R82–R85
+  specify active relationships, waiting/cleanup visibility, secondary completed history and bottom
+  manual creation. `docs/ready-changes/tasks-work-in-motion.md` is waiting to start; source idea
+  promoted. Existing API/query seams suffice. Incumbent browser tab returned HTTP 504; implementation
+  owes the recorded before/after rendered gates. No product code changed or active work selected.
+
 - **2026-10-02 — Review: exact context tokens and expanded-card runtime metadata.** No findings;
   the unit is closed. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna. The ACP decode,
   durable status/session tuple, turn rollup and reindex paths, resume/switch restoration,
