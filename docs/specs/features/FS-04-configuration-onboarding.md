@@ -210,6 +210,23 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 
 
 
+- **R50 — Four lean shipped personas.** `(planned)` Superseding R14–R15 only for the
+  shipped role set, a fresh home seeds the resident operator (currently `agentdecker`),
+  `implementer`, `reviewer`, and `researcher`. Coordination is part of the resident operator's
+  mandate; no separate coordinator, `pm`, or `teammate` is seeded. The default remains
+  `implementer`, all four inherit the existing permission policy, and role editing retains its
+  current fields and future-launch scope. FS-18.R16 owns their standing guidance. The separate
+  R48 product rename governs the resident operator's eventual spelling; this change neither
+  performs nor reverses that rename.
+- **R51 — Consolidation preserves configured roles and references.** `(planned; proposed
+  compatibility policy awaiting confirmation)` Existing `pm` and `teammate` files remain ordinary
+  editable/selectable roles, including customized prompts. Their defaults, saved task or pipeline
+  references, and existing agent/session identities are not deleted or remapped. Startup stops
+  creating these two files when absent. Retained shipped roles receive new prompt text only under
+  R47's exact-match, package-verified rule; customized prompts and every non-prompt field remain
+  unchanged. Running sessions are not restarted and existing launch snapshots stay frozen under
+  R13. All roles still receive the shared context in FS-18.R15 at its stated lifecycle boundary.
+
 ### 2.7 Onboarding wizard
 
 - **R16 — retired 2026-07-22:** The no-exit first-run wizard was replaced by the explicit
@@ -424,6 +441,18 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   with a configured Codex backend links Codex rather than the initial Claude fallback. Polls cannot
   eject an open wizard, pending link mutations cannot race Continue, and Set up later/completion
   still issue only their existing writes. *Verify by* onboarding tests and FS-12.A24's rendered pass.
+
+- **A30** `(planned)` (R50, FS-18.R16) — On a fresh home the role API, Settings and New Agent
+  expose exactly the four shipped personas, with implementer as default and inherited permissions.
+  A researcher can be selected for either an internal feature investigation or external
+  documentation research without choosing another persona. *Verify by* seed/config API tests and
+  a focused role-selection check; role-content evaluation is FS-18.A12.
+- **A31** `(planned)` (R47, R51) — Upgrading a fixture with an exact shipped retained prompt,
+  a customized reviewer, legacy `pm`/`teammate` roles, a legacy default and saved task/pipeline
+  references updates only the exact retained prompt. Legacy roles remain usable, missing legacy
+  files are not recreated, and references, custom fields and session snapshots remain unchanged.
+  *Verify by* migration, seed idempotence, reference-resolution and resume fixtures, including
+  unavailable-skill and per-role failure cases.
 
 ## 6. Deviations & open decisions
 

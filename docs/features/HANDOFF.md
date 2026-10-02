@@ -129,6 +129,13 @@ supplied.
 
 ## Changelog
 
+- **2026-10-02 — Design: lean personas and shared operating context.** Drafted
+  FS-04.R50–R51/A30–A31 and FS-18.R15–R17/A11–A13 from the user's four-role request and Luna
+  research. Proposed AgentDecker-owned coordination, internal/external Researcher, concise shared
+  context for every role and additive native-provider prompt delivery. Awaiting confirmation of
+  coordination placement and preservation of existing PM/Teammate roles/references before technical
+  design. Recorded research and resumption details in `docs/ideas.md`; no product code or ready change.
+
 - **2026-10-02 — Review: exact context tokens and expanded-card runtime metadata.** No findings;
   the unit is closed. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna. The ACP decode,
   durable status/session tuple, turn rollup and reindex paths, resume/switch restoration,

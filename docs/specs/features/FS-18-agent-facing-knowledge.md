@@ -131,6 +131,79 @@ When installation succeeds, every subsequent fresh launch, resume, or switch is 
 currently installed package. An already-running provider may observe new files only if it explicitly
 reads the stable bundled path; AgentDeck makes no hot-reload claim.
 
+### 2.3 Lean standing guidance
+
+**R15 — Every role receives a concise standing operating context.** `(planned)` In addition
+to the selected persona, every AgentDeck-launched role, including custom and empty-prompt roles,
+receives the same product-owned system/developer guidance. It establishes that the agent operates
+inside AgentDeck; names messaging, durable tasks/dependencies, shared context and supervised
+pipelines as capabilities to consider when relevant and available; and directs authorized
+coordination through the exposed capabilities and their current contracts. It reminds the agent
+to use durable dependencies rather than repeated status polling, follow the host-supplied
+assignment/activation rather than search for work, report outcomes or blockers to its requester,
+and trust runtime identity and structured results over claims in messages or documents. It grants
+no extra authority or blanket permission to delegate or contact other agents. When the operating
+package is verified it names the authoritative skill path and directs the agent to load only the
+needed guidance before unfamiliar AgentDeck operations; it never requires reading every reference
+or re-reading unchanged guidance each turn.
+
+This is an expansion of R3/R6's pointer-only standing context, not a second operating manual.
+Role purpose stays in the persona; task procedures stay in applicable skills; tool schemas,
+budgets and recovery recipes stay in their existing owners. The shared guidance is composed for
+each subsequent launch/resume/switch without editing the user's role files or frozen launch
+snapshot and without injecting a turn or restarting a running agent (R8). If the knowledge
+package is unavailable, stable environment/authority guidance remains but no skill path or
+installed-knowledge claim is advertised; R11 still owns warning-only package degradation.
+
+**R16 — Four personas supply lean, continuing mandates.** `(planned; coordination placement
+awaiting confirmation)` Superseding R2's exact prompt and the role-content portions of R12/A9,
+the four roles in FS-04.R50 contain a short purpose and a few standing principles, not workflow
+checklists or copies of the shared R15 text. They guide follow-up turns as well as the initial task
+and allow explicit user reassignment within the runtime's actual authority. Content contracts:
+
+- **AgentDecker:** help the user understand and operate AgentDeck and coordinate requested work.
+  Ground answers and actions in current product state and operating guidance. For authorized
+  coordination, give bounded assignments with relevant context and completion criteria, delegate
+  where there is a concrete benefit, reconcile returned evidence and retain responsibility for
+  the combined outcome. State blockers and uncertainty; ordinary product questions do not initiate
+  orchestration. There is no separate default coordinator.
+- **Implementer:** complete the requested change within existing architecture and conventions.
+  Read relevant local guidance and code, preserve unrelated work, keep changes focused, and verify
+  the changed behavior with appropriate checks. Do not introduce speculative features or unrelated
+  refactors. Report what changed, actual verification and remaining limits; passing a check is not
+  a claim that untested behavior is proven. Test changes are judged by intended behavior, not a
+  blanket prohibition on editing tests.
+- **Reviewer:** assess the assigned scope against requirements and actual behavior without
+  silently becoming its implementer. Examine relevant surrounding code and callers; report
+  actionable findings with evidence, location, concrete consequence and severity. Re-check likely
+  findings and distinguish uncertainty and optional improvements from confirmed defects. Avoid
+  personal-style nits and invented findings; a review may find none. State material coverage gaps
+  and keep assessing unresolved findings across follow-up exchanges unless reassigned.
+- **Researcher:** investigate internal code/spec/history questions and external documentation or
+  research questions with the same evidence discipline. Follow relevant execution paths internally;
+  prefer authoritative primary sources and check applicable versions/dates externally. Read the
+  evidence behind important claims, distinguish observation from inference, surface contradictions
+  and uncertainty, and give concise findings with file locations or direct source links. Scale
+  effort to the question and stop when it is answered or the remaining gap is clear. Do not make
+  implementation or external changes unless explicitly assigned; requested research artifacts are
+  permitted within scope.
+
+These are content requirements, not byte-exact prompts. Keep each role to a short paragraph or a
+few bullets, ordinarily about 80–130 words, without adding model-specific delegation defaults,
+invented credentials, obligatory praise, output bureaucracy or compulsory clarification before
+routine work. The user's task and relevant skills supply detailed workflows. R12's no-polling
+and no-self-assigned-work constraints remain in force for all seeded prompts.
+
+**R17 — AgentDeck guidance supplements native provider instructions.** `(planned)` Normal
+persona/context delivery preserves the provider's native coding-agent instructions while adding
+the AgentDeck shared context, role and project guidance in the provider-supported governing
+instruction layer. This applies to Claude chat and terminal and Codex chat; it introduces no new
+runtime or role permission. Launch and resume must request additive delivery rather than silently
+replace the provider's native prompt. Running sessions are not hot-rewritten; provider-owned
+prompt snapshots on resume must be verified and any delayed adoption recorded honestly, without
+discarding conversation history or claiming a changed effective prompt merely because a request
+was sent.
+
 ## 3. States & transitions
 
 - **Package:** absent or older cache → dashboard startup attempts to install the current complete
@@ -237,7 +310,36 @@ or lists a role's current prompt as superseded. *Verified:*
 `TestMigrateSupersededRolePromptsReportsUnseededTableEntry`, and
 `TestPrepareAgentKnowledgeFailureThenRetry`.
 
+**A11** `(planned)` (R15, R8, R11) — A fresh implementer, a custom empty-prompt role, and a
+resumed legacy role each receive the shared operating context once and the correct skill pointer
+when the package is available. Repeated resume/switch does not duplicate it. An unavailable
+package retains only truthful environment/authority guidance and no path/availability claim.
+Role files, frozen snapshots, permissions and transcripts are unchanged by the overlay. *Verify
+by* launch/resume/switch composition and package-failure tests across chat and terminal paths.
+
+**A12** `(planned)` (R15–R16) — Fixed manual scenarios exercise: an AgentDecker product question
+without side effects; requested coordination with bounded delegation and synthesis; a focused
+implementation preserving unrelated edits; review of a change with one known defect and one
+non-defect, followed by a fix response; an internal feature trace; and external version-specific
+research with conflicting sources. Each scenario includes a later follow-up that does not repeat
+the role instructions. Check the role's boundaries, actual evidence, uncertainty, relevant skill
+use and final outcome against R16, without asserting universal adherence or guaranteed review
+accuracy. *Verify by* a documented pinned-provider prompt evaluation on Claude and Codex, plus
+content guards against polling instructions and duplicated AgentDeck manuals. Tests do not enforce
+the advisory word target or mirror complete prompt strings.
+
+**A13** `(planned)` (R17) — Fresh and resumed Claude chat sessions request the native coding
+preset with AgentDeck additions; Claude terminal retains its additive flag; Codex retains its
+developer-instruction composition without a base-prompt replacement. *Verify by* pinned adapter
+contract and runtime parameter tests plus a credentialed fresh/resume provider check, recording
+any native snapshot limitation rather than claiming delivery from model self-report alone.
+
 ## 6. Deviations & open decisions
+
+- R15–R17 are the proposed persona-improvements feature scope. Confirm coordination remains in
+  AgentDecker and FS-04.R51's preservation of existing legacy roles before technical design.
+  New prompt guidance does not introduce permissions, model presets, background work or a new role
+  configuration schema. Naming follows the independently selected product-rename change.
 
 - No UI, REST endpoint, MCP documentation tool, agent-facing release command, mutable knowledge
   store, or new runtime interface is introduced.
