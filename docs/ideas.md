@@ -29,10 +29,6 @@ Example:
   server-wide change that could affect the dev proxy, xterm, and inline styles. Noted while
   researching safe diagram rendering.
 
-- **Approval notifications link to the conversation.** When a pop-up notification fires because an
-  agent needs approval, make it a link that opens that agent's conversation, so the user can jump
-  straight to the pending permission instead of hunting for the right agent.
-
 ## Ideas being defined
 
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates

@@ -696,6 +696,20 @@ does not authorize sending backend types, environment, credentials or paths to a
 actual JSON response and schema, metadata-free writes/ETags and restricted phone response under
 FS-09.A30, not a separately handwritten ideal response alone.
 
+**R51 (planned) — Notification navigation is client-only over the existing payload.** FS-02.R64
+needs no server, bus, or `notification` SSE payload change: every agent notification already
+carries `agent_id` (FS-02.R22). The client keeps `agent_id` on agent toasts (error toasts have
+none) and builds the conversation path through one shared helper used by both the toast and the
+desktop Web Notification path (INV §2). Navigation goes through the app's existing client router,
+not a full page load, so live stores and the SSE connection survive. The desktop path assigns the
+non-persistent `Notification`'s `click` handler to focus the window, navigate, and `close()` it
+([MDN `Notification: click` event](https://developer.mozilla.org/en-US/docs/Web/API/Notification/click_event));
+no service worker or persistent desktop notification is added, so a closed tab's notification
+stays inert. A path built from an id is URI-encoded. Mute, dedupe `tag`, toast cap and timers are
+unchanged. The phone entry keeps TS-13's Web Push click route. Verify with component tests that
+click a rendered toast and its close control, and an `sse.test.ts` case that dispatches `click` on
+a stubbed `Notification` and asserts focus, route, and `close()`.
+
 ## 3. Interfaces & data shapes
 
 Planned additive backend response field (R47; the example shows one entry, but all registered

@@ -136,6 +136,12 @@ supplied.
   coordination placement and preservation of existing PM/Teammate roles/references before technical
   design. Recorded research and resumption details in `docs/ideas.md`; no product code or ready change.
 
+- **2026-10-02 — Design: notifications open the agent's conversation.** User widened the approval
+  idea to every agent notification and chose the full conversation route, with the toast body
+  opening and a close control dismissing. FS-02.R64/A46 and TS-03.R51 specify client-only routing
+  over the existing `agent_id` payload; `docs/ready-changes/notifications-open-conversation.md` is
+  waiting to start; source idea promoted. No product code changed or active work selected.
+
 - **2026-10-02 — Review: exact context tokens and expanded-card runtime metadata.** No findings;
   the unit is closed. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna. The ACP decode,
   durable status/session tuple, turn rollup and reindex paths, resume/switch restoration,

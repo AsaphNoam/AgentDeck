@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -144,6 +144,18 @@ Notification is raised instead of the toast (deduped per agent via the notificat
 `budget_exceeded`) via Settings; a muted type is dropped client-side before any toast or desktop
 notification. Desktop notifications can be disabled wholesale, and desktop permission is requested
 from the Notifications settings editor.
+
+**R64** `(planned)` — **Every agent notification opens that agent's conversation.** Clicking an
+agent notification toast of any type (`permission_required`, `waiting_input`, `done`,
+`budget_exceeded`) opens the full conversation (`/agent/<agent_id>`) and dismisses the toast; a
+separate close control dismisses it without navigating. Clicking a desktop Web Notification brings
+the AgentDeck tab forward, opens the same conversation, and closes the notification. Nothing is
+approved, denied, or replied to from a notification. A stale target opens current truth: an
+already-answered permission shows its conversation as it now stands, and a vanished agent shows the
+existing **Agent not found** view. Error toasts that name no agent stay non-navigating. Mutes,
+per-agent desktop dedupe, the four-toast cap, and per-toast auto-dismiss (R23/R24) are unchanged,
+and phone push taps keep FS-20.R21. A desktop notification whose AgentDeck tab was closed has no
+page to open and does nothing.
 
 **R27.** A stopped agent's card context menu additionally offers **Resume**. It is absent from a
 running agent's menu, because a resume while a running row exists is rejected (FS-01.R25). The
@@ -791,6 +803,15 @@ picker and launches with the route project's id; the general modal continues to 
   the project-summary card is unchanged. *Verify:* `AgentCard` component tests, the deterministic
   three-appearance visual matrix, and a focused real-browser check at the desktop floor and a wider
   viewport.
+
+- **A46 (planned)** (R64) — From the Tasks page, clicking a `permission_required` toast for agent
+  X opens X's conversation with the pending permission visible and removes that toast; clicking
+  its close control removes it and stays on Tasks. A `done` toast and a `budget_exceeded` toast
+  navigate the same way, an error toast only dismisses, and a toast for an agent removed before
+  the click shows **Agent not found**. With the tab hidden and permission granted, a desktop
+  notification's click focuses the window, opens X's conversation and closes the notification.
+  *Verify:* `NotificationCenter.test.tsx` and `sse.test.ts` (stubbed `Notification` click), plus a
+  real-browser check of the toast path and a manual macOS desktop-notification click.
 
 ## 6. Deviations & open decisions
 
