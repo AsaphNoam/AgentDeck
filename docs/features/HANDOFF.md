@@ -21,10 +21,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   asset.
 - **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes and
-  `show-exact-context-and-runtime-metadata` (exact used/total context tokens through ACP decode,
-  status/session persistence, AgentState, and the shared meter; runtime identity on expanded
-  project cards) are available.
+- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -131,6 +128,16 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-02 — Review: exact context tokens and expanded-card runtime metadata.** No findings;
+  the unit is closed. **Fix model:** trivial/easy — Claude Sonnet or Codex Luna. The ACP decode,
+  durable status/session tuple, turn rollup and reindex paths, resume/switch restoration,
+  `AgentState` projection, shared meter, and expanded-card runtime identity match the named
+  requirements. The rendered matrix at 1024×900 and 1280×720 kept long metadata, state, Collapse,
+  and the exact-token meter separated without overflow in Core, Sky & Grove, and Studio. INV
+  1–3, 5, 7–11, 13, and 16–17 applied without a violation; 4, 6, 12, 14, and 15 had no applicable
+  changed surface. Both Go variants, the tagged build, all 558 UI tests, the style contract, and
+  the production UI build pass.
 
 - **2026-10-02 — Work: exact context tokens and expanded-card runtime metadata.** ACP
   `usage_update` decodes one reading (capped percentage plus the reported used/size pair; a
