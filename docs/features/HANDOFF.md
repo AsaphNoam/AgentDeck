@@ -149,7 +149,10 @@ supplied.
   real-browser check of the visual matrix at 1024/1440 in all three appearances found the longer
   label running under the state badge; the expanded action side now wraps the meter onto its own
   row, verified overlap-free. INV 1–3, 7–8, 10–11, 13, 16–17 applied; 4–6, 9, 12, 14–15 had no
-  changed surface. A live-app J5 pass against a real provider was not run.
+  changed surface. A follow-up live-app pass (`go run ./scripts/stress-fixture`: production server
+  and embedded UI with the fake ACP) showed `44,000 / 200,000 tokens · 22% context used` on the
+  expanded project card and the agent screen, kept it across reload, showed `claude · haiku ·
+  medium` on the expanded card, and no meter on collapsed cards. No paid real-provider run.
 
 - **2026-10-02 — Fix: phone desktop flow and agent management.** Open phone agent and project
   screens now enter the archived state when the desktop archives them (INV §1 republish derived state; project
