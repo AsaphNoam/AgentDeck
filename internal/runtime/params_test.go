@@ -1,6 +1,9 @@
 package runtime
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 // Regression (review fix): the native-resume path (session/load) must forward
 // additionalDirectories, or a multi-dir agent silently loses access to its extra
@@ -70,9 +73,6 @@ func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	if !ok {
 		t.Fatalf("_meta = %T, want map[string]any", params["_meta"])
 	}
-	if got := meta["systemPrompt"]; got != "be helpful" {
-		t.Fatalf("_meta.systemPrompt = %v, want %q", got, "be helpful")
-	}
 	claudeCode, ok := meta["claudeCode"].(map[string]any)
 	if !ok {
 		t.Fatalf("_meta.claudeCode = %T, want map[string]any", meta["claudeCode"])
@@ -90,6 +90,43 @@ func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	}
 	if len(dirs) != 2 || dirs[0] != "/extra/one" || dirs[1] != "/extra/two" {
 		t.Fatalf("claude additionalDirectories = %v, want the spec's AddDirs", dirs)
+	}
+}
+
+// FS-18.A13, TS-04.R69: Claude new and load both send the object shape the
+// pinned claude-agent-acp 0.75.1 forwards as a native-preset append; a string
+// there replaces Claude Code's coding instructions. The expected wire JSON is
+// written out here rather than taken from the builder (INV §17).
+func TestClaudeSessionParamsAppendToNativePreset(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		prompt string
+		want   string
+	}{
+		{"composed prompt", "be helpful", `{"append":"be helpful","preset":"claude_code","type":"preset"}`},
+		{"empty prompt", "", `{"append":"","preset":"claude_code","type":"preset"}`},
+	} {
+		spec := LaunchSpec{Cwd: "/work", SystemPrompt: tc.prompt, BackendType: "claude-acp"}
+		for name, params := range map[string]map[string]any{
+			"session/new":  sessionNewParams(spec),
+			"session/load": sessionLoadParams(spec, "sess-123"),
+		} {
+			raw, err := json.Marshal(params)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire struct {
+				Meta struct {
+					SystemPrompt json.RawMessage `json:"systemPrompt"`
+				} `json:"_meta"`
+			}
+			if err := json.Unmarshal(raw, &wire); err != nil {
+				t.Fatal(err)
+			}
+			if got := string(wire.Meta.SystemPrompt); got != tc.want {
+				t.Fatalf("%s %s _meta.systemPrompt = %s, want %s", tc.name, name, got, tc.want)
+			}
+		}
 	}
 }
 

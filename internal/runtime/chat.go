@@ -2272,6 +2272,17 @@ func checkACPVersion(initRes json.RawMessage) error {
 	return nil
 }
 
+// claudeSystemPrompt keeps Claude Code's native coding preset and appends the
+// composed AgentDeck prompt (TS-04.R69). The pinned adapter replaces the preset
+// outright for a string, so an object is sent even when the addition is empty.
+func claudeSystemPrompt(spec LaunchSpec) map[string]any {
+	return map[string]any{
+		"type":   "preset",
+		"preset": "claude_code",
+		"append": spec.StartSystemPrompt(),
+	}
+}
+
 // sessionNewParams builds the session/new params from the launch spec (§4.1).
 func sessionNewParams(spec LaunchSpec) map[string]any {
 	mcp := make([]map[string]any, 0, len(spec.MCPServers))
@@ -2291,7 +2302,7 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 			"cwd":        spec.Cwd,
 			"mcpServers": mcp,
 			"_meta": map[string]any{
-				"systemPrompt": spec.StartSystemPrompt(),
+				"systemPrompt": claudeSystemPrompt(spec),
 				"claudeCode":   map[string]any{"options": options},
 			},
 		}
@@ -2333,7 +2344,7 @@ func sessionLoadParams(spec LaunchSpec, sessionID string) map[string]any {
 			"cwd":        spec.Cwd,
 			"mcpServers": mcp,
 			"_meta": map[string]any{
-				"systemPrompt": spec.StartSystemPrompt(),
+				"systemPrompt": claudeSystemPrompt(spec),
 				"claudeCode":   map[string]any{"options": options},
 			},
 		}

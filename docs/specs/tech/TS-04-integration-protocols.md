@@ -842,7 +842,7 @@ no inferred counts. The fake ACP adapter and mapping tests exercise the real `us
 shape, invalid pairs, zero, over-window usage, and mid-turn republish independently of the runtime
 helper (FS-02.R62, TS-04.R25, INV §17).
 
-**R69 — Claude chat adds AgentDeck instructions to the native coding preset.** `(planned)`
+**R69 — Claude chat adds AgentDeck instructions to the native coding preset.**
 For FS-18.R17/A13, both `sessionNewParams` and `sessionLoadParams` build the Claude metadata
 prompt through one small shared builder with this shape:
 

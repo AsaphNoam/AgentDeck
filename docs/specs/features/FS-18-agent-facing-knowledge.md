@@ -194,7 +194,7 @@ invented credentials, obligatory praise, output bureaucracy or compulsory clarif
 routine work. The user's task and relevant skills supply detailed workflows. R12's no-polling
 and no-self-assigned-work constraints remain in force for all seeded prompts.
 
-**R17 — AgentDeck guidance supplements native provider instructions.** `(planned)` Normal
+**R17 — AgentDeck guidance supplements native provider instructions.** Normal
 persona/context delivery preserves the provider's native coding-agent instructions while adding
 the AgentDeck shared context, role and project guidance in the provider-supported governing
 instruction layer. This applies to Claude chat and terminal and Codex chat; it introduces no new

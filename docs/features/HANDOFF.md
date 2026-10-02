@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** lean personas and shared operating context (in progress).
+- **Active change:** none.
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -22,6 +22,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+  `lean-personas-and-operating-context` (four seeded personas, standing operating context in the
+  launch overlay, Claude native-preset append) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -29,20 +31,16 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-**Lean personas and shared operating context** — in progress,
-[`lean-personas-and-operating-context.md`](../ready-changes/lean-personas-and-operating-context.md).
-
-Done: slices 1–2 — four seeded personas in `internal/config/seed.go` (previous prompts kept as
-`testdata/superseded_<role>_prompt_2.txt` digests; `pm`/`teammate` no longer seeded or migrated),
-and `operatingContextPrompt` in `server.applyKnowledgeOverlay` (`internal/server/launch.go`).
-`go test ./internal/config ./internal/cli ./internal/server` passes.
-
-Next:
-3. Claude preset `_meta.systemPrompt` object for new/load (TS-04.R69) in `internal/runtime/chat.go`.
-4. Active docs/spec status, closure matrix; record the A12 scenarios and A13 credentialed
-   receipts as manual gates if not run.
+None.
 
 ## Acceptance gates still owed
+
+- FS-18.A12 / TS-11.R17: the six manual role scenarios with a role-free follow-up against the
+  pinned Claude and Codex providers have not been run; no qualitative receipt exists yet.
+- FS-18.A13: the credentialed fresh and resumed Claude chat check of native-preset adoption is
+  owed. Automated coverage proves only the sent shape against pinned
+  `claude-agent-acp` 0.75.1 (`scripts/release/node_modules/.../dist/acp-agent.js` forwards an
+  object `_meta.systemPrompt` as a preset append; a string replaces the preset).
 
 - FS-20.A1/A5/A6/A8: real tailnet, Android, iPhone, and `pmset -g assertions` checks. The iPhone
   Home Screen experience also still lacks a PNG touch icon. The 390px fake-provider browser pass
@@ -139,6 +137,16 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Work: lean personas and shared operating context.** Fresh homes seed
+  AgentDecker, Implementer, Reviewer and Researcher with lean FS-18.R16 prompts; `pm`/`teammate`
+  are no longer seeded or migrated, and existing files, defaults and references are untouched. The
+  previous retained prompts joined the exact-match digests. Every lifecycle composer now appends a
+  runtime-only standing context, with the skill pointer still package-gated. Claude chat new/load
+  send the native preset with an append. `make build` passes; `make test` passed except one
+  `sqlite_fts5` run of `TestCoalescedMailProducesOnePromptAndIsNeverReplayed` (unread count read
+  before completion projected it), which then passed 20/20 in each variant — an existing timing
+  flake, not fixed here. A12 and A13's credentialed receipt remain owed gates.
 
 - **2026-10-02 — Design: lean personas and shared operating context.** User confirmed four
   roles, coordination within AgentDecker and preservation of existing PM/Teammate roles/references.
