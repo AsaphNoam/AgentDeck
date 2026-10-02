@@ -43,6 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`lean-personas-and-operating-context.md`](lean-personas-and-operating-context.md) — four lean
+  roles, shared standing AgentDeck guidance, legacy-role preservation and additive Claude prompts.
 - [`notifications-open-conversation.md`](notifications-open-conversation.md) — clicking any agent
   toast or desktop notification opens that agent's conversation.
 - [`tasks-work-in-motion.md`](tasks-work-in-motion.md) — center Tasks on project-grouped active

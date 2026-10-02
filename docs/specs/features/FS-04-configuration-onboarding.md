@@ -218,8 +218,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   current fields and future-launch scope. FS-18.R16 owns their standing guidance. The separate
   R48 product rename governs the resident operator's eventual spelling; this change neither
   performs nor reverses that rename.
-- **R51 — Consolidation preserves configured roles and references.** `(planned; proposed
-  compatibility policy awaiting confirmation)` Existing `pm` and `teammate` files remain ordinary
+- **R51 — Consolidation preserves configured roles and references.** `(planned)` Existing
+  `pm` and `teammate` files remain ordinary
   editable/selectable roles, including customized prompts. Their defaults, saved task or pipeline
   references, and existing agent/session identities are not deleted or remapped. Startup stops
   creating these two files when absent. Retained shipped roles receive new prompt text only under

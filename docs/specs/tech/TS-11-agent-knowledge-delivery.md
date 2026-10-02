@@ -168,6 +168,81 @@ pre-rename seed prompts join `supersededRolePromptDigests` under R13 so the Deck
 an existing install through the same exact-match rule, and the renamed role id (FS-04.R48) is keyed
 in that table as its own role rather than inheriting the old id's digests.
 
+**R15 — Shared standing context extends the existing runtime-only overlay.** `(planned)` For
+FS-18.R15, `server.applyKnowledgeOverlay` remains the sole composition seam for fresh launch,
+ordinary/wake resume, runtime switch and pipeline launch/resume in chat and terminal. One
+code-owned, provider-neutral instruction block beside the existing knowledge pointer supplies the
+stable environment, capability-awareness, assignment, no-polling and authority guidance. It names
+capabilities conditionally on their actual availability, contains no secret, runtime credential,
+tool schema or numeric budget, and does not grant an operation. Role constants do not duplicate
+this block. Keep it to a short paragraph or a few bullets; no new configuration field, SQLite
+column, instruction-template registry or provider-specific copy is introduced.
+
+The helper appends that block once through `RuntimeSystemPromptSuffix` before testing package
+availability, and appends the verified direct-path skill-use instruction once only when available.
+It preserves any other runtime suffix and composes with `RuntimeSystemPrompt` switch primers.
+R4/R5's conditional directory/env/pointer rules and R10's installation degradation remain in
+force; their former absence of *all* product guidance when unavailable is superseded only by this
+stable block. The helper still strips an inherited reserved skill env value when the package is
+unavailable. Frozen `SystemPrompt`, `AddDirs`, role/project configuration, permissions and session
+metadata never acquire either managed instruction block (INV §1–§3).
+
+Each new process is composed from its frozen base plus the current dashboard's immutable package
+availability; it does not reuse a previous process's augmented suffix or skill directories. Repeat
+composition within the same process generation is idempotent. A later dashboard start with failed
+installation therefore exposes no stale skill path/env/directory, while retaining the stable
+standing context. No turn, restart, background repair or provider-state rewrite is added. Existing
+native skill discovery and the reference package stay the detailed operating source.
+
+**R16 — Four seed definitions reuse exact-prompt migration without deleting legacy roles.**
+`(planned)` For FS-04.R50–R51 and FS-18.R16, `config.seedRoles` and `SeedIfAbsent` expose only
+the resident operator, implementer, reviewer and researcher. Keep their prompt source in the
+existing seed constants; the implementation uses the FS-18.R16 content contracts rather than a
+second copy of the prompt in fixtures or provider configuration. The default role, Role JSON
+shape and permission inheritance are unchanged. Seed-count assertions enumerate the four-role
+contract independently; user-authored role CRUD remains unrestricted.
+
+Remove `pm`/`teammate` from the seed map and remove retired-role entries from the active
+`supersededRolePromptDigests` map. Preserve their on-disk files, references and historical identity;
+there is no delete/remap migration or compatibility alias. Retain the invariant that a migration
+entry for a non-seeded role is an error, rather than weakening it to tolerate a stale table. Add
+the immediately preceding shipped prompt bytes for each retained role to the historical fixtures
+and digest lists, keeping prior supported digests. Never add the new prompt's own digest. Retired
+fixtures may remain as preservation-test evidence but never activate a migration. Reuse R13's
+single package-gated migration pass and its per-role failure isolation. An empty or one-byte-edited
+custom prompt stays unchanged; existing PM/Teammate defaults and task/pipeline references continue
+to resolve through ordinary role reads. Frozen session personas are not refreshed on resume.
+
+The separately approved resident-role/product rename owns spelling and identity migration. If it
+lands first, use its canonical resident-role id and retain its preservation rules; this change
+neither reinstates the old id nor adds a second operator. Update active seed inventory and prompt
+documentation at implementation closure; historical archives remain historical.
+
+**R17 — Prompt checks distinguish delivery, migration and model behavior.** `(planned)`
+FS-04.A30–A31 and FS-18.A11–A13 are proved in three layers:
+
+- Extend existing config, CLI knowledge and server-overlay fixtures for four-role fresh seeding,
+  retained legacy roles/references, exact retained-role migration, custom/empty prompts, independent
+  I/O/decode failures, unavailable→available package starts and idempotence. Replace tests that
+  require a freshly seeded Teammate with retained-role migration cases plus explicit legacy-file
+  preservation; do not remove their error or identity coverage. Exercise the existing lifecycle
+  composer matrix with shared guidance and conditional pointer, a switch primer and frozen
+  metadata, including an old snapshot lacking the new managed text.
+- Prove native-provider prompt preservation through TS-04.R69's pinned adapter/SDK boundary and
+  both new/load payloads. Existing terminal argv and Codex overlay tests retain their scope.
+  A fake ACP echo alone cannot establish provider behavior (TS-04.R54, INV §17).
+- Run the six bounded manual scenarios in FS-18.A12 against the pinned Claude and Codex providers
+  with task and applicable skill held explicit, then a follow-up that omits role reminders. Record
+  versions, inputs, observed role boundaries, evidence and failures; this is a qualitative acceptance
+  receipt, not an accuracy benchmark. Fresh/resume prompt-adoption checks follow FS-18.A13.
+  Missing credentials or unavailable upstream services leave a named manual gate open, never a
+  fabricated pass. Automated content guards check prohibited polling/authority claims and source
+  duplication, not arbitrary word counts or complete prompt snapshots.
+
+Implementation closure runs the applicable TS-06.R5 matrix once after the final relevant change;
+this design-only update runs spec lint, twin-skill comparison and diff checks. No rendered redesign,
+new evaluation service or model-selection policy is part of the change.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:
@@ -191,6 +266,9 @@ SQLite state, REST/SSE data, or MCP arguments.
   frozen user-selected side of the boundary.
 - **INV §2:** R4 is the single launch/resume/switch composition helper; R7 leaves every local tool
   contract in its registration rather than rebuilding either surface elsewhere.
+- **INV §3:** R15's shared context and skill pointer stay in process-only fields rather than
+  frozen persona/project configuration or session metadata.
+- **INV §7:** R16 retains per-role migration failures and never deletes an existing legacy role.
 - **INV §4:** a process teardown removes only generation-scoped runtime artifacts and never deletes
   the installed cache or user configuration.
 - **INV §6:** chat, terminal, manual, wake, switch, and pipeline paths join the same conditional
@@ -209,6 +287,8 @@ SQLite state, REST/SSE data, or MCP arguments.
 
 - No external API or schema changes. `AGENTDECK_SKILL_DIR`, the managed path, and the bounded prompt
   pointer are the only new agent-facing delivery interfaces.
+- R15–R17 extend the existing prompt overlay and seed contents only; Claude's additive wire shape
+  is owned by TS-04.R69. The direct-action migration remains paused and is not a prerequisite.
 - No migration touches a customized role, and no managed/read-only role architecture is introduced.
 - No runtime copies the skill into provider homes or repositories. Native discovery is a convenience;
   the direct installed path is the compatibility fallback.

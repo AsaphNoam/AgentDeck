@@ -34,37 +34,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Lean personas and shared AgentDeck operating context.** Direct `/design-feature` request,
-  2026-10-02: consolidate the shipped roles to AgentDecker, implementer, reviewer, and researcher;
-  researcher covers both internal code/spec investigation and external documentation/web research.
-  Keep role prompts lean, grounded in established practices researched by Luna agents, and useful
-  as standing system/developer instructions alongside task skills. Every role, including custom
-  ones, receives concise shared AgentDeck awareness and a pointer to the operating skill. Proposed:
-  AgentDecker retains requested coordination rather than adding a fifth coordinator; preserve native
-  provider instructions when adding AgentDeck guidance, correcting Claude chat's replacement path.
-  Pending feature confirmation: coordinator choice and treatment of existing `pm`/`teammate` roles
-  and references. Recommend stop seeding those two roles, retain existing files/references, and
-  refresh only exact previously shipped prompts for retained roles under the existing migration
-  rule. Customized prompts and frozen sessions remain user-owned. No expanded permissions, new
-  configuration schema, model presets, or product rename is included. Coordinate with the separate
-  rename change for resident-role/product spelling only. Owners: FS-04 and FS-18; no technical
-  specification or ready change until feature behavior is confirmed.
-  Feature draft: FS-04.R50–R51/A30–A31 and FS-18.R15–R17/A11–A13. Primary operator journey:
-  select a familiar role, give it a task, and continue with follow-ups without restating its
-  mandate or teaching it AgentDeck mechanics. Upgrade risk: deleting an old role silently breaks
-  saved defaults/tasks; proposed preservation avoids that without adding migration UI.
-  Luna research (2026-10-02) supports scoped changes and real validation
-  ([GitHub](https://docs.github.com/en/copilot/tutorials/cloud-agent/get-the-best-results)),
-  contextual, actionable reviews without personal-style blockers
-  ([Google](https://google.github.io/eng-practices/review/reviewer/looking-for.html)), and keeping
-  orchestration with one owner unless a distinct instruction/tool/policy boundary justifies a split
-  ([OpenAI](https://developers.openai.com/api/docs/guides/agents/orchestration)). Researcher guidance
-  is a synthesis of evidence-first investigation, primary-source attribution and calibrated
-  uncertainty; no benchmark gain from these persona strings is claimed. Provider guidance supports
-  preserving Claude's native preset with additions
-  ([Anthropic](https://code.claude.com/docs/en/agent-sdk/modifying-system-prompts)); the current
-  pinned adapter's string replacement was confirmed in the preceding investigation.
-
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

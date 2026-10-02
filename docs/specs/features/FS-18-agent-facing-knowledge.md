@@ -155,8 +155,8 @@ snapshot and without injecting a turn or restarting a running agent (R8). If the
 package is unavailable, stable environment/authority guidance remains but no skill path or
 installed-knowledge claim is advertised; R11 still owns warning-only package degradation.
 
-**R16 — Four personas supply lean, continuing mandates.** `(planned; coordination placement
-awaiting confirmation)` Superseding R2's exact prompt and the role-content portions of R12/A9,
+**R16 — Four personas supply lean, continuing mandates.** `(planned)` Superseding R2's exact
+prompt and the role-content portions of R12/A2/A9,
 the four roles in FS-04.R50 contain a short purpose and a few standing principles, not workflow
 checklists or copies of the shared R15 text. They guide follow-up turns as well as the initial task
 and allow explicit user reassignment within the runtime's actual authority. Content contracts:
@@ -318,7 +318,7 @@ Role files, frozen snapshots, permissions and transcripts are unchanged by the o
 by* launch/resume/switch composition and package-failure tests across chat and terminal paths.
 
 **A12** `(planned)` (R15–R16) — Fixed manual scenarios exercise: an AgentDecker product question
-without side effects; requested coordination with bounded delegation and synthesis; a focused
+without initiating coordination; requested coordination with bounded delegation and synthesis; a focused
 implementation preserving unrelated edits; review of a change with one known defect and one
 non-defect, followed by a fix response; an internal feature trace; and external version-specific
 research with conflicting sources. Each scenario includes a later follow-up that does not repeat
@@ -336,10 +336,10 @@ any native snapshot limitation rather than claiming delivery from model self-rep
 
 ## 6. Deviations & open decisions
 
-- R15–R17 are the proposed persona-improvements feature scope. Confirm coordination remains in
-  AgentDecker and FS-04.R51's preservation of existing legacy roles before technical design.
-  New prompt guidance does not introduce permissions, model presets, background work or a new role
-  configuration schema. Naming follows the independently selected product-rename change.
+- R15–R17 and FS-04.R50–R51 were confirmed on 2026-10-02: coordination stays in AgentDecker and
+  existing legacy roles/references are preserved. The change introduces no permissions, model
+  presets, background work or new role configuration schema. Naming follows the independently
+  selected product-rename change.
 
 - No UI, REST endpoint, MCP documentation tool, agent-facing release command, mutable knowledge
   store, or new runtime interface is introduced.

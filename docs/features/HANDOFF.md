@@ -129,12 +129,13 @@ supplied.
 
 ## Changelog
 
-- **2026-10-02 — Design: lean personas and shared operating context.** Drafted
-  FS-04.R50–R51/A30–A31 and FS-18.R15–R17/A11–A13 from the user's four-role request and Luna
-  research. Proposed AgentDecker-owned coordination, internal/external Researcher, concise shared
-  context for every role and additive native-provider prompt delivery. Awaiting confirmation of
-  coordination placement and preservation of existing PM/Teammate roles/references before technical
-  design. Recorded research and resumption details in `docs/ideas.md`; no product code or ready change.
+- **2026-10-02 — Design: lean personas and shared operating context.** User confirmed four
+  roles, coordination within AgentDecker and preservation of existing PM/Teammate roles/references.
+  FS-04.R50–R51/A30–A31, FS-18.R15–R17/A11–A13, TS-11.R15–R17 and TS-04.R69 specify lean
+  personas, internal/external Researcher, runtime-only shared guidance and additive Claude prompt
+  delivery. Luna research and pinned adapter/SDK evidence are retained in
+  `docs/ready-changes/lean-personas-and-operating-context.md`, waiting to start; source idea promoted.
+  No product code changed or active work selected. Spec, twin-skill and diff checks pass.
 
 - **2026-10-02 — Design: notifications open the agent's conversation.** User widened the approval
   idea to every agent notification and chose the full conversation route, with the toast body

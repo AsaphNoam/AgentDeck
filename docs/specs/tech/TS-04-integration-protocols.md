@@ -842,6 +842,45 @@ no inferred counts. The fake ACP adapter and mapping tests exercise the real `us
 shape, invalid pairs, zero, over-window usage, and mid-turn republish independently of the runtime
 helper (FS-02.R62, TS-04.R25, INV §17).
 
+**R69 — Claude chat adds AgentDeck instructions to the native coding preset.** `(planned)`
+For FS-18.R17/A13, both `sessionNewParams` and `sessionLoadParams` build the Claude metadata
+prompt through one small shared builder with this shape:
+
+```json
+{
+  "_meta": {
+    "systemPrompt": {
+      "type": "preset",
+      "preset": "claude_code",
+      "append": "<LaunchSpec.StartSystemPrompt()>"
+    }
+  }
+}
+```
+
+The existing cwd, MCP servers, model, additional directories, resume id and other Claude options
+remain intact. An empty composed prompt still selects the native preset with an empty addition;
+it never becomes an empty custom replacement. Do not introduce an undocumented top-level ACP
+field, SDK wrapper, adapter patch, copied native prompt or new dependency version for this.
+
+The pinned `@agentclientprotocol/claude-agent-acp` 0.75.1 starts from the `claude_code` preset,
+replaces it for a string `_meta.systemPrompt`, and forwards object properties while fixing
+`type`/`preset`. Its SDK accepts the preset's `append` and routes it to the native append-system-
+prompt option. This source trace, together with the SDK's public system-prompt contract, establishes
+the supported path; R54 still separates sent/accepted metadata from effective provider behavior.
+Tests exercise the adapter-supported object shape for new and load independently of the builder,
+and fail against the previous string form. Claude terminal keeps `--append-system-prompt`; Codex
+chat keeps its existing `CODEX_CONFIG.developer_instructions` merge, preserving pre-existing
+overlay instructions and unrelated keys. No native base-instruction replacement is introduced.
+
+The change requests additive delivery on resume but leaves native prompt-snapshot policy alone.
+A provider may retain its previously captured prompt until its own refresh boundary; do not clear
+history, force compaction, disable snapshotting, or start a replacement session to hide that
+limitation. Record effective fresh/resume evidence and the pinned-provider limitation under
+FS-18.A13. A new conversation is the immediate-adoption path; role edits otherwise retain their
+existing future-launch semantics. Permission policy, tool availability, authentication and user
+configuration discovery are outside this correction.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact
