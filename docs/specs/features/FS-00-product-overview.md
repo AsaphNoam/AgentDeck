@@ -80,7 +80,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   works: a `system_prompt`, display `title`, and a `skip_permissions` policy (`null` inherits the
   global config value; `true`/`false` override it). Roles are stored as config files and seeded if
   absent, never overwriting user edits (see FS-04). Seed roles: `agentdecker`, `implementer`,
-  `reviewer`, `researcher`, `pm`, `teammate`.
+  `reviewer`, `researcher` (FS-04.R50).
 
 ### 2.3 Project — the workspace
 

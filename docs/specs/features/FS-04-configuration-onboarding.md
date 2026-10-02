@@ -169,10 +169,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 ### 2.6 Seeded configuration
 
 - **R14.** On `dashboard start`, `SeedIfAbsent` writes a default `config.json`, `backends.json`,
-  `layout.json`, the six seeded roles, and one seeded project — **only for targets absent on disk**.
+  `layout.json`, the seeded roles (R50), and one seeded project — **only for targets absent on disk**.
   It never overwrites an existing file, so hand edits and older installs are preserved while newly
   shipped seed files appear.
-- **R15.** The six seeded roles are `agentdecker`, `implementer`, `reviewer`, `researcher`, `pm`,
+- **R15.** (Role set superseded by R50.) The six seeded roles were `agentdecker`, `implementer`, `reviewer`, `researcher`, `pm`,
   and `teammate`, each with `skip_permissions: null` (inherit). The seeded project is `my-app`
   (`cwd: ~/Projects/my-app`). Because roles and a project are seeded, the onboarding role and project
   steps are already satisfied on a fresh install; the backend credential check is the operative gate
@@ -210,7 +210,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 
 
 
-- **R50 — Four lean shipped personas.** `(planned)` Superseding R14–R15 only for the
+- **R50 — Four lean shipped personas.** Superseding R14–R15 only for the
   shipped role set, a fresh home seeds the resident operator (currently `agentdecker`),
   `implementer`, `reviewer`, and `researcher`. Coordination is part of the resident operator's
   mandate; no separate coordinator, `pm`, or `teammate` is seeded. The default remains
@@ -218,7 +218,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   current fields and future-launch scope. FS-18.R16 owns their standing guidance. The separate
   R48 product rename governs the resident operator's eventual spelling; this change neither
   performs nor reverses that rename.
-- **R51 — Consolidation preserves configured roles and references.** `(planned)` Existing
+- **R51 — Consolidation preserves configured roles and references.** Existing
   `pm` and `teammate` files remain ordinary
   editable/selectable roles, including customized prompts. Their defaults, saved task or pipeline
   references, and existing agent/session identities are not deleted or remapped. Startup stops
@@ -336,8 +336,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **A6.** Deleting a role/project in use returns `409 in_use` with agent ids; `force=true` completes
   the delete without affecting running agents. *Verified:* `TestRolesInUseGuard`,
   `TestProjectsInUseGuard`.
-- **A7.** The six roles and the `my-app` project seed on a fresh home and are never clobbered on a
-  populated one. *Verified:* `TestRolesSeeded`, `TestProjectsSeeded`, `TestBackendsSeeded`,
+- **A7.** The seeded roles (R50) and the `my-app` project seed on a fresh home and are never
+  clobbered on a populated one. *Verified:* `TestRolesSeeded`, `TestProjectsSeeded`, `TestBackendsSeeded`,
   `TestSeedIfAbsentNoClobber`.
 - **A8.** The onboarding gate is unsatisfied on an empty store, satisfied when all steps pass, held
   open by bad backend credentials, and overridden by `onboarding_complete`. *Verified:*
@@ -442,12 +442,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   eject an open wizard, pending link mutations cannot race Continue, and Set up later/completion
   still issue only their existing writes. *Verify by* onboarding tests and FS-12.A24's rendered pass.
 
-- **A30** `(planned)` (R50, FS-18.R16) — On a fresh home the role API, Settings and New Agent
+- **A30** (R50, FS-18.R16) — On a fresh home the role API, Settings and New Agent
   expose exactly the four shipped personas, with implementer as default and inherited permissions.
   A researcher can be selected for either an internal feature investigation or external
   documentation research without choosing another persona. *Verify by* seed/config API tests and
   a focused role-selection check; role-content evaluation is FS-18.A12.
-- **A31** `(planned)` (R47, R51) — Upgrading a fixture with an exact shipped retained prompt,
+- **A31** (R47, R51) — Upgrading a fixture with an exact shipped retained prompt,
   a customized reviewer, legacy `pm`/`teammate` roles, a legacy default and saved task/pipeline
   references updates only the exact retained prompt. Legacy roles remain usable, missing legacy
   files are not recreated, and references, custom fields and session snapshots remain unchanged.

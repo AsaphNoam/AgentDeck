@@ -38,7 +38,9 @@ func TestKnowledgeOverlayIsRuntimeOnlyAndConditional(t *testing.T) {
 	if got := effective.StartAddDirs(); len(got) != 2 || got[0] != "/user/dir" || got[1] != root {
 		t.Fatalf("effective add dirs = %v", got)
 	}
-	if strings.Count(effective.StartSystemPrompt(), skillDir+"/SKILL.md") != 1 {
+	if strings.Count(effective.StartSystemPrompt(), skillDir+"/SKILL.md") != 1 ||
+		strings.Count(effective.StartSystemPrompt(), operatingContextPrompt) != 1 ||
+		!strings.HasPrefix(effective.StartSystemPrompt(), "base prompt\n\n") {
 		t.Fatalf("effective prompt = %q", effective.StartSystemPrompt())
 	}
 	if got := envValue(effective.StartEnv(), "AGENTDECK_SKILL_DIR"); got != skillDir {
@@ -58,6 +60,38 @@ func TestKnowledgeOverlayIsRuntimeOnlyAndConditional(t *testing.T) {
 	unavailable := srv.applyKnowledgeOverlay(base)
 	if got := unavailable.StartAddDirs(); len(got) != 1 || strings.Contains(unavailable.StartSystemPrompt(), "operating-agentdeck") || envValue(unavailable.StartEnv(), "AGENTDECK_SKILL_DIR") != "" {
 		t.Fatalf("unavailable overlay changed base spec: %+v", unavailable)
+	}
+	// FS-18.A11: the stable standing context survives an unavailable package,
+	// but advertises no skill path or installed knowledge.
+	if strings.Count(unavailable.StartSystemPrompt(), operatingContextPrompt) != 1 || strings.Contains(unavailable.StartSystemPrompt(), "SKILL.md") {
+		t.Fatalf("unavailable overlay prompt = %q", unavailable.StartSystemPrompt())
+	}
+}
+
+// FS-18.A11: a custom role with an empty prompt still receives the standing
+// context exactly once, and nothing of it enters the frozen snapshot.
+func TestKnowledgeOverlayReachesEmptyPromptRole(t *testing.T) {
+	srv := testServer(t, true)
+	srv.knowledge = agentknowledge.Installation{}
+	spec := srv.applyKnowledgeOverlay(srv.applyKnowledgeOverlay(runtime.LaunchSpec{}))
+	if got := spec.StartSystemPrompt(); got != operatingContextPrompt {
+		t.Fatalf("empty-prompt role start prompt = %q", got)
+	}
+	if meta := runtime.NewSessionMeta(spec, "sess"); meta.SystemPrompt != "" {
+		t.Fatalf("standing context leaked into frozen metadata: %q", meta.SystemPrompt)
+	}
+}
+
+// FS-18.R15: the standing context is pointer-free, budget-free guidance that
+// grants nothing. The prohibited content is enumerated from the requirement.
+func TestOperatingContextPromptStaysStable(t *testing.T) {
+	for _, banned := range []string{"SKILL.md", "/", "check_messages", "get_assigned_task", "skip_permissions", "token"} {
+		if strings.Contains(operatingContextPrompt, banned) {
+			t.Errorf("standing context contains %q", banned)
+		}
+	}
+	if strings.ContainsAny(operatingContextPrompt, "0123456789") {
+		t.Error("standing context contains a numeric budget")
 	}
 }
 
@@ -166,11 +200,14 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 			if got := strings.Count(spec.StartSystemPrompt(), skillDir+"/SKILL.md"); got != 1 {
 				t.Errorf("pointer appears %d times in %q", got, spec.StartSystemPrompt())
 			}
+			if got := strings.Count(spec.StartSystemPrompt(), operatingContextPrompt); got != 1 {
+				t.Errorf("standing context appears %d times in %q", got, spec.StartSystemPrompt())
+			}
 			if got := envValue(spec.StartEnv(), "AGENTDECK_SKILL_DIR"); got != skillDir {
 				t.Errorf("AGENTDECK_SKILL_DIR = %q, want %q", got, skillDir)
 			}
 			meta := runtime.NewSessionMeta(spec, "sess")
-			if countStr(meta.AddDirs, root) != 0 || strings.Contains(meta.SystemPrompt, skillDir) {
+			if countStr(meta.AddDirs, root) != 0 || strings.Contains(meta.SystemPrompt, skillDir) || strings.Contains(meta.SystemPrompt, operatingContextPrompt) {
 				t.Errorf("overlay leaked into frozen metadata: %+v", meta)
 			}
 			for _, key := range meta.EnvKeys {
@@ -190,6 +227,9 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 				strings.Contains(spec.StartSystemPrompt(), skillDir) ||
 				envValue(spec.StartEnv(), "AGENTDECK_SKILL_DIR") != "" {
 				t.Errorf("unavailable package still composed an overlay: %+v", spec)
+			}
+			if got := strings.Count(spec.StartSystemPrompt(), operatingContextPrompt); got != 1 {
+				t.Errorf("standing context appears %d times without the package", got)
 			}
 		})
 	}

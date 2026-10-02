@@ -133,7 +133,7 @@ reads the stable bundled path; AgentDeck makes no hot-reload claim.
 
 ### 2.3 Lean standing guidance
 
-**R15 — Every role receives a concise standing operating context.** `(planned)` In addition
+**R15 — Every role receives a concise standing operating context.** In addition
 to the selected persona, every AgentDeck-launched role, including custom and empty-prompt roles,
 receives the same product-owned system/developer guidance. It establishes that the agent operates
 inside AgentDeck; names messaging, durable tasks/dependencies, shared context and supervised
@@ -155,7 +155,7 @@ snapshot and without injecting a turn or restarting a running agent (R8). If the
 package is unavailable, stable environment/authority guidance remains but no skill path or
 installed-knowledge claim is advertised; R11 still owns warning-only package degradation.
 
-**R16 — Four personas supply lean, continuing mandates.** `(planned)` Superseding R2's exact
+**R16 — Four personas supply lean, continuing mandates.** Superseding R2's exact
 prompt and the role-content portions of R12/A2/A9,
 the four roles in FS-04.R50 contain a short purpose and a few standing principles, not workflow
 checklists or copies of the shared R15 text. They guide follow-up turns as well as the initial task
@@ -310,7 +310,7 @@ or lists a role's current prompt as superseded. *Verified:*
 `TestMigrateSupersededRolePromptsReportsUnseededTableEntry`, and
 `TestPrepareAgentKnowledgeFailureThenRetry`.
 
-**A11** `(planned)` (R15, R8, R11) — A fresh implementer, a custom empty-prompt role, and a
+**A11** (R15, R8, R11) — A fresh implementer, a custom empty-prompt role, and a
 resumed legacy role each receive the shared operating context once and the correct skill pointer
 when the package is available. Repeated resume/switch does not duplicate it. An unavailable
 package retains only truthful environment/authority guidance and no path/availability claim.

@@ -148,10 +148,10 @@ func TestRolesSeeded(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &roles); err != nil {
 		t.Fatalf("roles body: %v", err)
 	}
-	if len(roles) != 6 {
-		t.Fatalf("seeded roles = %d, want 6: %v", len(roles), roles)
+	if len(roles) != 4 {
+		t.Fatalf("seeded roles = %d, want 4: %v", len(roles), roles)
 	}
-	for _, k := range []string{"agentdecker", "implementer", "reviewer", "researcher", "pm", "teammate"} {
+	for _, k := range []string{"agentdecker", "implementer", "reviewer", "researcher"} {
 		if _, ok := roles[k]; !ok {
 			t.Errorf("missing seeded role %q", k)
 		}

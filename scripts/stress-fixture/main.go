@@ -96,7 +96,7 @@ func run(opts options) error {
 	cfg := config.DefaultConfig()
 	cfg.Port = opts.port
 	cfg.DefaultProject = "stress"
-	cfg.DefaultRole = "teammate"
+	cfg.DefaultRole = "implementer"
 	cfg.OnboardingComplete = true
 	if err := store.WriteConfig(cfg); err != nil {
 		return err
@@ -210,7 +210,7 @@ func launchWorkload(ctx context.Context, baseURL string, workers int) ([]launche
 	}
 	launched := make([]launchedSession, 0, len(names))
 	for i, name := range names {
-		role := "teammate"
+		role := "implementer"
 		if i == 0 {
 			role = "agentdecker"
 		}

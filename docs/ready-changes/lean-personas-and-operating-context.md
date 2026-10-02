@@ -1,6 +1,6 @@
 # Lean personas and shared AgentDeck operating context
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct `/design-feature` request, 2026-10-02, following persona-versus-skill research.
 The user confirmed four shipped roles, coordination within AgentDecker, and preservation of
 existing PM/Teammate configuration and references.

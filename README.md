@@ -109,7 +109,7 @@ cd ui && npm ci && npm run dev   # http://localhost:5173
 ## Layout (`~/.agentdeck/`)
 
 ```
-roles/{role}.json     personas (seeded: agentdecker, implementer, reviewer, researcher, pm, teammate)
+roles/{role}.json     personas (seeded: agentdecker, implementer, reviewer, researcher)
 projects/{p}.json     workspaces (seeded: my-app)
 backends.json         providers + models (version 2)
 config-sources.json   optional Claude/Codex native-config bindings
@@ -139,17 +139,20 @@ Seeding is per-file and if-absent: new roles appear on the next `dashboard start
 and your edits to existing ones are never overwritten. Edit them in Settings or
 directly in `roles/{role}.json`.
 
-- **`agentdecker`** — built-in AgentDeck expert. Ask it how anything works
+- **`agentdecker`** — built-in AgentDeck expert and coordinator. Ask it how anything works
   (launch syntax, config files, switch-runtime, archive, messaging), or hand it
   a goal: it can launch other agents via the `agentdeck` CLI and coordinate
   them over MCP messaging when the selected real CLI passes the credentialed HTTP-MCP
   compatibility gate recorded in the specifications.
-- **`implementer` / `reviewer` / `researcher` / `pm`** — the classic worker
-  archetypes: ship focused changes with tests, review diffs, investigate before
-  acting, break down and track work.
-- **`teammate`** — a worker built for multi-agent runs: checks its MCP mail on
-  wake, treats coordinator messages as its task queue, and reports outcomes
-  back. Pair it with `pm` or `agentdecker` as the coordinator.
+- **`implementer`** — completes a requested change within existing conventions and reports the
+  verification it actually ran. It is the default role.
+- **`reviewer`** — assesses work against its requirements and reports evidence-backed findings.
+- **`researcher`** — investigates code, specifications and history, or external documentation,
+  and reports sourced findings.
+
+Every role, including one you write yourself, also receives a short AgentDeck operating context at
+launch. Homes created before these four roles keep any `pm` or `teammate` role files as ordinary
+editable roles; AgentDeck no longer creates them.
 
 ## HTTP API (`127.0.0.1:{port}`)
 

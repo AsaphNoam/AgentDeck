@@ -168,7 +168,7 @@ pre-rename seed prompts join `supersededRolePromptDigests` under R13 so the Deck
 an existing install through the same exact-match rule, and the renamed role id (FS-04.R48) is keyed
 in that table as its own role rather than inheriting the old id's digests.
 
-**R15 — Shared standing context extends the existing runtime-only overlay.** `(planned)` For
+**R15 — Shared standing context extends the existing runtime-only overlay.** For
 FS-18.R15, `server.applyKnowledgeOverlay` remains the sole composition seam for fresh launch,
 ordinary/wake resume, runtime switch and pipeline launch/resume in chat and terminal. One
 code-owned, provider-neutral instruction block beside the existing knowledge pointer supplies the
@@ -195,7 +195,7 @@ standing context. No turn, restart, background repair or provider-state rewrite 
 native skill discovery and the reference package stay the detailed operating source.
 
 **R16 — Four seed definitions reuse exact-prompt migration without deleting legacy roles.**
-`(planned)` For FS-04.R50–R51 and FS-18.R16, `config.seedRoles` and `SeedIfAbsent` expose only
+For FS-04.R50–R51 and FS-18.R16, `config.seedRoles` and `SeedIfAbsent` expose only
 the resident operator, implementer, reviewer and researcher. Keep their prompt source in the
 existing seed constants; the implementation uses the FS-18.R16 content contracts rather than a
 second copy of the prompt in fixtures or provider configuration. The default role, Role JSON

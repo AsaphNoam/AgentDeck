@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -404,8 +405,23 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRoles: %v", err)
 	}
-	if len(roles) != 6 {
-		t.Fatalf("seeded roles = %d, want 6", len(roles))
+	// FS-04.A30: exactly the four shipped personas, enumerated from the
+	// requirement rather than from seedRoles().
+	ids := make([]string, 0, len(roles))
+	for id := range roles {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	if want := []string{"agentdecker", "implementer", "researcher", "reviewer"}; !slices.Equal(ids, want) {
+		t.Fatalf("seeded roles = %v, want %v", ids, want)
+	}
+	for id, role := range roles {
+		if role.SkipPermissions != nil {
+			t.Errorf("seeded role %q pins permissions; it must inherit the global policy", id)
+		}
+	}
+	if cfg, err := s.ReadConfig(); err != nil || cfg.DefaultRole != "implementer" {
+		t.Fatalf("default role = %q, %v; want implementer", cfg.DefaultRole, err)
 	}
 	agentdecker, err := s.ReadRole("agentdecker")
 	if err != nil || agentdecker.SystemPrompt != agentDeckerPrompt || strings.Contains(agentdecker.SystemPrompt, "propose_pipeline") {
@@ -440,20 +456,38 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	}
 }
 
-// supersededPromptFixture returns the previously shipped prompt bytes for a
-// role. The fixtures are the independent oracle for the digest table: a digest
-// is only trusted because these bytes hash to it (INV §17).
-func supersededPromptFixture(t *testing.T, id string) string {
+// supersededPromptFixtures returns every previously shipped prompt for a role,
+// oldest first. The fixtures are the independent oracle for the digest table:
+// a digest is only trusted because these bytes hash to it (INV §17).
+func supersededPromptFixtures(t *testing.T, id string) []string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", "superseded_"+id+"_prompt.txt"))
-	if err != nil {
-		t.Fatal(err)
+	paths, err := filepath.Glob(filepath.Join("testdata", "superseded_"+id+"_prompt*.txt"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no superseded prompt fixtures for %q: %v", id, err)
 	}
-	return strings.TrimSuffix(string(data), "\n")
+	slices.Sort(paths)
+	prompts := make([]string, 0, len(paths))
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		prompts = append(prompts, strings.TrimSuffix(string(data), "\n"))
+	}
+	return prompts
 }
 
+// supersededPromptFixture is a role's most recent previously shipped prompt.
+func supersededPromptFixture(t *testing.T, id string) string {
+	t.Helper()
+	prompts := supersededPromptFixtures(t, id)
+	return prompts[len(prompts)-1]
+}
+
+// supersededFixtureIDs are the retained seeded roles with migration history.
+// The retired teammate fixture is preservation evidence only (FS-04.R51).
 func supersededFixtureIDs() []string {
-	return []string{"agentdecker", "teammate", "implementer", "reviewer", "researcher"}
+	return []string{"agentdecker", "implementer", "reviewer", "researcher"}
 }
 
 // FS-18.A9, FS-04.A27: every shipped digest is re-derived from the fixture
@@ -479,10 +513,12 @@ func TestSupersededDigestTableMatchesSeededRoles(t *testing.T) {
 		}
 	}
 	for _, id := range supersededFixtureIDs() {
-		sum := sha256.Sum256([]byte(supersededPromptFixture(t, id)))
-		got := hex.EncodeToString(sum[:])
-		if !slices.Contains(supersededRolePromptDigests[id], got) {
-			t.Fatalf("fixture digest for %q = %s, not in the shipped table %v", id, got, supersededRolePromptDigests[id])
+		for _, prompt := range supersededPromptFixtures(t, id) {
+			sum := sha256.Sum256([]byte(prompt))
+			got := hex.EncodeToString(sum[:])
+			if !slices.Contains(supersededRolePromptDigests[id], got) {
+				t.Fatalf("fixture digest for %q = %s, not in the shipped table %v", id, got, supersededRolePromptDigests[id])
+			}
 		}
 	}
 }
@@ -496,6 +532,10 @@ func TestSeededPromptsDoNotInstructPolling(t *testing.T) {
 		"get_assigned_task",
 		"Start each turn by checking",
 		"woken with no new instruction",
+		// FS-18.R16: personas do not copy tool schemas or the shared context.
+		"propose_pipeline",
+		"create_task",
+		"SKILL.md",
 	}
 	for id, role := range seedRoles() {
 		for _, phrase := range banned {
@@ -503,9 +543,6 @@ func TestSeededPromptsDoNotInstructPolling(t *testing.T) {
 				t.Errorf("seeded role %q prompt contains %q; AgentDeck's activation names the tool a host-owned turn needs", id, phrase)
 			}
 		}
-	}
-	if teammate := seedRoles()["teammate"].SystemPrompt; !strings.Contains(teammate, "task queue") {
-		t.Error("teammate lost its assignment-queue stance")
 	}
 }
 
@@ -515,18 +552,28 @@ func TestSeededPromptsDoNotInstructPolling(t *testing.T) {
 func TestMigrateSupersededRolePromptsExactOnly(t *testing.T) {
 	seeded := seedRoles()
 	for _, id := range supersededFixtureIDs() {
-		superseded := supersededPromptFixture(t, id)
-		for _, tc := range []struct {
+		type migrationCase struct {
 			name    string
 			prompt  string
 			migrate bool
-		}{
-			{name: "exact", prompt: superseded, migrate: true},
-			{name: "one byte edit", prompt: superseded + "!"},
-			{name: "empty", prompt: ""},
-			{name: "custom", prompt: "my prompt"},
-			{name: "another role's superseded prompt", prompt: supersededPromptFixture(t, otherFixtureID(id))},
-		} {
+		}
+		var cases []migrationCase
+		// Every previously shipped generation migrates, so an install several
+		// releases behind is still corrected (TS-11.R13).
+		for i, superseded := range supersededPromptFixtures(t, id) {
+			cases = append(cases,
+				migrationCase{name: fmt.Sprintf("exact generation %d", i+1), prompt: superseded, migrate: true},
+				migrationCase{name: fmt.Sprintf("one byte edit generation %d", i+1), prompt: superseded + "!"},
+			)
+		}
+		cases = append(cases,
+			migrationCase{name: "current prompt", prompt: seeded[id].SystemPrompt},
+			migrationCase{name: "empty", prompt: ""},
+			migrationCase{name: "custom", prompt: "my prompt"},
+			migrationCase{name: "another role's superseded prompt", prompt: supersededPromptFixture(t, otherFixtureID(id))},
+			migrationCase{name: "retired teammate prompt", prompt: supersededPromptFixture(t, "teammate")},
+		)
+		for _, tc := range cases {
 			t.Run(id+"/"+tc.name, func(t *testing.T) {
 				s := newTestStore(t)
 				if err := s.EnsureLayout(); err != nil {
@@ -561,7 +608,7 @@ func TestMigrateSupersededRolePromptsExactOnly(t *testing.T) {
 
 func otherFixtureID(id string) string {
 	if id == "agentdecker" {
-		return "teammate"
+		return "reviewer"
 	}
 	return "agentdecker"
 }
@@ -612,8 +659,8 @@ func TestMigrateSupersededRolePromptsIsolatesPerRoleFailure(t *testing.T) {
 		if err := s.EnsureLayout(); err != nil {
 			t.Fatal(err)
 		}
-		writeOthers(t, s, "teammate")
-		path := s.rolePath("teammate")
+		writeOthers(t, s, "implementer")
+		path := s.rolePath("implementer")
 		before := []byte("{not json")
 		if err := os.WriteFile(path, before, 0o600); err != nil {
 			t.Fatal(err)
@@ -632,7 +679,7 @@ func TestMigrateSupersededRolePromptsIsolatesPerRoleFailure(t *testing.T) {
 		if !bytes.Equal(before, after) {
 			t.Fatalf("role bytes changed by a failed migration:\nbefore %s\nafter  %s", before, after)
 		}
-		assertOthersMigrated(t, s, "teammate")
+		assertOthersMigrated(t, s, "implementer")
 	})
 
 	t.Run("read failure", func(t *testing.T) {
@@ -734,6 +781,65 @@ func TestMigrateSupersededRolePromptsSkipsUnseededRole(t *testing.T) {
 	}
 	if got.SystemPrompt != custom.SystemPrompt {
 		t.Fatal("an unseeded role was rewritten by the seed-prompt migration")
+	}
+}
+
+// FS-04.A31: an upgraded home keeps its retired pm/teammate roles and any
+// default that names them byte-for-byte, a missing retired role is never
+// recreated, and only the exact retained prompt migrates.
+func TestUpgradePreservesRetiredRolesAndReferences(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DefaultRole = "pm"
+	if err := s.WriteConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	teammate := Role{Title: "Teammate", SystemPrompt: supersededPromptFixture(t, "teammate")}
+	if err := s.WriteRole("teammate", teammate); err != nil {
+		t.Fatal(err)
+	}
+	customReviewer := Role{Title: "Reviewer", SystemPrompt: "Review my way.", SkipPermissions: boolPtr(false)}
+	if err := s.WriteRole("reviewer", customReviewer); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WriteRole("implementer", Role{Title: "Implementer", SystemPrompt: supersededPromptFixture(t, "implementer")}); err != nil {
+		t.Fatal(err)
+	}
+	configBefore, err := os.ReadFile(s.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	teammateBefore, err := os.ReadFile(s.rolePath("teammate"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for pass := 0; pass < 2; pass++ {
+		if err := s.SeedIfAbsent(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.MigrateSupersededRolePrompts(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := s.ReadRole("pm"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing retired pm role was recreated: %v", err)
+	}
+	if after, err := os.ReadFile(s.rolePath("teammate")); err != nil || !bytes.Equal(after, teammateBefore) {
+		t.Fatalf("retired teammate role changed: %s, %v", after, err)
+	}
+	if after, err := os.ReadFile(s.configPath()); err != nil || !bytes.Equal(after, configBefore) {
+		t.Fatalf("config with a retired default changed: %s, %v", after, err)
+	}
+	if got, err := s.ReadRole("reviewer"); err != nil || !reflect.DeepEqual(got, customReviewer) {
+		t.Fatalf("customized reviewer changed: %+v, %v", got, err)
+	}
+	if got, err := s.ReadRole("implementer"); err != nil || got.SystemPrompt != seedRoles()["implementer"].SystemPrompt {
+		t.Fatalf("exact retained implementer prompt not migrated: %+v, %v", got, err)
 	}
 }
 

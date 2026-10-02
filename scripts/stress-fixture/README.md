@@ -1,7 +1,7 @@
 # Multi-tab stress fixture
 
 This fixture starts the production AgentDeck HTTP server and embedded UI with an isolated temporary
-home. It launches one `agentdecker` orchestrator and six `teammate` workers, all displayed as the
+home. It launches one `agentdecker` orchestrator and six `implementer` workers, all displayed as the
 `claude` backend with the `haiku` model. The provider is the repository's deterministic fake ACP, so
 the run needs no credentials, network access, or provider spend.
 

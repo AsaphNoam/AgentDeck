@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** lean personas and shared operating context (in progress).
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -29,7 +29,18 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+**Lean personas and shared operating context** — in progress,
+[`lean-personas-and-operating-context.md`](../ready-changes/lean-personas-and-operating-context.md).
+
+Done: slices 1–2 — four seeded personas in `internal/config/seed.go` (previous prompts kept as
+`testdata/superseded_<role>_prompt_2.txt` digests; `pm`/`teammate` no longer seeded or migrated),
+and `operatingContextPrompt` in `server.applyKnowledgeOverlay` (`internal/server/launch.go`).
+`go test ./internal/config ./internal/cli ./internal/server` passes.
+
+Next:
+3. Claude preset `_meta.systemPrompt` object for new/load (TS-04.R69) in `internal/runtime/chat.go`.
+4. Active docs/spec status, closure matrix; record the A12 scenarios and A13 credentialed
+   receipts as manual gates if not run.
 
 ## Acceptance gates still owed
 
