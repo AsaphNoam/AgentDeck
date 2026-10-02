@@ -161,11 +161,38 @@
 
 .agent-card-header-actions {
   align-items: center;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--ad-space-2);
-  grid-template-columns: minmax(88px, 1fr) auto auto;
+  justify-content: flex-end;
   width: 100%;
   padding-bottom: var(--ad-space-3);
+}
+
+/* The meter's label can carry the exact used/total figure (TS-08.R81), so the
+   meter takes its own full-width row below the state badge and Collapse rather
+   than letting the no-wrap label run under them. */
+.agent-card-header-actions > [data-slot="context"] {
+  flex: 1 0 100%;
+  margin-bottom: var(--ad-space-3);
+  order: 1;
+}
+
+/* The expanded card's header "content side" (name + quiet runtime metadata,
+   TS-08.R81) stacks independently of the "action side" (context/state/Collapse)
+   so a long backend/model/effort string wraps or clips without displacing them
+   or overlapping across the single-column expanded header grid. */
+.agent-card-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-space-1);
+  min-width: 0;
+}
+
+.agent-card-header-content .model-pill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 @container agent-card (max-width: 260px) {
@@ -176,15 +203,6 @@
   .agent-card-top > .state-badge {
     grid-column: 2;
     justify-self: start;
-  }
-
-  .agent-card-header-actions {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .agent-card-header-actions > [data-slot="context"] {
-    grid-column: 1 / -1;
-    margin-bottom: var(--ad-space-3);
   }
 
   .dashboard-chat-composer .composer {
@@ -203,12 +221,7 @@
 
 @container agent-card (max-width: 180px) {
   .agent-card-header-actions {
-    grid-template-columns: minmax(0, 1fr);
-    justify-items: start;
-  }
-
-  .agent-card-header-actions > [data-slot="context"] {
-    justify-self: stretch;
+    justify-content: flex-start;
   }
 }
 

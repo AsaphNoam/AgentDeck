@@ -28,7 +28,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 |----|------|--------|--------|
 | FS-00 | [features/FS-00-product-overview.md](features/FS-00-product-overview.md) | Partial | Product summary, goals/non-goals, core concepts, orchestration planes, glossary |
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Partial | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
-| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation |
+| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications, project creation |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, backend creation, settings UI, onboarding wizard, appearance preference, directory browsing, and exact per-role seed-prompt migration |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
@@ -84,7 +84,7 @@ Potential work that has not reached an FS/TS update belongs only in `docs/ideas.
 
 | Capability group | Relevant feature specs | Delivery state |
 |---|---|---|
-| Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped core; exact context/runtime-card display additions planned |
+| Core agent operation | FS-00 product concepts; FS-01 lifecycle; FS-02 dashboard; FS-03 chat | Shipped |
 | Configuration and providers | FS-04 configuration/onboarding; FS-09 backends | Shipped core; FS-09 expansion remains Partial |
 | Durable supervision | FS-05 archive/tracking; FS-06 coordination; FS-13 annotations | Shipped, including waking/deferred bounded inline mail |
 | Configurable pipelines | FS-14 templates, task-backed ordered runs, recovery, and supervision | Shipped; run detail browser acceptance pending |

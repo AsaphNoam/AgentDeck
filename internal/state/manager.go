@@ -396,7 +396,10 @@ WHERE agent_id = ?`, payload.AgentID).Scan(&curState, &curBusy, &curPct)
 	if curPct.Valid {
 		contextPct = curPct.Float64
 	}
-	if payload.ContextPct != nil {
+	// A hook reports a percentage only, so a newer reading makes the exact pair
+	// unknown rather than leaving stale counts beside it (TS-02.R39).
+	clearCounts := payload.ContextPct != nil
+	if clearCounts {
 		contextPct = *payload.ContextPct
 	}
 
@@ -409,8 +412,11 @@ ON CONFLICT(agent_id) DO UPDATE SET
     last_trace = excluded.last_trace,
     busy_since = excluded.busy_since,
     context_pct = excluded.context_pct,
+    context_used = CASE WHEN ? THEN NULL ELSE context_used END,
+    context_size = CASE WHEN ? THEN NULL ELSE context_size END,
     updated_at = excluded.updated_at`,
 		payload.AgentID, payload.State, payload.Detail, payload.LastTrace, busySince, contextPct, now.UnixMilli(),
+		clearCounts, clearCounts,
 	)
 	if err != nil {
 		return fmt.Errorf("state: apply status hook: %w", err)
@@ -438,7 +444,7 @@ func (m *Manager) recompute(agentID string) (AgentStateUpdate, error) {
 SELECT
     a.agent_id, a.name, a.role, a.project, a.backend, a.model, a.effort, a.fast, a.interface, a.grp, a.created_at, a.archived,
     r.pid, r.session_id, r.tty, r.driver, r.started_at, r.fast_available, r.steering_available,
-    st.state, st.detail, st.last_trace, st.busy_since, st.context_pct,
+    st.state, st.detail, st.last_trace, st.busy_since, st.context_pct, st.context_used, st.context_size,
     s.runtime_capabilities_json, s.last_session_id
 FROM agents a
 LEFT JOIN running r ON r.agent_id = a.agent_id
@@ -452,12 +458,13 @@ WHERE a.agent_id = ?`, agentID)
 	var fastAvailable, steeringAvailable sql.NullBool
 	var state, detail, lastTrace, busySince sql.NullString
 	var contextPct sql.NullFloat64
+	var contextUsed, contextSize sql.NullInt64
 	var capabilities, nativeSession sql.NullString
 	err := row.Scan(
 		&out.AgentID, &out.Name, &out.Role, &out.Project, &out.Backend, &out.Model, &out.Effort, &out.Fast,
 		&out.Interface, &out.Group, &out.CreatedAt, &out.Archived,
 		&pid, &sessionID, &tty, &driver, &startedAt, &fastAvailable, &steeringAvailable,
-		&state, &detail, &lastTrace, &busySince, &contextPct,
+		&state, &detail, &lastTrace, &busySince, &contextPct, &contextUsed, &contextSize,
 		&capabilities, &nativeSession,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -511,6 +518,7 @@ WHERE a.agent_id = ?`, agentID)
 	if contextPct.Valid {
 		out.ContextPct = contextPct.Float64
 	}
+	out.ContextCounts = contextCountsFromColumns(contextUsed, contextSize)
 	if unread, err := m.store.UnreadCount(agentID); err == nil {
 		out.UnreadMessages = unread
 	}

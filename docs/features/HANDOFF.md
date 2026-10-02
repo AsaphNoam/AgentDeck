@@ -19,10 +19,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   they now wait for that rendered default first. The GitHub Release carries the 293,072,856-byte
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
-- **Work units:** `show-exact-context-and-runtime-metadata.md` and
-  `rename-product-to-deckhand.md` are waiting to start.
+- **Work units:** `rename-product-to-deckhand.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes and
+  `show-exact-context-and-runtime-metadata` (exact used/total context tokens through ACP decode,
+  status/session persistence, AgentState, and the shared meter; runtime identity on expanded
+  project cards) are available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -129,6 +131,18 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-02 — Work: exact context tokens and expanded-card runtime metadata.** ACP
+  `usage_update` decodes one reading (capped percentage plus the reported used/size pair; a
+  missing, non-integer or out-of-range pair rejects the update). Migration 35 adds nullable pairs to
+  `status` and `sessions`; status writes, turn_end, rollup, reindex, resume and switch carry the
+  pair with the percentage, and a percentage-only hook clears it. `AgentState` gains optional
+  `context_used`/`context_size`; `ContextBar` renders `12,345 / 200,000 tokens · 6% context used`
+  on the chat header and expanded card, and the expanded card shows backend · model · effort. A
+  real-browser check of the visual matrix at 1024/1440 in all three appearances found the longer
+  label running under the state badge; the expanded action side now wraps the meter onto its own
+  row, verified overlap-free. INV 1–3, 7–8, 10–11, 13, 16–17 applied; 4–6, 9, 12, 14–15 had no
+  changed surface. A live-app J5 pass against a real provider was not run.
 
 - **2026-10-02 — Fix: phone desktop flow and agent management.** Open phone agent and project
   screens now enter the archived state when the desktop archives them (INV §1 republish derived state; project

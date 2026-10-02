@@ -620,7 +620,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   while tray caps/expiry/deletion, send behavior, and the three-column file/transcript/tray grid
   remain the shipped implementations. Focused tests drive actual selection ranges and the wire
   body rather than a helper-shaped fixture (INV §17).
-- **R81** `(planned)` — **Context and runtime metadata extend the existing card composition.**
+- **R81** — **Context and runtime metadata extend the existing card composition.**
   `ContextBar` remains the only component that clamps and rounds `context_pct`, selects its tone,
   and composes its accessible label. It additionally accepts the optional TS-03.R50 raw pair and,
   only when both values are present, formats the exact unabridged integers with digit grouping as

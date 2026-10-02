@@ -53,6 +53,12 @@ export interface AgentState {
   last_trace?: string;
   busy_since?: string;
   context_pct: number;
+  /** Exact current token count (TS-03.R50); present together with `context_size` or
+   * omitted entirely — never derive one from `context_pct`. */
+  context_used?: number;
+  /** Exact context-window size (TS-03.R50); present together with `context_used` or
+   * omitted entirely. */
+  context_size?: number;
   unread_messages?: number;
   last_sent_at?: string;
   updated_at: number;

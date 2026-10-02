@@ -216,7 +216,7 @@ type agentState struct {
 	mu         sync.Mutex
 	seq        int64
 	turnSeq    int64
-	contextPct float64
+	context    contextReading
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
@@ -754,10 +754,12 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 
 	// busy / thinking (techspec §4.4).
 	now := time.Now().UTC()
-	_ = c.writeStatus(as, state.Status{
+	busy := state.Status{
 		AgentID: as.agentID, State: "busy", Detail: "thinking",
-		LastTrace: "UserPromptSubmit", BusySince: &now, ContextPct: as.lastPct(),
-	})
+		LastTrace: "UserPromptSubmit", BusySince: &now,
+	}
+	as.lastContext().applyTo(&busy)
+	_ = c.writeStatus(as, busy)
 
 	// Drive the turn asynchronously: notifications stream over the hub while the
 	// prompt Call blocks for the result. SendPrompt itself returns immediately.
@@ -775,7 +777,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 				return
 			}
 			c.clearInlineMail(as.agentID, deliveryKey)
-			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			td := as.lastContext().turnEnd("error")
 			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
 			c.finishTurn(as, td)
@@ -978,9 +980,9 @@ func (as *agentState) settleAndReserveHeld(td *TurnEndData, hasPct bool) (string
 	defer as.mu.Unlock()
 	as.cancelEscalated = false
 	if hasPct {
-		as.contextPct = td.ContextPct
+		as.context = contextReading{pct: td.ContextPct}
 	} else {
-		td.ContextPct = as.contextPct
+		td.ContextPct, td.ContextCounts = as.context.pct, as.context.counts
 	}
 	return as.reserveHeldSuccessorLocked()
 }
@@ -1036,7 +1038,8 @@ func (c *ChatRuntime) Stop(ctx context.Context, agentID string) error {
 	// Keep the status row so the archive/UI can show a final state (§7.5).
 	st, err := c.store.ReadStatus(agentID)
 	if err != nil {
-		st = state.Status{AgentID: agentID, ContextPct: as.lastPct()}
+		st = state.Status{AgentID: agentID}
+		as.lastContext().applyTo(&st)
 	}
 	st.State = "done"
 	st.BusySince = nil
@@ -1157,7 +1160,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 		toolNames:        map[string]string{},
 		pending:          map[string]*pendingPerm{},
 		resolved:         map[string]struct{}{},
-		contextPct:       spec.LastContextPct,
+		context:          contextReading{pct: spec.LastContextPct, counts: spec.LastContext},
 		adapter:          ad,
 		// The notification callback is installed before session/load runs, so the
 		// replay gate has to be closed from construction — a provider that starts
@@ -1297,7 +1300,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	}
 	if err := c.writeStatus(as, state.Status{
 		AgentID: as.agentID, State: "idle", Detail: "resumed",
-		LastTrace: "SessionStart", ContextPct: spec.LastContextPct,
+		LastTrace: "SessionStart", ContextPct: spec.LastContextPct, ContextCounts: spec.LastContext,
 	}); err != nil {
 		as.shutdown()
 		_ = c.store.DeleteRunning(as.agentID)
@@ -1379,10 +1382,12 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 	// is correct and does not reopen a replay: the caller's kind-owned attempted
 	// boundary already committed, so the activation is retired, not re-armed.
 	now := time.Now().UTC()
-	if err := c.writeStatus(as, state.Status{
+	busy := state.Status{
 		AgentID: as.agentID, State: "busy", Detail: contract.StatusDetail,
-		LastTrace: contract.LastTrace, BusySince: &now, ContextPct: as.lastPct(),
-	}); err != nil {
+		LastTrace: contract.LastTrace, BusySince: &now,
+	}
+	as.lastContext().applyTo(&busy)
+	if err := c.writeStatus(as, busy); err != nil {
 		c.clearInlineMail(as.agentID, deliveryKey)
 		as.mu.Lock()
 		as.turnActive = false
@@ -1402,7 +1407,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 				return
 			}
 			c.clearInlineMail(as.agentID, deliveryKey)
-			td := TurnEndData{StopReason: "error", ContextPct: as.lastPct()}
+			td := as.lastContext().turnEnd("error")
 			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
 			c.finishTurn(as, td)
@@ -1534,11 +1539,11 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 	// through the existing status-write seam immediately so a long-running
 	// turn's dashboard meter does not go stale waiting for the next
 	// tool/status event or turn_end (TS-04.R25, INV §1).
-	if pct, ok := decodeContextUsage(params); ok {
+	if reading, ok := decodeContextUsage(params); ok {
 		as.mu.Lock()
-		as.contextPct = pct
+		as.context = reading
 		as.mu.Unlock()
-		c.republishContextPct(as)
+		c.republishContext(as)
 		return
 	}
 	// While session/load restores provider-native context, a replayed frame is
@@ -1684,7 +1689,7 @@ func (c *ChatRuntime) onTransportClosed(as *agentState) {
 		c.onExit(as.agentID, as.generation)
 	}
 
-	c.emit(as, EvTurnEnd, TurnEndData{StopReason: stopReason, ContextPct: as.lastPct()})
+	c.emit(as, EvTurnEnd, as.lastContext().turnEnd(stopReason))
 	as.closePersistence()
 	as.cancel()
 	as.hub.Close()
@@ -1834,10 +1839,11 @@ func (c *ChatRuntime) persistEvent(as *agentState, ev Event) bool {
 	}
 	if ev.Type == EvTurnEnd {
 		_ = w.Sync()
-		rollup := TurnRollup{LastSeq: ev.Seq, UpdatedAt: ev.Ts, LastContextPct: as.lastPct()}
+		last := as.lastContext()
+		rollup := TurnRollup{LastSeq: ev.Seq, UpdatedAt: ev.Ts, LastContextPct: last.pct, LastContext: last.counts}
 		var td TurnEndData
 		if err := json.Unmarshal(ev.Data, &td); err == nil {
-			rollup.LastContextPct = td.ContextPct
+			rollup.LastContextPct, rollup.LastContext = td.ContextPct, td.ContextCounts
 		}
 		if err := ix.OnEventAndTurnEnd(as.agentID, ev, rollup); err != nil {
 			slog.Error("runtime: index turn end", "agent", as.agentID, "seq", ev.Seq, "err", err)
@@ -1963,7 +1969,7 @@ func (c *ChatRuntime) updateStatus(as *agentState, st, detail, trace string, mod
 	cur.State = st
 	cur.Detail = detail
 	cur.LastTrace = trace
-	cur.ContextPct = as.lastPct()
+	as.lastContext().applyTo(&cur)
 	if mode == clearBusySince {
 		cur.BusySince = nil
 	}
@@ -1982,12 +1988,12 @@ func (c *ChatRuntime) writeStatus(as *agentState, st state.Status) error {
 	return nil
 }
 
-// republishContextPct refreshes only the current status row's context
-// percentage from the latest decoded usage_update and republishes it through
-// the same write+touch seam as updateStatus/writeStatus, without disturbing
-// the row's state/detail/trace/busy_since (there is no status transition
-// implied by a usage_update alone).
-func (c *ChatRuntime) republishContextPct(as *agentState) {
+// republishContext refreshes only the current status row's context percentage
+// and exact pair from the latest decoded usage_update and republishes them
+// through the same write+touch seam as updateStatus/writeStatus, without
+// disturbing the row's state/detail/trace/busy_since (there is no status
+// transition implied by a usage_update alone).
+func (c *ChatRuntime) republishContext(as *agentState) {
 	cur, err := c.store.ReadStatus(as.agentID)
 	if err != nil {
 		// Unlike updateStatus there is no state transition to record, so an
@@ -1996,7 +2002,7 @@ func (c *ChatRuntime) republishContextPct(as *agentState) {
 		slog.Debug("runtime: read status for usage republish", "agent", as.agentID, "err", err)
 		return
 	}
-	cur.ContextPct = as.lastPct()
+	as.lastContext().applyTo(&cur)
 	if err := c.store.WriteStatus(cur); err != nil {
 		slog.Error("runtime: write status", "agent", as.agentID, "err", err)
 		return
@@ -2117,10 +2123,10 @@ func (as *agentState) setCapabilities(caps SessionCapabilities) {
 	as.mu.Unlock()
 }
 
-func (as *agentState) lastPct() float64 {
+func (as *agentState) lastContext() contextReading {
 	as.mu.Lock()
 	defer as.mu.Unlock()
-	return as.contextPct
+	return as.context
 }
 
 func (as *agentState) nextTurnIDLocked() string {

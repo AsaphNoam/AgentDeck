@@ -255,16 +255,23 @@ func (ix *Indexer) flushLocked(agentID string, rollup runtime.TurnRollup, countT
 	if countTurn {
 		turnInc = 1
 	}
+	// The exact pair travels with the percentage; NULL means unknown (TS-02.R39).
+	var lastUsed, lastSize any
+	if c := rollup.LastContext; c != nil {
+		lastUsed, lastSize = c.ContextUsed, c.ContextSize
+	}
 	if _, err := tx.Exec(`
 UPDATE sessions
 SET turn_count = turn_count + ?,
     last_seq = CASE WHEN last_seq < ? THEN ? ELSE last_seq END,
     last_context_pct = ?,
+    last_context_used = ?,
+    last_context_size = ?,
     updated_at = CASE WHEN ? <> '' THEN ? ELSE updated_at END,
     files_touched = (SELECT COUNT(*) FROM tracked_files WHERE agent_id = ?),
     commands_run = (SELECT COUNT(*) FROM tracked_commands WHERE agent_id = ?)
 WHERE agent_id = ?`,
-		turnInc, rollup.LastSeq, rollup.LastSeq, rollup.LastContextPct, rollup.UpdatedAt, rollup.UpdatedAt, agentID, agentID, agentID); err != nil {
+		turnInc, rollup.LastSeq, rollup.LastSeq, rollup.LastContextPct, lastUsed, lastSize, rollup.UpdatedAt, rollup.UpdatedAt, agentID, agentID, agentID); err != nil {
 		return fmt.Errorf("index: update turn rollup: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

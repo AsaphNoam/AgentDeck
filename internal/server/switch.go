@@ -452,6 +452,7 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 		ExtraArgs:      extraArgs,
 		LastSessionID:  resumeID,
 		LastContextPct: snap.LastContextPct,
+		LastContext:    snap.LastContext,
 		// Switch continues the same logical session, so the frozen federation launch
 		// object carries over unchanged — switch never re-resolves the source (§2.5).
 		LaunchConfig: snap.LaunchConfig,

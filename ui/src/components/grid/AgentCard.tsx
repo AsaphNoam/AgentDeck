@@ -19,6 +19,9 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
   };
   const preview = agent.detail || lastLine || "";
   const projectLabel = projectTitle?.trim() || agent.project;
+  // Collapsed and expanded cards show the same runtime identity string (FS-02.R63,
+  // TS-08.R81), so it is derived once rather than re-joined at each call site (INV §2).
+  const runtimeIdentity = [agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ");
 
   return (
     <article
@@ -57,13 +60,16 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
           ::
         </button>}
         {expanded ? (
-          <Link className="agent-card-name-link" data-slot="identity" to={`/agent/${agent.agent_id}`} onClick={(event) => event.stopPropagation()}>
-            {agent.name}
-          </Link>
+          <div className="agent-card-header-content">
+            <Link className="agent-card-name-link" data-slot="identity" to={`/agent/${agent.agent_id}`} onClick={(event) => event.stopPropagation()}>
+              {agent.name}
+            </Link>
+            {runtimeIdentity && <span className="model-pill" data-slot="metadata">{runtimeIdentity}</span>}
+          </div>
         ) : <strong data-slot="identity">{agent.name}</strong>}
         {expanded ? (
           <div className="agent-card-header-actions">
-            <div data-slot="context"><ContextBar value={agent.context_pct} compact /></div>
+            <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} compact /></div>
             <StateBadge state={agent.state} />
             <Button
               data-slot="collapse-control"
@@ -81,9 +87,7 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
       </div>
       {expanded ? children : <>
       <p className="agent-subtitle" data-slot="metadata">{showProject ? `${agent.role} · ${projectLabel}` : agent.role}</p>
-      <span className="model-pill">
-        {[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}
-      </span>
+      <span className="model-pill">{runtimeIdentity}</span>
       {agent.pipeline && (
         <Link
           className="pipeline-association"

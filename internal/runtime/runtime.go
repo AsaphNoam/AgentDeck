@@ -53,11 +53,12 @@ type LaunchSpec struct {
 	// AutoApproveTools is the current code-derived set of AgentDeck MCP tool
 	// identities allowed once without entering the human permission gate.
 	AutoApproveTools map[string]struct{}
-	HookToken        string          // per-launch one-time token passed to the agent's hooks
-	MCPServers       []MCPServerSpec // messaging MCP server registration; one entry this phase
-	ExtraArgs        []string        // reserved (e.g. extra adapter flags) — empty this phase
-	LastSessionID    string          // prior CLI session id; Resume tries session/load with this
-	LastContextPct   float64         // last-known context pct; Resume restores it to the status row
+	HookToken        string               // per-launch one-time token passed to the agent's hooks
+	MCPServers       []MCPServerSpec      // messaging MCP server registration; one entry this phase
+	ExtraArgs        []string             // reserved (e.g. extra adapter flags) — empty this phase
+	LastSessionID    string               // prior CLI session id; Resume tries session/load with this
+	LastContextPct   float64              // last-known context pct; Resume restores it to the status row
+	LastContext      *state.ContextCounts // exact pair recorded with LastContextPct, nil when unknown
 	// LaunchConfig is the frozen configuration-federation launch object (Phase 7
 	// techspec §2.5): redacted requested-vs-resolved model/effort/provider, binding
 	// backend/provider/profile, source generation + fingerprints, native-inherit
@@ -147,6 +148,7 @@ type MCPServerSpec struct {
 type TurnRollup struct {
 	LastSeq        int64
 	LastContextPct float64
+	LastContext    *state.ContextCounts
 	UpdatedAt      string
 }
 

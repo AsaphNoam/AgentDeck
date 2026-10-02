@@ -117,6 +117,9 @@ type PermOption struct {
 type TurnEndData struct {
 	StopReason string  `json:"stop_reason"` // "end_turn" | "cancelled" | "max_tokens" | "error"
 	ContextPct float64 `json:"context_pct"` // 0..1 if reported, else last-known
+	// The exact pair recorded with ContextPct, omitted when unknown, so an index
+	// rebuild restores the same tuple as the live rollup (TS-02.R39).
+	*state.ContextCounts
 }
 
 // ErrorData — runtime/protocol/process error surfaced to the client.

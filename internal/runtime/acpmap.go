@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
 )
 
@@ -177,22 +178,43 @@ func decodeAvailableCommands(params json.RawMessage) ([]CommandItem, bool) {
 	return out, true
 }
 
+// contextReading is one normalized context report: the capped percentage and
+// the exact pair it came from, or a nil pair when only the percentage is known.
+type contextReading struct {
+	pct    float64
+	counts *state.ContextCounts
+}
+
 // decodeContextUsage recognizes the ACP usage_update notification that carries
-// the current context usage and window size (TS-04.R25). Its value is bounded
-// at the provider boundary because context_pct is a 0..1 dashboard contract.
-func decodeContextUsage(params json.RawMessage) (float64, bool) {
+// the current context usage and window size (TS-04.R25/R68). Its percentage is
+// bounded at the provider boundary because context_pct is a 0..1 dashboard
+// contract; the reported integers are kept as-is, even when used > size. A
+// missing, malformed or out-of-range pair rejects the whole update.
+func decodeContextUsage(params json.RawMessage) (contextReading, bool) {
 	var su acpSessionUpdate
 	if err := json.Unmarshal(params, &su); err != nil || su.Update.SessionUpdate != "usage_update" {
-		return 0, false
+		return contextReading{}, false
 	}
-	if su.Update.Used < 0 || su.Update.Size <= 0 {
-		return 0, false
+	used, size := su.Update.Used, su.Update.Size
+	if used == nil || size == nil || *used < 0 || *size <= 0 {
+		return contextReading{}, false
 	}
-	pct := float64(su.Update.Used) / float64(su.Update.Size)
+	pct := float64(*used) / float64(*size)
 	if pct > 1 {
 		pct = 1
 	}
-	return pct, true
+	return contextReading{pct: pct, counts: &state.ContextCounts{ContextUsed: *used, ContextSize: *size}}, true
+}
+
+// applyTo writes the percentage and its optional pair onto st together.
+func (r contextReading) applyTo(st *state.Status) {
+	st.ContextPct = r.pct
+	st.ContextCounts = r.counts
+}
+
+// turnEnd is the terminal turn event carrying this reading.
+func (r contextReading) turnEnd(stopReason string) TurnEndData {
+	return TurnEndData{StopReason: stopReason, ContextPct: r.pct, ContextCounts: r.counts}
 }
 
 // acpmap.go is the ONLY place ACP wire shapes are decoded (techspec §12.1
@@ -224,8 +246,8 @@ type acpUpdate struct {
 	RawInput   json.RawMessage `json:"rawInput"`
 
 	// usage_update: the current context usage and its window size.
-	Used int `json:"used"`
-	Size int `json:"size"`
+	Used *int64 `json:"used"`
+	Size *int64 `json:"size"`
 }
 
 // acpContentBlock is a single content item (text or diff). Tool-call content is

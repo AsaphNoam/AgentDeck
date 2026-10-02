@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/transcript"
 )
 
@@ -59,6 +60,7 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 	path := filepath.Join(root, agentID, "transcript.ndjson")
 	var lastSeq int64
 	var lastContext float64
+	var lastCounts *state.ContextCounts
 	var updatedAt string
 	// pendingFlush tracks whether events have been buffered since the last
 	// turn_end flush. It must trigger a final flush not only when NO turn_end
@@ -81,8 +83,8 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 		if ev.Type == runtime.EvTurnEnd {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(ev.Data, &d)
-			lastContext = d.ContextPct
-			if err := ix.OnEventAndTurnEnd(agentID, ev, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, UpdatedAt: ev.Ts}); err != nil {
+			lastContext, lastCounts = d.ContextPct, d.ContextCounts
+			if err := ix.OnEventAndTurnEnd(agentID, ev, runtime.TurnRollup{LastSeq: ev.Seq, LastContextPct: d.ContextPct, LastContext: d.ContextCounts, UpdatedAt: ev.Ts}); err != nil {
 				return fmt.Errorf("index: turn_end %s seq %d: %w", agentID, ev.Seq, err)
 			}
 			pendingFlush = false
@@ -97,7 +99,7 @@ func reindexAgent(ix *Indexer, root, agentID string) error {
 		return fmt.Errorf("index: replay %s: %w", agentID, err)
 	}
 	if lastSeq > 0 && updatedAt != "" && pendingFlush {
-		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, UpdatedAt: updatedAt}, false, "partial"); err != nil {
+		if err := ix.flush(agentID, runtime.TurnRollup{LastSeq: lastSeq, LastContextPct: lastContext, LastContext: lastCounts, UpdatedAt: updatedAt}, false, "partial"); err != nil {
 			return fmt.Errorf("index: final flush %s: %w", agentID, err)
 		}
 	}

@@ -113,6 +113,27 @@ const backends = {
   },
 };
 
+// FS-03.R66/A47: the full agent screen's context meter renders the shared
+// exact used/total figure beside the percentage when both raw counts are known.
+it("shows the exact used/total token figure when both raw counts are known", () => {
+  const agent = { ...liveAgent("a_exact"), context_pct: 0.06, context_used: 12345, context_size: 200000 };
+  useAgentStore.setState({ agents: { a_exact: agent }, order: ["a_exact"], hydrated: true, hydrating: false });
+  mocks.useBackends.mockReturnValue({ data: backends });
+  renderPanel("a_exact");
+
+  expect(screen.getByText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+});
+
+// A state with no raw pair keeps the existing percentage-only label.
+it("keeps the existing percentage-only label when raw counts are unavailable", () => {
+  const agent = { ...liveAgent("a_pctonly"), context_pct: 0.12 };
+  useAgentStore.setState({ agents: { a_pctonly: agent }, order: ["a_pctonly"], hydrated: true, hydrating: false });
+  mocks.useBackends.mockReturnValue({ data: backends });
+  renderPanel("a_pctonly");
+
+  expect(screen.getByText("12% context used")).toBeInTheDocument();
+});
+
 // FS-12.A28: unsupported live controls leave no empty settings band, while a
 // staged target with effort controls still exposes its existing settings.
 it("omits empty session settings and shows them for a capable staged model", async () => {

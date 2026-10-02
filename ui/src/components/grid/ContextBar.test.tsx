@@ -33,4 +33,35 @@ describe("ContextBar", () => {
     expect(meter).toHaveAttribute("data-variant", "medium");
     expect(meter).not.toHaveAttribute("data-state");
   });
+
+  // FS-02.R62/TS-08.R81: the exact pair renders digit-grouped, unabridged
+  // integers beside the existing rounded percentage, never a second label.
+  it("renders the exact used/size pair with digit grouping beside the percentage", () => {
+    render(<ContextBar value={0.06} used={12345} size={200000} />);
+    expect(screen.getByLabelText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+  });
+
+  it("renders zero used as zero rather than an empty track", () => {
+    render(<ContextBar value={0} used={0} size={200000} />);
+    expect(screen.getByLabelText("0 / 200,000 tokens · 0% context used")).toBeInTheDocument();
+  });
+
+  // A1.R62: a reported used count beyond size still reports the raw integers;
+  // only the percentage is capped by the shared clamp.
+  it("keeps the reported raw integers when used exceeds size, capping only the percentage", () => {
+    render(<ContextBar value={1.25} used={250000} size={200000} />);
+    expect(screen.getByLabelText("250,000 / 200,000 tokens · 100% context used")).toBeInTheDocument();
+  });
+
+  it("falls back to the percentage-only label when the pair is absent", () => {
+    render(<ContextBar value={0.5} />);
+    expect(screen.getByLabelText("50% context used")).toBeInTheDocument();
+  });
+
+  it("falls back to the percentage-only label when only one of the pair is present", () => {
+    render(<ContextBar value={0.42} used={100000} />);
+    expect(screen.getByLabelText("42% context used")).toBeInTheDocument();
+    render(<ContextBar value={0.42} size={200000} />);
+    expect(screen.getAllByLabelText("42% context used")).toHaveLength(2);
+  });
 });

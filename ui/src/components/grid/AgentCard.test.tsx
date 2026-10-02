@@ -139,4 +139,51 @@ describe("AgentCard", () => {
 
     expect(screen.queryByLabelText("0% context used")).not.toBeInTheDocument();
   });
+
+  // FS-02.R62/R63, A44/A45: the expanded card states the exact figure and the
+  // same backend/model/effort runtime identity already shown collapsed.
+  it("shows the exact context figure and runtime metadata while expanded", () => {
+    const { rerender } = render(
+      <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+        <AgentCard expanded agent={{
+          agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+          backend: "claude", model: "sonnet", effort: "high", interface: "chat", state: "idle",
+          detail: "ready", running: true, context_pct: 0.06, context_used: 12345, context_size: 200000,
+        }} />
+      </SortableContext></DndContext></MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+    expect(screen.getByText("claude · sonnet · high")).toBeInTheDocument();
+
+    // A live update replaces both numbers (and the percentage) in place.
+    rerender(
+      <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+        <AgentCard expanded agent={{
+          agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+          backend: "claude", model: "sonnet", effort: "high", interface: "chat", state: "idle",
+          detail: "ready", running: true, context_pct: 0.5, context_used: 100000, context_size: 200000,
+        }} />
+      </SortableContext></DndContext></MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("100,000 / 200,000 tokens · 50% context used")).toBeInTheDocument();
+    expect(screen.queryByLabelText("12,345 / 200,000 tokens · 6% context used")).not.toBeInTheDocument();
+  });
+
+  // An empty effort must not leave a dangling " · " separator in the reused
+  // runtime-identity string (FS-02.R63/A45).
+  it("renders the runtime identity with no dangling separator when effort is empty", () => {
+    render(
+      <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+        <AgentCard expanded agent={{
+          agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+          backend: "claude", model: "sonnet", interface: "chat", state: "idle",
+          detail: "ready", running: true, context_pct: 0,
+        }} />
+      </SortableContext></DndContext></MemoryRouter>,
+    );
+
+    expect(screen.getByText("claude · sonnet")).toBeInTheDocument();
+  });
 });

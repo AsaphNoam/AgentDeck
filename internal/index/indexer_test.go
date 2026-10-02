@@ -72,7 +72,21 @@ func fixtureEvents(t *testing.T) []runtime.Event {
 		ev(t, 3, runtime.EvDiff, runtime.DiffData{ToolCallID: "tc_edit", Path: "/workspace/my-app/src/auth.ts", NewText: "package auth"}),
 		ev(t, 4, runtime.EvToolCall, runtime.ToolCallData{ToolCallID: "tc_cmd", Name: "Bash", Args: json.RawMessage(`{"command":"go test ./..."}`), Status: "in_progress"}),
 		ev(t, 5, runtime.EvToolResult, runtime.ToolResultData{ToolCallID: "tc_cmd", Status: "completed", Content: json.RawMessage(`"ok"`)}),
-		ev(t, 6, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.42}),
+		ev(t, 6, runtime.EvTurnEnd, runtime.TurnEndData{StopReason: "end_turn", ContextPct: 0.42,
+			ContextCounts: &state.ContextCounts{ContextUsed: 84000, ContextSize: 200000}}),
+	}
+}
+
+// assertLastContextPair proves the session rollup keeps the exact pair with
+// its percentage (TS-02.R39).
+func assertLastContextPair(t *testing.T, db *sql.DB, wantUsed, wantSize int64) {
+	t.Helper()
+	var used, size sql.NullInt64
+	if err := db.QueryRow(`SELECT last_context_used, last_context_size FROM sessions WHERE agent_id = 'a_index'`).Scan(&used, &size); err != nil {
+		t.Fatalf("read last context pair: %v", err)
+	}
+	if !used.Valid || !size.Valid || used.Int64 != wantUsed || size.Int64 != wantSize {
+		t.Fatalf("last context pair = %+v/%+v, want %d/%d", used, size, wantUsed, wantSize)
 	}
 }
 
@@ -86,7 +100,7 @@ func indexFixture(t *testing.T, db *sql.DB) {
 		if e.Type == runtime.EvTurnEnd {
 			var d runtime.TurnEndData
 			_ = json.Unmarshal(e.Data, &d)
-			if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: e.Seq, LastContextPct: d.ContextPct, UpdatedAt: e.Ts}); err != nil {
+			if err := ix.OnTurnEnd("a_index", runtime.TurnRollup{LastSeq: e.Seq, LastContextPct: d.ContextPct, LastContext: d.ContextCounts, UpdatedAt: e.Ts}); err != nil {
 				t.Fatalf("OnTurnEnd: %v", err)
 			}
 		}
@@ -107,6 +121,7 @@ FROM sessions WHERE agent_id = 'a_index'`).Scan(&turnCount, &eventCount, &lastSe
 	if turnCount != 1 || eventCount != 6 || lastSeq != 6 || contextPct != 0.42 || filesTouched != 1 || commandsRun != 1 {
 		t.Fatalf("rollup = turns:%d events:%d last:%d pct:%v files:%d commands:%d", turnCount, eventCount, lastSeq, contextPct, filesTouched, commandsRun)
 	}
+	assertLastContextPair(t, st.DB(), 84000, 200000)
 
 	var path string
 	var editCount, hasDiff int
@@ -388,6 +403,7 @@ func TestReindexRebuildsFromRawLogs(t *testing.T) {
 	if agentID != "a_index" {
 		t.Fatalf("fts after reindex agent = %q, want a_index", agentID)
 	}
+	assertLastContextPair(t, st.DB(), 84000, 200000)
 }
 
 // TestReindexIsolatesBadAgent guards the BLOCKING finding that Reindex wiped
@@ -823,6 +839,9 @@ func TestFileReportSupplementsTrackingOnly(t *testing.T) {
 		var edits, diff int
 		_ = rows.Scan(&path, &edits, &diff)
 		got = append(got, path+":"+strconv.Itoa(edits)+":"+strconv.Itoa(diff))
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate tracked files: %v", err)
 	}
 	if strings.Join(got, ",") != "a.go:1:1,b.go:1:0" {
 		t.Fatalf("tracked = %q", got)

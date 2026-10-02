@@ -97,7 +97,7 @@ existing transcript projection continues indexing only excerpts and instructions
 reindex accept both shapes permanently, so a new file annotation and an old transcript annotation
 can share one durable batch without changing either record's meaning (INV §11).
 
-**R39** `(planned)` — **Exact context usage is one nullable pair beside the existing percentage.** One
+**R39** — **Exact context usage is one nullable pair beside the existing percentage.** One
 forward-only migration adds nullable integer `context_used` and `context_size` columns to `status`
 and nullable `last_context_used` and `last_context_size` columns to `sessions`; it does not reinterpret
 or replace `context_pct` / `last_context_pct`. The pair is either wholly absent or contains a

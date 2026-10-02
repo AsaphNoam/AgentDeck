@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -164,6 +165,81 @@ func TestManagerStartPublishesExistingAgents(t *testing.T) {
 	}
 	if pub.updates[0].AgentID != "a_8f3c12" || pub.updates[1].AgentID != "a_123abc" {
 		t.Fatalf("published order = %+v, want created_at order", pub.updates)
+	}
+}
+
+// TestContextCountsPersistProjectAndClear covers TS-02.R39 and TS-03.R50: the
+// exact pair round-trips with the percentage, projects into AgentState JSON
+// only when known, survives a hook without context, and is cleared by a newer
+// percentage-only hook report.
+func TestContextCountsPersistProjectAndClear(t *testing.T) {
+	withFixedNow(t, mustTime(t, "2026-06-22T10:01:00Z"))
+	st, _ := newTestStore(t)
+	mgr := NewManager(st, &capturePublisher{})
+	agent := testAgent("a_8f3c12", mustTime(t, "2026-06-22T10:00:00Z"))
+	if err := st.WriteAgent(agent); err != nil {
+		t.Fatalf("WriteAgent: %v", err)
+	}
+	if err := st.WriteRunning(RunningEntry{
+		AgentID: agent.AgentID, PID: 48213, SessionID: "sess", Interface: "chat",
+		HookToken: "tok_live", StartedAt: mustTime(t, "2026-06-22T10:00:01Z"),
+	}); err != nil {
+		t.Fatalf("WriteRunning: %v", err)
+	}
+
+	projected := func() map[string]any {
+		t.Helper()
+		update, err := mgr.Touch(agent.AgentID)
+		if err != nil {
+			t.Fatalf("Touch: %v", err)
+		}
+		raw, err := json.Marshal(update)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var out map[string]any
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		return out
+	}
+
+	// No pair: both keys are absent, not zero.
+	if err := st.WriteStatus(Status{AgentID: agent.AgentID, State: "idle", ContextPct: 0.06}); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	if got := projected(); got["context_used"] != nil || got["context_size"] != nil || got["context_pct"] != 0.06 {
+		t.Fatalf("percentage-only projection = %v", got)
+	}
+
+	// Known pair, including a zero count, round-trips and projects together.
+	status := Status{AgentID: agent.AgentID, State: "idle", ContextPct: 0,
+		ContextCounts: &ContextCounts{ContextUsed: 0, ContextSize: 200000}, UpdatedAt: 1}
+	if err := st.WriteStatus(status); err != nil {
+		t.Fatalf("WriteStatus: %v", err)
+	}
+	if got, err := st.ReadStatus(agent.AgentID); err != nil || !reflect.DeepEqual(got, status) {
+		t.Fatalf("ReadStatus = %+v err %v, want %+v", got, err, status)
+	}
+	if got := projected(); got["context_used"] != 0.0 || got["context_size"] != 200000.0 {
+		t.Fatalf("pair projection = %v", got)
+	}
+
+	// A hook without a context field preserves the pair.
+	if _, err := mgr.ApplyHook("tok_live", HookPayload{AgentID: agent.AgentID, Event: "status", State: "busy"}); err != nil {
+		t.Fatalf("ApplyHook: %v", err)
+	}
+	if got, _ := st.ReadStatus(agent.AgentID); got.ContextCounts == nil || got.ContextCounts.ContextSize != 200000 {
+		t.Fatalf("pair after context-free hook = %+v, want preserved", got.ContextCounts)
+	}
+
+	// A newer percentage-only report makes the pair unknown.
+	pct := 0.5
+	if _, err := mgr.ApplyHook("tok_live", HookPayload{AgentID: agent.AgentID, Event: "status", State: "busy", ContextPct: &pct}); err != nil {
+		t.Fatalf("ApplyHook pct: %v", err)
+	}
+	if got, _ := st.ReadStatus(agent.AgentID); got.ContextCounts != nil || got.ContextPct != 0.5 {
+		t.Fatalf("status after pct-only hook = %+v, want pct 0.5 and no pair", got)
 	}
 }
 

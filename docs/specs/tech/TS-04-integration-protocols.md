@@ -824,7 +824,7 @@ pipeline-association lookup and no second resolution over the context-recipient 
 pipeline-stage wording is removed (FS-06.R37). Ambiguity, retry classification and the context
 plane's resolver are unchanged.
 
-**R68** `(planned)` — **ACP context usage preserves the raw pair it already reports.** The sole ACP
+**R68** — **ACP context usage preserves the raw pair it already reports.** The sole ACP
 decode boundary normalizes an accepted `usage_update` into one value containing `used`, `size`, and
 the capped `context_pct`: `used` must be non-negative, `size` positive, and values outside the host
 integer range or a malformed/missing pair reject the entire update without disturbing the last-known

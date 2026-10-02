@@ -288,7 +288,7 @@ export function ChatPanel() {
             <><span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span><span>{agent.fast ? "Fast mode" : "Normal speed"}</span></>
           )}
         </div>
-        <div data-slot="context"><ContextBar value={agent.context_pct} /></div>
+        <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} /></div>
       </header>
       <PointerContextMenu menu={headerMenu} onClose={() => setHeaderMenu(null)} />
       <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs" data-slot="tabs">

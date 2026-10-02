@@ -1,6 +1,7 @@
 package state
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 )
@@ -55,7 +56,34 @@ type Status struct {
 	LastTrace  string     `json:"last_trace,omitempty"`
 	BusySince  *time.Time `json:"busy_since,omitempty"`
 	ContextPct float64    `json:"context_pct"`
-	UpdatedAt  int64      `json:"updated_at"`
+	*ContextCounts
+	UpdatedAt int64 `json:"updated_at"`
+}
+
+// ContextCounts is the exact runtime-reported context reading kept beside
+// context_pct (TS-02.R39): a non-negative used count and a positive window
+// size, present together or not at all. Structs embed it as a pointer so JSON
+// flattens it to context_used/context_size and nil omits both (TS-03.R50).
+type ContextCounts struct {
+	ContextUsed int64 `json:"context_used"`
+	ContextSize int64 `json:"context_size"`
+}
+
+// contextCountsFromColumns returns the stored pair, or nil when either nullable
+// column is absent or the pair is not a valid reading.
+func contextCountsFromColumns(used, size sql.NullInt64) *ContextCounts {
+	if !used.Valid || !size.Valid || used.Int64 < 0 || size.Int64 <= 0 {
+		return nil
+	}
+	return &ContextCounts{ContextUsed: used.Int64, ContextSize: size.Int64}
+}
+
+// contextCountsColumns is the nullable column pair written for c.
+func contextCountsColumns(c *ContextCounts) (any, any) {
+	if c == nil {
+		return nil, nil
+	}
+	return c.ContextUsed, c.ContextSize
 }
 
 // RuntimeCapabilities is AgentDeck's normalized, provider-independent vocabulary
@@ -165,6 +193,7 @@ type AgentState struct {
 	LastTrace  string  `json:"last_trace,omitempty"`
 	BusySince  string  `json:"busy_since,omitempty"`
 	ContextPct float64 `json:"context_pct"`
+	*ContextCounts
 
 	UnreadMessages int                  `json:"unread_messages,omitempty"`
 	LastSentAt     string               `json:"last_sent_at,omitempty"`

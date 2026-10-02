@@ -171,9 +171,12 @@ export function VisualMatrix() {
           </article>
           <article className="agent-card" data-ui="agent-card" data-state={liveState} data-variant="expanded" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[1].color.join(",")})` } as React.CSSProperties}>
             <div className="agent-card-top" data-slot="header">
-              <a className="agent-card-name-link" data-slot="identity" href="/agent/expanded-fixture">Expanded long-name agent fixture</a>
+              <div className="agent-card-header-content">
+                <a className="agent-card-name-link" data-slot="identity" href="/agent/expanded-fixture">Expanded long-name agent fixture</a>
+                <span className="model-pill" data-slot="metadata">anthropic-extended-thinking-partner · claude-opus-4-fixture-long-runtime-identity-string · effort: maximum-reasoning-depth</span>
+              </div>
               <div className="agent-card-header-actions">
-                <div data-slot="context"><ContextBar value={0.74} compact /></div>
+                <div data-slot="context"><ContextBar value={0.74} used={153482} size={200000} compact /></div>
                 <StateBadge state={liveState === "stopped" ? "busy" : liveState} />
                 <Button data-slot="collapse-control" size="small">Collapse</Button>
               </div>

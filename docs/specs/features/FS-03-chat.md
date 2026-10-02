@@ -529,7 +529,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   requires a distinct normalized state, retention and presentation contract; their availability in
   ACP is recorded as a future product option rather than treated as a protocol limitation.
 
-- **R66** `(planned)` — The live agent screen's context meter uses FS-02.R62's shared exact-token
+- **R66** — The live agent screen's context meter uses FS-02.R62's shared exact-token
   reading when both current tokens and context-window size are known, placing the unabridged
   **used / total tokens** figure beside its existing percentage. When raw counts are unavailable it
   retains the percentage-only label. This changes neither the runtime controls nor transcript and
@@ -898,7 +898,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   *Verify by* file-viewer, transcript-composition, tray, and annotation-store component tests plus
   journey J13 extended with a loaded-file selection.
 
-- **A47** `(planned)` (R66, FS-02.R62) — The full agent screen and its expanded project-dashboard
+- **A47** (R66, FS-02.R62) — The full agent screen and its expanded project-dashboard
   card show the same exact used/total token reading and rounded percentage from one live state
   update; a percentage-only state keeps the existing label on both surfaces. *Verify:*
   `ChatPanel`, `AgentCard`, and shared `ContextBar` component tests.

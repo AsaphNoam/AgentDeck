@@ -621,7 +621,7 @@ to reach the shared annotation endpoint under TS-13.R16 and may carry the additi
 handler never reads or validates the named file: it persists and delivers the supplied point-in-time
 path/excerpt under FS-13.R12/R25, so this adds no remote file-reading authority.
 
-**R50** `(planned)` — **Agent state exposes optional exact context counts additively.** Every full
+**R50** — **Agent state exposes optional exact context counts additively.** Every full
 `AgentState` projection used by the hydration burst and subsequent `state_update` events carries
 `context_used` and `context_size` together when TS-02.R39 has a known pair, and omits both otherwise;
 `context_pct` remains required and keeps its shipped meaning. The Go projection, TypeScript

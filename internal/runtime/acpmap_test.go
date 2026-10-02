@@ -85,22 +85,40 @@ func TestContextUsageFromRealClaudeAdapterShapes(t *testing.T) {
 	}
 
 	// (2) Real usage_update session notification: used + size (context window).
+	// The exact pair is retained as reported, including over-window usage,
+	// while only the percentage is capped (TS-04.R68).
+	update := func(fields string) string {
+		return `{"sessionId":"s","update":{"sessionUpdate":"usage_update",` + fields + `}}`
+	}
 	for _, tc := range []struct {
-		name    string
-		raw     string
-		wantPct float64
-		wantOK  bool
+		name     string
+		raw      string
+		wantPct  float64
+		wantUsed int64
+		wantSize int64
+		wantOK   bool
 	}{
-		{"normal", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":44000,"size":200000}}`, 0.22, true},
-		{"zero", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":0,"size":200000}}`, 0, true},
-		{"capped", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":210000,"size":200000}}`, 1, true},
-		{"negative ignored", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":-1,"size":200000}}`, 0, false},
-		{"zero window ignored", `{"sessionId":"s","update":{"sessionUpdate":"usage_update","used":44000,"size":0}}`, 0, false},
+		{"normal", update(`"used":44000,"size":200000`), 0.22, 44000, 200000, true},
+		{"zero", update(`"used":0,"size":200000`), 0, 0, 200000, true},
+		{"capped", update(`"used":210000,"size":200000`), 1, 210000, 200000, true},
+		{"negative ignored", update(`"used":-1,"size":200000`), 0, 0, 0, false},
+		{"zero window ignored", update(`"used":44000,"size":0`), 0, 0, 0, false},
+		{"missing used ignored", update(`"size":200000`), 0, 0, 0, false},
+		{"missing size ignored", update(`"used":44000`), 0, 0, 0, false},
+		{"fractional ignored", update(`"used":1.5,"size":200000`), 0, 0, 0, false},
+		{"string ignored", update(`"used":"44000","size":200000`), 0, 0, 0, false},
+		{"out of range ignored", update(`"used":44000,"size":99999999999999999999`), 0, 0, 0, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			pct, ok := decodeContextUsage(json.RawMessage(tc.raw))
-			if ok != tc.wantOK || pct != tc.wantPct {
-				t.Fatalf("usage_update = pct=%v ok=%v, want %v/%v", pct, ok, tc.wantPct, tc.wantOK)
+			got, ok := decodeContextUsage(json.RawMessage(tc.raw))
+			if ok != tc.wantOK || got.pct != tc.wantPct {
+				t.Fatalf("usage_update = pct=%v ok=%v, want %v/%v", got.pct, ok, tc.wantPct, tc.wantOK)
+			}
+			if !tc.wantOK {
+				return
+			}
+			if got.counts == nil || got.counts.ContextUsed != tc.wantUsed || got.counts.ContextSize != tc.wantSize {
+				t.Fatalf("usage_update counts = %+v, want %d/%d", got.counts, tc.wantUsed, tc.wantSize)
 			}
 		})
 	}

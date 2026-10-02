@@ -594,4 +594,16 @@ CREATE TABLE remote_devices (
 );
 `,
 	},
+	{
+		// The exact context pair beside the existing percentage. NULL means raw
+		// counts are unknown, never zero; context_pct keeps its meaning
+		// (TS-02.R39).
+		version: 35,
+		sql: `
+ALTER TABLE status ADD COLUMN context_used INTEGER;
+ALTER TABLE status ADD COLUMN context_size INTEGER;
+ALTER TABLE sessions ADD COLUMN last_context_used INTEGER;
+ALTER TABLE sessions ADD COLUMN last_context_size INTEGER;
+`,
+	},
 }

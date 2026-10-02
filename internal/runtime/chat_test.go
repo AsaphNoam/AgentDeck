@@ -510,14 +510,20 @@ func TestChatStreamText(t *testing.T) {
 	if td.ContextPct < 0.219 || td.ContextPct > 0.221 {
 		t.Fatalf("context_pct = %v, want ~0.22", td.ContextPct)
 	}
+	if td.ContextCounts == nil || *td.ContextCounts != (state.ContextCounts{ContextUsed: 44000, ContextSize: 200000}) {
+		t.Fatalf("turn_end counts = %+v, want 44000/200000", td.ContextCounts)
+	}
 
-	// After the turn: idle, busy_since cleared, context_pct written.
+	// After the turn: idle, busy_since cleared, context_pct and pair written.
 	final, _ := c.store.ReadStatus(h.AgentID)
 	if final.State != "idle" || final.BusySince != nil {
 		t.Fatalf("post-turn status = %+v, want idle + nil busy_since", final)
 	}
 	if final.ContextPct < 0.219 || final.ContextPct > 0.221 {
 		t.Fatalf("post-turn context_pct = %v, want ~0.22", final.ContextPct)
+	}
+	if final.ContextCounts == nil || *final.ContextCounts != (state.ContextCounts{ContextUsed: 44000, ContextSize: 200000}) {
+		t.Fatalf("post-turn counts = %+v, want 44000/200000", final.ContextCounts)
 	}
 	if final.LastTrace != "Stop" {
 		t.Fatalf("post-turn last_trace = %q, want Stop", final.LastTrace)
@@ -585,6 +591,9 @@ func TestUsageUpdateRepublishesContextPctMidTurn(t *testing.T) {
 	}
 	if st.ContextPct < 0.74 || st.ContextPct > 0.76 {
 		t.Fatalf("mid-turn context_pct = %v, want ~0.75 (republished before turn_end)", st.ContextPct)
+	}
+	if st.ContextCounts == nil || *st.ContextCounts != (state.ContextCounts{ContextUsed: 150000, ContextSize: 200000}) {
+		t.Fatalf("mid-turn counts = %+v, want 150000/200000 republished with the percentage", st.ContextCounts)
 	}
 
 	// Release the hold so the turn can finish cleanly.
@@ -736,6 +745,8 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 		Args:    []string{"mcp-stdio", "--agent", spec.Agent.AgentID, "--token", "tok-123"},
 		Env:     []string{"X=1"},
 	}}
+	spec.LastContextPct = 0.06
+	spec.LastContext = &state.ContextCounts{ContextUsed: 12345, ContextSize: 200000}
 
 	h, err := c.Resume(ctx, spec, "prior-session-id")
 	if err != nil {
@@ -746,6 +757,12 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	// fakeacp's session/load succeeds → resumed via the load path.
 	if h.SessionID != "fake-sess-loaded" {
 		t.Fatalf("sessionID = %q, want fake-sess-loaded (load path)", h.SessionID)
+	}
+	// Resume restores the last-known percentage and exact pair together
+	// (TS-02.R39).
+	if st, err := c.store.ReadStatus(h.AgentID); err != nil || st.ContextPct != 0.06 ||
+		st.ContextCounts == nil || *st.ContextCounts != *spec.LastContext {
+		t.Fatalf("resumed status = %+v err %v, want restored 0.06 with 12345/200000", st, err)
 	}
 
 	raw, err := os.ReadFile(dump)
