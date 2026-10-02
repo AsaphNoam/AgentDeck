@@ -226,6 +226,70 @@ describe("AgentScreen", () => {
     expect(screen.getByText("Archive this agent? Restore is available on the desktop.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive agent" })).toBeInTheDocument();
   });
+
+  // FS-20.R39 — archival from the desktop reaches an open phone screen.
+  it("shows the archived state when the desktop archives the open agent", async () => {
+    renderScreen();
+    expect(await screen.findByText("Clean the build")).toBeInTheDocument();
+    act(() => useConnection.setState({ agents: { a1: { ...agent, running: false, archived: true } } }));
+    expect(await screen.findByText(/Archived on the Mac/)).toBeInTheDocument();
+    expect(screen.queryByText("Clean the build")).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Manage" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Project" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
+  });
+
+  // FS-20.R37 — Open diff shows exactly the requested diff, not another one.
+  it("opens the selected file's diff from Files", async () => {
+    const requested = { agent_id: "a1", seq: 40, type: "diff", ts: "", data: { path: "other.go", old_text: "a", new_text: "requested change" } };
+    server.use(
+      http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: [{ path: "other.go", edit_count: 1, last_ts: "2026-10-02T00:00:00Z", has_diff: true, diff_refs: [{ seq: 40, tool_call_id: "t9" }] }] })),
+      http.get("/api/sessions/a1/transcript", ({ request }) => {
+        const url = new URL(request.url);
+        reads.push(url.search);
+        return HttpResponse.json(url.searchParams.get("before_seq") === "41" ? { agent_id: "a1", events: [requested], has_more: true } : live);
+      }),
+    );
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open diff" }));
+    const card = await screen.findByRole("region", { name: "Requested diff" });
+    await waitFor(() => expect(card.textContent).toContain("other.go"));
+    expect(card.textContent).not.toContain("main.go");
+    expect(reads).toContain("?limit=1&before_seq=41");
+    expect(screen.getByRole("tab", { name: "Chat" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  // FS-20.R36 — a model choice resets effort to that model's default, and the
+  // draft follows a runtime change made elsewhere.
+  it("switches runtime with the selected model's own effort", async () => {
+    const switches: unknown[] = [];
+    server.use(
+      http.get("/api/remote/runtime-options", () => HttpResponse.json({ backends: [{ id: "claude", name: "Claude", default: true, default_model: "m", models: [
+        { id: "m", name: "M", efforts: ["max"], default_effort: "max", fast: false },
+        { id: "n", name: "N", efforts: ["low", "high"], default_effort: "low", fast: false },
+      ] }] })),
+      http.post("/api/sessions/a1/switch-runtime", async ({ request }) => {
+        switches.push(await request.json());
+        return HttpResponse.json({ history_handoff: "native_resume" });
+      }),
+    );
+    useConnection.setState({ agents: { a1: { ...agent, state: "idle", effort: "max" } } });
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Manage" }));
+    const model = await screen.findByRole("combobox", { name: "Model" });
+    await waitFor(() => expect(model.querySelectorAll("option")).toHaveLength(2));
+    fireEvent.change(model, { target: { value: "n" } });
+    fireEvent.click(screen.getByRole("button", { name: "Switch runtime" }));
+    await waitFor(() => expect(switches).toEqual([{ backend: "claude", model: "n", effort: "low" }]));
+
+    act(() => useConnection.setState({ agents: { a1: { ...agent, state: "idle", model: "n", effort: "high" } } }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue("n"));
+    // The live Effort control offers the live model's vocabulary.
+    const efforts = screen.getAllByRole("combobox", { name: "Effort" });
+    expect(efforts[efforts.length - 1]).toHaveValue("high");
+    expect([...efforts[efforts.length - 1].querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["", "low", "high"]);
+  });
 });
 
 // FS-20.R32 — the phone's diff-line annotate-and-assign form over the shared

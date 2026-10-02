@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -30,5 +30,19 @@ describe("ProjectScreen new agent", () => {
     expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue("preferred");
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Remote reviewer" } });
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Remote reviewer");
+  });
+});
+
+// FS-20.R39 — archiving the project on the desktop reaches an open project screen.
+describe("ProjectScreen archival", () => {
+  it("shows the archived state after a desktop archive", async () => {
+    let archived = false;
+    server.use(http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", color: [1, 2, 3], archived } })));
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ProjectScreen projectID="app" /></QueryClientProvider>);
+    expect(await screen.findByRole("button", { name: "New agent" })).toBeInTheDocument();
+    archived = true;
+    act(() => useConnection.setState({ revision: 1 }));
+    expect(await screen.findByText(/Archived on the Mac/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New agent" })).toBeNull();
   });
 });

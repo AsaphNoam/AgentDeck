@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelTurn,
@@ -151,10 +151,21 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const [tab, setTab] = useState<"chat" | "files" | "commands" | "manage">("chat");
   const [rename, setRename] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
+  const [diffSeq, setDiffSeq] = useState<number | null>(null);
   const chat = agent?.interface !== "terminal";
   const files = useQuery({ queryKey: ["tracked-files", agentId, rev], queryFn: () => getTrackedFiles(agentId), enabled: tab === "files" });
   const commands = useQuery({ queryKey: ["tracked-commands", agentId, rev], queryFn: () => getTrackedCommands(agentId), enabled: tab === "commands" });
   const file = useQuery({ queryKey: ["tracked-file", agentId, filePath], queryFn: () => getFileContent(agentId, filePath!), enabled: !!filePath });
+  // Open diff reads exactly the requested event, wherever it falls (FS-20.R37).
+  const focusedDiff = useQuery({
+    queryKey: ["focused-diff", agentId, diffSeq],
+    queryFn: async () => (await getTranscriptWindow(agentId, { limit: 1, beforeSeq: diffSeq! + 1 })).events.find((event) => event.seq === diffSeq) ?? null,
+    enabled: diffSeq !== null,
+  });
+  const diffCard = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (tab === "chat" && focusedDiff.data) diffCard.current?.scrollIntoView?.({ block: "start" });
+  }, [tab, focusedDiff.data]);
   const addAnnotation = useAnnotationStore((state) => state.add);
 
   // Older windows cover seqs before `anchor`; while they are shown, the live
@@ -212,7 +223,20 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     }
   };
 
-  if (!agent) return <p className="phone-empty">This agent is not on the Mac any more.</p>;
+  if (!agent) return <p className="phone-empty">This agent is not on the Mac any more. <button type="button" className="phone-link" onClick={() => navigate("/")}>Home</button></p>;
+  // Archived from either device: the screen stops offering work (FS-20.R39).
+  if (agent.archived) {
+    return (
+      <div className="phone-agent">
+        <header className="phone-agent-header"><h1>{agentTitle(agent)}</h1></header>
+        <p className="phone-empty">Archived on the Mac. Restore is available on the desktop.</p>
+        <div className="phone-actions">
+          <button type="button" onClick={() => navigate(`/project/${encodeURIComponent(agent.project)}`)}>Project</button>
+          <button type="button" onClick={() => navigate("/")}>Home</button>
+        </div>
+      </div>
+    );
+  }
 
   // Every refused action shows the desktop's reason and keeps the typed text
   // (FS-20.R27); only a delivered message clears the composer.
@@ -250,11 +274,20 @@ export function AgentScreen({ agentId }: { agentId: string }) {
       <div className="phone-actions phone-tabs" role="tablist" aria-label="Agent views">
         {(["chat", "files", "commands", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}
       </div>
-      {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
+      {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setDiffSeq(tracked.diff_refs[0].seq); setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
       {tab === "commands" && <section className="phone-section" aria-label="Commands"><h2>Commands</h2>{commands.isError ? <p className="phone-error">{errorText(commands.error)}</p> : <ul className="phone-list">{(commands.data?.commands ?? []).map((command) => <li key={`${command.seq}:${command.command}`}><div className="phone-row"><span className="phone-row-title">{command.command}</span><span className="phone-row-meta">{command.exit_status || "Running"}{command.exit_error ? ` · ${command.exit_error}` : ""}</span></div></li>)}</ul>}</section>}
       {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} />}
       {tab === "chat" && <>
       {pending && <PermissionCard agent={agent} event={pending} latest={latest} disabled={offline} onSettled={refresh} />}
+      {diffSeq !== null && (
+        <section ref={diffCard} className="phone-card" aria-label="Requested diff">
+          <div className="phone-actions">
+            <strong>Diff</strong>
+            <button type="button" onClick={() => setDiffSeq(null)}>Close</button>
+          </div>
+          {focusedDiff.isError ? <p className="phone-error">{errorText(focusedDiff.error)}</p> : focusedDiff.data ? <EventRow event={normalizeEvent(focusedDiff.data)} onAnnotate={annotate} /> : focusedDiff.data === null ? <p className="phone-meta">This diff is no longer in the conversation.</p> : <p className="phone-meta">Loading…</p>}
+        </section>
+      )}
       {!chat ? (
         <p className="phone-empty">This is a terminal agent. Its terminal is on the Mac; the phone shows its status only.</p>
       ) : (
@@ -355,13 +388,19 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename }: { age
   const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
   const [runtime, setRuntime] = useState({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" });
   const [archiveConfirm, setArchiveConfirm] = useState(false);
+  // A runtime change from either device restarts the switch draft from the
+  // agent's live runtime (FS-20.R17).
+  useEffect(() => setRuntime({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" }), [agent.backend, agent.model, agent.effort]);
+  const findModel = (backendID: string, modelID: string) => options.data?.backends.find((item) => item.id === backendID)?.models.find((item) => item.id === modelID);
   const backend = options.data?.backends.find((item) => item.id === runtime.backend);
-  const model = backend?.models.find((item) => item.id === runtime.model);
+  const model = findModel(runtime.backend, runtime.model);
+  const liveModel = findModel(agent.backend, agent.model);
   const disable = offline || busy || !agent.running || agent.interface !== "chat";
+  // Choosing a model always starts from that model's default effort.
+  const selectModel = (backendID: string, modelID: string) => setRuntime({ backend: backendID, model: modelID, effort: findModel(backendID, modelID)?.default_effort ?? "" });
   const selectBackend = (backendID: string) => {
     const next = options.data?.backends.find((item) => item.id === backendID);
-    const selected = next?.models.find((item) => item.id === next.default_model) ?? next?.models[0];
-    setRuntime({ backend: backendID, model: selected?.id ?? "", effort: selected?.default_effort ?? "" });
+    selectModel(backendID, (next?.models.find((item) => item.id === next.default_model) ?? next?.models[0])?.id ?? "");
   };
-  return <section className="phone-section" aria-label="Agent management"><form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}><label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label><button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button></form>{agent.running && agent.interface === "chat" && <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}><p className="phone-card-kicker">Runtime</p><label className="phone-field">Backend<select value={runtime.backend} onChange={(event) => selectBackend(event.target.value)}><option value="">Choose…</option>{(options.data?.backends ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label><label className="phone-field">Model<select value={runtime.model} onChange={(event) => setRuntime({ ...runtime, model: event.target.value })}>{(backend?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>{(model?.efforts.length ?? 0) > 0 && <label className="phone-field">Effort<select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<button type="submit" disabled={disable || !runtime.backend || !runtime.model}>Switch runtime</button></form>}{agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}{agent.running && agent.interface === "chat" && (model?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<div className="phone-card"><button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>{agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}{archiveConfirm ? <><p>Archive this agent? Restore is available on the desktop.</p><div className="phone-actions"><button type="button" disabled={offline || busy} onClick={() => setArchiveConfirm(false)}>Cancel</button><button type="button" className="phone-danger" disabled={offline || busy} onClick={() => act(() => archiveAgent(agent.agent_id), false, () => navigate(`/project/${encodeURIComponent(agent.project)}`))}>Archive agent</button></div></> : <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>}</div></section>;
+  return <section className="phone-section" aria-label="Agent management"><form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}><label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label><button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button></form>{agent.running && agent.interface === "chat" && <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}><p className="phone-card-kicker">Runtime</p><label className="phone-field">Backend<select value={runtime.backend} onChange={(event) => selectBackend(event.target.value)}><option value="">Choose…</option>{(options.data?.backends ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label><label className="phone-field">Model<select value={runtime.model} onChange={(event) => selectModel(runtime.backend, event.target.value)}>{(backend?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>{(model?.efforts.length ?? 0) > 0 && <label className="phone-field">Effort<select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<button type="submit" disabled={disable || !runtime.backend || !runtime.model}>Switch runtime</button></form>}{agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}{agent.running && agent.interface === "chat" && (liveModel?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{liveModel!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<div className="phone-card"><button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>{agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}{archiveConfirm ? <><p>Archive this agent? Restore is available on the desktop.</p><div className="phone-actions"><button type="button" disabled={offline || busy} onClick={() => setArchiveConfirm(false)}>Cancel</button><button type="button" className="phone-danger" disabled={offline || busy} onClick={() => act(() => archiveAgent(agent.agent_id), false, () => navigate(`/project/${encodeURIComponent(agent.project)}`))}>Archive agent</button></div></> : <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>}</div></section>;
 }

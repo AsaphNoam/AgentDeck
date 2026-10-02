@@ -74,7 +74,8 @@ export function HomeScreen() {
 
 function Projects() {
   const agents = useConnection((state) => state.agents);
-  const projects = useQuery({ queryKey: ["projects"], queryFn: () => phoneFetch<Record<string, { title: string; color: [number, number, number]; archived?: boolean }>>("/api/projects") });
+  const revision = useConnection((state) => state.revision);
+  const projects = useQuery({ queryKey: ["projects", revision], queryFn: () => phoneFetch<Record<string, { title: string; color: [number, number, number]; archived?: boolean }>>("/api/projects"), placeholderData: (previous) => previous });
   if (!projects.data) return <p className="phone-empty">Loading projects…</p>;
   const entries = deriveDashboardProjects(projects.data, agents);
   return <section className="phone-section" aria-label="Projects"><h2>Projects</h2><ul className="phone-list">{entries.map((project) => <li key={project.id}><button type="button" className="phone-row" onClick={() => navigate(`/project/${encodeURIComponent(project.id)}`)}><span className="phone-row-title">{project.title}</span><span className="phone-row-reason">{project.unavailable ? "Project unavailable" : `${project.agents.length} agents · ${project.stateSummary}`}</span></button></li>)}</ul></section>;

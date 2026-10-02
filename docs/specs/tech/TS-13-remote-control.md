@@ -263,8 +263,8 @@ summaries carry `stage_number`/`stage_count` for the stage position. `GET /api/r
 Shipped (R20): `GET /api/remote/home` → `{needs_you, active_runs}` with the same item shape and no
 `since` parameter.
 
-`GET /api/remote/runtime-options` → `{backends: [{id, name, default? (planned, R23),
-default_model? (planned, R23), models: [{id, name, efforts, default_effort?, fast}]}]}`, sorted by id; the existing annotation, task Re-arm, and
+`GET /api/remote/runtime-options` → `{backends: [{id, name, default, default_model (R23), models:
+[{id, name, efforts, default_effort?, fast}]}]}`, sorted by id; the existing annotation and
 pipeline Replace request/response shapes remain shared with loopback and gain only the R4 guard,
 device authentication, allowlist, and bounded-body enforcement on the tailnet listener.
 
@@ -299,8 +299,9 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 - Attention and Home: `internal/server/remote_home.go`, `state.ListAttentionTasks`.
 - Runtime options (R15): `handleRemoteRuntimeOptions` in `internal/server/remote_home.go`; tests
   `TestRemoteRuntimeOptionsAreSecretFree`, `TestRemoteReplaceValidatesChosenRuntime`. Annotation
-  (R16): `TestRemoteAnnotationUsesSharedDelivery`. Re-arm (R17):
-  `TestRemoteRearmHasDesktopValueAuthority`. Transcript window (R18):
+  (R16): `TestRemoteAnnotationUsesSharedDelivery`. R17 is superseded by R21; task denial:
+  `TestRemoteDeniesEveryTaskRoute`. Allowlist and tracked-file reads (R21/R22):
+  `TestRemoteAllowlistAndFieldFilter`, `TestRemoteTrackedFileRead`. Transcript window (R18):
   `internal/server/transcript_window.go`; tests in `transcript_window_test.go`.
 - Push: `internal/remote/push.go`, `internal/server/remote_push.go`.
 - Keep-awake: `internal/remote/keepawake.go`, `internal/server/keepawake.go`.

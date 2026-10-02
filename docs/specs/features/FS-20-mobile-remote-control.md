@@ -286,14 +286,14 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   allows the phone; an expired, reused, or declined code pairs nothing; an unpaired or revoked device
   receives no data and no action, including the live stream; revoking closes an open phone
   connection. — server tests.
-- **A3** (R11–R13, R17) — At a 390px-wide phone viewport, Home shows Needs you / Moving /
-  Since you last looked from seeded agents, tasks, and runs; a permission card approves and denies
+- **A3** (R11–R13, R17) — At a 390px-wide phone viewport, Home shows Needs you from seeded agents
+  and runs (R33 replaced Moving and Since you last looked); a permission card approves and denies
   with the desktop result; a conversation sends, holds a follow-up, steers, cancels, and stops. —
   UI tests plus a fakeACP browser pass at phone size.
-- **A4** (R14, R15, R27) — From the phone: retry an `interrupted` task, continue a paused
-  run, start a pipeline run from a template, create a task, and Ask AgentDecker both with and without
-  a running `agentdecker` agent; a refused action shows the desktop reason and keeps typed text. —
-  server and UI tests plus the fakeACP browser pass.
+- **A4** (R14, R27) — From the phone, continue a paused run; a refused action shows the desktop
+  reason and keeps typed text. Task retry, task creation, Ask AgentDecker, and the New work screen
+  left the phone under R40/R33; starting a pipeline is A10's project-page journey. — server and UI
+  tests plus the fakeACP browser pass.
 - **A5 (planned)** (R18–R21, R25, R28) — Each attention event notifies a subscribed phone once,
   honoring desktop mutes and the per-phone switch; completions never notify; payload text contains
   no command, diff, message, or file content; notifications carry no actions; a resolved item's
@@ -308,10 +308,10 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - **A8 (planned)** (all) — Real end-to-end journey: pair an Android phone and an iPhone over a real
   tailnet off the home network, receive a permission notification, approve it with details, reply
   to a question, launch a new agent from a project page, then revoke one phone. — manual gate.
-- **A9 (planned)** (R30–R32) — At a 390px phone viewport, edit an eligible task from one valid
-  prerequisite set to another, replace a pipeline orchestrator with a different configured
-  model/effort/fast selection, and annotate diff lines to each supported target; invalid arms and
-  runtime choices are rejected without mutation, and a failed annotation send preserves its draft.
+- **A9 (planned)** (R31, R32) — At a 390px phone viewport, replace a pipeline orchestrator with a
+  different configured model/effort/fast selection and annotate diff lines to each supported
+  target; invalid runtime choices are rejected without mutation, and a failed annotation send
+  preserves its draft. R30's Re-arm editing left the phone with tasks (R40).
   — server and UI tests plus a fakeACP browser pass at phone size.
 - **A10 (planned)** (R33–R35, R41) — At a 390px phone viewport with seeded projects (one empty, one
   unavailable, one archived) and running, stopped, and archived agents: Home shows the Needs you
@@ -345,6 +345,9 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of
   R18 and A3/A4/A9 were retired or narrowed in the same change.
 
+- R39 for an open project screen relies on the live agent stream: archiving a project with no
+  agents emits no stream event, so that screen shows the archived state on its next refresh or
+  reconnect rather than immediately.
 - The phone's pairing credential lives in the installed app's browser storage (R9); a Face ID or
   fingerprint app lock is not part of this version.
 - Tailscale is required on both devices; AgentDeck runs no relay of its own.
@@ -361,14 +364,25 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   allowlist inventory, single-use claim under `-race`, revoke closing the stream).
 - A3/A4: `ui/src/remote/*.test.tsx`, `internal/server/remote_home_test.go`; 2026-09-28 fakeACP
   browser pass at 390×844 through the dev-only fake tailnet (pair, Home, approve, send, stop,
-  create task, revoke) with no horizontal overflow.
+  revoke) with no horizontal overflow; that pass predates R33's Home.
 - A5 (automated half): `internal/server/remote_push_test.go`, `internal/remote/push_test.go`.
 - A6 (automated half): `internal/server/keepawake_test.go`, `internal/remote/keepawake_test.go`.
 - A7: `ui/src/remote/PhoneApp.test.tsx`, `AgentScreen.test.tsx` (unreachable, stale, disabled,
   first decision wins).
 - Settings: `ui/src/features/settings/RemoteEditor.test.tsx`.
-- A9 (automated half): `ui/src/remote/WorkScreens.test.tsx` (task-control matrix, Re-arm editor,
-  orchestrator replacement), `AgentScreen.test.tsx` (diff annotation);
-  `internal/server/remote_routes_test.go` (`TestRemoteRearmHasDesktopValueAuthority`,
-  `TestRemoteReplaceValidatesChosenRuntime`, `TestRemoteRuntimeOptionsAreSecretFree`),
-  `annotations_test.go` (`TestRemoteAnnotationUsesSharedDelivery`).
+- A9 (automated half): `AgentScreen.test.tsx` (diff annotation);
+  `internal/server/remote_routes_test.go` (`TestRemoteReplaceValidatesChosenRuntime`,
+  `TestRemoteRuntimeOptionsAreSecretFree`), `annotations_test.go`
+  (`TestRemoteAnnotationUsesSharedDelivery`). The phone orchestrator-replacement form has no
+  focused UI test yet.
+- A10 (automated half): `ProjectScreen.test.tsx` (launch defaults), `PhoneApp.test.tsx` (Home);
+  `remote_routes_test.go` (`TestRemoteAllowlistAndFieldFilter`,
+  `TestRemotePipelineStartUsesMacDefaults`). Launching and starting a pipeline from the page have
+  no UI request test yet.
+- A11 (automated half): `AgentScreen.test.tsx` (archive confirmation, desktop archival, switch
+  runtime with the chosen model's effort and live-runtime sync), `ProjectScreen.test.tsx`
+  (desktop project archival). Rename, fast/effort, and clone have no UI request test yet.
+- A12 (automated half): `AgentScreen.test.tsx` (Open diff shows the requested diff);
+  `remote_routes_test.go` (`TestRemoteTrackedFileRead`, `TestRemoteRouteInventoryIsClassified`).
+- A13 (automated half): `remote_routes_test.go` (`TestRemoteDeniesEveryTaskRoute`),
+  `remote_home_test.go`; the `/task/<id>` redirect has no UI test yet.
