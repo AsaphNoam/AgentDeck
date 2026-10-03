@@ -69,6 +69,18 @@ None.
 
 ## Review findings
 
+### Notifications open the agent's conversation — reviewed 2026-10-03 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+- **Worth fixing** — the stale-agent acceptance path is not proved by the notification tests.
+  **Where:** `ui/src/components/shell/NotificationCenter.test.tsx:66-96` routes notification clicks
+  to a placeholder component, so it cannot assert the required existing **Agent not found** view.
+  **Normal-use trigger:** an agent disappears after its toast is raised but before the person clicks
+  it. **Why it matters:** FS-02.A46 explicitly includes this recovery path, and the current test can
+  keep passing if the real `/agent/:id` route stops rendering current truth for a vanished agent.
+  **Requirement:** FS-02.A46, INV §17. **Suggested fix/test:** mount the real `ChatPanel` route with
+  the agent store hydrated and the target absent, click the toast, and assert both **Agent not
+  found** and toast dismissal.
+
 ### Tasks as project-grouped work in motion — reviewed 2026-10-03 — **Fix model:** medium — Codex Terra or Claude Opus.
 
 - **Must fix** — delegation children are presented as sequential work. **Where:**
@@ -169,6 +181,15 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Review: notifications open the agent's conversation.** The implementation matches
+  the notification-navigation requirements, but one Worth-fixing coverage gap keeps the unit open:
+  the toast test substitutes a placeholder route and does not prove the specified stale-agent
+  **Agent not found** recovery. INV 2, 8, 10 and 13 applied without a violation; INV 17 applies to
+  the finding; INV 1, 3–7, 9, 11–12 and 14–16 had no applicable changed surface. The 31 focused UI
+  tests, style/presentation checks, production UI build and diff check pass; A46's real-browser
+  toast check and manual macOS desktop-notification click remain owed. **Fix model:** trivial/easy —
+  Claude Sonnet or Codex Luna.
 
 - **2026-10-03 — Work: notifications open the agent's conversation.** Agent toasts (all four types)
   open `/agent/<id>` and dismiss; a × control only dismisses; error/pipeline toasts stay
