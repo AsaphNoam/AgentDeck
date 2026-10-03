@@ -58,22 +58,63 @@ function byCreated(a: Task, b: Task): number {
   return a.created_at.localeCompare(b.created_at) || a.task_id.localeCompare(b.task_id);
 }
 
-/** topologicalOrder orders a group by its prerequisite links, breaking ties by
- *  creation. Delegation is not chronology, and links need not form a DAG, so
- *  members left in a cycle follow in creation order (TS-08.R84). */
-function topologicalOrder(tasks: Task[], links: Map<string, TaskLink[]>): Task[] {
-  const ids = new Set(tasks.map((task) => task.task_id));
-  const pending = new Map(tasks.map((task) => [task.task_id, new Set(
-    (links.get(task.task_id) ?? []).filter((link) => link.kind === "prerequisite" && ids.has(link.sourceID)).map((link) => link.sourceID),
-  )]));
-  const remaining = [...tasks].sort(byCreated);
+/** Minimal binary min-heap in creation order, for the ready queue below. */
+function heapPush(heap: Task[], task: Task) {
+  let i = heap.push(task) - 1;
+  while (i > 0) {
+    const up = (i - 1) >> 1;
+    if (byCreated(heap[up], heap[i]) <= 0) break;
+    [heap[up], heap[i]] = [heap[i], heap[up]];
+    i = up;
+  }
+}
+
+function heapPop(heap: Task[]): Task {
+  const top = heap[0];
+  const last = heap.pop()!;
+  if (heap.length > 0) {
+    heap[0] = last;
+    for (let i = 0; ;) {
+      const left = 2 * i + 1;
+      const right = left + 1;
+      let min = i;
+      if (left < heap.length && byCreated(heap[left], heap[min]) < 0) min = left;
+      if (right < heap.length && byCreated(heap[right], heap[min]) < 0) min = right;
+      if (min === i) break;
+      [heap[min], heap[i]] = [heap[i], heap[min]];
+      i = min;
+    }
+  }
+  return top;
+}
+
+/** topologicalOrder orders a group by its prerequisite successors, breaking
+ *  ties by creation. Delegation is not chronology, and links need not form a
+ *  DAG, so when nothing is ready the earliest-created remaining member is
+ *  taken next (TS-08.R84). O((tasks + links) log tasks). */
+function topologicalOrder(tasks: Task[], next: Map<string, Task[]>, indegree: Map<string, number>): Task[] {
+  const byCreation = [...tasks].sort(byCreated);
+  const remaining = new Map(byCreation.map((task) => [task.task_id, indegree.get(task.task_id) ?? 0]));
+  const emitted = new Set<string>();
+  const ready: Task[] = [];
+  for (const task of byCreation) if (remaining.get(task.task_id) === 0) heapPush(ready, task);
   const out: Task[] = [];
-  while (remaining.length > 0) {
-    let index = remaining.findIndex((task) => pending.get(task.task_id)!.size === 0);
-    if (index < 0) index = 0;
-    const [task] = remaining.splice(index, 1);
+  let fallback = 0;
+  while (out.length < tasks.length) {
+    let task: Task;
+    if (ready.length > 0) {
+      task = heapPop(ready);
+    } else {
+      while (emitted.has(byCreation[fallback].task_id)) fallback++;
+      task = byCreation[fallback];
+    }
+    emitted.add(task.task_id);
     out.push(task);
-    for (const waiting of pending.values()) waiting.delete(task.task_id);
+    for (const successor of next.get(task.task_id) ?? []) {
+      const left = remaining.get(successor.task_id)! - 1;
+      remaining.set(successor.task_id, left);
+      if (left === 0 && !emitted.has(successor.task_id)) heapPush(ready, successor);
+    }
   }
   return out;
 }
@@ -89,7 +130,11 @@ export function projectWork(project: string, tasks: Task[], pinned: ReadonlySet<
   const find = (id: string): string => {
     let root = id;
     while (parent.get(root) !== root) root = parent.get(root)!;
-    parent.set(id, root);
+    for (let node = id; node !== root;) {
+      const up = parent.get(node)!;
+      parent.set(node, root);
+      node = up;
+    }
     return root;
   };
   const union = (a: string, b: string) => {
@@ -100,7 +145,9 @@ export function projectWork(project: string, tasks: Task[], pinned: ReadonlySet<
 
   const links = new Map<string, TaskLink[]>();
   const external = new Map<string, ExternalWait[]>();
+  // Prerequisite successors only: delegation is parentage, never "leads to".
   const next = new Map<string, Task[]>();
+  const indegree = new Map<string, number>();
   for (const task of tasks) {
     const inbound: TaskLink[] = [];
     const outside: ExternalWait[] = [];
@@ -119,9 +166,15 @@ export function projectWork(project: string, tasks: Task[], pinned: ReadonlySet<
         if (byID.has(arm.source_id)) union(task.task_id, arm.source_id);
       }
     }
+    const sources = new Set<string>();
     for (const link of inbound) {
-      if (link.source && !(next.get(link.sourceID) ?? []).includes(task)) next.set(link.sourceID, [...(next.get(link.sourceID) ?? []), task]);
+      if (link.kind !== "prerequisite" || !link.source || sources.has(link.sourceID)) continue;
+      sources.add(link.sourceID);
+      const successors = next.get(link.sourceID);
+      if (successors) successors.push(task);
+      else next.set(link.sourceID, [task]);
     }
+    indegree.set(task.task_id, sources.size);
     links.set(task.task_id, inbound);
     external.set(task.task_id, outside);
   }
@@ -129,11 +182,13 @@ export function projectWork(project: string, tasks: Task[], pinned: ReadonlySet<
   const members = new Map<string, Task[]>();
   for (const task of tasks) {
     const root = find(task.task_id);
-    members.set(root, [...(members.get(root) ?? []), task]);
+    const group = members.get(root);
+    if (group) group.push(task);
+    else members.set(root, [task]);
   }
 
   const groups: WorkGroup[] = [...members.entries()].map(([id, groupTasks]) => {
-    const ordered = topologicalOrder(groupTasks, links);
+    const ordered = topologicalOrder(groupTasks, next, indegree);
     const depth = new Map<string, number>();
     const rows = ordered.map((task) => {
       // Depth follows only links to earlier rows, so a cycle cannot recurse.

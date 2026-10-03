@@ -22,9 +22,6 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-chuck.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
-  `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
-  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) was reviewed and
-  remains open on the findings below.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
@@ -78,29 +75,6 @@ None.
   **Requirement:** FS-02.A46, INV §17. **Suggested fix/test:** mount the real `ChatPanel` route with
   the agent store hydrated and the target absent, click the toast, and assert both **Agent not
   found** and toast dismissal.
-
-### Tasks as project-grouped work in motion — reviewed 2026-10-03 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Must fix** — delegation children are presented as sequential work. **Where:**
-  `ui/src/features/tasks/taskWork.ts:122-124` adds every inbound relationship, including delegation,
-  to `next`; `ui/src/features/tasks/TasksPage.tsx:65-68` renders every `next` task as “leads to”.
-  **Normal-use trigger:** open a related-work group containing a parent task and its delegated child.
-  **Why it matters:** the parent row claims that it leads to the child even though delegation is
-  provenance, not a start condition or chronology, so the page gives a false account of why work
-  exists or progresses. **Requirement:** FS-16.R42, TS-08.R84, INV §8. **Suggested fix/test:** add
-  only prerequisite successors to `next` (or project delegation successors with explicit parentage
-  wording), and assert that a delegated parent never renders “leads to” its child while dependency
-  branches still do.
-- **Must fix** — the relationship projection exceeds its required linear work bound. **Where:**
-  `ui/src/features/tasks/taskWork.ts:64-77` repeatedly scans and splices the remaining tasks and then
-  scans every pending prerequisite set; `:122-132` repeatedly copies growing successor and component
-  arrays. **Normal-use trigger:** open Tasks for a project with a long retained chain or a large
-  fan-out group. **Why it matters:** projection cost grows quadratically even though retained task
-  history can grow, making the page increasingly slow or unresponsive instead of keeping graph work
-  bounded at entry. **Requirement:** TS-08.R84, INV §16. **Suggested fix/test:** build prerequisite
-  adjacency/indegree and component arrays once, use a deterministic ready queue plus an explicit
-  deterministic cycle fallback, and add large chain/fan-out projection tests that preserve the
-  required ordering and grouping.
 
 ### Claude 5.5 launch compatibility — reported 2026-10-01 — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -179,6 +153,13 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Fix: Tasks work in motion.** Both Must-fix findings closed; the unit is closed.
+  Parent rows no longer claim they "lead to" delegated children — only prerequisite successors feed
+  `next` (INV §8, FS-16.R42). The projection now builds successor/indegree indexes and components
+  once, orders rows with a creation-ordered ready heap plus an earliest-created cycle fallback, and
+  path-compresses its union-find (INV §16, TS-08.R84); 5,000-task chain and fan-out tests pin the
+  order. Specifications already required this behavior. UI, Go, spec, and build checks pass.
 
 - **2026-10-03 — Review: lean personas and shared operating context.** No findings; the unit is
   closed. Fresh and upgraded role seeding, exact-only retained-role migration, the runtime-only

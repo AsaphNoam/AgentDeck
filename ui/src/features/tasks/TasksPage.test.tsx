@@ -123,6 +123,8 @@ describe("Tasks work in motion", () => {
     ]);
     expect(within(await rowOf("Write API docs")).getByText("Waits for Implement API → success")).toBeInTheDocument();
     expect(within(await rowOf("Draft release notes")).getByText(/delegated by Coordinate release/)).toBeInTheDocument();
+    expect(within(await rowOf("Coordinate release")).queryByText(/leads to/)).not.toBeInTheDocument();
+    expect(within(await rowOf("Design schema")).getByText(/leads to Implement API/)).toBeInTheDocument();
     expect(within(await rowOf("Follow up on removed work")).getByText(/unavailable task tk_gone/)).toBeInTheDocument();
     expect(within(await rowOf("Migrate orders")).getByText("Waiting for work updates")).toBeInTheDocument();
     expect(within(await rowOf("Publish notes")).getByText("Finishing cleanup")).toBeInTheDocument();

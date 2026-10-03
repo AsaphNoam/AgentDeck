@@ -66,6 +66,39 @@ describe("projectWork", () => {
     expect(looped.active.flatMap((group) => names(group.rows)).sort()).toEqual(["tk_a", "tk_b"]);
   });
 
+  it("never presents a delegated child as the parent's successor (FS-16.R42)", () => {
+    const parent = groupOf("tk_p").rows.find((row) => row.task.task_id === "tk_p")!;
+    expect(parent.next).toEqual([]);
+    expect(groupOf("tk_d").rows.find((row) => row.task.task_id === "tk_d")!.next.map((task) => task.task_id)).toEqual(["tk_e", "tk_f"]);
+  });
+
+  it("projects a long reversed chain and a wide fan-out in prerequisite order (TS-08.R84)", () => {
+    // tk_c is unfinished, so every generated group stays active.
+    const [c] = tasks("my-app").filter((task) => task.task_id === "tk_c");
+    const arm = c.arms![0];
+    const n = 5000;
+    const id = (i: number) => `tk_${String(i).padStart(5, "0")}`;
+    // Created newest-first so creation order fights prerequisite order.
+    const chain = Array.from({ length: n }, (_, i) => ({
+      ...c, task_id: id(i), created_at: new Date(Date.UTC(2026, 0, 1) + (n - i) * 1000).toISOString(),
+      arms: i === 0 ? [] : [{ ...arm, arm_id: `arm${i}`, task_id: id(i), source_id: id(i - 1) }],
+    }));
+    const started = performance.now();
+    const linear = projectWork("my-app", chain);
+    expect(linear.active.flatMap((group) => names(group.rows))).toEqual(chain.map((task) => task.task_id));
+    const fan = Array.from({ length: n }, (_, i) => ({
+      ...c, task_id: id(i), created_at: new Date(Date.UTC(2026, 0, 1) + (n - i) * 1000).toISOString(),
+      arms: i === 0 ? [] : [{ ...arm, arm_id: `arm${i}`, task_id: id(i), source_id: id(0) }],
+    }));
+    const wide = projectWork("my-app", fan);
+    expect(wide.active).toHaveLength(1);
+    const rows = names(wide.active[0].rows);
+    expect(rows[0]).toBe(id(0));
+    expect(rows.slice(1)).toEqual(fan.slice(1).map((task) => task.task_id).reverse());
+    expect(wide.active[0].rows[0].next).toHaveLength(n - 1);
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
   it("keeps duplicate names as distinct rows keyed by id", () => {
     const [c] = tasks("my-app").filter((task) => task.task_id === "tk_c");
     const twin = { ...c, task_id: "tk_c2", arms: [] };
