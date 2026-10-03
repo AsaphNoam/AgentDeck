@@ -900,7 +900,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
 
 ### 2.12 Tasks relationship view
 
-- **R82** `(planned)` — **Project sections reuse the task query family.** Implement FS-16.R41–R45
+- **R82** (shipped 2026-10-03) — **Project sections reuse the task query family.** Implement FS-16.R41–R45
   in the existing Tasks feature. Enumerate the existing project catalog, including archived project
   definitions with retained work, and reuse `GET /api/tasks?project=` and `TASK_QUERY_KEYS.project`;
   absence of the route's project parameter means All projects, not the first project. Share query
@@ -913,7 +913,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   is reported rather than replaced silently. No all-project endpoint, protocol change, persistence
   migration, background polling, or history-retention change is introduced. Existing HTTP full-list
   behavior is reused, not extended into recursive per-task or per-ancestor fetches.
-- **R83** `(planned)` — **The frontend preserves the existing task wire meaning.** Extend the shared
+- **R83** (shipped 2026-10-03) — **The frontend preserves the existing task wire meaning.** Extend the shared
   task schema with `waiting`, lineage (parent/run/stage/creation-attempt ids), result details/outputs,
   timestamps, continuation/resume flags, pending yield/release and cleanup fields needed by this
   view. Match the existing Go JSON shape, including omitted/null collections and optional fields
@@ -930,7 +930,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   refusals visible rather than broadening eligibility.
   Creator/assignee labels resolve through existing agent identity data when available, with stable
   id fallback; never request every archived transcript to obtain a display name.
-- **R84** `(planned)` — **One feature-owned projection derives related-work groups.** Index each
+- **R84** (shipped 2026-10-03) — **One feature-owned projection derives related-work groups.** Index each
   project's task snapshot by stable id. Build typed prerequisite links from task work-result arms
   (source → dependent), and delegation links from parent lineage (parent → child). Use undirected
   connectivity of known same-project task nodes only for grouping; keep typed/directed relations
@@ -950,7 +950,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   action is in progress, even when it becomes settled. Classification into history requires all
   members finished and no pending release/yield or unresolved cleanup. No grouping result is stored
   in the database or used to decide execution, cancellation scope or authority.
-- **R85** `(planned)` — **Connected rows belong to the shared presentation system.** Use semantic
+- **R85** (shipped 2026-10-03) — **Connected rows belong to the shared presentation system.** Use semantic
   lists, existing buttons/badges/disclosures, feature-owned `tasks.css`, and the existing tokens and
   hooks across Core, Sky & Grove and Studio. Task title/state and wait explanation lead; shallow
   connectors plus textual relationship references preserve branches and joins without infinite

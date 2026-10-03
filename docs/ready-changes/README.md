@@ -45,8 +45,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`notifications-open-conversation.md`](notifications-open-conversation.md) — clicking any agent
   toast or desktop notification opens that agent's conversation.
-- [`tasks-work-in-motion.md`](tasks-work-in-motion.md) — center Tasks on project-grouped active
-  relationships, retain completed context, and collapse manual creation at the bottom.
 - [`show-exact-context-and-runtime-metadata.md`](show-exact-context-and-runtime-metadata.md) — show
   exact used/total context tokens beside the percentage and keep model/effort visible when a scoped
   project agent card expands.
@@ -58,7 +56,7 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`simplify-agent-and-automation-setup.md`](simplify-agent-and-automation-setup.md) — reduce setup
   overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
-- [`rename-product-to-deckhand.md`](rename-product-to-deckhand.md) — rename AgentDeck to Deckhand
+- [`rename-product-to-chuck.md`](rename-product-to-chuck.md) — rename AgentDeck to Chuck
   across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
 - [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
   give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,

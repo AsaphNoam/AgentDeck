@@ -1,0 +1,695 @@
+{
+  "my-app": {
+    "tasks": [
+      {
+        "task_id": "tk_h2",
+        "project": "my-app",
+        "display_name": "Old follow-up",
+        "instruction": "Instruction for Old follow-up.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "cancelled",
+        "outcome_source": "host",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:16:00Z",
+        "updated_at": "2026-10-01T09:17:00Z",
+        "finished_at": "2026-10-01T09:20:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_h2_arm00",
+            "task_id": "tk_h2",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_h1",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfiable"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_h1",
+        "project": "my-app",
+        "display_name": "Old spike",
+        "instruction": "Instruction for Old spike.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "failure",
+        "outcome_source": "agent",
+        "outcome_summary": "Reported failure.",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:15:00Z",
+        "updated_at": "2026-10-01T09:16:00Z",
+        "started_at": "2026-10-01T09:16:00Z",
+        "finished_at": "2026-10-01T09:21:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_k",
+        "project": "my-app",
+        "display_name": "Publish notes",
+        "instruction": "Instruction for Publish notes.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "success",
+        "outcome_source": "agent",
+        "outcome_summary": "Reported success.",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_k",
+        "pending_release": true,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_phase": "release",
+        "cleanup_failure_count": 2,
+        "cleanup_next_retry_at": "2026-10-01T09:30:00Z",
+        "cleanup_last_error": "agent did not stop",
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:14:00Z",
+        "updated_at": "2026-10-01T09:15:00Z",
+        "started_at": "2026-10-01T09:15:00Z",
+        "finished_at": "2026-10-01T09:20:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_u",
+        "project": "my-app",
+        "display_name": "Build stage",
+        "instruction": "Instruction for Build stage.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "running",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_u",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:13:00Z",
+        "updated_at": "2026-10-01T09:14:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "tk_u",
+          "pipeline_run_id": "pr_1",
+          "pipeline_stage_id": "build",
+          "created_at": "2026-10-01T09:13:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_t",
+        "project": "my-app",
+        "display_name": "Ship release",
+        "instruction": "Instruction for Ship release.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "armed",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:12:00Z",
+        "updated_at": "2026-10-01T09:13:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_t_arm00",
+            "task_id": "tk_t",
+            "kind": "signal",
+            "signal_name": "ci-green",
+            "state": "unsatisfied"
+          },
+          {
+            "arm_id": "tk_t_arm01",
+            "task_id": "tk_t",
+            "kind": "work_result",
+            "source_kind": "pipeline_run",
+            "source_id": "pr_1",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_s",
+        "project": "my-app",
+        "display_name": "Follow up on removed work",
+        "instruction": "Instruction for Follow up on removed work.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "dependency_failed",
+        "attention_reason": "a prerequisite can no longer be satisfied",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:11:00Z",
+        "updated_at": "2026-10-01T09:12:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_s_arm00",
+            "task_id": "tk_s",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_gone",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfiable"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_r",
+        "project": "my-app",
+        "display_name": "Tidy fixtures",
+        "instruction": "Instruction for Tidy fixtures.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "ready",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:10:00Z",
+        "updated_at": "2026-10-01T09:11:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_q",
+        "project": "my-app",
+        "display_name": "Draft release notes",
+        "instruction": "Instruction for Draft release notes.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "interrupted",
+        "attention_reason": "the assigned agent stopped before reporting a result",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_gone",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:09:00Z",
+        "updated_at": "2026-10-01T09:10:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "tk_q",
+          "parent_task_id": "tk_p",
+          "created_at": "2026-10-01T09:09:00Z"
+        },
+        "retry_eligible": true,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_p",
+        "project": "my-app",
+        "display_name": "Coordinate release",
+        "instruction": "Instruction for Coordinate release.",
+        "target_kind": "agent",
+        "target_agent_id": "ag_lead",
+        "fast": false,
+        "state": "running",
+        "created_by_kind": "person",
+        "assigned_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:08:00Z",
+        "updated_at": "2026-10-01T09:09:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_g",
+        "project": "my-app",
+        "display_name": "Verify migration",
+        "instruction": "Instruction for Verify migration.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "armed",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:07:00Z",
+        "updated_at": "2026-10-01T09:08:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_g_arm00",
+            "task_id": "tk_g",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_e",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfied"
+          },
+          {
+            "arm_id": "tk_g_arm01",
+            "task_id": "tk_g",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_f",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_f",
+        "project": "my-app",
+        "display_name": "Migrate orders",
+        "instruction": "Instruction for Migrate orders.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "waiting",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_f",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 1,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:06:00Z",
+        "updated_at": "2026-10-01T09:07:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_f_arm00",
+            "task_id": "tk_f",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_d",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "satisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_e",
+        "project": "my-app",
+        "display_name": "Migrate users",
+        "instruction": "Instruction for Migrate users.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "ready",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "ready_at": "2026-10-01T09:10:00Z",
+        "created_at": "2026-10-01T09:05:00Z",
+        "updated_at": "2026-10-01T09:06:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_e_arm00",
+            "task_id": "tk_e",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_d",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "satisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_d",
+        "project": "my-app",
+        "display_name": "Split data",
+        "instruction": "Instruction for Split data.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "success",
+        "outcome_source": "agent",
+        "outcome_summary": "Reported success.",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:04:00Z",
+        "updated_at": "2026-10-01T09:05:00Z",
+        "started_at": "2026-10-01T09:05:00Z",
+        "finished_at": "2026-10-01T09:10:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_c",
+        "project": "my-app",
+        "display_name": "Write API docs",
+        "instruction": "Instruction for Write API docs.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "armed",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:03:00Z",
+        "updated_at": "2026-10-01T09:04:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_c_arm00",
+            "task_id": "tk_c",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_b",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "unsatisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_b",
+        "project": "my-app",
+        "display_name": "Implement API",
+        "instruction": "Instruction for Implement API.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "running",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_b",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:02:00Z",
+        "updated_at": "2026-10-01T09:03:00Z",
+        "started_at": "2026-10-01T09:08:00Z",
+        "arms": [
+          {
+            "arm_id": "tk_b_arm00",
+            "task_id": "tk_b",
+            "kind": "work_result",
+            "source_kind": "task",
+            "source_id": "tk_a",
+            "satisfying_outcomes": [
+              "success"
+            ],
+            "state": "satisfied"
+          }
+        ],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_a",
+        "project": "my-app",
+        "display_name": "Design schema",
+        "instruction": "Instruction for Design schema.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "success",
+        "outcome_source": "agent",
+        "outcome_summary": "Reported success.",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "assigned_agent_id": "ag_a",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:00:00Z",
+        "updated_at": "2026-10-01T09:01:00Z",
+        "started_at": "2026-10-01T09:01:00Z",
+        "finished_at": "2026-10-01T09:06:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "outputs": {
+          "schema": "docs/schema.md"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      }
+    ]
+  },
+  "other": {
+    "tasks": [
+      {
+        "task_id": "tk_o2",
+        "project": "other",
+        "display_name": "Rotate keys",
+        "instruction": "Instruction for Rotate keys.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "running",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_other",
+        "assigned_agent_id": "ag_o",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:22:00Z",
+        "updated_at": "2026-10-01T09:23:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      },
+      {
+        "task_id": "tk_o1",
+        "project": "other",
+        "display_name": "Audit logs",
+        "instruction": "Instruction for Audit logs.",
+        "target_kind": "launch",
+        "role": "implementer",
+        "fast": false,
+        "state": "finished",
+        "outcome": "blocked",
+        "outcome_source": "agent",
+        "outcome_summary": "Reported blocked.",
+        "created_by_kind": "agent",
+        "created_by_agent_id": "ag_lead",
+        "pending_release": false,
+        "continuation_pending": false,
+        "pending_yield": false,
+        "wait_version": 0,
+        "resume_needed": false,
+        "cleanup_unsafe": false,
+        "start_attempt_count": 0,
+        "revision": 1,
+        "created_at": "2026-10-01T09:20:00Z",
+        "updated_at": "2026-10-01T09:21:00Z",
+        "started_at": "2026-10-01T09:21:00Z",
+        "finished_at": "2026-10-01T09:26:00Z",
+        "arms": [],
+        "lineage": {
+          "task_id": "",
+          "created_at": "0001-01-01T00:00:00Z"
+        },
+        "retry_eligible": false,
+        "attachments": []
+      }
+    ]
+  }
+}

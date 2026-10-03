@@ -5,6 +5,7 @@ export const TASK_STATES = [
   "ready",
   "starting",
   "running",
+  "waiting",
   "interrupted",
   "finished",
   "dependency_failed",
@@ -35,6 +36,15 @@ export const taskAttachmentSchema = z.object({
   created_at: z.string(),
 });
 
+export const taskLineageSchema = z.object({
+  parent_task_id: z.string().optional().default(""),
+  pipeline_run_id: z.string().optional().default(""),
+  pipeline_stage_id: z.string().optional().default(""),
+  creation_attempt_id: z.string().optional().default(""),
+});
+
+const EMPTY_LINEAGE = { parent_task_id: "", pipeline_run_id: "", pipeline_stage_id: "", creation_attempt_id: "" };
+
 export const taskSchema = z.object({
   task_id: z.string(),
   project: z.string(),
@@ -59,6 +69,25 @@ export const taskSchema = z.object({
   retry_eligible: z.boolean().optional().default(false),
   revision: z.number(),
   created_at: z.string(),
+  updated_at: z.string().optional().default(""),
+  started_at: z.string().optional(),
+  finished_at: z.string().optional(),
+  outcome_details: z.string().optional().default(""),
+  // Runtime continuation and cleanup flags (FS-16.R33–R38) the view needs to
+  // tell durable waiting and finishing apart from an unexpected interruption.
+  pending_release: z.boolean().optional().default(false),
+  continuation_pending: z.boolean().optional().default(false),
+  pending_yield: z.boolean().optional().default(false),
+  resume_needed: z.boolean().optional().default(false),
+  cleanup_phase: z.string().optional().default(""),
+  cleanup_failure_count: z.number().optional().default(0),
+  cleanup_next_retry_at: z.string().optional(),
+  cleanup_last_error: z.string().optional().default(""),
+  cleanup_unsafe: z.boolean().optional().default(false),
+  // Lineage is provenance (TS-10.R25); the server always emits the object, with
+  // empty fields when a task has no recorded parent or pipeline run.
+  lineage: taskLineageSchema.nullable().optional().transform((value) => value ?? EMPTY_LINEAGE),
+  outputs: z.record(z.string(), z.string()).nullable().optional().transform((value) => value ?? {}),
   arms: z.array(taskArmSchema).nullable().optional().default([]),
   attachments: z.array(taskAttachmentSchema).nullable().optional().default([]),
 });

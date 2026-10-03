@@ -34,6 +34,11 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Explain and recover from bundled-provider version skew.** From the 2026-10-01 Codex cache
+  mismatch and Claude 5.5 reports: make New Agent distinguish harmless catalog skew from a runtime
+  incompatibility, explain the consequence in task language, and offer a safe next action or
+  supported automatic recovery where AgentDeck can prove one. Defining under FS-09/FS-10 and the
+  shared release/provider-runtime boundary.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

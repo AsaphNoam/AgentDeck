@@ -19,11 +19,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   they now wait for that rendered default first. The GitHub Release carries the 293,072,856-byte
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
-- **Work units:** `rename-product-to-deckhand.md` is waiting to start.
+- **Work units:** `rename-product-to-chuck.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
   `lean-personas-and-operating-context` (four seeded personas, standing operating context in the
   launch overlay, Claude native-preset append) is available.
+  `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
+  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85) is available — **uncommitted**:
+  the session's commit attempts were refused by the permission classifier, so its files sit in the
+  working tree (see Active change).
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -31,7 +35,16 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+None. **Uncommitted finished work:** Tasks work in motion is implemented and verified but not
+committed (commit was refused by the session's permission classifier). Its files: `ui/src/schemas/task.ts`,
+`ui/src/api/tasks.ts`, `ui/src/features/tasks/{TasksPage,taskForms,taskWork}.tsx?/ts` plus tests and
+`fixtures/taskLists.json`, `internal/server/task_wire_fixture_test.go`,
+`ui/src/components/grid/CardGrid.tsx`, `ui/src/styles/features/tasks.css`,
+`ui/src/presentation/contract.json`, `internal/server/ui/dist/**`, FS-16/TS-08/specs README, the
+deleted `docs/ready-changes/tasks-work-in-motion.md` and its README line, and this handoff's entries.
+Commit them together (the README/HANDOFF diffs also carry another session's Deckhand→Chuck rename
+lines). Fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server -run
+TestTaskWireFixture`.
 
 ## Acceptance gates still owed
 
@@ -137,6 +150,16 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Work: Tasks as project-grouped work in motion.** Tasks opens on All projects
+  (≤4 project reads in flight), each project showing related-work groups built only from
+  task-result prerequisites and parent lineage, with typed links, branches/joins, unavailable
+  references, quiet creator/assignee labels and collapsed settled history. Detail expands inline
+  with existing controls; run-lineage work withholds stage-restricted controls until run detail
+  confirms ownership. Create and Fire signal are closed bottom disclosures with explicit projects.
+  The UI now parses `waiting`, lineage, outputs and cleanup flags against a Go-marshalled fixture.
+  Rendered in Core, Sky & Grove and Studio at 1024/1440px against that fixture; a live multi-agent
+  run through the built binary was not done. `make test`, UI tests and `make dist` pass.
 
 - **2026-10-03 — Work: lean personas and shared operating context.** Fresh homes seed
   AgentDecker, Implementer, Reviewer and Researcher with lean FS-18.R16 prompts; `pm`/`teammate`

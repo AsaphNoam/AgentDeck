@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { taskListSchema, taskSchema, type Task } from "../schemas/task";
 
@@ -65,20 +65,64 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-export function useTasks(project: string | undefined) {
-  return useQuery({
-    queryKey: TASK_QUERY_KEYS.project(project ?? ""),
+/** taskListOptions is the one project task read every consumer shares, so the
+ *  single-project and all-project views use the same key, schema and cache
+ *  (TS-08.R82). `gate` lets a caller bound how many reads run at once. */
+export function taskListOptions(project: string, gate?: <T>(signal: AbortSignal, run: () => Promise<T>) => Promise<T>) {
+  return queryOptions({
+    queryKey: TASK_QUERY_KEYS.project(project),
     enabled: Boolean(project),
-    queryFn: () => request(`/api/tasks?project=${encodeURIComponent(project!)}`, taskListSchema),
+    queryFn: ({ signal }) => {
+      const read = () => request(`/api/tasks?project=${encodeURIComponent(project)}`, taskListSchema, { signal });
+      return gate ? gate(signal, read) : read();
+    },
     select: (data: { tasks: Task[] }) => data.tasks,
   });
 }
 
+export function useTasks(project: string | undefined) {
+  return useQuery(taskListOptions(project ?? ""));
+}
+
+/** limitConcurrency admits at most `limit` reads at once; a queued read whose
+ *  query is cancelled (scope change, unmount) leaves the queue without running. */
+export function limitConcurrency(limit: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
+  const release = () => {
+    active--;
+    queue.shift()?.();
+  };
+  return <T,>(signal: AbortSignal, run: () => Promise<T>): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const start = () => {
+        signal.removeEventListener("abort", abort);
+        if (signal.aborted) {
+          reject(signal.reason);
+          queue.shift()?.();
+          return;
+        }
+        active++;
+        run().then(resolve, reject).finally(release);
+      };
+      const abort = () => {
+        const index = queue.indexOf(start);
+        if (index >= 0) queue.splice(index, 1);
+        reject(signal.reason);
+      };
+      if (active < limit) start();
+      else {
+        queue.push(start);
+        signal.addEventListener("abort", abort, { once: true });
+      }
+    });
+}
+
 /** useTaskAction is one hook for every per-task control, because they differ
  *  only in route and body and all invalidate the same list. */
-function useTaskAction<Input>(
+function useTaskAction<Input, Output>(
   project: string | undefined,
-  run: (input: Input) => Promise<unknown>,
+  run: (input: Input) => Promise<Output>,
 ) {
   const client = useQueryClient();
   return useMutation({

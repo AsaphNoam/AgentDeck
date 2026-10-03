@@ -529,18 +529,29 @@
         "instruction",
         "waiting",
         "actions",
-        "metadata"
+        "metadata",
+        "project",
+        "group",
+        "links",
+        "detail",
+        "history",
+        "authoring"
       ],
       "states": [
         "armed",
         "ready",
         "starting",
         "running",
+        "waiting",
         "interrupted",
         "finished",
         "dependency_failed"
       ],
-      "variants": []
+      "variants": [
+        "prerequisite",
+        "delegation",
+        "next"
+      ]
     },
     "pipelines": {
       "slots": [

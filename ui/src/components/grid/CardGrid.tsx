@@ -15,7 +15,7 @@ import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
 import { useProjects } from "../../api/config";
 import { useTasks } from "../../api/tasks";
-import { needsAttention } from "../../features/tasks/TasksPage";
+import { needsAttention } from "../../features/tasks/taskWork";
 import { Button, ConfirmDialog, PageHeader } from "../ui";
 
 // projectID scopes which agents the grid shows; fixedProject locks New Agent to a

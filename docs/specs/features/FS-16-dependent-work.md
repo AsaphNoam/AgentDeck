@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -272,7 +272,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 
 ### 2.5 Project-grouped work in motion
 
-- **R41** `(planned)` — **Tasks opens on work in motion across projects.** The desktop Tasks
+- **R41** (shipped 2026-10-03) — **Tasks opens on work in motion across projects.** The desktop Tasks
   route defaults to All projects; an explicit project filter, including existing `?project=` links,
   narrows it. Each project has a readable heading and counts of unfinished and attention tasks.
   Related work appears as compact connected rows, with task name, state and a short explanation of
@@ -283,7 +283,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   from an empty project and do not hide successfully loaded projects. This supersedes R14's
   single-project presentation, not its control capabilities, and specializes FS-12.R49/R55 only
   for this page's new hierarchy.
-- **R42** `(planned)` — **Groups express recorded relationships, not guessed workflows.** Within
+- **R42** (shipped 2026-10-03) — **Groups express recorded relationships, not guessed workflows.** Within
   a project, tasks connected by task-result prerequisites or recorded parent/delegation lineage
   belong to one related-work group; unrelated tasks remain independent even when their creator is
   the same agent. Prerequisite links say which result permits progress; delegation links describe
@@ -293,7 +293,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   edges. Pipeline lineage offers a run link. A missing/deleted related record remains labelled
   unavailable; it never becomes an inferred success, a fabricated task, or a cross-project group.
   Future work means already-created successors, not predicted tasks or a promise they will run.
-- **R43** `(planned)` — **Active relationships retain useful history.** A group remains in the
+- **R43** (shipped 2026-10-03) — **Active relationships retain useful history.** A group remains in the
   primary view while any task is unfinished or has pending runtime cleanup. Completed predecessors
   and other finished members stay available as quiet context alongside active and waiting work;
   long completed stretches may collapse behind an explicit count, with their connections preserved.
@@ -304,7 +304,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   drafts; a group being inspected may remain visibly marked finished in place until that inspection
   closes, rather than disappearing mid-action. No task is archived, deleted, or completed by this
   presentation rule.
-- **R44** `(planned)` — **State and detail explain progress and recovery.** Rows distinguish
+- **R44** (shipped 2026-10-03) — **State and detail explain progress and recovery.** Rows distinguish
   armed prerequisites, ready admission, starting, running, durable waiting, ready-to-resume,
   interrupted, dependency failure, and finishing/yielding cleanup using the authoritative task
   state and available transition information. Readiness alone is not proof of capacity exhaustion;
@@ -316,7 +316,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   retain input and show their reason. Waiting and cleanup are not unexpected interruption and must
   not offer an execution retry as cleanup repair. Reconnect/refetch refreshes the recorded truth;
   failed refreshes mark retained data as stale rather than claiming it is live.
-- **R45** `(planned)` — **Human authoring is an exceptional bottom action.** Create task manually
+- **R45** (shipped 2026-10-03) — **Human authoring is an exceptional bottom action.** Create task manually
   is a labelled, keyboard-operable disclosure below project work and history, closed on entry.
   Opening it exposes the existing form and prerequisite capacity under R39–R40, with an explicit
   project selector in All projects and the focused project preselected otherwise. No task can be
@@ -631,20 +631,20 @@ Each names the verification that demonstrates it.
   draft values, and all existing mutation errors remain visible. *Verify by* Tasks component tests
   using paginated API fixtures and the rendered setup pass.
 
-- **A27** `(planned)` (R41–R43) — In two projects, inspect a completed A → running B → armed C
+- **A27** (shipped 2026-10-03) (R41–R43) — In two projects, inspect a completed A → running B → armed C
   chain, a branching/joining dependency group, parent/child delegation, and unrelated tasks from
   the same creator. Identify the current work and C's release condition without opening an agent.
   Every task appears once, dependency and delegation labels differ, and project filtering retains
   the complete selected group's context. Missing predecessors and shared signal/run prerequisites
   do not invent edges. *Verify by* projection/component fixtures and a rendered desktop journey.
-- **A28** `(planned)` (R43–R44) — Exercise running → finished while detail is open, durable wait
+- **A28** (shipped 2026-10-03) (R43–R44) — Exercise running → finished while detail is open, durable wait
   → ready-to-resume, interruption, impossible prerequisites, pending cleanup and cleanup attention.
   Inspect the cause and use only eligible existing recovery; pipeline-owned work links to its run.
   Once settled and no longer inspected, a finished group enters collapsed history with its real
   outcomes; a completed predecessor of unfinished work stays in that active group. Refused actions
   preserve drafts. *Verify by* producer-shaped state fixtures, mutation tests and a rendered
   wait/recovery/completion journey.
-- **A29** `(planned)` (R41, R44–R45) — Open Tasks with no project and through `?project=`, then
+- **A29** (shipped 2026-10-03) (R41, R44–R45) — Open Tasks with no project and through `?project=`, then
   exercise an empty project, one failed project among successful reads, stale refresh, reconnect,
   unavailable creator/assignee, and a long chain. Manual creation stays closed below the work;
   opening, closing and reopening preserves input, project changes clear only incompatible choices,
@@ -656,7 +656,10 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-- **Work-in-motion redesign.** R41–R45 and A27–A29 are approved behavior, pending implementation.
+- **Work-in-motion redesign.** R41–R45 and A27–A29 shipped 2026-10-03. Rendered acceptance used
+  the real UI against the Go-marshalled task fixture in all three skins at 1024px and 1440px; a
+  live multi-agent journey through the built binary was not run. Optional collapsing of long
+  completed stretches inside an active group (R43) is not implemented: every member stays visible.
   Existing task lifecycle, ownership and result contracts remain authoritative.
 
 - **Persistent pipeline orchestration.** R30–R38 and A20–A24 support FS-14.R61–R77. TS-10.R25–R37

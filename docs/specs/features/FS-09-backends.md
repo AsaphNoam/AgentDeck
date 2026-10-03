@@ -254,6 +254,49 @@ Configuration-source federation for Claude/Codex is FS-08.
   When support metadata is unavailable, offer retry and withhold an unverified Terminal switch
   without silently changing the selected target. Existing backend/model/effort choices, reset rules,
   running-agent eligibility and server-side switch/rollback behavior remain unchanged.
+- **R64** `(planned)` — Claude and Codex chat backends expose one effective provider-runtime
+  choice: AgentDeck's reviewed bundled provider executable (the default) or an explicit local
+  provider executable. The ACP adapter and Node runtime remain release-owned in both cases; this
+  choice replaces only the provider executable through the adapter's documented override. Settings
+  shows the effective source, absolute path and version when known, and lets the person return to
+  the bundled default. New Agent shows the same effective source for the selected backend before
+  launch. A local choice is stored on that backend and applies to its future launches, resumes and
+  runtime switches; it does not hot-change a running agent or another backend. AgentDeck-managed
+  local recovery is temporary: after an application update, a newly bundled provider runtime that
+  satisfies the recorded incompatibility automatically becomes effective for future work and the
+  local override is removed. Settings reports that return to the tested bundle. A manually entered
+  executable override without AgentDeck's recovery provenance remains explicit configuration and is
+  never removed automatically.
+- **R65** `(planned)` — When AgentDeck can identify a local Claude or Codex executable, New Agent
+  and Settings may offer it by path and reported version. Choosing **Use local runtime for this
+  backend** first explains that the person is leaving the release-tested provider executable,
+  requires an explicit confirmation, then saves the provider's existing executable-override
+  environment key on that backend. AgentDeck never silently selects a local executable, rewrites a
+  model, or changes a default. A failed or unavailable version probe is reported as unverified, not
+  incompatible, and does not prevent an explicit path already configured by the person from being
+  used or removed.
+- **R66** `(planned)` — Provider-runtime notices state the task consequence and available recovery,
+  not only component versions. A Codex personal-cache mismatch is a non-blocking notice that says
+  launch remains available and only newer cached models were not imported. A recognized Claude or
+  Codex launch rejection caused by provider-version incompatibility preserves the person's New
+  Agent input and reports the effective source/version, the required version when the provider
+  supplied one, and only truthful actions: choose another model, use a detected local runtime whose
+  version satisfies the reported minimum, return to the bundled runtime, or copy the explicit
+  AgentDeck update command. Unknown compatibility and arbitrary provider detail fall back to bounded
+  backend-specific guidance and never become a claim that a candidate will work.
+- **R67** `(planned)` — Applying a confirmed local runtime from a pre-launch notice refreshes that
+  backend's runtime status and provider model import without overwriting existing models/defaults or
+  unrelated New Agent input. Applying it from a failed launch additionally retries the unchanged
+  launch request once after the save and refresh succeed. Save, probe, import or retry failure leaves
+  the form open, identifies the failed stage, preserves the prior valid backend configuration when
+  the save did not complete, and offers retry or return to bundled. AgentDeck does not check for,
+  download or install an application update in the background; update recovery remains the explicit
+  FS-10.R7 command flow. On the first start after an explicit application update, AgentDeck compares
+  each AgentDeck-managed local recovery with the new bundled provider version before serving launch
+  configuration. It returns to bundled only when the recorded minimum is met, or for a Codex catalog
+  mismatch when the newly bundled version matches the current personal-cache version; otherwise the
+  local recovery remains active. This reconciliation changes only future work and is reported in
+  Settings; it does not restart or mutate a running agent.
 
 ## 3. States & transitions
 
@@ -587,6 +630,38 @@ Configuration-source federation for Claude/Codex is FS-08.
   retry preserves unsaved model/env edits and does not persist response metadata. *Verify by*
   BackendsEditor/ModelRow tests covering type change, clear, failed save and missing metadata, plus
   a focused rendered edit→type change→repair→save journey.
+- **A33** `(planned)` (R59, R64–R67) — With bundled Codex 0.154.0 and a personal cache from
+  0.159.2, New Agent says that launch still works and that only newer cached models were skipped,
+  shows the bundled executable as effective, and offers a detected local Codex without changing
+  configuration. Confirming the local runtime persists its exact path on only that backend, imports
+  newly visible models add-only, preserves the selected role/project/model and defaults, and makes
+  subsequent launch/resume/runtime-switch summaries identify the local runtime. Returning to bundled
+  removes the override without changing another backend or a running agent. *Verify by* config/API,
+  model-import, launch-composition and New Agent/Settings component tests plus a rendered
+  mismatch→confirm local→launch→return to bundled journey.
+- **A34** `(planned)` (R64–R67) — A Claude model-setting failure carrying a bounded
+  `claude_code_version_too_old` detail identifies the bundled Claude version and provider minimum,
+  preserves the completed launch form, and offers a local Claude only when its reported version
+  meets that minimum. Confirming it persists `CLAUDE_CODE_EXECUTABLE` on that backend and retries the
+  same launch once through the bundled ACP adapter; success closes normally, while a second failure
+  stays visible with return-to-bundled and choose-another-model recovery. A missing, older or
+  unverified local candidate is never described as compatible. *Verify by* the pinned adapter's
+  executable-override contract, bounded JSON-RPC error fixtures, launch-composition tests and a
+  rendered fail→confirm local→retry journey.
+- **A35** `(planned)` (R64–R67, FS-10.R7) — Probe absence, timeout, malformed version output,
+  unknown provider errors and a failed backend save each produce distinct bounded states without a
+  runtime switch outside R67's authorized post-update reconciliation, model substitution,
+  background network check or application update. The
+  person can keep or restore the bundled runtime, edit an explicit path in Settings, choose another
+  model, or copy the documented update command as applicable. *Verify by* provider-probe tables,
+  API/UI error-state tests and one rendered unverified-local recovery check.
+- **A36** `(planned)` (R64, R67, FS-10.R7) — An AgentDeck-managed Claude recovery recorded for a
+  provider minimum remains local across an application update whose bundle is still too old, but a
+  later bundle meeting that minimum removes the override before the first new launch and reports the
+  return to bundled in Settings. A Codex cache-mismatch recovery returns only when the new bundle
+  matches the current cache version. A manually entered local path, an unknown local version, another
+  backend and an already running agent are unchanged. *Verify by* installed-version transition,
+  backend-config migration/reconciliation, launch/resume composition and Settings notice tests.
 
 ## 6. Deviations & open decisions
 
