@@ -80,8 +80,9 @@ type rpcMessage struct {
 }
 
 type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 var (
@@ -207,6 +208,13 @@ func handle(msg *rpcMessage) {
 			Value    string `json:"value"`
 		}
 		_ = json.Unmarshal(msg.Params, &setParams)
+		// FAKEACP_MODEL_REJECT_DATA reproduces how the pinned Claude adapter fails a
+		// model its embedded executable refuses: a bare `Internal error` whose data
+		// carries the provider's message.
+		if data := os.Getenv("FAKEACP_MODEL_REJECT_DATA"); data != "" && setParams.ConfigID == "model" {
+			writeMessage(rpcMessage{JSONRPC: "2.0", ID: msg.ID, Error: &rpcError{Code: -32603, Message: "Internal error", Data: json.RawMessage(data)}})
+			return
+		}
 		if os.Getenv("FAKEACP_EFFORT_FAIL") != "" {
 			respondErr(*msg.ID, -32000, "effort rejected")
 			return

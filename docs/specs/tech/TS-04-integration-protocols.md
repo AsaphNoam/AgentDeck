@@ -50,6 +50,10 @@ text frame with `cols`/`rows` requests resize. Viewer disconnect never stops the
 **R9 — External CLI capabilities fail honestly.** Missing binaries, rejected flags, failed
 initialize, unavailable credentials, and unsupported interface/backend combinations return bounded,
 backend-specific errors. AgentDeck does not claim a capability solely because a binary exists.
+A session setting the provider refuses reports only the JSON-RPC message, except that a recognized
+Claude `claude_code_version_too_old` rejection names the bundled Claude Code version, the required
+version, and that updating AgentDeck (not the person's own `claude` CLI) is the recovery; no other
+provider error data is returned.
 
 **R10 — retired 2026-08-14:** Startup bounds and diagnostics shipped as R22; optional-integration
 flag fallback/probing remains planned as R23.

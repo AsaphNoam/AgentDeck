@@ -1085,6 +1085,46 @@ func TestSessionConfigurationReplacesTheOptionListWithExplicitEmpty(t *testing.T
 	}
 }
 
+// TS-04.R9, INV §8 — the pinned Claude adapter reports a model its embedded
+// Claude Code is too old for as a bare `Internal error`, with the provider's
+// message only in the error data. The launch must name both versions and the
+// recovery, and must not echo the rest of the provider payload.
+func TestModelRejectionReportsAnOutdatedBundledClaudeRuntime(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.ModelID = "claude-opus-5-5"
+	providerMessage := `API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Claude Code 2.1.257 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.","details":{"error_code":"claude_code_version_too_old"}},"request_id":"req_secret_marker"}`
+	data, _ := json.Marshal(map[string]string{"details": providerMessage})
+	spec.Env = append(spec.Env, "FAKEACP_MODEL_REJECT_DATA="+string(data))
+
+	_, err := c.Start(context.Background(), spec)
+	if !errors.Is(err, ErrSettingRejected) {
+		t.Fatalf("Start error = %v, want ErrSettingRejected", err)
+	}
+	msg := err.Error()
+	for _, want := range []string{"bundled Claude chat runtime", "Claude Code 2.1.257", "Claude Code 2.1.280 or newer", "update AgentDeck"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q missing %q", msg, want)
+		}
+	}
+	for _, leaked := range []string{"req_secret_marker", "Internal error", "claude update"} {
+		if strings.Contains(msg, leaked) {
+			t.Errorf("error %q leaks %q", msg, leaked)
+		}
+	}
+}
+
+// INV §8 — unrecognized provider data on a rejected setting is not surfaced.
+func TestModelRejectionWithUnrecognizedDataStaysGeneric(t *testing.T) {
+	c, spec := newChatTest(t, "stream_text")
+	spec.ModelID = "claude-opus-5-5"
+	spec.Env = append(spec.Env, `FAKEACP_MODEL_REJECT_DATA={"details":"secret_marker"}`)
+
+	_, err := c.Start(context.Background(), spec)
+	if !errors.Is(err, ErrSettingRejected) || strings.Contains(err.Error(), "secret_marker") {
+		t.Fatalf("Start error = %v, want a generic ErrSettingRejected", err)
+	}
+}
+
 // FS-09.A27, INV §12 — a peer that answers success while its own rebuilt option
 // list reports a different effective value has ignored the setting. That is the
 // exact silent failure BR-1 shipped for Codex model delivery, so the RPC

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -2380,6 +2381,28 @@ func deliveredModelID(spec LaunchSpec) string {
 	return model
 }
 
+// claudeVersionTooOldPattern matches the provider sentence the pinned Claude
+// adapter forwards inside a JSON-RPC `Internal error`'s data when the Claude Code
+// executable it embeds is too old for the requested model.
+var claudeVersionTooOldPattern = regexp.MustCompile(`Claude Code ([0-9][0-9A-Za-z.+-]{0,31}) does not support this model; version ([0-9][0-9A-Za-z.+-]{0,31}) or newer is required`)
+
+// claudeVersionTooOldHint turns a recognized `claude_code_version_too_old`
+// rejection into a bounded recovery message naming both versions. The adapter
+// reports only `Internal error` as the message, so without this the person never
+// learns that AgentDeck's own Claude runtime, not their installed CLI, is too old
+// (TS-04.R9, INV §8). Anything else in the provider data stays unreported.
+func claudeVersionTooOldHint(err error) string {
+	var rpcErr *rpcError
+	if !errors.As(err, &rpcErr) || !strings.Contains(string(rpcErr.Data), "claude_code_version_too_old") {
+		return ""
+	}
+	m := claudeVersionTooOldPattern.FindStringSubmatch(string(rpcErr.Data))
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf("AgentDeck's bundled Claude chat runtime is Claude Code %s, and this model needs Claude Code %s or newer; updating your own claude CLI does not change it, so update AgentDeck", m[1], m[2])
+}
+
 // setConfigOption sends one session configuration option and folds the peer's
 // answer back into the advertisement (TS-04.R46/R47).
 //
@@ -2398,6 +2421,9 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 		"sessionId": sessionID, "configId": id, "value": value,
 	})
 	if err != nil {
+		if hint := claudeVersionTooOldHint(err); hint != "" {
+			return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, hint)
+		}
 		return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, err)
 	}
 	if rebuilt, present := decodeSessionConfigOptionsWithPresence(result); present {

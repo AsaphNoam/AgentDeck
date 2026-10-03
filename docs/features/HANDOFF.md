@@ -25,7 +25,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
-  finding; its Must-fix items are closed.
+  finding; its Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
+  finding (bump the bundled Claude adapter past Claude Code 2.1.280 after its credentialed gate, or
+  decide on a local-CLI override); its Must-fix is closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -92,20 +94,6 @@ None.
   AgentDeck version was not stated; the current shipped release is v0.8.0. No separate log file was
 supplied.
 
-- **Must fix** — Claude model rejection discards the actionable provider reason (**confirmed code
-  defect**). **Where:** `@agentclientprotocol/claude-agent-acp` 0.75.1 converts a failed SDK
-  `query.setModel` into JSON-RPC `Internal error` with the original message under `error.data`;
-  `internal/runtime/jsonrpc.go:24-31` decodes that data, but `rpcError.Error` returns only `Message`,
-  and `internal/runtime/chat.go:2379-2385` therefore surfaces only `provider rejected the setting:
-  model: Internal error`. **Normal-use trigger:** launch a Claude chat with an explicit model that
-  the packaged Claude executable rejects, including `claude-opus-5-5` under the shipped 2.1.257
-  executable. **Why it matters:** the person is told neither that AgentDeck is running a different
-  Claude version nor the provider's minimum-version recovery, so `claude update` appears ineffective
-  and the launch is not an honest, actionable compatibility failure. **Requirement:** TS-04.R9/R22,
-  INV §8/§12. **Suggested fix/test:** preserve a bounded, sanitized provider detail for recognized
-  session-configuration failures and add a launch regression whose ACP error carries
-  `claude_code_version_too_old`, asserting that the response identifies the packaged runtime and
-  required update without leaking arbitrary provider data.
 - **Worth fixing** — the packaged Claude runtime lags the minimum needed for Opus 5.5, with no
   version disclosure analogous to packaged Codex (**confirmed specification gap and compatibility
   limitation**). **Where:** `scripts/release/package.json:10` pins `claude-agent-acp` 0.75.1, whose
@@ -153,6 +141,13 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Fix: Claude 5.5 launch compatibility (Must fix).** A model the bundled Claude
+  executable is too old for no longer surfaces as `model: Internal error`: a recognized
+  `claude_code_version_too_old` rejection now names the bundled and required Claude Code versions
+  and says to update AgentDeck, not the local `claude` CLI; other provider error data stays
+  unreported (INV §8, TS-04.R9 updated). Fake-ACP launch regressions cover both paths. The
+  Worth-fixing adapter-bump/override finding stays open.
 
 - **2026-10-03 — Fix: Tasks work in motion.** Both Must-fix findings closed; the unit is closed.
   Parent rows no longer claim they "lead to" delegated children — only prerequisite successors feed
