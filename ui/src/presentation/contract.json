@@ -217,7 +217,9 @@
     "toast": {
       "slots": [
         "title",
-        "body"
+        "body",
+        "open",
+        "close"
       ],
       "states": [
         "done",

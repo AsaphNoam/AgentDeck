@@ -27,6 +27,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
   collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) was reviewed and
   remains open on the findings below.
+  `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
+  FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -38,6 +40,9 @@ None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test 
 -run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
+
+- FS-02.A46: real-browser toast click check and a manual macOS desktop-notification click are
+  owed; automated component and `sse.test.ts` coverage passes.
 
 - FS-18.A12 / TS-11.R17: the six manual role scenarios with a role-free follow-up against the
   pinned Claude and Codex providers have not been run; no qualitative receipt exists yet.
@@ -164,6 +169,15 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Work: notifications open the agent's conversation.** Agent toasts (all four types)
+  open `/agent/<id>` and dismiss; a × control only dismisses; error/pipeline toasts stay
+  non-navigating. Desktop Web Notification click focuses, navigates, and closes. One helper,
+  `ui/src/lib/agentConversation.ts`, builds the path for both; `NotificationCenter` registers the
+  router's navigate for the SSE client (importing the router from `sse.ts` would cycle). FS-02 is
+  now Current. `make test`, `make build`, UI tests and `make dist` pass. INV 2, 8, 13 apply and were
+  checked; no other class has a surface. Owed: A46's real-browser toast check and manual macOS
+  desktop click.
 
 - **2026-10-03 — Review: Tasks as project-grouped work in motion.** Two Must-fix findings keep the
   unit open: delegation successors are incorrectly labelled as sequential “leads to” work, and the

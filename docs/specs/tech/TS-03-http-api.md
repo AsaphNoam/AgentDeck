@@ -696,7 +696,7 @@ does not authorize sending backend types, environment, credentials or paths to a
 actual JSON response and schema, metadata-free writes/ETags and restricted phone response under
 FS-09.A30, not a separately handwritten ideal response alone.
 
-**R51 (planned) — Notification navigation is client-only over the existing payload.** FS-02.R64
+**R51 — Notification navigation is client-only over the existing payload.** FS-02.R64
 needs no server, bus, or `notification` SSE payload change: every agent notification already
 carries `agent_id` (FS-02.R22). The client keeps `agent_id` on agent toasts (error toasts have
 none) and builds the conversation path through one shared helper used by both the toast and the

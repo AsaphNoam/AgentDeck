@@ -535,6 +535,45 @@ describe("SseClient watchdog reconnect", () => {
     expect(calls).toEqual([{ title: "Atlas finished", body: "done", tag: "a_1" }]);
     expect(useUiStore.getState().toasts).toEqual([]);
   });
+
+  // FS-02.A46: a desktop notification click focuses the tab, opens the
+  // agent's conversation through the router, and closes the notification.
+  it("opens the agent's conversation when a desktop notification is clicked", async () => {
+    const shown: FakeNotification[] = [];
+    class FakeNotification {
+      static permission = "granted";
+      static requestPermission = vi.fn();
+      onclick: (() => void) | null = null;
+      close = vi.fn();
+      constructor() {
+        shown.push(this);
+      }
+    }
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    vi.stubGlobal("Notification", FakeNotification as unknown as typeof Notification);
+    const focus = vi.spyOn(window, "focus").mockImplementation(() => {});
+    const navigate = vi.fn();
+
+    const { sseClient } = await import("./sse");
+    const { queryClient } = await import("./config");
+    const { registerConversationNavigator } = await import("../lib/agentConversation");
+    registerConversationNavigator(navigate);
+    queryClient.setQueryData(["config"], { notifications: { desktop_enabled: true } });
+    sseClient.connect();
+    FakeEventSource.instances[0].emit("notification", JSON.stringify({
+      type: "notification",
+      seq: 1,
+      ts: 1,
+      agent_id: "a 1",
+      data: { type: "notification", notification_type: "permission_required", agent_id: "a 1", title: "Needs you", ts: "t" },
+    }));
+    shown[0].onclick?.();
+
+    expect(focus).toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/agent/a%201");
+    expect(shown[0].close).toHaveBeenCalled();
+    registerConversationNavigator(null);
+  });
 });
 
 // The shared worker is the thing that makes six tabs cost one connection, so

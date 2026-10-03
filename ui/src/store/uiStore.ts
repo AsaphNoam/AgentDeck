@@ -1,11 +1,14 @@
 import { create } from "zustand";
 import type { NotificationPayload } from "../api/types";
+import { notificationAgentId } from "../lib/agentConversation";
 
 export interface ToastItem {
   id: string;
   title: string;
   body?: string;
   type: NotificationPayload["notification_type"] | "error";
+  // The agent whose conversation the toast opens; absent on error toasts.
+  agentId?: string;
 }
 
 interface UiStoreState {
@@ -49,7 +52,13 @@ export const useUiStore = create<UiStoreState>((set) => ({
       return {
         toasts: [
           ...state.toasts.filter((toast) => toast.id !== id),
-          { id, title: notification.title, body: notification.body, type: notification.notification_type },
+          {
+            id,
+            title: notification.title,
+            body: notification.body,
+            type: notification.notification_type,
+            agentId: notificationAgentId(notification),
+          },
         ].slice(-4),
       };
     }),

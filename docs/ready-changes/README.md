@@ -43,8 +43,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`notifications-open-conversation.md`](notifications-open-conversation.md) — clicking any agent
-  toast or desktop notification opens that agent's conversation.
 - [`show-exact-context-and-runtime-metadata.md`](show-exact-context-and-runtime-metadata.md) — show
   exact used/total context tokens beside the percentage and keep model/effort visible when a scoped
   project agent card expands.

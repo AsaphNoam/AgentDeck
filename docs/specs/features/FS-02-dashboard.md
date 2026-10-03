@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -145,7 +145,7 @@ Notification is raised instead of the toast (deduped per agent via the notificat
 notification. Desktop notifications can be disabled wholesale, and desktop permission is requested
 from the Notifications settings editor.
 
-**R64** `(planned)` — **Every agent notification opens that agent's conversation.** Clicking an
+**R64** — **Every agent notification opens that agent's conversation.** Clicking an
 agent notification toast of any type (`permission_required`, `waiting_input`, `done`,
 `budget_exceeded`) opens the full conversation (`/agent/<agent_id>`) and dismisses the toast; a
 separate close control dismisses it without navigating. Clicking a desktop Web Notification brings
@@ -804,7 +804,7 @@ picker and launches with the route project's id; the general modal continues to 
   three-appearance visual matrix, and a focused real-browser check at the desktop floor and a wider
   viewport.
 
-- **A46 (planned)** (R64) — From the Tasks page, clicking a `permission_required` toast for agent
+- **A46** (R64) — From the Tasks page, clicking a `permission_required` toast for agent
   X opens X's conversation with the pending permission visible and removes that toast; clicking
   its close control removes it and stays on Tasks. A `done` toast and a `budget_exceeded` toast
   navigate the same way, an error toast only dismisses, and a toast for an agent removed before

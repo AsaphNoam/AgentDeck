@@ -12,6 +12,7 @@ import { useReasoningStore } from "../store/reasoningStore";
 import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
 import { discardChatDraft } from "../components/chat/drafts";
+import { notificationAgentId, openAgentConversation } from "../lib/agentConversation";
 
 class SseClient {
   private es: EventSourceLike | null = null;
@@ -176,7 +177,15 @@ class SseClient {
       "Notification" in window &&
       Notification.permission === "granted";
     if (canDesktop) {
-      new Notification(notification.title, { body: notification.body, tag: notification.agent_id });
+      const desktop = new Notification(notification.title, { body: notification.body, tag: notification.agent_id });
+      const agentId = notificationAgentId(notification);
+      if (agentId) {
+        desktop.onclick = () => {
+          window.focus();
+          openAgentConversation(agentId);
+          desktop.close();
+        };
+      }
       return;
     }
     useUiStore.getState().pushToast(notification);

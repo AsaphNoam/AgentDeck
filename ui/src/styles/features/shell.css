@@ -294,15 +294,37 @@
   box-shadow: var(--ad-shadow-offset);
   color: var(--ad-text-primary);
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.toast [data-slot="open"],
+.toast [data-slot="close"] {
+  background: none;
+  border: 0;
+  color: inherit;
+  min-height: auto;
+}
+
+.toast [data-slot="open"] {
+  display: grid;
   gap: var(--ad-space-1);
   justify-content: stretch;
-  min-height: auto;
   padding: var(--ad-space-3) var(--ad-space-4);
   text-align: left;
 }
 
-.toast:hover:not(:disabled) {
-  background: var(--ad-surface-raised);
+.toast [data-slot="close"] {
+  align-self: start;
+  color: var(--ad-text-muted);
+  padding: var(--ad-space-2) var(--ad-space-3);
+}
+
+.toast [data-slot]:hover:not(:disabled) {
+  background: none;
+}
+
+.toast [data-slot="close"]:hover:not(:disabled) {
+  color: var(--ad-text-primary);
 }
 
 .toast span {
