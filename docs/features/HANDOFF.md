@@ -26,8 +26,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
-  finding (bump the bundled Claude adapter past Claude Code 2.1.280 after its credentialed gate, or
-  decide on a local-CLI override); its Must-fix is closed.
+  finding (bump the bundled Claude adapter past Claude Code 2.1.280 after its credentialed gate);
+  its Must-fix is closed. The opt-in local-runtime recovery is already decided as planned
+  FS-09.R64–R67/A33–A34 under the bundled-provider-skew idea, with no ready change yet.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -106,8 +107,8 @@ supplied.
   bump, and the UI gives no way to distinguish that state from the user's installed CLI. The moving
   `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
   translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
-  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:** decide explicitly
-  whether Claude chat remains release-pinned or gains a reviewed local-CLI override; at minimum bump
+  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:** the bundled default
+  plus opt-in local override is already specified as planned FS-09.R64–R67; for this finding, bump
   the official adapter to a version embedding Claude Code 2.1.280+ after its credentialed
   compatibility gate, expose the effective packaged Claude/adapter versions before launch, and test
   that release PATH selection cannot be mistaken for the ambient CLI.
