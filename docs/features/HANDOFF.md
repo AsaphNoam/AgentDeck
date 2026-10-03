@@ -25,7 +25,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `lean-personas-and-operating-context` (four seeded personas, standing operating context in the
   launch overlay, Claude native-preset append) is available.
   `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
-  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) is available.
+  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) was reviewed and
+  remains open on the findings below.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -62,6 +63,29 @@ None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test 
 None.
 
 ## Review findings
+
+### Tasks as project-grouped work in motion — reviewed 2026-10-03 — **Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix** — delegation children are presented as sequential work. **Where:**
+  `ui/src/features/tasks/taskWork.ts:122-124` adds every inbound relationship, including delegation,
+  to `next`; `ui/src/features/tasks/TasksPage.tsx:65-68` renders every `next` task as “leads to”.
+  **Normal-use trigger:** open a related-work group containing a parent task and its delegated child.
+  **Why it matters:** the parent row claims that it leads to the child even though delegation is
+  provenance, not a start condition or chronology, so the page gives a false account of why work
+  exists or progresses. **Requirement:** FS-16.R42, TS-08.R84, INV §8. **Suggested fix/test:** add
+  only prerequisite successors to `next` (or project delegation successors with explicit parentage
+  wording), and assert that a delegated parent never renders “leads to” its child while dependency
+  branches still do.
+- **Must fix** — the relationship projection exceeds its required linear work bound. **Where:**
+  `ui/src/features/tasks/taskWork.ts:64-77` repeatedly scans and splices the remaining tasks and then
+  scans every pending prerequisite set; `:122-132` repeatedly copies growing successor and component
+  arrays. **Normal-use trigger:** open Tasks for a project with a long retained chain or a large
+  fan-out group. **Why it matters:** projection cost grows quadratically even though retained task
+  history can grow, making the page increasingly slow or unresponsive instead of keeping graph work
+  bounded at entry. **Requirement:** TS-08.R84, INV §16. **Suggested fix/test:** build prerequisite
+  adjacency/indegree and component arrays once, use a deterministic ready queue plus an explicit
+  deterministic cycle fallback, and add large chain/fan-out projection tests that preserve the
+  required ordering and grouping.
 
 ### Claude 5.5 launch compatibility — reported 2026-10-01 — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -140,6 +164,14 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Review: Tasks as project-grouped work in motion.** Two Must-fix findings keep the
+  unit open: delegation successors are incorrectly labelled as sequential “leads to” work, and the
+  graph projection is quadratic instead of the specified O(tasks + links) bound. INV 8, 16 and 17
+  applied to the findings; INV 1–2, 7, 10–11 and 13 applied without another violation; INV 3–6,
+  9, 12, 14–15 had no applicable changed surface. The 40 focused Tasks UI tests, Go-produced task
+  wire fixture check and style/presentation contract pass. **Fix model:** medium — Codex Terra or
+  Claude Opus.
 
 - **2026-10-03 — Work: Tasks as project-grouped work in motion.** Tasks opens on All projects
   (≤4 project reads in flight), each project showing related-work groups built only from
