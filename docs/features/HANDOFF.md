@@ -20,15 +20,17 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
 - **Work units:** `rename-product-to-chuck.md` is waiting to start.
+  `use-installed-provider-clis.md` is waiting to start (FS-09.R68–R74, FS-10.R20–R22;
+  managed adapters with user-installed provider defaults and explicit recovery).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
-  finding (bump the bundled Claude adapter past Claude Code 2.1.280 after its credentialed gate);
-  its Must-fix is closed. The opt-in local-runtime recovery is already decided as planned
-  FS-09.R64–R67/A33–A34 under the bundled-provider-skew idea, with no ready change yet.
+  finding; its Must-fix is closed. The ready `use-installed-provider-clis.md` change specifies the
+  remaining runtime-selection correction and its credentialed gate. The former bundled-default,
+  opt-in recovery draft FS-09.R64–R67/A33–A36 is retired; no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -107,11 +109,12 @@ supplied.
   bump, and the UI gives no way to distinguish that state from the user's installed CLI. The moving
   `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
   translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
-  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:** the bundled default
-  plus opt-in local override is already specified as planned FS-09.R64–R67; for this finding, bump
-  the official adapter to a version embedding Claude Code 2.1.280+ after its credentialed
-  compatibility gate, expose the effective packaged Claude/adapter versions before launch, and test
-  that release PATH selection cannot be mistaken for the ambient CLI.
+  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:**
+  implement `docs/ready-changes/use-installed-provider-clis.md` (FS-09.R68–R74/A37–A44), selecting
+  the installed provider through the managed adapter, exposing effective runtime details, and
+  reporting provider-owned update guidance. Prove that an old dependency CLI cannot shadow it and
+  complete the fixed-adapter cross-version gate. This finding remains open until verified;
+  the retired bundled-default/opt-in draft is not the intended fix.
 
 ### Phone desktop flow and agent management — reviewed 2026-10-02 — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -142,6 +145,16 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Design: use installed provider CLIs.** Added waiting ready change
+  `docs/ready-changes/use-installed-provider-clis.md`: local Claude/Codex by default with managed
+  adapters/SDK/Node, persistent existing overrides, next-process adoption, scoped runtime metadata,
+  explicit local-only refresh and provider-owned recovery. FS-09.R68–R74/A37–A44,
+  FS-10.R20–R22/A10–A12, TS-03.R52–R53, TS-04.R70–R74 and TS-06.R28–R29 are planned.
+  Retired the unshipped bundled-default/temporary-local draft and promoted its source idea.
+  A Luna design check tightened resume failures, unsaved metadata identity and refresh races;
+  fixed-adapter real-provider receipts remain pre-ship gates, not existing evidence. Spec lint,
+  twin-skill comparison and whitespace checks pass. No product code changed; Active change stays none.
 
 - **2026-10-03 — Fix: Claude 5.5 launch compatibility (Must fix).** A model the bundled Claude
   executable is too old for no longer surfaces as `model: Internal error`: a recognized

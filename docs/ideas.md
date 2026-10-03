@@ -34,11 +34,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Explain and recover from bundled-provider version skew.** From the 2026-10-01 Codex cache
-  mismatch and Claude 5.5 reports: make New Agent distinguish harmless catalog skew from a runtime
-  incompatibility, explain the consequence in task language, and offer a safe next action or
-  supported automatic recovery where AgentDeck can prove one. Defining under FS-09/FS-10 and the
-  shared release/provider-runtime boundary.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,
@@ -135,10 +130,12 @@ capability; it is not by itself authority to remove the fallback or ship the def
   `CODEX_CONFIG.developer_instructions` because Codex ACP does not consume generic ACP
   `systemPrompt`. Keep and reverify the overlay on every adapter bump until the adapter exposes a
   proven portable replacement.
-- **Codex executable authority.** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
+- **Codex executable authority (current release).** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
   pinned private Codex executable and the assembled tree proves there is exactly one Codex at the
-  pinned compatible version (currently adapter/CLI 1.12.0/0.154.0). Keep that rule on every bump;
-  explicit `CODEX_PATH` overrides remain supported.
+  pinned compatible version (currently adapter/CLI 1.12.0/0.154.0). This remains shipped behavior;
+  [`use-installed-provider-clis.md`](ready-changes/use-installed-provider-clis.md) deliberately
+  supersedes provider selection while retaining adapter patches and deterministic inventory.
+  Explicit `CODEX_PATH` overrides remain supported in both policies.
 
 ## Known things to improve
 

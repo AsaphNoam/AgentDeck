@@ -43,6 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
+  with managed adapters, scoped runtime feedback, local model refresh and actionable recovery.
 - [`show-exact-context-and-runtime-metadata.md`](show-exact-context-and-runtime-metadata.md) — show
   exact used/total context tokens beside the percentage and keep model/effort visible when a scoped
   project agent card expands.

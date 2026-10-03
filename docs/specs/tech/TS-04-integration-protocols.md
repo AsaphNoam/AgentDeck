@@ -885,6 +885,89 @@ FS-18.A13. A new conversation is the immediate-adoption path; role edits otherwi
 existing future-launch semantics. Permission policy, tool availability, authentication and user
 configuration discovery are outside this correction.
 
+**R70 `(planned)` — Provider selection has one owner, separate from adapter selection.** A shared
+Claude/Codex resolver accepts provider type, merged process/backend/model environment and the
+original user search path. Resolve the effective `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` first
+(model > backend > process; an effective empty value requests discovery). Custom values are
+literal absolute paths or bare executable names resolved on that search path; reject relative
+paths containing separators with path-repair guidance rather than binding them to an agent's cwd.
+The advanced editor writes only the existing backend env key, not a new config mode/schema.
+Without an override, search absolute, nonempty user PATH entries in order, then the fixed macOS
+locations `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, de-duplicated. Never invoke a shell,
+source shell startup files, inspect shell aliases, recursively scan disks or search application
+bundles. Skip AgentDeck-managed runtime directories (including canonical targets of symlinks) in
+automatic discovery. A deliberately supplied absolute override is not rewritten or silently
+substituted, including one deliberately pointing into an old installation.
+
+Return source, absolute launcher path and bounded resolution state. Re-resolve on each process
+start and refresh; retain the launcher/symlink path, not a permanently cached resolved target.
+Canonicalize only for validation/exclusion and probe freshness, not to pin future launches to an
+old version. Do not execute the file during resolution. Missing/not-executable overrides fail
+closed. Inject the selected absolute path into the adapter's documented override; Claude terminal
+invokes that same selection directly. This supersedes only provider ownership in R13/R15 and the
+corresponding packaged-provider baseline in R61; all ACP/SDK delivery, capability and patch
+contracts remain. OpenCode/OpenHands, including their separate planned override repair, are out of scope.
+
+**R71 `(planned)` — Every provider consumer shares selection and preserves profile ownership.**
+Route all launch composers and process starts, including rollback/wake/task/pipeline/clone and
+Claude terminal drivers, through R70. Resolve before irreversible launch side effects and before
+stopping a live runtime for a switch; a later spawn race still returns a bounded start error.
+Use the same selection for version checks and native login/readiness. `providerauth` continues
+to own fixed argv: Claude `auth login`/`auth status`, Codex `login`/`login status`; neither native
+command depends on finding a different `claude`/`codex` through the adapter PATH. Preserve the
+existing status-flag fallback, Codex API-key alternative, and explicit login-command override as
+an advanced login-only exception, never as executable discovery or a readiness bypass.
+
+CLI auth target selection: an explicit backend must have the requested provider type; otherwise
+choose the configured default backend if it has that type, else the sole matching backend, else
+report ambiguity with `--backend` guidance. A selected backend uses its default model unless
+`--model` names another existing model; invalid selections fail before spawn. A missing catalog
+uses ambient selection only; a corrupt/unreadable existing catalog is an error, not a default.
+Login and probes use the personal auth/config profile which feeds the existing Codex refresh,
+not `<agentdeck-home>/codex`; R20–R21's session isolation, refresh source and no-write-through
+guarantees do not change. Do not redefine personal-home ownership from backend `CODEX_HOME` in
+this change: login/readiness must use the same process-owned personal source as refresh, overriding
+scoped home values consistently with launch, rather than authenticating a profile launch will not use.
+
+**R72 `(planned)` — Version observation is bounded and never a version-equality gate.**
+On explicit Refresh provider, existing save/readiness actions or an actual process-start operation,
+the selected executable may be asked for `--version` without a shell or model turn. Bound a version
+probe to two seconds and 8 KiB combined captured output; share a two-probe concurrency limit and
+the readiness operation's six-second total deadline. Capture at the writer boundary and terminate
+timed-out children. Retain only parsed provider version and bounded status; never return raw
+stdout/stderr, credentials or arbitrary provider detail. Unsupported output/exit/timeout is
+unknown, not incompatible or a launch veto. A successful probe proves neither auth nor feature support.
+
+GET projections only resolve/stat and reuse an observation for the same selection and executable
+identity (including symlink target), at most 60 seconds old; otherwise omit the version/check time.
+Keep at most the last observation per configured backend/model and discard on config change/removal;
+publish a refresh observation only after R53 of TS-03 accepts its original catalog/selection under
+the lock. A rejected refresh must not leak its observation into a concurrent GET's projection.
+No persistent version registry, history migration or background updater/poller is added. Mark it
+last checked, not the guaranteed version of a later spawn. Login/version/readiness errors use the
+existing bounded failure vocabulary and no automatic prompt retry.
+
+**R73 `(planned)` — Catalog freshness is independent of packaged executable versions.**
+Remove `AGENTDECK_CODEX_VERSION` as runtime/catalog authority and the equality rejection in
+`ReadCodexModelCatalog`; preserve schema validation, visible entries and add-only merge. Continue
+reading the existing personal Codex home and Claude settings source; neither the private session
+store nor adapter package metadata is a provider catalog. Existing autosync opt-in remains required.
+The explicit refresh action reuses the per-backend import helper, locks the latest catalog for the
+add-only merge and never writes a stale whole-document snapshot. Do not claim catalog completeness,
+model entitlement or runtime support; configured exact selectors still reach provider validation.
+
+**R74 `(planned)` — Provider recovery preserves intent and distinguishes ownership.**
+Extend the existing launch error classifier with `provider_executable_missing`,
+`provider_executable_invalid` and `provider_incompatible` through the shared API error envelope.
+Include only safe provider name/source, effective path on desktop, parsed version and a provider-
+supplied required version when available. A recognized too-old rejection points to the selected
+provider's official update instructions, superseding R9's bundled-Claude update guidance. Unknown
+errors retain the existing bounded stage diagnostic rather than invented minimums or unsupported
+maximum-version rules. Missing/invalid executable and recognized provider-version incompatibility
+must escape before any resume/wake new-session fallback; preserve the native id and transcript. No automatic
+executable fallback, model change, launch retry or prompt replay is added. Redact paths from the
+existing remote error projection; no new phone authority is implied.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

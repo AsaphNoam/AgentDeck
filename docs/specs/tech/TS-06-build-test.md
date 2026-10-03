@@ -195,6 +195,46 @@ pinned). A bump re-verifies the TS-13 evidence surface —
 before landing. Automated tests exercise the remote chain through a fake listener and fake `WhoIs`
 and never contact a real tailnet or push service; FS-20's manual gates own those.
 
+**R28 `(planned)` — Managed integration components never become an implicit provider default.**
+For FS-09.R68 and FS-10.R20–R22, preserve the immutable Node/ACP/SDK dependency closure, manifest
+checks and Codex steering patch. Replace R15/R22's executable-selection behavior: the archive
+wrapper identifies its immutable runtime root but does not replace the user's `CODEX_PATH`, export
+a packaged provider version as runtime authority, or shadow provider commands with private PATH
+entries. Managed chat adapters launch through absolute private Node and adapter-entrypoint paths;
+provider subprocesses receive the original user PATH plus explicit backend/model PATH configuration.
+Source builds keep their documented adapter installation path and use the same provider resolver.
+Do not depend on a globally installed adapter or Node to run a packaged adapter, and do not force
+a provider's npm launcher to use the adapter's private Node through PATH shadowing.
+
+Native provider packages currently required by the adapter closure/direct manifest pin may remain
+in the artifact with accurate component versions. They are dependency inventory, not a supported
+default, recovery option or compatibility certification; stripping/repackaging them is excluded.
+Keep existing deterministic installation checks while replacing tests that assert implicit private
+provider execution. Old release directories are never patched. R20's authentication ownership is
+superseded by FS-10.R21/TS-04.R71; R21's install/auth checks use marked external-provider fixtures
+and include complete absence. R26's ACP patch/capability checks remain, but its reference CLI pin
+is a test pairing, not a runtime-selection requirement. README, installer/setup guidance and the
+shipped operator knowledge describe provider-owned updates and no automatic fallback.
+
+**R29 `(planned)` — Compatibility evidence varies the provider, not the host and adapter together.**
+Before completing the local-provider change, record a credentialed matrix for each fixed packaged
+adapter/SDK/Node with (a) its release-reference provider executable and (b) a newer stable provider
+executable, using explicit isolated test paths. Record exact versions, platform, auth mode and the
+FS-09.A44 outcomes. Reuse real acceptance harnesses and add missing checks rather than inventing
+provider-like mocks. Existing user provider installations are not downgraded, upgraded or rewritten
+by tests; real-provider runs/downloads require their usual explicit authorization. A missing gate
+stays visibly owed and cannot be labelled a pass. This is a pre-ship change gate, not a runtime
+allowlist or a requirement that users wait for every newer provider to be certified.
+
+Automated coverage must prove the selected executable markers, all process-start paths, no private
+fallback, read-only GET behavior, bounded probes, literal path handling, auth/profile consistency,
+provider replacement without dashboard restart, concurrent refresh/save preservation, and effective
+runtime error copy. Use independent fixtures for cache-version inequality and provider-reported
+minimums. Add a reusable explicit compatibility-test invocation for later adapter bumps and
+reproduced provider regressions; no background provider updater, downloaded denylist or recurring
+monitoring service is part of this change. Run the normal R5 closure matrix and focused lifecycle/
+catalog race tests; UI closure includes the FS-09.A40/A41 rendered journeys in the supported skins.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

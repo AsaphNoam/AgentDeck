@@ -710,6 +710,43 @@ unchanged. The phone entry keeps TS-13's Web Push click route. Verify with compo
 click a rendered toast and its close control, and an `sse.test.ts` case that dispatches `click` on
 a stubbed `Notification` and asserts focus, route, and `close()`.
 
+**R52 `(planned)` — Provider runtime metadata is scoped and read-only.** GET/PUT backend responses
+add `provider_runtimes`, keyed first by configured backend id and then model id, for Claude/Codex
+only. Each entry is `{source:"detected"|"ambient"|"backend"|"model",
+state:"available"|"missing"|"not_executable"|"invalid", path?, version?, checked_at?}`. An available
+path with no version is unverified, not incompatible. Source identifies which configuration layer
+won; path identifies the launcher. TS-04.R70/R72 own resolution and observation freshness. Empty
+maps are `{}`, never null. This field uses the same response-only/tolerant browser parsing and
+metadata-free PUT/ETag pattern as R47; malformed metadata cannot erase valid editable catalog data.
+The existing global `codex_runtime` field is deprecated and kept conservatively as
+`{catalog_status:"unverified"}` for old clients, without a misleading bundled/default path/version.
+New UI reads the model-scoped projection only. Unsaved backend/model drafts have no checked
+identity; render save-to-check guidance rather than reusing another entry's result or adding a
+draft-execution endpoint. `backend_support` retains its independent meaning.
+GET performs no version/status command or catalog import for this metadata. The phone projection
+and allowlist remain unchanged; no executable paths or this field cross that boundary.
+
+**R53 `(planned)` — Explicit provider refresh is one bounded desktop operation.** Add
+`POST /api/backends/{id}/refresh-provider` to R5's Config family, guarded by the existing local-only
+chain and excluded from the tailnet allowlist. It accepts only optional `{model_id}` (defaulting
+to that backend's default model), with a 4 KiB body limit and the existing catalog `If-Match`
+precondition. It cannot supply an arbitrary executable, environment, URL, login command or unsaved
+configuration. Validate backend/model/provider before any process work. Unknown targets return 404;
+unsupported provider/bad input return 422; stale catalog returns 409 `backend_catalog_changed`.
+
+Run the shared resolution/version/readiness checks and the opted-in, local-only model import.
+Return `{runtime:<R52 entry>, credentials:<existing bounded result>,
+catalog:{status:"added"|"unchanged"|"disabled"|"unavailable", added_count:<integer>}}` and the
+resulting catalog ETag. Missing/unaskable providers and missing/malformed catalogs are truthful
+200 result states, not successful readiness claims. Persistence failure uses the standard error
+envelope. Under the catalog lock, revalidate the selection/config and original ETag before merging;
+if either changed during the checks, return 409 without writing or publishing stale observations.
+Keep provider execution outside that lock. Enforce at most two active refreshes process-wide with
+no unbounded waiting queue; excess receives 429 `provider_check_busy` with retry guidance.
+Invalidate onboarding/catalog queries after a successful check/import as applicable; no prompt or
+login is sent. The UI disables duplicate refresh, explains that unsaved Settings changes must be
+saved or discarded first, and refetches on completion without overwriting unrelated form input.
+
 ## 3. Interfaces & data shapes
 
 Planned additive backend response field (R47; the example shows one entry, but all registered

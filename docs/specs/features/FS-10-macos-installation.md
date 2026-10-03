@@ -93,6 +93,34 @@ person's provider credentials or AgentDeck configuration.
   login-command overrides, and the installer's own variables. No `AGENTDECK_*` variable is honored
   except `AGENTDECK_HOME` under R17.
 
+- **R20** `(planned)` — Installing AgentDeck supplies its application, managed adapters/SDKs
+  and Node, not a supported default Claude/Codex provider installation. The dashboard can install
+  and open without either CLI; provider setup then reports **Install Claude Code** or **Install
+  Codex**, links to the provider's official installation instructions, and offers an explicit
+  executable path in desktop Settings. It never silently uses dependency-bundled providers or
+  runs an installer/package manager. This qualifies R1/R3's self-contained installation promise
+  and supersedes R5/A3's bundled-provider sign-in when shipped: provider installation is a separate
+  prerequisite for launching that provider, not for installing AgentDeck. With a selected installed
+  CLI, the interactive installer may still offer R5's explicit sign-in; without it, show installation
+  guidance and continue dashboard setup. A10–A11 replace the provider-selection part of A3.
+- **R21** `(planned)` — `agentdeck auth claude|codex` delegates to the same user-installed
+  provider selection used by the matching backend/default model. Optional `--backend <id>` and
+  `--model <id>` select a configured target; a provider/type mismatch or ambiguous backend requires
+  correction rather than guessing. The command identifies its target/executable before interactive
+  login, inherits that target's provider environment and writes no credentials itself. A missing CLI
+  offers install guidance rather than starting login. Dashboard/onboarding still never run login;
+  they show the target-specific command and Refresh provider. Fresh installation without a backend
+  catalog uses ambient provider selection without creating or rewriting configuration.
+- **R22** `(planned)` — Updating Claude/Codex is owned by its installer/package manager;
+  AgentDeck only offers official instructions and a recheck. An AgentDeck update/rollback changes
+  application/adapter components, not the user provider or explicit executable preferences, and
+  does not roll back native session formats. Rolling back to a release predating this policy
+  restores that release's original bundled-selection behavior; rollback guidance must disclose this,
+  not claim the new policy retroactively applies to old binaries. R7's explicit application-update
+  policy and immutable old directories remain. The first start of a local-provider release uses local discovery for
+  unconfigured backends, preserves existing explicit environment overrides and all user state,
+  and reports missing providers without reverting to the former bundled behavior.
+
 ## 3. States & transitions
 
 - **R10** — A release runtime is either absent, staged, current, previous, or retained.
@@ -157,7 +185,25 @@ person's provider credentials or AgentDeck configuration.
   gives the exact command to remove it. *Verified:* release-documentation review against this
   specification.
 
+- **A10** `(planned)` (R20–R22) — A fresh install with no provider produces a working dashboard,
+  truthful provider-install guidance and no native-provider spawn; with a user CLI it uses that
+  CLI despite dependency copies. Install/login cancellation is non-destructive. *Verify by*
+  release-layout/installer/onboarding fixtures and a focused rendered missing-provider journey.
+- **A11** `(planned)` (R21) — Default, sole-provider, ambiguous, explicit backend/model and
+  missing-catalog auth selection follow TS-04.R71; login/status/launch child markers and provider
+  homes agree, and unsupported status remains skipped. *Verify by* CLI/readiness integration tests
+  and the authorized real-provider check in FS-09.A42.
+- **A12** `(planned)` (R22) — Upgrading from the bundled-default release uses a fake external
+  provider on the next process; a missing provider blocks only its launch; explicit overrides and
+  user data survive update/rollback unchanged. Old immutable release directories are not patched.
+  *Verify by* installed-version transition tests and documentation review that distinguishes
+  application rollback from provider/session rollback and pre-policy selection behavior.
+
 ## 6. Deviations & open decisions
+
+- R20–R22/A10–A12 are planned successors, not shipped behavior. R5/A3's bundled sign-in remains
+  the current implementation until this change lands; implementation must update the opening setup
+  copy and acceptance evidence together with provider selection.
 
 - This MVP intentionally excludes Intel macOS, Windows, Linux, Homebrew, signing, notarization,
   auto-updates, launch-at-login, global adapter installation, and automatic migration of a source
