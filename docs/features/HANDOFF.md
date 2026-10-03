@@ -25,9 +25,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `lean-personas-and-operating-context` (four seeded personas, standing operating context in the
   launch overlay, Claude native-preset append) is available.
   `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
-  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85) is available — **uncommitted**:
-  the session's commit attempts were refused by the permission classifier, so its files sit in the
-  working tree (see Active change).
+  collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -35,16 +33,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. **Uncommitted finished work:** Tasks work in motion is implemented and verified but not
-committed (commit was refused by the session's permission classifier). Its files: `ui/src/schemas/task.ts`,
-`ui/src/api/tasks.ts`, `ui/src/features/tasks/{TasksPage,taskForms,taskWork}.tsx?/ts` plus tests and
-`fixtures/taskLists.json`, `internal/server/task_wire_fixture_test.go`,
-`ui/src/components/grid/CardGrid.tsx`, `ui/src/styles/features/tasks.css`,
-`ui/src/presentation/contract.json`, `internal/server/ui/dist/**`, FS-16/TS-08/specs README, the
-deleted `docs/ready-changes/tasks-work-in-motion.md` and its README line, and this handoff's entries.
-Commit them together (the README/HANDOFF diffs also carry another session's Deckhand→Chuck rename
-lines). Fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server -run
-TestTaskWireFixture`.
+None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+-run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
 
