@@ -22,8 +22,6 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-chuck.md` is waiting to start.
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
-  `lean-personas-and-operating-context` (four seeded personas, standing operating context in the
-  launch overlay, Claude native-preset append) is available.
   `tasks-work-in-motion` (All-projects Tasks view grouped by recorded relationships, inline detail,
   collapsed history, bottom authoring; FS-16.R41–R45, TS-08.R82–R85; `d462d9d`) was reviewed and
   remains open on the findings below.
@@ -181,6 +179,15 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-03 — Review: lean personas and shared operating context.** No findings; the unit is
+  closed. Fresh and upgraded role seeding, exact-only retained-role migration, the runtime-only
+  overlay across every lifecycle composer, and Claude's shared new/load native-preset builder match
+  the governing requirements. The already-recorded manual role scenarios and credentialed Claude
+  fresh/resume check remain acceptance gates, not code-review failures. INV 1–3, 7–12, 15 and 17
+  applied without a violation; INV 4–6, 13–14 and 16 had no applicable changed surface. Spec lint
+  and the focused config, runtime and server suites pass. **Fix model:** trivial/easy — Claude
+  Sonnet or Codex Luna.
 
 - **2026-10-03 — Review: notifications open the agent's conversation.** The implementation matches
   the notification-navigation requirements, but one Worth-fixing coverage gap keeps the unit open:
