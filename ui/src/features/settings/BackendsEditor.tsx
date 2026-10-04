@@ -292,17 +292,26 @@ export function BackendsEditor() {
   // (FS-09.R72): the check never runs or reports on a draft.
   const dirty = !data || canonicalCatalog(entriesToConfig(entries, defaultId)) !== canonicalCatalog(editableBackendsConfig(data));
 
+  // One refresh runs at a time across the editor: each one advances the
+  // catalog ETag, so a second concurrent request would only conflict.
   const handleRefresh = (id: string, backend: Backend) => {
+    const before = data?.backends?.[id]?.models ?? {};
     setRefreshing(id);
     setRefreshMessages((prev) => ({ ...prev, [id]: "" }));
     refreshProvider.mutate({ backendId: id, modelId: backend.default_model, catalogEtag }, {
       onSuccess: async (res) => {
         setCredentials((prev) => ({ ...prev, [id]: res.credentials }));
         setRefreshMessages((prev) => ({ ...prev, [id]: refreshSummary(res) }));
-        // The draft is clean, so folding in imported models and the new ETag
-        // discards nothing the person typed.
+        // The draft may have changed while the check ran, so fold in only the
+        // models the refresh added (it is add-only) and keep every edit.
         const fresh = await refetch();
-        if (fresh.data) seedDraft(fresh.data);
+        const added = Object.fromEntries(
+          Object.entries(fresh.data?.backends?.[id]?.models ?? {}).filter(([modelId]) => !(modelId in before)),
+        );
+        setEntries((prev) => prev.map((e) => (e.id === id
+          ? { ...e, backend: { ...e.backend, models: { ...added, ...e.backend.models } } }
+          : e)));
+        setCatalogEtag(res.catalogEtag);
       },
       onError: (e) => setRefreshMessages((prev) => ({ ...prev, [id]: `Refresh failed: ${configErrorMessage(e)}` })),
       onSettled: () => setRefreshing(null),
@@ -382,6 +391,7 @@ export function BackendsEditor() {
               runtime={savedBackendIds.has(id) ? data?.provider_runtimes?.[id]?.[backend.default_model] : undefined}
               dirty={dirty}
               refreshing={refreshing === id}
+              otherRefreshing={refreshing !== null && refreshing !== id}
               refreshMessage={refreshMessages[id] || null}
               onRefresh={() => handleRefresh(id, backend)}
             />

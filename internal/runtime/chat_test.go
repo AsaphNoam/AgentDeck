@@ -1131,10 +1131,16 @@ func TestResumeProviderIncompatibilityDoesNotReplaceTheSession(t *testing.T) {
 	newDump := filepath.Join(t.TempDir(), "new_params.json")
 	data, _ := json.Marshal(map[string]string{"details": claudeTooOldData})
 	spec.Env = append(spec.Env, "FAKEACP_LOAD_REJECT_DATA="+string(data), "FAKEACP_NEW_DUMP="+newDump)
+	spec.ProviderSource = "bundled"
 
 	_, err := c.Resume(context.Background(), spec, "prior-session-id")
 	if !errors.Is(err, ErrProviderIncompatible) {
 		t.Fatalf("Resume error = %v, want ErrProviderIncompatible", err)
+	}
+	// The selected source travels with the typed error (TS-04.R76).
+	var tooOld *ProviderTooOldError
+	if !errors.As(err, &tooOld) || tooOld.Source != "bundled" || !strings.Contains(err.Error(), "AgentDeck bundle") {
+		t.Fatalf("Resume error = %v, want the bundled source and its repair", err)
 	}
 	if _, statErr := os.Stat(newDump); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatal("session/new replaced the conversation after a provider incompatibility")

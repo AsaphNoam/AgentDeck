@@ -31,12 +31,13 @@ person's provider credentials or AgentDeck configuration.
   and credentials. Installing, updating, rolling back, or uninstalling the application runtime never
   overwrites `$AGENTDECK_HOME` (normally `~/.agentdeck`) or provider-owned configuration. A person
   can keep using a source build independently of the release installation.
-- **R5** — An interactive fresh install checks the default Claude backend's readiness.
-  If sign-in is needed, it offers to run the bundled provider sign-in flow in the current terminal.
-  `agentdeck auth claude` and `agentdeck auth codex` provide the same guided, provider-specific flow
-  later. Declining, cancelling, or failing sign-in leaves a working installation and directs the
-  person to retry from the dashboard/onboarding or with the same command; it never records or prints
-  credentials itself.
+- **R5 — superseded 2026-10-03 by R21/R23:** Described checking the default Claude backend's
+  readiness and offering the *bundled* provider sign-in flow by default. Backend selection now
+  defaults to Installed (R23); an interactive fresh install checks the selected backend's readiness
+  and offers that target's guided sign-in under R21, falling back to the bundled flow only when the
+  person explicitly selects Bundle. `agentdeck auth claude`/`agentdeck auth codex` remain the same
+  guided flow later, and declining/cancelling/failing sign-in still leaves a working installation
+  that routes the person to the dashboard/onboarding or the same command, printing no credentials.
 - **R6** — At the end of an interactive install, AgentDeck starts the dashboard in the
   background and opens the loopback dashboard in the default browser. `--no-start` and
   non-interactive installation suppress that action. If startup fails, the installer reports that
@@ -95,9 +96,11 @@ person's provider credentials or AgentDeck configuration.
   `--model <id>` select a configured target; a provider/type mismatch or ambiguous backend requires
   correction rather than guessing. The command identifies its target/executable before interactive
   login, inherits that target's provider environment and writes no credentials itself. A missing CLI
-  offers install guidance rather than starting login. Dashboard/onboarding still never run login;
-  they show the target-specific command and Refresh provider. Fresh installation without a backend
-  catalog uses ambient provider selection without creating or rewriting configuration.
+  offers install guidance rather than starting login. Dashboard/onboarding still never run login:
+  Settings shows the target-specific command and its backend card's Refresh provider, which re-probes
+  a saved backend/model without opening a login flow; onboarding's existing readiness check reuses
+  Validate & Continue to re-probe the provider instead. Fresh installation without a backend catalog
+  uses ambient provider selection without creating or rewriting configuration.
 - **R22 — retired 2026-10-03:** Installed-only update ownership replaced by two-source R24.
 - **R23** — Packaged AgentDeck supplies one managed Claude provider and one managed
   Codex provider with its tested adapters/SDKs/Node, but backend selection defaults to Installed
@@ -150,10 +153,12 @@ person's provider credentials or AgentDeck configuration.
 - **A2** — The installed command resolves its Node runtime and both official ACP adapter
   entry points from the selected private runtime, without changing global package locations or
   requiring them on PATH. *Verified:* release-layout/wrapper integration tests.
-- **A3** — A fresh interactive install offers default-provider sign-in, while declined,
-  cancelled, failed, and successful sign-in each leave the installer outcome truthful and route the
-  person to onboarding or the running dashboard. *Verified:* fake-provider command tests and manual
-  J2 credential branches; successful real-provider sign-in is credential-gated.
+- **A3 — superseded 2026-10-03 by A10–A12:** Described verifying default *bundled*-provider
+  sign-in. A fresh interactive install now offers sign-in for the selected (Installed-default)
+  backend under R21/R23, while declined, cancelled, failed, and successful sign-in each leave the
+  installer outcome truthful and route the person to onboarding or the running dashboard.
+  *Verified:* fake-provider command tests and manual J2 credential branches; successful real-provider
+  sign-in is credential-gated. Current coverage: A10–A12 below.
 - **A4** — A successful explicit update activates the new version without modifying
   `$AGENTDECK_HOME`; a simulated download/checksum/unpack interruption preserves the previous
   command; `agentdeck update --rollback` restores it. *Verified:* installer/update integration tests.
@@ -200,9 +205,11 @@ person's provider credentials or AgentDeck configuration.
 
 ## 6. Deviations & open decisions
 
-- R21/R23–R24/A10–A12 are planned successors, not shipped behavior. R5/A3's bundled sign-in remains
-  the current implementation until this change lands; implementation must update the opening setup
-  copy and acceptance evidence together with provider selection.
+- R21 and R23–R24 shipped 2026-10-04: backend selection defaults to Installed, Bundle is an explicit
+  choice, `agentdeck auth claude|codex` delegates to the selected target, and Settings/onboarding
+  offer Refresh provider / Validate & Continue respectively rather than running login. R5 and A3 are
+  superseded. Automated fixtures cover the implemented behavior, but A10–A12 stay planned until the
+  rendered journeys and the authorized credentialed provider runs (TS-06.R31) are recorded.
 
 - This MVP intentionally excludes Intel macOS, Windows, Linux, Homebrew, signing, notarization,
   auto-updates, launch-at-login, global adapter installation, and automatic migration of a source

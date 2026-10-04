@@ -290,7 +290,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   about a running process. Unknown version is not incompatibility and does not disable launch.
   **Refresh provider** rechecks the saved backend/selected model, obtains bounded runtime/readiness
   feedback, and runs that backend's existing add-only import only if model autosync is enabled.
-  It neither enables autosync nor saves an unsaved Settings draft. New Agent uses configured
+  It neither enables autosync nor saves an unsaved Settings draft. Settings runs one refresh at a
+  time; edits made while it runs survive, and only its added models join the draft. New Agent uses configured
   backend/model identities; new or changed unsaved Settings entries say **Save to check provider**
   instead of showing saved metadata as the draft's result. On success the available models
   refresh without discarding role/project/prompt/model selections or selecting a newly discovered

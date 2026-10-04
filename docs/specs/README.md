@@ -35,8 +35,8 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent mail with waking/deferred delivery and bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
-| FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, capability matrix and planned installed-default/bundle-choice provider selection |
-| FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Partial | macOS installation, guided provider setup, application updates/rollback and planned installed-versus-bundled update ownership |
+| FS-09 | [features/FS-09-backends.md](features/FS-09-backends.md) | Partial | Backend/model catalog, credential checks, capability matrix and installed-default/explicit-bundle provider selection |
+| FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Partial | macOS installation, guided provider setup, application updates/rollback and installed-versus-bundled update ownership |
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | AgentDeck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Core, Sky & Grove and Studio share creative-workspace composition and polish; Studio acceptance is closed |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |

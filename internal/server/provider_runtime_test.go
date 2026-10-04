@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -195,6 +197,32 @@ func TestRemoteProviderErrorsRedactPaths(t *testing.T) {
 	_, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "my-app"})
 	if !strings.Contains(string(body), "/Users/secret/bin/claude") {
 		t.Fatalf("desktop error lost the path: %s", body)
+	}
+}
+
+// TS-04.R76, FS-09.R77: a too-old Claude keeps its selected source through
+// the desktop envelope and the phone rewrite, which names that source's repair
+// without the desktop path.
+func TestProviderIncompatibleErrorCarriesSource(t *testing.T) {
+	for _, tc := range []struct {
+		source, phone string
+	}{
+		{"bundled", "The AgentDeck bundle's Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Choose Installed provider"},
+		{"backend", "The installed Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Update Claude Code on the Mac, or choose AgentDeck bundle"},
+	} {
+		tooOld := &rt.ProviderTooOldError{Have: "2.1.100", Need: "2.1.300", Source: tc.source}
+		ae := providerIncompatibleError(fmt.Errorf("%w; update the Claude Code at /Users/secret/bin/claude, then retry", tooOld))
+		if ae.Details["source"] != tc.source {
+			t.Fatalf("%s: desktop details = %v", tc.source, ae.Details)
+		}
+		desktop, err := json.Marshal(map[string]any{"error": ae})
+		if err != nil {
+			t.Fatal(err)
+		}
+		phone := string(remoteProviderError(desktop))
+		if !strings.Contains(phone, tc.phone) || !strings.Contains(phone, `"source":"`+tc.source+`"`) || strings.Contains(phone, "/Users/secret") {
+			t.Fatalf("%s: phone error = %s", tc.source, phone)
+		}
 	}
 }
 

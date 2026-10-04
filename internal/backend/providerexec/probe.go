@@ -40,25 +40,26 @@ func ProbeVersion(ctx context.Context, path string, env []string) string {
 	// A timed-out child is killed; WaitDelay bounds a grandchild holding the
 	// pipes open.
 	cmd.WaitDelay = 250 * time.Millisecond
-	if err := cmd.Run(); err != nil || ctx.Err() != nil {
+	if err := cmd.Run(); err != nil || ctx.Err() != nil || out.truncated {
 		return ""
 	}
 	return versionPattern.FindString(string(out.buf))
 }
 
 // cappedBuffer captures at most limit bytes at the writer boundary while
-// accepting (and discarding) the rest, so a chatty child never blocks.
+// accepting (and discarding) the rest, so a chatty child never blocks. It
+// remembers whether anything was discarded.
 type cappedBuffer struct {
-	buf   []byte
-	limit int
+	buf       []byte
+	limit     int
+	truncated bool
 }
 
 func (b *cappedBuffer) Write(p []byte) (int, error) {
-	if room := b.limit - len(b.buf); room > 0 {
-		if len(p) < room {
-			room = len(p)
-		}
-		b.buf = append(b.buf, p[:room]...)
+	room := max(b.limit-len(b.buf), 0)
+	if len(p) > room {
+		b.truncated = true
 	}
+	b.buf = append(b.buf, p[:min(room, len(p))]...)
 	return len(p), nil
 }

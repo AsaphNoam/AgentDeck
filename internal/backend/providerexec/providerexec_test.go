@@ -3,8 +3,10 @@ package providerexec
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -170,6 +172,8 @@ func TestProbeVersionIsBounded(t *testing.T) {
 		"garbage": `echo "no version here"`,
 		"failure": `echo "1.2.3"; exit 2`,
 		"huge":    `yes x | head -c 100000; echo 9.9.9`,
+		"prefix":  `echo 2.1.300; yes x | head -c 100000`,
+		"stderr":  `echo 2.1.300; yes x | head -c 100000 >&2`,
 		"timeout": `sleep 5; echo 1.2.3`,
 	} {
 		start := time.Now()
@@ -179,5 +183,118 @@ func TestProbeVersionIsBounded(t *testing.T) {
 		if time.Since(start) > 4*time.Second {
 			t.Errorf("%s: probe was not bounded", name)
 		}
+	}
+}
+
+// waitForFile polls until path exists and holds want, or fails the test at
+// the deadline. No fixed sleeps: this only waits as long as the process
+// actually needs to write its marker.
+func waitForFile(t *testing.T, path, want string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if b, err := os.ReadFile(path); err == nil && string(b) == want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s to hold %q", path, want)
+}
+
+// alive reports whether pid is still running, using a zero-signal probe that
+// delivers nothing (FS-09.A37: the running process must receive no signal).
+func alive(pid int) bool {
+	return syscall.Kill(pid, 0) == nil
+}
+
+// writeMarkerScript writes a script that records marker on start, traps
+// TERM/HUP/INT into sigfile instead of dying from them, and then blocks
+// until killed so the test can observe whether it ever received a signal.
+func writeMarkerScript(t *testing.T, path, marker string) {
+	t.Helper()
+	body := "#!/bin/sh\n" +
+		"printf '" + marker + "' > \"$1\"\n" +
+		"trap 'printf signal >> \"$2\"' TERM HUP INT\n" +
+		"while true; do sleep 0.2; done\n"
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// FS-09.A37: replacing the installed launcher a running process was started
+// from must not touch that process, and the next start through the same
+// resolver call must pick up the replacement. This is the one executable-
+// marker regression at the resolver level: everything else (launch, resume,
+// switch, clone, pipelines, terminal) composes a spec from the same
+// providerexec.Resolve call this test exercises directly, so duplicating a
+// lifecycle suite per caller would not add coverage.
+func TestResolveThenStartObservesLauncherRetargetWithoutSignalingTheRunningProcess(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("signal/symlink semantics differ on windows")
+	}
+	dir := t.TempDir()
+	v1 := filepath.Join(dir, "claude-v1.sh")
+	v2 := filepath.Join(dir, "claude-v2.sh")
+	writeMarkerScript(t, v1, "v1")
+	writeMarkerScript(t, v2, "v2")
+
+	launcher := filepath.Join(dir, "claude")
+	if err := os.Symlink(v1, launcher); err != nil {
+		t.Fatal(err)
+	}
+
+	// The resolver call every process start makes (FS-09.R68/R75): an
+	// Installed-mode override naming the launcher, resolved fresh per start.
+	resolve := func() Selection {
+		sel, ok := Resolve(Input{BackendType: "claude-acp", BackendEnv: map[string]string{"CLAUDE_CODE_EXECUTABLE": launcher}})
+		if !ok || !sel.Available() {
+			t.Fatalf("launcher did not resolve: %+v", sel)
+		}
+		return sel
+	}
+
+	sel1 := resolve()
+	marker1, sig1 := filepath.Join(dir, "marker1"), filepath.Join(dir, "sig1")
+	cmd1 := exec.Command(sel1.Path, marker1, sig1)
+	if err := cmd1.Start(); err != nil {
+		t.Fatalf("start process 1: %v", err)
+	}
+	defer func() {
+		_ = cmd1.Process.Kill()
+		_, _ = cmd1.Process.Wait()
+	}()
+	waitForFile(t, marker1, "v1")
+
+	// Retarget the installed launcher while process 1 keeps running, exactly
+	// as an update replaces an installed CLI under a live dashboard/agent.
+	if err := os.Remove(launcher); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(v2, launcher); err != nil {
+		t.Fatal(err)
+	}
+
+	sel2 := resolve()
+	if sel2.Path != launcher {
+		t.Fatalf("retarget changed the resolved path: %q, want %q", sel2.Path, launcher)
+	}
+	marker2, sig2 := filepath.Join(dir, "marker2"), filepath.Join(dir, "sig2")
+	cmd2 := exec.Command(sel2.Path, marker2, sig2)
+	if err := cmd2.Start(); err != nil {
+		t.Fatalf("start process 2: %v", err)
+	}
+	defer func() {
+		_ = cmd2.Process.Kill()
+		_, _ = cmd2.Process.Wait()
+	}()
+	waitForFile(t, marker2, "v2")
+
+	if !alive(cmd1.Process.Pid) {
+		t.Fatal("process 1 (old marker) no longer alive after retarget")
+	}
+	if b, err := os.ReadFile(sig1); err == nil && len(b) > 0 {
+		t.Fatalf("process 1 received a signal on retarget: %q", b)
+	} else if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("reading sig1: %v", err)
 	}
 }

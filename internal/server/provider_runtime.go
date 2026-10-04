@@ -79,13 +79,17 @@ func overrideLabel(sel providerexec.Selection) string {
 }
 
 // providerIncompatibleError maps a recognized provider-version incompatibility
-// to its typed envelope with only the parsed versions as details (TS-04.R76).
+// to its typed envelope with the selected source and parsed versions as
+// details (TS-04.R76).
 func providerIncompatibleError(err error) *runtime.APIError {
 	ae := apiError(runtime.CodeProviderIncompatible, err.Error())
 	ae.Details = map[string]any{"provider": "claude"}
 	var tooOld *runtime.ProviderTooOldError
 	if errors.As(err, &tooOld) {
 		ae.Details["version"], ae.Details["required_version"] = tooOld.Have, tooOld.Need
+		if tooOld.Source != "" {
+			ae.Details["source"] = tooOld.Source
+		}
 	}
 	return ae
 }
@@ -126,9 +130,18 @@ func remoteProviderError(body []byte) []byte {
 	case runtime.CodeBundledProviderMissing:
 		msg = fmt.Sprintf("The AgentDeck bundle for %s is unavailable on the Mac. Change this backend's provider in AgentDeck Settings on the Mac, then retry.", name)
 	case runtime.CodeProviderIncompatible:
-		msg = fmt.Sprintf("%s on the Mac is too old for this request. Update it or change this backend's provider in AgentDeck Settings on the Mac, then retry.", name)
+		subject, repair := name+" on the Mac", "Update it or change this backend's provider in AgentDeck Settings on the Mac, then retry."
+		switch src := details["source"]; {
+		case src == providerexec.SourceBundled:
+			subject = "The AgentDeck bundle's " + name + " on the Mac"
+			repair = "Choose Installed provider for this backend in AgentDeck Settings on the Mac, or update AgentDeck, then retry."
+		case src != nil:
+			subject = "The installed " + name + " on the Mac"
+			repair = "Update " + name + " on the Mac, or choose AgentDeck bundle for this backend in AgentDeck Settings on the Mac, then retry."
+		}
+		msg = fmt.Sprintf("%s is too old for this request. %s", subject, repair)
 		if have, need := details["version"], details["required_version"]; have != nil && need != nil {
-			msg = fmt.Sprintf("%s on the Mac is %v; this request needs %v or newer. Update it or change this backend's provider in AgentDeck Settings on the Mac, then retry.", name, have, need)
+			msg = fmt.Sprintf("%s is %v; this request needs %v or newer. %s", subject, have, need, repair)
 		}
 	default:
 		msg = fmt.Sprintf("%s is not available for this backend on the Mac. Repair it in AgentDeck Settings on the Mac, then retry.", name)

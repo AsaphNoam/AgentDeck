@@ -20,6 +20,8 @@ export interface ProviderSectionProps {
   // True when the Settings draft differs from the saved catalog.
   dirty: boolean;
   refreshing: boolean;
+  // True while another backend's refresh runs; refreshes are serialized.
+  otherRefreshing: boolean;
   refreshMessage: string | null;
   onRefresh: () => void;
 }
@@ -36,6 +38,7 @@ export function ProviderSection({
   runtime,
   dirty,
   refreshing,
+  otherRefreshing,
   refreshMessage,
   onRefresh,
 }: ProviderSectionProps) {
@@ -100,7 +103,7 @@ export function ProviderSection({
           type="button"
           className="btn-sm"
           onClick={onRefresh}
-          disabled={dirty || !runtime || refreshing}
+          disabled={dirty || !runtime || refreshing || otherRefreshing}
           title={dirty ? "Save your Settings changes first" : undefined}
         >
           {refreshing ? "Checking…" : "Refresh provider"}

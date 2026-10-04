@@ -613,6 +613,90 @@ describe("BackendsEditor", () => {
       expect(screen.getAllByRole("radio", { name: /Default/ }).length).toBeGreaterThan(0);
     });
 
+    it("keeps edits made while a refresh runs and folds in only the added models", async () => {
+      let refreshed = false;
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      let putBody: { catalogEtag?: string; backends: Record<string, { name: string; models: Record<string, unknown> }> } | null = null;
+      let putIfMatch: string | null = null;
+      server.use(
+        http.get("/api/backends", () => {
+          const doc = refreshed
+            ? { ...savedDoc, backends: { claude: { ...savedDoc.backends.claude, models: { ...savedDoc.backends.claude.models, opus: { name: "claude-opus-5-5", model: "claude-opus-5-5" } } } } }
+            : savedDoc;
+          return HttpResponse.json(
+            { ...doc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: runtimes(refreshed ? "2.1.300" : undefined) },
+            { headers: { ETag: refreshed ? '"v2"' : '"v1"' } },
+          );
+        }),
+        http.post("/api/backends/claude/refresh-provider", async () => {
+          await held;
+          refreshed = true;
+          return HttpResponse.json({
+            runtime: runtimes("2.1.300").claude.sonnet,
+            credentials: { status: "ok" },
+            catalog: { status: "added", added_count: 1 },
+          }, { headers: { ETag: '"v2"' } });
+        }),
+        http.put("/api/backends", async ({ request }) => {
+          putIfMatch = request.headers.get("If-Match");
+          putBody = (await request.json()) as typeof putBody;
+          return HttpResponse.json({ ...savedDoc, credentials: {} });
+        }),
+      );
+      renderWithQuery(<BackendsEditor />);
+      const refresh = await screen.findByRole("button", { name: "Refresh provider" });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      fireEvent.click(refresh);
+      await screen.findByRole("button", { name: "Checking…" });
+
+      fireEvent.change(screen.getByDisplayValue("Claude"), { target: { value: "Claude edited" } });
+      release();
+
+      expect((await screen.findAllByDisplayValue("claude-opus-5-5")).length).toBe(2);
+      expect(screen.getByDisplayValue("Claude edited")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("Save"));
+      await waitFor(() => expect(putBody).not.toBeNull());
+      expect(putBody!.backends.claude.name).toBe("Claude edited");
+      expect(Object.keys(putBody!.backends.claude.models)).toContain("opus");
+      expect(putIfMatch).toBe('"v2"');
+    });
+
+    it("runs one refresh at a time across backends", async () => {
+      const twoDoc = {
+        ...savedDoc,
+        backends: { ...savedDoc.backends, other: { ...savedDoc.backends.claude, name: "Claude two", default: false } },
+      };
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      server.use(
+        http.get("/api/backends", () => HttpResponse.json(
+          { ...twoDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: { ...runtimes(), other: runtimes().claude } },
+          { headers: { ETag: '"v1"' } },
+        )),
+        http.post("/api/backends/claude/refresh-provider", async () => {
+          await held;
+          return HttpResponse.json({
+            runtime: runtimes("2.1.300").claude.sonnet,
+            credentials: { status: "ok" },
+            catalog: { status: "unchanged", added_count: 0 },
+          }, { headers: { ETag: '"v1"' } });
+        }),
+      );
+      renderWithQuery(<BackendsEditor />);
+      await waitFor(() => expect(screen.getAllByRole("button", { name: "Refresh provider" })).toHaveLength(2));
+      const [first] = screen.getAllByRole("button", { name: "Refresh provider" });
+      await waitFor(() => expect(first).toBeEnabled());
+      fireEvent.click(first);
+      await screen.findByRole("button", { name: "Checking…" });
+      expect(screen.getByRole("button", { name: "Refresh provider" })).toBeDisabled();
+
+      release();
+      expect(await screen.findByText("Version 2.1.300; signed in; no new models.")).toBeInTheDocument();
+      await waitFor(() => screen.getAllByRole("button", { name: "Refresh provider" }).forEach((b) => expect(b).toBeEnabled()));
+    });
+
     it("keeps the catalog editable when provider metadata is malformed", async () => {
       server.use(
         http.get("/api/backends", () => HttpResponse.json({ ...savedDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: { claude: { sonnet: { source: "weird" } } } })),

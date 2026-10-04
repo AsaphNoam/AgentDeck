@@ -2398,10 +2398,13 @@ var claudeVersionTooOldPattern = regexp.MustCompile(`Claude Code ([0-9][0-9A-Za-
 // selected Claude Code reported that it is older than a model requires. It
 // wraps ErrProviderIncompatible so callers can map it to a typed error and stop
 // a resume from replacing the conversation (TS-04.R76). Only the two parsed
-// versions are reported; withProviderGuidance adds the source-aware repair
-// where the selection is known (INV §8).
+// versions are reported; withProviderGuidance adds the selected source and its
+// repair where the selection is known (INV §8).
 type ProviderTooOldError struct {
 	Have, Need string
+	// Source is the selected provider source (LaunchSpec.ProviderSource), or
+	// empty when the selection is unknown.
+	Source string
 }
 
 func (e *ProviderTooOldError) Error() string {
@@ -2438,11 +2441,12 @@ func providerUpdateGuidance(spec LaunchSpec) string {
 	return "update your Claude Code, then retry"
 }
 
-// withProviderGuidance appends source-aware guidance to a recognized
-// incompatibility, leaving every other error unchanged.
+// withProviderGuidance records the selected source on a recognized
+// incompatibility and appends its repair, leaving every other error unchanged.
 func withProviderGuidance(err error, spec LaunchSpec) error {
 	var tooOld *ProviderTooOldError
 	if errors.As(err, &tooOld) {
+		tooOld.Source = spec.ProviderSource
 		return fmt.Errorf("%w; %s", err, providerUpdateGuidance(spec))
 	}
 	return err
