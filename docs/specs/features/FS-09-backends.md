@@ -269,18 +269,10 @@ Configuration-source federation for Claude/Codex is FS-08.
   can deliver their settings. AgentDeck does not promise support for every future provider version
   or a new provider feature merely because the CLI was updated. This supersedes the provider-binary
   default, not the adapter/session contracts, in R29 and TS-04.R13.
-- **R69** `(planned)` — Existing explicit executable configuration remains authoritative:
-  model environment overrides backend environment, which overrides the inherited environment;
-  without an effective override, AgentDeck discovers the installed CLI. Settings offers an advanced
-  backend executable field backed by `CLAUDE_CODE_EXECUTABLE` or `CODEX_PATH`, with the effective
-  source/path shown for the selected model. Saving or clearing this field changes only that backend
-  key and preserves model/ambient overrides, other environment entries, models and defaults. A
-  higher-priority model override is explained, not silently erased. A missing or invalid explicit
-  executable is an actionable error, never permission to choose another executable. Overrides
-  persist across AgentDeck updates; no temporary-recovery provenance or automatic reversion exists.
+- **R69 — retired 2026-10-03:** Unconditional override authority replaced by mode-scoped R76.
 - **R70** `(planned)` — Selection is resolved for every new provider process: launch, resume,
   clone where it starts a process, switch and rollback, task/pipeline activation, wake, and Claude
-  terminal. A normal provider update at its installed launcher path is picked up by the next
+  terminal. In Installed mode, a normal provider update at its installed launcher path is picked up by the next
   process without restarting AgentDeck. A newly installed CLI outside the dashboard's inherited
   search path may require an explicit path or a dashboard restart. Running agents are not restarted
   or deliberately rebound; frozen model/effort/prompt and native session identity remain unchanged.
@@ -310,22 +302,51 @@ Configuration-source federation for Claude/Codex is FS-08.
   model. On failure the form remains and identifies the failed check/import/save stage. Reads and
   opening a form do not execute a CLI just to display its version. Runtime diagnostics are response
   metadata, not new persisted user configuration or a new session/history store.
-- **R73** `(planned)` — Recovery names the action's consequence: missing/non-executable CLI
-  offers provider installation instructions or an explicit path; a provider-reported version
-  minimum offers provider update instructions and manual Retry; sign-in failure names sign-in;
-  unknown failures retain bounded diagnostics without guessing the cause. A provider-only failure
-  never instructs the person to update AgentDeck as though that updates their CLI. A demonstrated
-  adapter incompatibility may instead name an AgentDeck update, without inferring it from mere
-  version inequality. No automatic installation, update, fallback to a bundled/older provider,
-  model substitution or launch/prompt replay is introduced. Failed launch input remains intact.
-  Normal provider discovery needs no consent dialog; saving an advanced override uses the existing
-  Settings save interaction. The server enforces executable availability even if UI metadata is stale.
+- **R73 — retired 2026-10-03:** Installed-only recovery replaced by source-aware R77.
 - **R74** `(planned)` — Login guidance, credential readiness and launch use the same provider
   selection for the named backend/model. A missing executable reports installation needed, not bad
   credentials; an unaskable version/status probe remains unknown/skipped. R16–R19's best-effort save
   and onboarding rules otherwise remain. The desktop owns executable editing and refresh; the phone
   inherits the selected runtime for its existing launch flows but gains no paths, environment data,
   executable editor or new remote configuration authority.
+
+- **R75** `(planned)` — Each Claude/Codex backend offers **Installed provider (default)** or
+  **AgentDeck bundle** in its existing Settings definition. There is exactly one managed provider
+  bundle per provider in the running AgentDeck release, shared by all backends selecting it; there
+  is no per-model/per-chat bundle, version picker or historical bundle manager. Both choices use
+  the same managed adapter/SDK stack. Missing mode means Installed, including existing backends.
+  A saved choice applies to subsequent process starts under R70, never hot-switches running work,
+  and persists until explicitly changed. New Agent reports the choice but does not add another
+  selector. Saving uses the ordinary Settings interaction, not a second confirmation modal.
+  Explain beside the choice that Installed follows the user's updates, Bundle follows AgentDeck
+  releases, and neither promises new models/account access or safe downgrade of native sessions.
+- **R76** `(planned)` — In Installed mode, executable overrides use model > backend > inherited
+  environment precedence, then discovery. The advanced backend field uses existing
+  `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` keys; editing/clearing it preserves other env, model overrides,
+  models and defaults. Invalid winning overrides fail rather than falling through. Bundle mode
+  uses only its managed executable: stored/ambient executable overrides are inactive, not deleted,
+  and Settings says so. Returning to Installed restores their effect. Mode changes preserve all
+  unrelated configuration and never write a managed absolute path into user environment settings.
+- **R77** `(planned)` — Recovery follows the selected source. Missing/old Installed providers
+  offer official install/update instructions, path repair where applicable, or a link to the
+  backend's Bundle choice. A missing Bundle offers Installed or repair of the AgentDeck installation;
+  an old Bundle offers Installed or AgentDeck update guidance without promising an available release
+  fixes it. Known adapter incompatibility may require an AgentDeck update. Unknown errors do not
+  guess; failed input stays intact. Recovery links do not save the choice or retry work: the person
+  saves Settings and explicitly retries. No automatic source switching/reversion, provider install/
+  update, model substitution or prompt replay. Server availability checks remain authoritative.
+  Auth/readiness use the same selected executable and existing profile rules. Missing bundle and
+  recognized provider/session-format incompatibility on resume fail without replacement sessions;
+  no downgrade conversion is introduced. This qualifies R74's installation guidance by source.
+- **R78** `(planned)` — Compatibility support targets the current managed stack and a current
+  installed provider, not every historical release. Existing optional controls consume effective
+  server/session capabilities, not frontend provider-version tables. Where the adapter's advertised
+  feature assumes a provider capability (including Steer), the integration must validate that
+  assumption or withhold the feature with bounded update/source-choice guidance. Essential protocol
+  incompatibility refuses launch; an unavailable optional feature does not disable unrelated chat.
+  Do not silently weaken permissions, substitute model/effort, or reinterpret Steer as Send.
+  Unknown version alone is not incompatibility. Testing and compatibility work are capped by
+  TS-06.R31; this is not an obligation to build old-version emulations or a new capability framework.
 
 ## 3. States & transitions
 
@@ -663,34 +684,25 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A34 — retired 2026-10-03:** Unshipped automatic launch retry replaced by A41.
 - **A35 — retired 2026-10-03:** Unshipped bundle-selection error cases replaced by A38/A41.
 - **A36 — retired 2026-10-03:** Unshipped update-triggered reversion removed; A39 proves preservation.
-- **A37** `(planned)` (R68–R70) — With old private provider dependencies and newer fake user
+- **A37** `(planned)` (R68, R70, R75) — In Installed mode, with old private provider dependencies and newer fake user
   CLIs, every process-start path selects the user CLI while the packaged adapter/Node stay managed.
   Replace a launcher/symlink while the dashboard stays open: the next start uses the replacement,
   the already-running process receives no signal, and resumed native identity/profile is unchanged.
   *Verify by* executable-marker integration tests across launch/resume/switch/rollback, clone,
   task/pipeline activation and wake, plus Claude terminal drivers and built-wrapper tests.
-- **A38** `(planned)` (R69, R72–R74) — Model/backend/ambient overrides and discovery obey their
+- **A38** `(planned)` (R72, R74, R76–R77) — Installed-mode model/backend/ambient overrides and discovery obey their
   precedence, including an invalid winning override. No provider invocation occurs during a catalog
   GET; timeout, large output, malformed version and unknown status remain bounded/unknown, while a
   known missing executable fails start before registration or stopping a switch's current runtime.
   *Verify by* resolver/probe unit tests, no-exec marker fixtures, HTTP/schema and lifecycle tests.
-- **A39** `(planned)` (R69–R70) — Saving/clearing one backend's override preserves unrelated
-  config, higher-priority model overrides, ETag concurrency, running agents and native histories.
-  Application update/rollback does not remove the override; releases implementing this policy do
-  not select their dependency CLI. Rollback to a pre-policy release is disclosed under FS-10.R22.
-  *Verify by* Settings component, catalog concurrency and installed-version transition tests.
+- **A39 — retired 2026-10-03:** Installed-only transition coverage replaced by A45.
 - **A40** `(planned)` (R71–R72) — Codex cache 0.159.2 imports visible valid candidates when the
   provider is newer, older or unverified; no exact-version warning is shown. Disabled autosync adds
   nothing; malformed/missing caches remain non-blocking. Claude imports only configured selectors.
   Refresh adds models without changing selection/defaults and preserves a concurrently saved catalog.
   *Verify by* model-import, refresh API and New Agent/Settings tests plus a rendered provider-update
   →refresh→select-new-model journey. No provider/network model query is used by import.
-- **A41** `(planned)` (R70, R73) — Missing CLI and provider-too-old failures retain completed
-  launch input; recovery names install/update of the selected provider, not AgentDeck. Unknown
-  errors do not guess. Refresh sends no prompt; only a new explicit launch/retry can start work.
-  Missing/invalid executable and recognized version incompatibility during resume/wake create no
-  replacement native session. *Verify by*
-  runtime wire/error fixtures, UI tests and a rendered missing→install-guidance→refresh→retry journey.
+- **A41 — retired 2026-10-03:** Installed-only recovery coverage replaced by A47.
 - **A42** `(planned)` (R74) — Auth and credential checks for the same backend/model execute the
   same provider as chat/terminal, with the appropriate personal auth profile rather than Codex's
   private session store. Missing/status-unsupported cases do not masquerade as bad credentials.
@@ -700,17 +712,32 @@ Configuration-source federation for Claude/Codex is FS-08.
   current, a refresh rejected for a concurrent config change publishes no observation even to a
   concurrent GET, and no paths/env/probe operation become available through the phone route allowlist.
   *Verify by* serialization, metadata-free save, stale-probe and remote projection/allowlist tests.
-- **A44** `(planned)` (R68–R74) — With adapters fixed, compare the reference provider pair with
-  a newer stable user-installed CLI for each provider: real fresh/resumed chat, exact selected
-  model/effort, fast when supported, role/skill delivery, MCP messaging, approve/deny, cancel/stop;
-  Codex additionally exercises advertised steering, clone, native children/background work and file
-  reporting. Record exact versions, platform and observed outcomes, separately from new unsupported
-  capabilities. *Verify by* the explicit credentialed matrix in TS-06.R29; mocks alone cannot pass it.
+- **A44 — retired 2026-10-03:** Broad cross-version matrix replaced by bounded A46/TS-06.R31.
+- **A45** `(planned)` (R70, R75–R76) — An omitted mode uses Installed. Saving Bundle selects the
+  current release's single provider in the child environment despite all executable override layers;
+  stored overrides are unchanged and returning to Installed
+  restores those overrides. Both sources use the same launch/auth/terminal resolver. Config/ETag,
+  other backends, defaults, running agents and histories survive saves and app updates; selected
+  Bundle uses the new release's bundle only when the dashboard runs that release. *Verify by*
+  shared resolver marker tables, serialization/save tests and one Settings toggle journey, not a
+  separate lifecycle suite per version. Source builds without a managed bundle fail truthfully.
+- **A46** `(planned)` (R75, R78) — Real-provider evidence uses at most four combinations: each
+  provider with its bundled CLI and one current stable installed CLI, fixed adapter/SDK/Node per
+  provider. Exercise the finite smoke journey in TS-06.R31 and record exact versions/outcomes;
+  reuse existing receipts for identical combinations. Missing evidence stays owed. No historical
+  version matrix, every-model sweep or provider-version × skin cross-product is required.
+- **A47** `(planned)` (R70, R77–R78) — Missing/old Installed, unavailable/old Bundle and known
+  optional-capability failure preserve user input, name the correct repair and send no automatic
+  prompt. Resume incompatibility preserves native identity. An adapter advertising Steer over an
+  unsupported provider cannot expose a falsely usable control; failure still preserves the draft.
+  *Verify by* focused protocol fixtures and shared UI supported/unavailable/error states, plus the
+  capped recovery journey in TS-06.R31. No real old-provider download is needed for these fixtures.
 
 ## 6. Deviations & open decisions
 
-- **Local-provider design is ready, not shipped.** R68–R74/A37–A44 supersede the retired
-  R64–R67 recovery draft. Until implemented, R59/A29 and the shipped private-runtime selection
+- **Local-default/bundle-choice design is ready, not shipped.** R68/R70–R72/R74–R78 and
+  A37–A38/A40/A42–A43/A45–A47 supersede the retired installed-only and temporary-recovery drafts.
+  Until implemented, R59/A29 and the shipped private-runtime selection
   remain current. No cross-version compatibility receipt is implied by the historical audit.
 
 - **Bounded launch-support projection shipped 2026-09-29.** R60–R63 and A30–A32 cover the

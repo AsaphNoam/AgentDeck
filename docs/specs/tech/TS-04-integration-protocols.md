@@ -885,32 +885,11 @@ FS-18.A13. A new conversation is the immediate-adoption path; role edits otherwi
 existing future-launch semantics. Permission policy, tool availability, authentication and user
 configuration discovery are outside this correction.
 
-**R70 `(planned)` — Provider selection has one owner, separate from adapter selection.** A shared
-Claude/Codex resolver accepts provider type, merged process/backend/model environment and the
-original user search path. Resolve the effective `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` first
-(model > backend > process; an effective empty value requests discovery). Custom values are
-literal absolute paths or bare executable names resolved on that search path; reject relative
-paths containing separators with path-repair guidance rather than binding them to an agent's cwd.
-The advanced editor writes only the existing backend env key, not a new config mode/schema.
-Without an override, search absolute, nonempty user PATH entries in order, then the fixed macOS
-locations `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`, de-duplicated. Never invoke a shell,
-source shell startup files, inspect shell aliases, recursively scan disks or search application
-bundles. Skip AgentDeck-managed runtime directories (including canonical targets of symlinks) in
-automatic discovery. A deliberately supplied absolute override is not rewritten or silently
-substituted, including one deliberately pointing into an old installation.
-
-Return source, absolute launcher path and bounded resolution state. Re-resolve on each process
-start and refresh; retain the launcher/symlink path, not a permanently cached resolved target.
-Canonicalize only for validation/exclusion and probe freshness, not to pin future launches to an
-old version. Do not execute the file during resolution. Missing/not-executable overrides fail
-closed. Inject the selected absolute path into the adapter's documented override; Claude terminal
-invokes that same selection directly. This supersedes only provider ownership in R13/R15 and the
-corresponding packaged-provider baseline in R61; all ACP/SDK delivery, capability and patch
-contracts remain. OpenCode/OpenHands, including their separate planned override repair, are out of scope.
+**R70 — retired 2026-10-03:** Installed-only resolver replaced by backend-mode resolver R75.
 
 **R71 `(planned)` — Every provider consumer shares selection and preserves profile ownership.**
 Route all launch composers and process starts, including rollback/wake/task/pipeline/clone and
-Claude terminal drivers, through R70. Resolve before irreversible launch side effects and before
+Claude terminal drivers, through R75. Resolve before irreversible launch side effects and before
 stopping a live runtime for a switch; a later spawn race still returns a bounded start error.
 Use the same selection for version checks and native login/readiness. `providerauth` continues
 to own fixed argv: Claude `auth login`/`auth status`, Codex `login`/`login status`; neither native
@@ -956,17 +935,65 @@ The explicit refresh action reuses the per-backend import helper, locks the late
 add-only merge and never writes a stale whole-document snapshot. Do not claim catalog completeness,
 model entitlement or runtime support; configured exact selectors still reach provider validation.
 
-**R74 `(planned)` — Provider recovery preserves intent and distinguishes ownership.**
-Extend the existing launch error classifier with `provider_executable_missing`,
-`provider_executable_invalid` and `provider_incompatible` through the shared API error envelope.
-Include only safe provider name/source, effective path on desktop, parsed version and a provider-
-supplied required version when available. A recognized too-old rejection points to the selected
-provider's official update instructions, superseding R9's bundled-Claude update guidance. Unknown
-errors retain the existing bounded stage diagnostic rather than invented minimums or unsupported
-maximum-version rules. Missing/invalid executable and recognized provider-version incompatibility
-must escape before any resume/wake new-session fallback; preserve the native id and transcript. No automatic
-executable fallback, model change, launch retry or prompt replay is added. Redact paths from the
-existing remote error projection; no new phone authority is implied.
+**R74 — retired 2026-10-03:** Installed-only recovery replaced by source-aware R76.
+
+**R75 `(planned)` — One resolver selects a backend's provider mode before its executable.**
+Accept provider type, backend `provider_mode`, merged process/backend/model environment, original
+user PATH and the running release's managed runtime root. Omitted mode is `installed`. In that
+mode resolve `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` with model > backend > process precedence; an
+effective empty value requests discovery. Accept literal absolute paths or bare commands resolved
+on the effective user PATH; reject relative paths containing separators with repair guidance.
+Without an override, search absolute nonempty PATH entries then `~/.local/bin`, `/opt/homebrew/bin`,
+`/usr/local/bin`, deduplicated. Exclude managed runtime directories and canonical symlink targets
+from discovery; an explicit absolute user override remains deliberate configuration. Never invoke
+a shell, source startup scripts, recursively scan or search application bundles.
+
+In `bundled` mode select only the single provider executable identified by the running release's
+verified layout/manifest; do not consult PATH or executable overrides. Return `source:bundled`.
+Leave override configuration untouched; overwrite the provider's effective executable-override key
+after all environment merging so no model/backend/ambient value can redirect the Bundle child.
+Both modes invoke the same managed adapter/SDK/Node and use R71's
+auth/profile rules; Claude terminal directly invokes the same selected provider. Never silently
+fall through between modes. Missing managed artifacts, including source builds with no managed
+release root, yield `bundled_provider_unavailable`; do not search previous release directories.
+
+Return source, absolute launcher and bounded state; do not execute during resolution. Re-resolve
+each start/refresh and preserve launcher/symlink paths rather than pinning their canonical target.
+Canonicalization is only for validation/exclusion and observation freshness. All consumers share
+this resolver, not separate installed/bundled lifecycle implementations. This supersedes provider
+default ownership in R13/R15/R61, not ACP/SDK delivery or patches. OpenCode/OpenHands are unchanged.
+
+**R76 `(planned)` — Recovery distinguishes selected source without replay or migration.**
+Use the shared API envelope for `provider_executable_missing`, `provider_executable_invalid`,
+`bundled_provider_unavailable` and `provider_incompatible`. Every provider error identifies its
+effective source (including `bundled` for bundle errors). Include only safe provider/source,
+desktop-only effective path, parsed version and evidenced required version. Apply FS-09.R77's
+source-specific install/update/backend-Settings guidance, superseding R9's unconditional bundled
+update copy. Recognized provider or native-session-format incompatibility and executable-selection
+errors escape before resume/wake's new-session fallback; retain native id/transcript. Unknown
+failures retain bounded diagnostics, never a guessed minimum/maximum version. Do not rewrite
+native history, downgrade a session format, switch sources or replay prompts. Remote errors redact
+paths and offer desktop Settings guidance, not new remote config authority.
+
+**R77 `(planned)` — Provider-dependent feature checks stay at the existing integration boundary.**
+For the exposed structured surfaces (model/effort/fast settings, steering, clone, native children,
+background work and file reports), perform one implementation-time source audit of the current
+adapter's underlying provider assumptions. Record only actionable dependencies in existing
+capability tests/traceability, not a new compatibility registry. Prefer actual negotiated capability
+or an existing bounded provider probe; an adapter's unconditional advertisement alone is not proof
+for a variable CLI. Where no suitable probe exists, a narrow documented/tested version guard for
+that specific feature is allowed; unknown then withholds only that unproven feature. Derive guards
+from verified upstream contracts or observed failures and test them with focused fixtures, not
+additional historical live-provider combinations. No speculative
+global minimum, maximum-version cutoff or frontend semver branch is introduced.
+
+Reuse existing runtime capability fields (e.g. `steering_available`) and backend-support projection;
+invalidate/recompute on process/session changes. Retain existing unsupported/error UI conventions,
+preserve refused drafts and never degrade safety-relevant settings or silently retry a side-effecting
+action. A demonstrated essential protocol incompatibility fails launch; a demonstrated optional
+dependency produces bounded unavailability guidance. Prefer updating the one managed adapter stack
+to adding historical shims; do not fork an adapter per provider version, emulate missing features,
+or add background compatibility discovery. TS-06.R31 bounds verification and expansion.
 
 ## 3. Interfaces & data shapes
 

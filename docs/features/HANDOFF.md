@@ -20,8 +20,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
 - **Work units:** `rename-product-to-chuck.md` is waiting to start.
-  `use-installed-provider-clis.md` is waiting to start (FS-09.R68–R74, FS-10.R20–R22;
-  managed adapters with user-installed provider defaults and explicit recovery).
+  `use-installed-provider-clis.md` is waiting to start (FS-09.R75–R78, FS-10.R23–R24;
+  Installed default, one explicit Bundle choice per provider/backend, and capped compatibility
+  work under TS-06.R31; the ready file lists retained requirements).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
@@ -110,10 +111,10 @@ supplied.
   `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
   translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
   beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:**
-  implement `docs/ready-changes/use-installed-provider-clis.md` (FS-09.R68–R74/A37–A44), selecting
+  implement `docs/ready-changes/use-installed-provider-clis.md` (FS-09.R75–R78/A45–A47), selecting
   the installed provider through the managed adapter, exposing effective runtime details, and
   reporting provider-owned update guidance. Prove that an old dependency CLI cannot shadow it and
-  complete the fixed-adapter cross-version gate. This finding remains open until verified;
+  complete the bounded fixed-adapter gate in TS-06.R31. This finding remains open until verified;
   the retired bundled-default/opt-in draft is not the intended fix.
 
 ### Phone desktop flow and agent management — reviewed 2026-10-02 — **Fix model:** medium — Codex Terra or Claude Opus.
@@ -145,6 +146,18 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-04 — Design revision: explicit provider bundles, bounded compatibility.** The waiting
+  `use-installed-provider-clis.md` change now defaults each backend to Installed and offers the
+  current release's single Bundle per provider. Saved overrides remain intact but inactive in
+  Bundle mode; no automatic fallback, per-chat versioning or independent bundle updater. Planned
+  FS-09.R75–R78/A45–A47, FS-10.R23–R24, TS-03.R54, TS-04.R75–R77 and TS-06.R30–R31 replace
+  conflicting installed-only clauses with source-aware recovery and existing capability fields.
+  Verification is capped at four real-provider combinations and two browser journeys in one skin;
+  future bumps rerun only the affected provider smoke, not historical matrices. Larger compatibility
+  machinery requires a separate scope decision. Luna checked precedence and contradictions;
+  spec lint, twin-skill comparison and whitespace checks pass. Real-provider receipts remain owed.
+  No product code changed. Concurrent rename edits are outside this unit.
 
 - **2026-10-03 — Design: use installed provider CLIs.** Added waiting ready change
   `docs/ready-changes/use-installed-provider-clis.md`: local Claude/Codex by default with managed

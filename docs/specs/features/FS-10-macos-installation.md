@@ -93,17 +93,8 @@ person's provider credentials or AgentDeck configuration.
   login-command overrides, and the installer's own variables. No `AGENTDECK_*` variable is honored
   except `AGENTDECK_HOME` under R17.
 
-- **R20** `(planned)` — Installing AgentDeck supplies its application, managed adapters/SDKs
-  and Node, not a supported default Claude/Codex provider installation. The dashboard can install
-  and open without either CLI; provider setup then reports **Install Claude Code** or **Install
-  Codex**, links to the provider's official installation instructions, and offers an explicit
-  executable path in desktop Settings. It never silently uses dependency-bundled providers or
-  runs an installer/package manager. This qualifies R1/R3's self-contained installation promise
-  and supersedes R5/A3's bundled-provider sign-in when shipped: provider installation is a separate
-  prerequisite for launching that provider, not for installing AgentDeck. With a selected installed
-  CLI, the interactive installer may still offer R5's explicit sign-in; without it, show installation
-  guidance and continue dashboard setup. A10–A11 replace the provider-selection part of A3.
-- **R21** `(planned)` — `agentdeck auth claude|codex` delegates to the same user-installed
+- **R20 — retired 2026-10-03:** Installed-only setup replaced by explicit-bundle alternative R23.
+- **R21** `(planned)` — `agentdeck auth claude|codex` delegates to the same selected
   provider selection used by the matching backend/default model. Optional `--backend <id>` and
   `--model <id>` select a configured target; a provider/type mismatch or ambiguous backend requires
   correction rather than guessing. The command identifies its target/executable before interactive
@@ -111,15 +102,25 @@ person's provider credentials or AgentDeck configuration.
   offers install guidance rather than starting login. Dashboard/onboarding still never run login;
   they show the target-specific command and Refresh provider. Fresh installation without a backend
   catalog uses ambient provider selection without creating or rewriting configuration.
-- **R22** `(planned)` — Updating Claude/Codex is owned by its installer/package manager;
-  AgentDeck only offers official instructions and a recheck. An AgentDeck update/rollback changes
-  application/adapter components, not the user provider or explicit executable preferences, and
-  does not roll back native session formats. Rolling back to a release predating this policy
-  restores that release's original bundled-selection behavior; rollback guidance must disclose this,
-  not claim the new policy retroactively applies to old binaries. R7's explicit application-update
-  policy and immutable old directories remain. The first start of a local-provider release uses local discovery for
-  unconfigured backends, preserves existing explicit environment overrides and all user state,
-  and reports missing providers without reverting to the former bundled behavior.
+- **R22 — retired 2026-10-03:** Installed-only update ownership replaced by two-source R24.
+- **R23** `(planned)` — Packaged AgentDeck supplies one managed Claude provider and one managed
+  Codex provider with its tested adapters/SDKs/Node, but backend selection defaults to Installed
+  (FS-09.R75). Without an installed CLI, the dashboard still opens and offers official provider
+  installation instructions or the backend's explicit Bundle choice; never select it automatically.
+  Source builds without a managed bundle explain its unavailability. Interactive installer sign-in
+  uses only the selected available executable under R21; missing provider skips login with guidance,
+  not installation failure. This supersedes R5/A3's implicit bundled sign-in and qualifies R1/R3:
+  a separately installed provider is not necessary if the user explicitly selects Bundle. No provider
+  installer or independent bundle updater runs automatically.
+- **R24** `(planned)` — Installed providers update through their own installer/package manager;
+  bundled providers update only with AgentDeck releases. An application update changes its managed
+  stack but preserves each backend's mode and saved overrides; it never updates the user's CLI or
+  automatically reverts Installed to Bundle. A running dashboard keeps its own release's bundle;
+  restarting into the new application release makes that release's bundle available for subsequent
+  starts. Old immutable release directories may remain for application rollback, not a provider
+  version picker. Neither changing mode nor rolling back AgentDeck migrates/downgrades native
+  sessions. Rollback to a pre-policy binary restores that binary's old selection behavior and must
+  be disclosed. Existing configs lacking mode adopt Installed without rewriting user state.
 
 ## 3. States & transitions
 
@@ -185,23 +186,23 @@ person's provider credentials or AgentDeck configuration.
   gives the exact command to remove it. *Verified:* release-documentation review against this
   specification.
 
-- **A10** `(planned)` (R20–R22) — A fresh install with no provider produces a working dashboard,
-  truthful provider-install guidance and no native-provider spawn; with a user CLI it uses that
-  CLI despite dependency copies. Install/login cancellation is non-destructive. *Verify by*
+- **A10** `(planned)` (R21, R23–R24) — A fresh install with no installed provider produces a working dashboard,
+  truthful provider-install/explicit-Bundle guidance and no automatic native-provider spawn; with a user CLI it uses that
+  CLI despite bundle copies until Bundle is selected. Install/login cancellation is non-destructive. *Verify by*
   release-layout/installer/onboarding fixtures and a focused rendered missing-provider journey.
 - **A11** `(planned)` (R21) — Default, sole-provider, ambiguous, explicit backend/model and
   missing-catalog auth selection follow TS-04.R71; login/status/launch child markers and provider
   homes agree, and unsupported status remains skipped. *Verify by* CLI/readiness integration tests
   and the authorized real-provider check in FS-09.A42.
-- **A12** `(planned)` (R22) — Upgrading from the bundled-default release uses a fake external
-  provider on the next process; a missing provider blocks only its launch; explicit overrides and
+- **A12** `(planned)` (R24) — Upgrading an existing mode-less config from the bundled-default release uses a fake external
+  provider on the next process; a missing provider blocks only its launch; explicit modes, overrides and
   user data survive update/rollback unchanged. Old immutable release directories are not patched.
   *Verify by* installed-version transition tests and documentation review that distinguishes
   application rollback from provider/session rollback and pre-policy selection behavior.
 
 ## 6. Deviations & open decisions
 
-- R20–R22/A10–A12 are planned successors, not shipped behavior. R5/A3's bundled sign-in remains
+- R21/R23–R24/A10–A12 are planned successors, not shipped behavior. R5/A3's bundled sign-in remains
   the current implementation until this change lands; implementation must update the opening setup
   copy and acceptance evidence together with provider selection.
 

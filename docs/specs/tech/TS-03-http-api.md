@@ -712,10 +712,10 @@ a stubbed `Notification` and asserts focus, route, and `close()`.
 
 **R52 `(planned)` — Provider runtime metadata is scoped and read-only.** GET/PUT backend responses
 add `provider_runtimes`, keyed first by configured backend id and then model id, for Claude/Codex
-only. Each entry is `{source:"detected"|"ambient"|"backend"|"model",
-state:"available"|"missing"|"not_executable"|"invalid", path?, version?, checked_at?}`. An available
+only. Each entry is `{source:"detected"|"ambient"|"backend"|"model"|"bundled",
+state:"available"|"missing"|"not_executable"|"invalid"|"bundle_unavailable", path?, version?, checked_at?}`. An available
 path with no version is unverified, not incompatible. Source identifies which configuration layer
-won; path identifies the launcher. TS-04.R70/R72 own resolution and observation freshness. Empty
+won (or the explicitly selected bundle); path identifies the launcher. TS-04.R75/R72 own resolution and observation freshness. Empty
 maps are `{}`, never null. This field uses the same response-only/tolerant browser parsing and
 metadata-free PUT/ETag pattern as R47; malformed metadata cannot erase valid editable catalog data.
 The existing global `codex_runtime` field is deprecated and kept conservatively as
@@ -746,6 +746,20 @@ no unbounded waiting queue; excess receives 429 `provider_check_busy` with retry
 Invalidate onboarding/catalog queries after a successful check/import as applicable; no prompt or
 login is sent. The UI disables duplicate refresh, explains that unsaved Settings changes must be
 saved or discarded first, and refetches on completion without overwriting unrelated form input.
+
+**R54 `(planned)` — Provider mode is one backend setting, not runtime/session metadata.** Add
+optional `provider_mode: "installed" | "bundled"` to Claude/Codex backend definitions in
+`backends.json` and their existing GET/PUT browser schema. Omission defaults to Installed; invalid
+values or bundled mode on other provider types fail normal validation. Other providers may omit
+the field or carry `installed` without changing behavior; the editor clears mode on a type change
+away from Claude/Codex. No per-model/session mode or managed path is persisted. Round-trip this
+editable field through the existing ETag/atomic-save contract; metadata remains excluded. Switching
+mode preserves executable env overrides and all unrelated fields, invalidates runtime/readiness
+observations, and updates only future process selection. Saving a structurally valid mode does not
+require that its executable be available; return source-aware readiness guidance, preserving the
+existing best-effort save contract. Bundle availability derives from the actual managed root, not
+the presence of arbitrary npm dependencies. The phone gains neither this editable field nor a
+mode mutation route; its existing effective runtime capability fields remain available.
 
 ## 3. Interfaces & data shapes
 
