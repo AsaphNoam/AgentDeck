@@ -256,7 +256,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 ### User-installed Claude and Codex providers
 
-- **R68** `(planned)` — Claude and Codex use the user's installed provider executable by
+- **R68** — Claude and Codex use the user's installed provider executable by
   default, not the provider copy shipped as an adapter dependency. Packaged AgentDeck continues
   to own its ACP adapters, SDK dependencies and Node runtime. Claude terminal uses the same selected
   provider as Claude chat; other providers and terminal eligibility are unchanged. Updating a
@@ -265,7 +265,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   or a new provider feature merely because the CLI was updated. This supersedes the provider-binary
   default, not the adapter/session contracts, in R29 and TS-04.R13.
 - **R69 — retired 2026-10-03:** Unconditional override authority replaced by mode-scoped R76.
-- **R70** `(planned)` — Selection is resolved for every new provider process: launch, resume,
+- **R70** — Selection is resolved for every new provider process: launch, resume,
   clone where it starts a process, switch and rollback, task/pipeline activation, wake, and Claude
   terminal. In Installed mode, a normal provider update at its installed launcher path is picked up by the next
   process without restarting AgentDeck. A newly installed CLI outside the dashboard's inherited
@@ -285,7 +285,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   Existing entries, effort/fast declarations and defaults are not rewritten. A missing, unreadable
   or malformed source remains a non-blocking skipped import, and a discovered model may still be
   refused by the provider/account at launch.
-- **R72** `(planned)` — Settings and New Agent identify the selected provider source and
+- **R72** — Settings and New Agent identify the selected provider source and
   executable for a saved backend/model, with a last-checked version when known; these are next-start details, not a claim
   about a running process. Unknown version is not incompatibility and does not disable launch.
   **Refresh provider** rechecks the saved backend/selected model, obtains bounded runtime/readiness
@@ -298,14 +298,14 @@ Configuration-source federation for Claude/Codex is FS-08.
   opening a form do not execute a CLI just to display its version. Runtime diagnostics are response
   metadata, not new persisted user configuration or a new session/history store.
 - **R73 — retired 2026-10-03:** Installed-only recovery replaced by source-aware R77.
-- **R74** `(planned)` — Login guidance, credential readiness and launch use the same provider
+- **R74** — Login guidance, credential readiness and launch use the same provider
   selection for the named backend/model. A missing executable reports installation needed, not bad
   credentials; an unaskable version/status probe remains unknown/skipped. R16–R19's best-effort save
   and onboarding rules otherwise remain. The desktop owns executable editing and refresh; the phone
   inherits the selected runtime for its existing launch flows but gains no paths, environment data,
   executable editor or new remote configuration authority.
 
-- **R75** `(planned)` — Each Claude/Codex backend offers **Installed provider (default)** or
+- **R75** — Each Claude/Codex backend offers **Installed provider (default)** or
   **AgentDeck bundle** in its existing Settings definition. There is exactly one managed provider
   bundle per provider in the running AgentDeck release, shared by all backends selecting it; there
   is no per-model/per-chat bundle, version picker or historical bundle manager. Both choices use
@@ -315,14 +315,14 @@ Configuration-source federation for Claude/Codex is FS-08.
   selector. Saving uses the ordinary Settings interaction, not a second confirmation modal.
   Explain beside the choice that Installed follows the user's updates, Bundle follows AgentDeck
   releases, and neither promises new models/account access or safe downgrade of native sessions.
-- **R76** `(planned)` — In Installed mode, executable overrides use model > backend > inherited
+- **R76** — In Installed mode, executable overrides use model > backend > inherited
   environment precedence, then discovery. The advanced backend field uses existing
   `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` keys; editing/clearing it preserves other env, model overrides,
   models and defaults. Invalid winning overrides fail rather than falling through. Bundle mode
   uses only its managed executable: stored/ambient executable overrides are inactive, not deleted,
   and Settings says so. Returning to Installed restores their effect. Mode changes preserve all
   unrelated configuration and never write a managed absolute path into user environment settings.
-- **R77** `(planned)` — Recovery follows the selected source. Missing/old Installed providers
+- **R77** — Recovery follows the selected source. Missing/old Installed providers
   offer official install/update instructions, path repair where applicable, or a link to the
   backend's Bundle choice. A missing Bundle offers Installed or repair of the AgentDeck installation;
   an old Bundle offers Installed or AgentDeck update guidance without promising an available release
@@ -727,15 +727,14 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 ## 6. Deviations & open decisions
 
-- **Local-default/bundle-choice design is in progress.** R71's version-gate removal shipped
-  2026-10-04. The shared resolver (TS-04.R71/R75) now selects the Claude/Codex executable for
-  every process start, Claude terminal, readiness probe and `agentdeck auth`, failing with typed
-  provider errors before side effects. Releases publish the managed root and no longer shadow
-  PATH or pin a default Codex, so Installed is the effective default and Bundle selects the
-  release's native providers (TS-06.R15/R22). Settings/New Agent surfaces, refresh and metadata
-  remain planned, as do
-  R68/R70/R72/R74–R78 and A37–A38/A40/A42–A43/A45–A47. No cross-version compatibility receipt is
-  implied by the historical audit.
+- **Installed-provider default and explicit bundle shipped 2026-10-04.** R68/R70–R72/R74–R77:
+  one resolver selects each backend's Installed or Bundle provider for every process start,
+  terminal, readiness and sign-in; Settings owns the choice, executable path and Refresh provider;
+  New Agent reports the saved next-start provider. Onboarding rechecks readiness through its
+  existing Validate & Continue save rather than a separate Refresh provider button (review note).
+  R78's Steer/feature audit and A37–A38/A40/A42–A43/A45–A47's acceptance closure, including the
+  capped credentialed runs, remain planned. No cross-version compatibility receipt is implied by
+  the historical audit.
 
 - **Bounded launch-support projection shipped 2026-09-29.** R60–R63 and A30–A32 cover the
   adapter-support projection, New Agent, Settings and the existing Terminal-switch control. A Settings
@@ -819,6 +818,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   application in `internal/runtime/chat.go`; AgentDeck's own-home reads stay in
   `internal/server/config_sources.go` and `internal/config/codexmodels.go` (see TS-04.R20/R21).
 - **UI:** `ui/src/schemas/backends.ts`, `ui/src/lib/backendTypes.ts`,
+  `ui/src/lib/providerRuntime.ts`, `ui/src/features/settings/ProviderSection.tsx`,
   `ui/src/features/settings/BackendsEditor.tsx`,
   `ui/src/features/onboarding/steps/BackendStep.tsx`,
   `ui/src/features/launch/NewAgentModal.tsx`.

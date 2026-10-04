@@ -145,7 +145,9 @@ describe("BackendStep", () => {
     expect(screen.getByText(/LLM base URL/i)).toBeInTheDocument();
   });
 
-  it("explains a missing adapter in human terms", async () => {
+  // FS-10.R23/A10: a missing installed Claude points at installation or the
+  // explicit AgentDeck bundle, not at credentials.
+  it("explains a missing provider in human terms", async () => {
     server.use(
       http.put("/api/backends", () =>
         HttpResponse.json({
@@ -157,7 +159,7 @@ describe("BackendStep", () => {
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
     await waitForLoaded();
     fireEvent.click(screen.getByText("Validate & Continue"));
-    expect(await screen.findByText(/adapter is not installed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Claude Code was not found.*choose AgentDeck bundle/i)).toBeInTheDocument();
     expect(screen.queryByText(/cli_not_installed/)).toBeNull();
   });
 

@@ -47,3 +47,20 @@ describe("backend_support parsing", () => {
     expect(JSON.parse(JSON.stringify(editableBackendsConfig(response)))).toEqual(catalog);
   });
 });
+
+// TS-03.R52, FS-09.A43 — provider runtime metadata is response-only and
+// tolerantly parsed.
+describe("provider_runtimes parsing", () => {
+  it("keeps valid entries, drops malformed ones, and never reaches the PUT body", async () => {
+    const { parseProviderRuntimes, withBackendSupport, editableBackendsConfig } = await import("./backends");
+    const parsed = parseProviderRuntimes({
+      claude: { sonnet: { source: "detected", state: "available", path: "/bin/claude" }, bad: { source: "nope" } },
+      codex: null,
+    });
+    expect(parsed).toEqual({ claude: { sonnet: { source: "detected", state: "available", path: "/bin/claude" } } });
+    const res = withBackendSupport({ ...catalog, provider_runtimes: { claude: { sonnet: { source: "bundled", state: "bundle_unavailable" } } } });
+    expect(res.provider_runtimes.claude.sonnet.state).toBe("bundle_unavailable");
+    expect(withBackendSupport({ ...catalog }).provider_runtimes).toEqual({});
+    expect(JSON.parse(JSON.stringify(editableBackendsConfig(res)))).toEqual(catalog);
+  });
+});

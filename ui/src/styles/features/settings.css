@@ -242,6 +242,52 @@
   padding-top: var(--ad-space-3);
 }
 
+/* Provider choice for Claude/Codex backends (FS-09.R72/R75). */
+.backend-provider-section {
+  border: 0;
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  display: grid;
+  gap: var(--ad-space-2);
+  margin: 0;
+  min-width: 0;
+  padding: var(--ad-space-3) 0 0;
+}
+
+.backend-provider-section legend {
+  font-family: var(--ad-font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0;
+  text-transform: uppercase;
+}
+
+.backend-provider-modes,
+.backend-provider-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+}
+
+.backend-provider-hint,
+.backend-provider-status {
+  color: var(--ad-text-muted);
+  font-size: 0.74rem;
+  margin: 0;
+}
+
+.backend-provider-path {
+  color: var(--ad-text-muted);
+  display: grid;
+  font-size: 0.74rem;
+  gap: var(--ad-space-1);
+}
+
+.backend-provider-runtime {
+  font-family: var(--ad-font-mono);
+  overflow-wrap: anywhere;
+}
+
 .backend-env-section summary,
 .backend-source-section summary {
   cursor: pointer;

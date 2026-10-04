@@ -30,6 +30,9 @@ export const backendSchema = z.object({
   // Opt-in startup model import (FS-09.R28/R45): codex-acp syncs the Codex CLI
   // model cache; claude-acp imports configured user-level Claude settings.
   autosync_models: z.boolean().optional(),
+  // Which Claude/Codex executable future processes use (FS-09.R75,
+  // TS-03.R54). Omitted means Installed.
+  provider_mode: z.enum(["installed", "bundled"]).optional(),
 });
 
 export const backendsConfigSchema = z.object({
@@ -93,15 +96,61 @@ export function launchSupportFor(
   return type ? support?.[type]?.[iface] : undefined;
 }
 
+// Read-only next-start provider metadata per backend/model (TS-03.R52). Like
+// backend_support it is parsed tolerantly: a malformed entry is dropped on its
+// own and can never fail or erase the editable catalog.
+export const providerRuntimeSchema = z.object({
+  source: z.enum(["detected", "ambient", "backend", "model", "bundled"]),
+  state: z.enum(["available", "missing", "not_executable", "invalid", "bundle_unavailable"]),
+  path: z.string().optional(),
+  version: z.string().optional(),
+  checked_at: z.string().optional(),
+});
+
+export type ProviderRuntime = z.infer<typeof providerRuntimeSchema>;
+export type ProviderRuntimes = Record<string, Record<string, ProviderRuntime>>;
+
+export function parseProviderRuntimes(raw: unknown): ProviderRuntimes {
+  const out: ProviderRuntimes = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [backendId, models] of Object.entries(raw as Record<string, unknown>)) {
+    if (!models || typeof models !== "object") continue;
+    for (const [modelId, entry] of Object.entries(models as Record<string, unknown>)) {
+      const parsed = providerRuntimeSchema.safeParse(entry);
+      if (parsed.success) (out[backendId] ??= {})[modelId] = parsed.data;
+    }
+  }
+  return out;
+}
+
 export type BackendsResponse = z.infer<typeof backendsResponseSchema> & {
   backend_support: BackendSupport;
+  provider_runtimes: ProviderRuntimes;
 };
 
-// withBackendSupport replaces the wire backend_support with its tolerant parse,
-// leaving the editable catalog exactly as the server sent it.
-export function withBackendSupport<T extends object>(res: T): T & { backend_support: BackendSupport } {
-  return { ...res, backend_support: parseBackendSupport((res as { backend_support?: unknown }).backend_support) };
+// withBackendSupport replaces the wire read-only metadata (backend_support,
+// provider_runtimes) with its tolerant parse, leaving the editable catalog
+// exactly as the server sent it.
+export function withBackendSupport<T extends object>(res: T): T & { backend_support: BackendSupport; provider_runtimes: ProviderRuntimes } {
+  const wire = res as { backend_support?: unknown; provider_runtimes?: unknown };
+  return {
+    ...res,
+    backend_support: parseBackendSupport(wire.backend_support),
+    provider_runtimes: parseProviderRuntimes(wire.provider_runtimes),
+  };
 }
+
+// Refresh provider result (TS-03.R53).
+export const refreshProviderResponseSchema = z.object({
+  runtime: providerRuntimeSchema,
+  credentials: credResultSchema,
+  catalog: z.object({
+    status: z.enum(["added", "unchanged", "disabled", "unavailable"]),
+    added_count: z.number(),
+  }),
+});
+
+export type RefreshProviderResponse = z.infer<typeof refreshProviderResponseSchema>;
 
 // editableBackendsConfig is the explicit PUT projection: only the editable
 // catalog fields, never a spread of a response carrying read-only metadata.

@@ -58,8 +58,13 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
    executable identity), `ProbeVersion` (2 s/8 KiB/2 slots), `POST
    /api/backends/{id}/refresh-provider` (If-Match, 4 KiB, 2 active → 429, lock-revalidated add-only
    import, no observation on 409). TS-03.R52–R53, TS-04.R72–R73 shipped; route remote-denied.
-6. **Next:** UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
-7. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
+6. **Done 2026-10-04:** Settings `ProviderSection` (mode radios, executable path editing only the
+   override key, inactive-override note, next-start line, Refresh provider disabled while the
+   draft is dirty), New Agent provider line, source-aware onboarding guidance and
+   `--backend` command. FS-09.R68/R70/R72/R74–R77, FS-10.R21/R23, TS-03.R54, TS-04.R75 shipped.
+   **Review note:** onboarding keeps Validate & Continue as its readiness recheck instead of a
+   separate Refresh provider button.
+7. **Next:** Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
    owed credentialed gate (TS-06.R31, needs authorization).
 
 Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
@@ -172,6 +177,10 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: provider choice in Settings and New Agent.** Slice 6 adds the Installed /
+  AgentDeck bundle choice, executable path, next-start provider and Refresh provider to Settings,
+  reports the provider in New Agent, and makes onboarding guidance source-aware. Full UI suite
+  (589) and type check pass.
 - **2026-10-04 — Work: provider refresh API.** Slice 5 adds read-only `provider_runtimes`, a bounded
   `--version` probe and the desktop-only Refresh provider endpoint with its add-only import and
   concurrency/staleness guards. Server/config/backend suites pass.

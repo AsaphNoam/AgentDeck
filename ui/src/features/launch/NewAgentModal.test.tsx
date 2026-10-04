@@ -69,6 +69,13 @@ function backendsFixture() {
         catalog_status: "mismatch",
       },
       backend_support: BACKEND_SUPPORT_WIRE as unknown,
+      provider_runtimes: {
+        claude: {
+          sonnet: { source: "detected", state: "available", path: "/Users/me/.local/bin/claude", version: "2.1.300", checked_at: "2026-10-04T10:00:00Z" },
+          haiku: { source: "model", state: "missing", path: "/old/claude" },
+        },
+        codex: { "gpt-4o": { source: "bundled", state: "available", path: "/app/runtime/codex" } },
+      } as unknown,
   };
 }
 
@@ -99,6 +106,19 @@ describe("NewAgentModal", () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     expect(await screen.findByRole("option", { name: "Implementer (implementer)" })).toBeInTheDocument();
     expect(await screen.findByRole("option", { name: "My App (my-app)" })).toBeInTheDocument();
+  });
+
+  // FS-09.R72: New Agent reports the saved next-start provider for the chosen
+  // backend/model and points a broken one at Settings, without a selector.
+  it("reports the selected backend/model provider and its repair", async () => {
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    expect(await screen.findByText(/Installed Claude Code · \/Users\/me\/\.local\/bin\/claude · version 2\.1\.300/)).toBeInTheDocument();
+    await openOptions();
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
+    expect(await screen.findByText(/The Claude Code executable path was not found.*Settings → Backends/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    expect(await screen.findByText(/AgentDeck bundle Codex · \/app\/runtime\/codex · version not checked/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "AgentDeck bundle" })).toBeNull();
   });
 
   // FS-09.A40: a cache version difference is not an incompatibility warning.

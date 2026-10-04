@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useBackends, usePutBackends, configErrorMessage, type CatalogETagged } from "../../api/config";
+import { useBackends, usePutBackends, useRefreshProvider, configErrorMessage, type CatalogETagged } from "../../api/config";
 import type {
   BackendsConfig,
   Backend,
@@ -7,8 +7,11 @@ import type {
   Model,
   CredResult,
   CreateBackendResponse,
+  RefreshProviderResponse,
 } from "../../schemas/backends";
-import { launchSupportFor } from "../../schemas/backends";
+import { editableBackendsConfig, launchSupportFor } from "../../schemas/backends";
+import { hasProviderSource, providerExecutableKey } from "../../lib/providerRuntime";
+import { ProviderSection } from "./ProviderSection";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendTypes";
 import { ModelRow, type ModelCapability } from "./ModelRow";
 import { ConfigSourcePanel } from "./ConfigSourcePanel";
@@ -127,6 +130,44 @@ function modelCapability(support: BackendSupport | undefined, type: Backend["typ
   };
 }
 
+// canonicalCatalog renders a catalog in a key-order- and default-insensitive
+// form, so the draft and the saved catalog compare equal when nothing the
+// server would store differs.
+function canonicalCatalog(value: unknown): string {
+  const norm = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(norm);
+    if (v && typeof v === "object") {
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        const child = norm((v as Record<string, unknown>)[k]);
+        if (child === undefined || child === false || child === "" ||
+          (child && typeof child === "object" && !Array.isArray(child) && Object.keys(child).length === 0)) continue;
+        out[k] = child;
+      }
+      return out;
+    }
+    return v;
+  };
+  return JSON.stringify(norm(value));
+}
+
+function setEnvPair(pairs: Pair[], key: string, value: string): Pair[] {
+  const rest = pairs.filter((p) => p.key.trim() !== key);
+  return value === "" ? rest : [...rest, { key, value }];
+}
+
+function refreshSummary(res: RefreshProviderResponse): string {
+  const version = res.runtime.version ? `Version ${res.runtime.version}` : res.runtime.state === "available" ? "Version unknown" : "Provider unavailable";
+  const signIn = res.credentials.status === "ok" ? "signed in" : res.credentials.status === "failed" ? "sign-in needed" : "sign-in not checked";
+  const models = {
+    added: `${res.catalog.added_count} new model${res.catalog.added_count === 1 ? "" : "s"} added`,
+    unchanged: "no new models",
+    disabled: "model import is off",
+    unavailable: "no local model list found",
+  }[res.catalog.status];
+  return `${version}; ${signIn}; ${models}.`;
+}
+
 function credChip(result: CredResult) {
   const cls = result.status === "ok" ? "cred-ok" : result.status === "failed" ? "cred-failed" : "cred-skipped";
   return (
@@ -139,6 +180,9 @@ function credChip(result: CredResult) {
 export function BackendsEditor() {
   const { data, isLoading, refetch } = useBackends();
   const putBackends = usePutBackends();
+  const refreshProvider = useRefreshProvider();
+  const [refreshing, setRefreshing] = useState<string | null>(null);
+  const [refreshMessages, setRefreshMessages] = useState<Record<string, string>>({});
 
   const [entries, setEntries] = useState<BackendEntry[]>([]);
   const [defaultId, setDefaultId] = useState<string>("");
@@ -244,6 +288,27 @@ export function BackendsEditor() {
     });
   };
 
+  // Refresh provider needs the saved catalog, so any unsaved edit disables it
+  // (FS-09.R72): the check never runs or reports on a draft.
+  const dirty = !data || canonicalCatalog(entriesToConfig(entries, defaultId)) !== canonicalCatalog(editableBackendsConfig(data));
+
+  const handleRefresh = (id: string, backend: Backend) => {
+    setRefreshing(id);
+    setRefreshMessages((prev) => ({ ...prev, [id]: "" }));
+    refreshProvider.mutate({ backendId: id, modelId: backend.default_model, catalogEtag }, {
+      onSuccess: async (res) => {
+        setCredentials((prev) => ({ ...prev, [id]: res.credentials }));
+        setRefreshMessages((prev) => ({ ...prev, [id]: refreshSummary(res) }));
+        // The draft is clean, so folding in imported models and the new ETag
+        // discards nothing the person typed.
+        const fresh = await refetch();
+        if (fresh.data) seedDraft(fresh.data);
+      },
+      onError: (e) => setRefreshMessages((prev) => ({ ...prev, [id]: `Refresh failed: ${configErrorMessage(e)}` })),
+      onSettled: () => setRefreshing(null),
+    });
+  };
+
   if (isLoading) return <p data-ui="config-editor" data-state="loading" data-variant="backends">Loading backends…</p>;
 
   return (
@@ -288,7 +353,11 @@ export function BackendsEditor() {
             />
             <select
               value={backend.type}
-              onChange={(e) => updateBackend(id, { type: e.target.value as Backend["type"] })}
+              onChange={(e) => {
+                const type = e.target.value as Backend["type"];
+                // Provider mode belongs only to Claude/Codex (TS-03.R54).
+                updateBackend(id, hasProviderSource(type) ? { type } : { type, provider_mode: undefined });
+              }}
               className="backend-type-select"
             >
               {BACKEND_TYPE_OPTIONS.map((t) => (
@@ -302,6 +371,21 @@ export function BackendsEditor() {
               Remove
             </button>
           </div>
+
+          {hasProviderSource(backend.type) && (
+            <ProviderSection
+              backendId={id}
+              backend={backend}
+              executable={envPairs.find((p) => p.key.trim() === providerExecutableKey(backend.type))?.value ?? ""}
+              onModeChange={(mode) => updateBackend(id, { provider_mode: mode })}
+              onExecutableChange={(value) => updateEntry(id, { envPairs: setEnvPair(envPairs, providerExecutableKey(backend.type), value) })}
+              runtime={savedBackendIds.has(id) ? data?.provider_runtimes?.[id]?.[backend.default_model] : undefined}
+              dirty={dirty}
+              refreshing={refreshing === id}
+              refreshMessage={refreshMessages[id] || null}
+              onRefresh={() => handleRefresh(id, backend)}
+            />
+          )}
 
           <details className="backend-env-section">
             <summary>Backend env ({envPairs.length})</summary>

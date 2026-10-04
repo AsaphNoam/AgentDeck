@@ -509,4 +509,126 @@ describe("BackendsEditor", () => {
     await waitFor(() => expect(putBody).not.toBeNull());
     expect(putBody!.backend_support).toBeUndefined();
   });
+
+  // FS-09.R72/R75–R76/A40/A43/A45 — the provider choice, executable path,
+  // next-start metadata and Refresh provider in Settings.
+  describe("provider", () => {
+    const runtimes = (version?: string) => ({
+      claude: { sonnet: { source: "backend", state: "available", path: "/Users/me/bin/claude", ...(version ? { version, checked_at: "2026-10-04T10:00:00Z" } : {}) } },
+    });
+    const savedDoc = {
+      ...defaultBackendsDoc,
+      backends: {
+        claude: {
+          ...defaultBackendsDoc.backends.claude,
+          autosync_models: true,
+          env: { CLAUDE_CODE_EXECUTABLE: "/Users/me/bin/claude", ANTHROPIC_BASE_URL: "https://proxy" },
+        },
+      },
+    };
+
+    it("shows the saved next-start provider and saves Bundle without deleting overrides", async () => {
+      let putBody: { backends: Record<string, { provider_mode?: string; env?: Record<string, string> }> } | null = null;
+      server.use(
+        http.get("/api/backends", () => HttpResponse.json({ ...savedDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: runtimes() })),
+        http.put("/api/backends", async ({ request }) => {
+          putBody = (await request.json()) as typeof putBody;
+          return HttpResponse.json({ ...savedDoc, credentials: {} });
+        }),
+      );
+      renderWithQuery(<BackendsEditor />);
+      expect(await screen.findByText(/Next start: Installed \(backend path\) Claude Code · \/Users\/me\/bin\/claude · version not checked/)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Installed provider (default)" })).toBeChecked();
+      expect(screen.getByLabelText("Executable path (advanced)")).toHaveValue("/Users/me/bin/claude");
+
+      fireEvent.click(screen.getByRole("radio", { name: "AgentDeck bundle" }));
+      expect(screen.getByText(/are inactive while the AgentDeck bundle is selected/)).toBeInTheDocument();
+      expect(screen.getByText("Save to check provider.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Refresh provider" })).toBeDisabled();
+
+      fireEvent.click(screen.getByText("Save"));
+      await waitFor(() => expect(putBody).not.toBeNull());
+      expect(putBody!.backends.claude.provider_mode).toBe("bundled");
+      expect(putBody!.backends.claude.env).toEqual({ CLAUDE_CODE_EXECUTABLE: "/Users/me/bin/claude", ANTHROPIC_BASE_URL: "https://proxy" });
+      expect((putBody as unknown as Record<string, unknown>).provider_runtimes).toBeUndefined();
+    });
+
+    it("edits only the executable entry and clears provider mode on a type change", async () => {
+      let putBody: { backends: Record<string, { type: string; provider_mode?: string; env?: Record<string, string> }> } | null = null;
+      server.use(
+        http.get("/api/backends", () => HttpResponse.json({ ...savedDoc, backends: { claude: { ...savedDoc.backends.claude, provider_mode: "bundled" } }, backend_support: BACKEND_SUPPORT_WIRE })),
+        http.put("/api/backends", async ({ request }) => {
+          putBody = (await request.json()) as typeof putBody;
+          return HttpResponse.json({ ...savedDoc, credentials: {} });
+        }),
+      );
+      renderWithQuery(<BackendsEditor />);
+      fireEvent.click(await screen.findByRole("radio", { name: "Installed provider (default)" }));
+      fireEvent.change(screen.getByLabelText("Executable path (advanced)"), { target: { value: "claude-beta" } });
+      fireEvent.click(screen.getByText("Save"));
+      await waitFor(() => expect(putBody).not.toBeNull());
+      expect(putBody!.backends.claude.provider_mode).toBe("installed");
+      expect(putBody!.backends.claude.env).toEqual({ CLAUDE_CODE_EXECUTABLE: "claude-beta", ANTHROPIC_BASE_URL: "https://proxy" });
+
+      putBody = null;
+      fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "opencode-acp" } });
+      expect(screen.queryByRole("radio", { name: "AgentDeck bundle" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText("Save"));
+      await waitFor(() => expect(putBody).not.toBeNull());
+      expect(putBody!.backends.claude.provider_mode).toBeUndefined();
+    });
+
+    it("refreshes a clean saved backend and folds new models in without changing the default", async () => {
+      let refreshed = false;
+      let ifMatch: string | null = null;
+      server.use(
+        http.get("/api/backends", () => {
+          const doc = refreshed
+            ? { ...savedDoc, backends: { claude: { ...savedDoc.backends.claude, models: { ...savedDoc.backends.claude.models, opus: { name: "claude-opus-5-5", model: "claude-opus-5-5" } } } } }
+            : savedDoc;
+          return HttpResponse.json(
+            { ...doc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: runtimes(refreshed ? "2.1.300" : undefined) },
+            { headers: { ETag: refreshed ? '"v2"' : '"v1"' } },
+          );
+        }),
+        http.post("/api/backends/claude/refresh-provider", async ({ request }) => {
+          ifMatch = request.headers.get("If-Match");
+          expect(await request.json()).toEqual({ model_id: "sonnet" });
+          refreshed = true;
+          return HttpResponse.json({
+            runtime: runtimes("2.1.300").claude.sonnet,
+            credentials: { status: "ok" },
+            catalog: { status: "added", added_count: 1 },
+          }, { headers: { ETag: '"v2"' } });
+        }),
+      );
+      renderWithQuery(<BackendsEditor />);
+      const refresh = await screen.findByRole("button", { name: "Refresh provider" });
+      await waitFor(() => expect(refresh).toBeEnabled());
+      fireEvent.click(refresh);
+      expect(await screen.findByText("Version 2.1.300; signed in; 1 new model added.")).toBeInTheDocument();
+      expect(ifMatch).toBe('"v1"');
+      expect((await screen.findAllByDisplayValue("claude-opus-5-5")).length).toBe(2);
+      expect(screen.getByText(/version 2\.1\.300, last checked/)).toBeInTheDocument();
+      expect(screen.getAllByRole("radio", { name: /Default/ }).length).toBeGreaterThan(0);
+    });
+
+    it("keeps the catalog editable when provider metadata is malformed", async () => {
+      server.use(
+        http.get("/api/backends", () => HttpResponse.json({ ...savedDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: { claude: { sonnet: { source: "weird" } } } })),
+      );
+      renderWithQuery(<BackendsEditor />);
+      expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
+      expect(screen.getByText("Save to check provider.")).toBeInTheDocument();
+    });
+
+    it("explains a missing installed provider with an install link", async () => {
+      server.use(
+        http.get("/api/backends", () => HttpResponse.json({ ...defaultBackendsDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: { claude: { sonnet: { source: "detected", state: "missing" } } } })),
+      );
+      renderWithQuery(<BackendsEditor />);
+      expect(await screen.findByText(/Claude Code was not found/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Install Claude Code" })).toHaveAttribute("href", "https://code.claude.com/docs/en/setup");
+    });
+  });
 });

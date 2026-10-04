@@ -933,7 +933,7 @@ model entitlement or runtime support; configured exact selectors still reach pro
 
 **R74 — retired 2026-10-03:** Installed-only recovery replaced by source-aware R76.
 
-**R75 `(planned)` — One resolver selects a backend's provider mode before its executable.**
+**R75 — One resolver selects a backend's provider mode before its executable.**
 Accept provider type, backend `provider_mode`, merged process/backend/model environment, original
 user PATH and the running release's managed runtime root. Omitted mode is `installed`. In that
 mode resolve `CLAUDE_CODE_EXECUTABLE`/`CODEX_PATH` with model > backend > process precedence; an

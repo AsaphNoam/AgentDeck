@@ -747,7 +747,7 @@ Invalidate onboarding/catalog queries after a successful check/import as applica
 login is sent. The UI disables duplicate refresh, explains that unsaved Settings changes must be
 saved or discarded first, and refetches on completion without overwriting unrelated form input.
 
-**R54 `(planned)` — Provider mode is one backend setting, not runtime/session metadata.** Add
+**R54 — Provider mode is one backend setting, not runtime/session metadata.** Add
 optional `provider_mode: "installed" | "bundled"` to Claude/Codex backend definitions in
 `backends.json` and their existing GET/PUT browser schema. Omission defaults to Installed; invalid
 values or bundled mode on other provider types fail normal validation. Other providers may omit

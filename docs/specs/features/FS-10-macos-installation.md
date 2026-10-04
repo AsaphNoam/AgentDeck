@@ -90,7 +90,7 @@ person's provider credentials or AgentDeck configuration.
   preparation in R25; ordinary fresh installs require none of that preparation.
 
 - **R20 — retired 2026-10-03:** Installed-only setup replaced by explicit-bundle alternative R23.
-- **R21** `(planned)` — `agentdeck auth claude|codex` delegates to the same selected
+- **R21** — `agentdeck auth claude|codex` delegates to the same selected
   provider selection used by the matching backend/default model. Optional `--backend <id>` and
   `--model <id>` select a configured target; a provider/type mismatch or ambiguous backend requires
   correction rather than guessing. The command identifies its target/executable before interactive
@@ -99,7 +99,7 @@ person's provider credentials or AgentDeck configuration.
   they show the target-specific command and Refresh provider. Fresh installation without a backend
   catalog uses ambient provider selection without creating or rewriting configuration.
 - **R22 — retired 2026-10-03:** Installed-only update ownership replaced by two-source R24.
-- **R23** `(planned)` — Packaged AgentDeck supplies one managed Claude provider and one managed
+- **R23** — Packaged AgentDeck supplies one managed Claude provider and one managed
   Codex provider with its tested adapters/SDKs/Node, but backend selection defaults to Installed
   (FS-09.R75). Without an installed CLI, the dashboard still opens and offers official provider
   installation instructions or the backend's explicit Bundle choice; never select it automatically.

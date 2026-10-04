@@ -12,7 +12,7 @@ import type {
   BackendType,
   CreateBackendResponse,
 } from "../schemas/backends";
-import { editableBackendsConfig, withBackendSupport } from "../schemas/backends";
+import { editableBackendsConfig, refreshProviderResponseSchema, withBackendSupport } from "../schemas/backends";
 import type { Config } from "../schemas/config";
 
 // Query keys — used for cache invalidation.
@@ -250,6 +250,28 @@ export function usePutBackends() {
         body: JSON.stringify(editableBackendsConfig(data)),
       })),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEYS.backends }),
+  });
+}
+
+// useRefreshProvider runs Refresh provider for one saved backend/model
+// (TS-03.R53). It needs the saved catalog's ETag, so it is only offered when
+// the Settings draft has no unsaved edits. On success it refreshes the catalog
+// and onboarding queries; the caller decides how to fold models into its draft.
+export function useRefreshProvider() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ backendId, modelId, catalogEtag }: { backendId: string; modelId?: string; catalogEtag?: string }) => {
+      const res = await jsonWithCatalogETag<unknown>(`/api/backends/${encodeURIComponent(backendId)}/refresh-provider`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "If-Match": catalogEtag ?? "" },
+        body: JSON.stringify(modelId ? { model_id: modelId } : {}),
+      });
+      return { ...refreshProviderResponseSchema.parse(res), catalogEtag: res.catalogEtag };
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.backends });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.config });
+    },
   });
 }
 

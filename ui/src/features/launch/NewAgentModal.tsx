@@ -9,6 +9,7 @@ import { useLaunchAgent } from "../../api/config";
 import { useConfigSources } from "../../api/configSources";
 import { launchSupportFor, type LaunchSupport } from "../../schemas/backends";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
+import { describeProviderRuntime, hasProviderSource } from "../../lib/providerRuntime";
 import { useSuggestedName } from "./useSuggestedName";
 
 interface NewAgentModalProps {
@@ -112,7 +113,12 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const modelLabels = modelEntries.map(([id, model]) => [id, model.name] as [string, string]);
   const selectedModel = selectedBackend?.models[modelId];
   const effortLevels = selectedModel?.efforts ?? [];
-  const codexPathOverride = selectedModel?.env?.CODEX_PATH || selectedBackend?.env?.CODEX_PATH;
+  // The saved next-start provider for this backend/model (FS-09.R72). New
+  // Agent reports it; the choice itself lives in Settings.
+  const providerRuntime = selectedBackend && hasProviderSource(selectedBackend.type)
+    ? backendsData?.provider_runtimes?.[backendId]?.[modelId]
+    : undefined;
+  const providerDescription = selectedBackend && providerRuntime && describeProviderRuntime(selectedBackend.type, providerRuntime);
 
   useEffect(() => {
     setEffort(resetRuntimeForModel(backendsData, backendId, modelId).effort);
@@ -230,8 +236,11 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
               {fast && <span>Fast mode</span>}
               <span>{agentInterface === "terminal" ? "Terminal" : "Chat"}</span>
             </div>
-            {selectedBackend?.type === "codex-acp" && codexPathOverride && (
-              <p className="form-warning">Codex runtime override: {codexPathOverride} (version not verified).</p>
+            {providerDescription && (
+              <p className={providerDescription.problem ? "form-warning" : "new-agent-provider"}>
+                {providerDescription.problem ?? providerDescription.summary}
+                {providerDescription.problem && " Change it in Settings → Backends."}
+              </p>
             )}
 
             <details className="new-agent-options" open={optionsOpen} onToggle={(event) => setOptionsOpen(event.currentTarget.open)}>

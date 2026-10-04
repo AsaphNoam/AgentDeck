@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { configErrorMessage, useBackends, usePutBackends } from "../../../api/config";
 import type { BackendsConfig, BackendType } from "../../../schemas/backends";
+import { hasProviderSource, providerInstallURL, providerName } from "../../../lib/providerRuntime";
 import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../../lib/backendTypes";
 
 interface BackendStepProps {
@@ -31,7 +32,15 @@ const signInProvider: Partial<Record<BackendType, string>> = {
 
 function credentialGuidance(status: string, detail: string | null, type: BackendType): string {
   if (detail === "cli_not_installed") {
-    return `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then check again.`;
+    return hasProviderSource(type)
+      ? `${providerName(type)} was not found. Install it (${providerInstallURL(type)}), or choose AgentDeck bundle for this backend in Settings → Backends, then check again.`
+      : `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then check again.`;
+  }
+  if (detail === "bundle_unavailable") {
+    return `The AgentDeck bundle for ${providerName(type)} is not available in this installation. Choose Installed provider in Settings → Backends, or reinstall AgentDeck, then check again.`;
+  }
+  if (detail === "cli_invalid") {
+    return `The ${providerName(type)} executable path set for this backend is not usable. Fix or clear it in Settings → Backends, then check again.`;
   }
   if (detail === "cli_incompatible") {
     return `The installed ${BACKEND_TYPE_LABELS[type]} adapter is too old for AgentDeck's readiness check, so its sign-in could not be confirmed. Update the adapter, then check again.`;
@@ -62,6 +71,9 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
   const [error, setError] = useState<string | null>(null);
   const backendId = seededIdForType[type];
   const seeded = existing?.backends[backendId];
+  // Name the target backend when several share this provider, so sign-in
+  // uses the same provider selection as launch (FS-10.R21).
+  const sameTypeCount = Object.values(existing?.backends ?? {}).filter((b) => b.type === type).length;
   const readyToValidate = !!existing && !isLoading;
   // Once a readiness result came back non-ok, the same submit becomes a plain
   // re-check: nothing about the document changed, only the provider's state.
@@ -159,7 +171,7 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
             in AgentDeck. In a terminal, run:
           </p>
           <p>
-            <code>agentdeck auth {authProvider}</code>
+            <code>agentdeck auth {authProvider}{sameTypeCount > 1 ? ` --backend ${backendId}` : ""}</code>
           </p>
           <p className="form-hint">
             {type === "codex-acp"

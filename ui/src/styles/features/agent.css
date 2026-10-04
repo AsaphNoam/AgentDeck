@@ -143,6 +143,14 @@
   padding: var(--ad-space-3);
 }
 
+.new-agent-provider {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.72rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .new-agent-runtime > span:first-child {
   color: var(--ad-text-muted);
   flex-basis: 100%;
