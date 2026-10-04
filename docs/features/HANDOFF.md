@@ -23,7 +23,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) was reviewed 2026-10-04 and its
   findings were fixed the same day; the unit is closed apart from its owed credentialed and
   rendered gates. The test-only `post-release-flaky-test-synchronization` fixes are available.
-  `rename-product-to-chuck` (2026-10-04, `36afbf2`..closure commit: module
+  `rename-product-to-chuck` (2026-10-04, `36afbf2`..`3855419`: module
   `github.com/AsaphNoam/Chuck`, `cmd/chuck`, `CHUCK_*`/`~/.chuck`, Chuck install tree/archive,
   `chuck-messaging`/`X-Chuck-Token`, `chuck-` tmux prefix, FirstMate, `operating-chuck`, UI/phone
   branding, legacy annotation recognition, storage copy-forward, `scripts/check-old-name.sh`,
