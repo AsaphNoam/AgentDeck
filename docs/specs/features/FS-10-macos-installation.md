@@ -57,41 +57,37 @@ person's provider credentials or AgentDeck configuration.
   that macOS may require the person to approve an unidentified developer on first open; AgentDeck
   never attempts to bypass Gatekeeper or asks for an administrator password.
 
-- **R15 — The installed product is Deckhand.** (planned) The release installs the `deckhand`
-  command into a Deckhand-named install tree (`~/Library/Application Support/Deckhand` by default,
-  `$DECKHAND_APP_ROOT` to override), publishes `deckhand-<version>-<target>.tar.gz`, and names its
-  manifest component `deckhand`. `agentdeck` is not installed, aliased, or kept on PATH; a person
+- **R15 — The installed product is Chuck.** (planned) The release installs the `chuck`
+  command into a Chuck-named install tree (`~/Library/Application Support/Chuck` by default,
+  `$CHUCK_APP_ROOT` to override), publishes `chuck-<version>-<target>.tar.gz`, and names its
+  manifest component `chuck`. `agentdeck` is not installed, aliased, or kept on PATH; a person
   who typed it gets their shell's ordinary command-not-found. Everything R1–R14 promises about
   fresh install, private runtime, provider sign-in, explicit update and rollback holds unchanged
   under the new name.
-- **R16 — An existing AgentDeck install moves over by running the Deckhand installer once.**
-  (planned) There is no in-place `agentdeck update` path onto Deckhand: the update command in an
-  installed AgentDeck resolves releases from the pre-rename GitHub repository, and this
-  specification does not depend on that repository redirecting. The Deckhand installer is a normal
-  fresh install (R2) that additionally detects an AgentDeck install tree and reports that it found
-  one. It never modifies, moves, or deletes that tree — the previous install stays runnable as a
-  fallback — and documentation gives the exact command to remove it once the person is satisfied.
-- **R17 — First start migrates the state directory once.** (planned) When `deckhand` starts and
-  `$DECKHAND_HOME` (default `~/.deckhand`) does not exist while an AgentDeck home does
-  (`$AGENTDECK_HOME` if set, else `~/.agentdeck`), it moves that directory to the Deckhand home and
-  reports the source path, the destination path, and that the move happened. Everything inside
-  comes across unchanged and keeps working: the SQLite state database with its agents, sessions,
-  tasks, pipelines and context links; transcripts; `backends.json`, `config.json`,
-  `config-sources.json` and `layout.json`; project resources; and owned worktrees. `AGENTDECK_HOME`
-  is read for this one purpose and has no other effect. Once a Deckhand home exists the check does
-  not run again.
-- **R18 — Migration refuses rather than guesses.** (planned) It does not run, and start proceeds
-  against the Deckhand home alone while saying why, when: both homes already exist (it never merges
-  two states, and names which one it is using); a dashboard is running against either home; the
-  AgentDeck home is unreadable, is not a directory, or is not the owner's; or the destination cannot
-  be created. A refusal is reported with the path and a retryable action, never swallowed, and never
-  leaves the person guessing which state they are running on.
-- **R19 — The environment is renamed with the product.** (planned) Every variable the product
-  defines or injects is `DECKHAND_*` — `DECKHAND_HOME`, `DECKHAND_APP_ROOT`, `DECKHAND_HOOK_URL`,
-  `DECKHAND_HOOK_TOKEN`, `DECKHAND_AGENT_ID`, `DECKHAND_INTERFACE`, `DECKHAND_SKILL_DIR`,
-  `DECKHAND_PROJECT_RESOURCES`, `DECKHAND_LOG_LEVEL`, `DECKHAND_CODEX_VERSION`, the provider
-  login-command overrides, and the installer's own variables. No `AGENTDECK_*` variable is honored
-  except `AGENTDECK_HOME` under R17.
+- **R16 — retired 2026-10-03:** Legacy-install detection replaced by supervised cutover R25.
+- **R17 — retired 2026-10-03:** Automatic home migration replaced by R25–R26.
+- **R18 — retired 2026-10-03:** Automatic migration refusal machinery is no longer required.
+- **R19 — retired 2026-10-03:** Legacy home-variable exception removed by R26.
+
+- **R25** `(planned)` — The sole operator moves to Chuck through one supervised cutover.
+  Install Chuck normally; no legacy-install detector, migration command, startup migrator or
+  `agentdeck update` bridge is shipped. Before transfer, stop dashboards and all their agent/tmux
+  sessions, pause automatic work, save browser drafts, and preserve a recoverable source snapshot.
+  Inventory and preserve configuration (including edited roles), agents/session history,
+  transcripts, tasks/pipelines/context links, project resources and owned worktrees; starting empty
+  or discarding any of these requires a separate explicit choice. Prepare the Chuck home offline,
+  adapt the concrete installation's role references and relocated paths, then verify it before
+  starting new sessions. Live-process continuity and automatic adoption of old tmux sessions are
+  excluded; retaining history does not promise native-provider resume across the cutover.
+  Release instructions identify source/destination, completion checks, recovery from the preserved
+  source, phone re-pairing and optional old-install removal after success. Never run both versions
+  against shared state/worktrees. This design authorizes no live transfer or deletion itself.
+- **R26** `(planned)` — Chuck resolves only `$CHUCK_HOME`, default `~/.chuck`, and otherwise uses
+  ordinary fresh-home startup. It does not inspect, move, merge or repair an AgentDeck home.
+  Every product-defined/injected variable becomes `CHUCK_*`, including home, app root, hooks,
+  agent identity, interface, skill/resources, logging, provider/login overrides and installer
+  variables; no `AGENTDECK_*` input is honored. Existing data can be used only after the supervised
+  preparation in R25; ordinary fresh installs require none of that preparation.
 
 - **R20 — retired 2026-10-03:** Installed-only setup replaced by explicit-bundle alternative R23.
 - **R21** `(planned)` — `agentdeck auth claude|codex` delegates to the same selected
@@ -170,21 +166,23 @@ person's provider credentials or AgentDeck configuration.
   sign-in requirement, and explicit update/rollback commands. *Verified:* release-documentation
   review against this specification.
 
-- **A7** (R15, R19) — (planned) A fresh install on a clean macOS arm64 home produces a runnable
-  `deckhand --version` and dashboard, installs nothing named `agentdeck` on PATH or in the install
-  tree, and the launched agent environment contains only `DECKHAND_*` variables. *Verified:*
+- **A7** (R15, R26) — (planned) A fresh install on a clean macOS arm64 home produces a runnable
+  `chuck --version` and dashboard, installs nothing named `agentdeck` on PATH or in the install
+  tree, and the launched agent environment contains only `CHUCK_*` product variables. *Verified:*
   fresh-home installer integration test extended to assert the absent old command, plus a
   launch-environment test asserting no `AGENTDECK_` prefix is injected.
-- **A8** (R17, R18) — (planned) A populated `~/.agentdeck` containing agents, transcripts,
-  config files, project resources and a worktree becomes `~/.deckhand` on first start with every
-  one of those readable afterward and the dashboard serving the same agents; a home that already
-  exists at both paths, a running dashboard, and an unreadable source each refuse with a named path
-  and leave both directories untouched. *Verified:* state-migration integration tests covering the
-  success path and each refusal branch.
-- **A9** (R16) — (planned) Release documentation states that moving from AgentDeck is a one-time
-  installer run rather than `agentdeck update`, that the previous install tree is left in place, and
-  gives the exact command to remove it. *Verified:* release-documentation review against this
-  specification.
+- **A8 — retired 2026-10-03:** General migration matrix replaced by bounded A13–A14.
+- **A9 — retired 2026-10-03:** Cutover documentation is covered by A14.
+- **A13** `(planned)` (R26) — With a populated old home and `AGENTDECK_HOME` set, startup uses
+  only the chosen Chuck home and leaves the old home untouched; an absent Chuck home seeds normally.
+  *Verify by* focused home-resolution/startup tests, not a migration failure matrix.
+- **A14** `(planned)` (R25) — Rehearse the documented cutover on a disposable copy representative
+  of the operator's installation. Confirm retained records/transcripts and customized roles are
+  readable, resources and owned Git worktrees resolve, new FirstMate sessions launch, and the
+  preserved source can still be used for recovery after Chuck is stopped. Review stop/pause,
+  draft preservation, phone re-pairing and cleanup instructions. Record what was checked and any
+  native-resume limitation; do not claim a real installation was migrated from this rehearsal.
+  *Verify by* one supervised rehearsal receipt and release-documentation review.
 
 - **A10** `(planned)` (R21, R23–R24) — A fresh install with no installed provider produces a working dashboard,
   truthful provider-install/explicit-Bundle guidance and no automatic native-provider spawn; with a user CLI it uses that
@@ -224,4 +222,4 @@ person's provider credentials or AgentDeck configuration.
 - Regression coverage: `internal/release/{archive,install,wrapper}_test.go`; release CLI and
   fresh-home bootstrap coverage: `internal/cli/{release,update,auth,installer}_test.go`; release
   publication: `.github/workflows/release.yml`; product documentation: `README.md`.
-- Rename identity, install tree, and state migration (R15–R19): TS-06.R24, TS-02.R32–R33.
+- Rename identity and supervised cutover (R15, R25–R26): TS-06.R24, TS-02.R40–R41.

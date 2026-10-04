@@ -24,7 +24,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 
 - **R1 — Remote control is off until the person turns it on.** Desktop Settings gains a
   **Remote** section. Turning remote control on makes AgentDeck join the person's tailnet as its
-  own device named `agentdeck` (the product name governs it, FS-00.R16); no Tailscale application
+  own device named `agentdeck` (the planned Chuck rename governs it, FS-00.R19); no Tailscale application
   is required on the Mac. The first time, the section shows a Tailscale sign-in link that the person
   opens to approve the device; afterward AgentDeck rejoins on its own at every start while remote
   control stays on.

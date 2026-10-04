@@ -669,20 +669,16 @@ global resource list.
   This release gate is subordinate to FS-17.R20: implementation does not start until packaged Codex
   can reach the reviewed narrow transport under its default sandbox.
 
-**R52 — The rename reaches the integration surfaces an agent process touches.** (planned) With
-FS-00.R16 the in-process MCP server's `Implementation.Name` becomes `deckhand-messaging`, its
-token header becomes `X-Deckhand-Token` on both the `/mcp` transport and `/api/hook`, and the hook
-scripts send that header reading `DECKHAND_HOOK_TOKEN` from the `DECKHAND_*` launch environment
-(FS-10.R19). Header name, environment variable names, and the launch-time injection stay spelled in
-one place each, so a renamed header cannot reach the server while the script still sends the old one
-(INV §2, §11). Registered tool names are unchanged — none was ever brand-prefixed — so no agent's
-learned tool vocabulary breaks; only tool *descriptions* and refusal text change wording under
-FS-18.R14. Because the token is minted per launch and the header travels only between this product
-and the children it starts, there is no deployed third party to keep compatible: the old header is
-not accepted after the rename, and a child launched by a pre-rename binary cannot outlive the
-migration, which runs only with the dashboard stopped (FS-10.R18). The tmux session prefix becomes
-`deckhand-`, while session discovery accepts both prefixes so a detached pre-rename session is still
-found, adopted, and torn down rather than orphaned (INV §4).
+**R52 — retired 2026-10-03:** Legacy tmux adoption removed by R78's stopped-process cutover.
+**R78** `(planned)` — Chuck's MCP implementation name is `chuck-messaging`, and `/mcp` and
+`/api/hook` use `X-Chuck-Token`; hook scripts read `CHUCK_HOOK_TOKEN` from the `CHUCK_*` launch
+environment (FS-10.R26). Keep one definition per header/env spelling and update every producer and
+consumer together. Tool names remain unchanged; descriptions follow FS-18.R18. Reject the old
+header, mint credentials on new launches as today, and use only `chuck-` for tmux creation/discovery.
+Do not discover/adopt old-prefix sessions or add aliases. FS-10.R25 requires stopping old child and
+tmux processes before cutover, independently of dashboard shutdown; no seamless live transition is
+promised (INV §2, §10). Verify new launch/hook/MCP wiring and the sole tmux prefix with focused
+fixtures; verify the shutdown prerequisite in the supervised cutover rehearsal.
 
 **R53 — Waking/deferred mail shares the existing protocol and bounded prompt builder.** (shipped 2026-09-13)
 Extend `send_message` with optional boolean `wake`, default true; reject non-booleans. Successful

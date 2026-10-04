@@ -31,7 +31,7 @@ the installed app on iOS.
   loopback server, agents, tasks, or pipelines; it surfaces only as FS-20.R2's **Unavailable** state
   with a stable reason code. Rationale: remote control is an optional channel, not a runtime.
 - **R2 — The tailnet node is an embedded `tsnet.Server`.** Hostname is the product name
-  (FS-00.R16), state lives in `$AGENTDECK_HOME/remote/tailscale/` (`0700`, TS-05.R5), and the node is
+  (FS-00.R19), state lives in `$AGENTDECK_HOME/remote/tailscale/` (`0700`, TS-05.R5), and the node is
   not ephemeral so pairings and its address survive restarts. It starts when `remote_enabled` is
   true at startup or when the person turns it on, and is closed with `Server.Close` when turned off or
   at shutdown. Enable/disable transitions are generation-scoped so a late start from a superseded

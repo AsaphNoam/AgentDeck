@@ -149,15 +149,15 @@ the default sandbox. Enabling broad network access or substituting a filesystem 
 pass this build gate.
 
 **R24 (planned) — The rename is one cut through build, release, and distribution identity.** The Go
-module becomes `github.com/deckhand/deckhand` with every internal import path following it and the
-version `-ldflags -X` target tracking the change; the command directory becomes `cmd/deckhand`; the
-built binary, the wrapper shim at `bin/deckhand`, the FTS5 binary at `libexec/deckhand`, the
+module follows the renamed Chuck repository under the existing GitHub owner, with every internal
+import path and version `-ldflags -X` target tracking it; the command directory becomes `cmd/chuck`;
+the built binary, the wrapper shim at `bin/chuck`, the FTS5 binary at `libexec/chuck`, the
 manifest's required layout and its component key, the archive name
-`deckhand-<version>-<target>.tar.gz`, the staging and versioned release directory names, the
+`chuck-<version>-<target>.tar.gz`, the staging and versioned release directory names, the
 assembled runtime's package name, the install tree default
-`~/Library/Application Support/Deckhand`, the installer's `DECKHAND_*` variables, and the release
+`~/Library/Application Support/Chuck`, the installer's `CHUCK_*` variables, and the release
 workflow's smoke test all rename together. There is no transitional release that publishes both
-names and no compatibility alias, because FS-10.R16 moves an existing install through a fresh
+names and no compatibility alias, because FS-10.R25 moves the sole existing install through a fresh
 installer run rather than through an in-place update, so no already-installed client has to parse a
 manifest or resolve an archive under the new name. The release repository constant moves to the
 renamed GitHub repository; renaming that repository is an operational step, and this specification

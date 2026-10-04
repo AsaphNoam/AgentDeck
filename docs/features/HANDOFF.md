@@ -19,7 +19,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   they now wait for that rendered default first. The GitHub Release carries the 293,072,856-byte
   `darwin-arm64` archive, `install.sh`, and a `0.8.0` manifest whose size and SHA-256 match the archive
   asset.
-- **Work units:** `rename-product-to-chuck.md` is waiting to start.
+- **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
+  cutover, new sessions, no general legacy migration (FS-10.R25–R26).
   `use-installed-provider-clis.md` is waiting to start (FS-09.R75–R78, FS-10.R23–R24;
   Installed default, one explicit Bundle choice per provider/backend, and capped compatibility
   work under TS-06.R31; the ready file lists retained requirements).
@@ -146,6 +147,17 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-04 — Design revision: simplify the Chuck cutover.** Revised the waiting rename unit
+  for the sole operator's approved supervised cutover. FS-00.R19, FS-04.R52/A32,
+  FS-10.R25–R26/A13–A14, FS-18.R18/A14, TS-02.R40–R41, TS-04.R78 and TS-11.R18 retire automatic
+  home/role migration, old tmux adoption and special skill-retirement machinery. Keep source data
+  recoverable, prepare role/path references offline, restart processes and rehearse once on a
+  disposable copy. Retain historical annotation parsing and browser draft copy-forward. Corrected
+  stale Deckhand wording to Chuck in governing rename clauses. Existing whole-root skill
+  publication needs no extra cleanup mechanism. Spec lint, twin-skill comparison and whitespace
+  checks pass. No product code or live data changed; implementation and the actual cutover remain
+  pending, and Active change stays none.
 
 - **2026-10-04 — Design revision: explicit provider bundles, bounded compatibility.** The waiting
   `use-installed-provider-clis.md` change now defaults each backend to Installed and offers the

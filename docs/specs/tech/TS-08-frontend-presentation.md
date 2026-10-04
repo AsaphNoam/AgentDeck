@@ -639,10 +639,10 @@ primitive seam; the rejected alternatives are recorded in §5.
   component tests plus matched Core, Sky & Grove, and Studio matrix/browser views cover zero,
   unknown, long, and live-updating values (FS-02.R63/A44–A45; INV §8/§10/§13/§17).
 - **R58 — Browser-local identifiers rename with a one-time copy-forward.** (planned) With
-  FS-00.R16 the document title, the header wordmark component, the built-in skin name, and every
-  on-screen product string say Deckhand. The identifiers the browser itself keys on rename too:
-  `deckhand-chat-drafts`, `deckhand-annotation-tray`, `deckhand.pipeline-builder-agent`, and the
-  `deckhand-events` SharedWorker. Because that storage is per-origin and holds text a person has not
+  FS-00.R19 the document title, the header wordmark component, the built-in skin name, and every
+  on-screen product string say Chuck. The identifiers the browser itself keys on rename too:
+  `chuck-chat-drafts`, `chuck-annotation-tray`, `chuck.pipeline-builder-agent`, and the
+  `chuck-events` SharedWorker. Because that storage is per-origin and holds text a person has not
   sent yet, one module owns a startup copy-forward that reads each old key, writes the new key only
   when it is absent, and then removes the old one — never merging, never overwriting newer state,
   and tolerating unreadable or absent storage without blocking the app (INV §1, §7). The renamed

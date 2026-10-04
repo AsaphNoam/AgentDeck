@@ -197,16 +197,14 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   remains a bounded catch-up rather than managed roles or recurring seed synchronization.
   FS-18.R12–R13 own the corrected prompt content and its user-visible limits; TS-11.R13 owns the
   comparison, the digest table, and the atomic write.
-- **R48 — The seeded resident-operator role becomes `firstmate`.** (planned) With the rename
-  (FS-00.R16), the role AgentDeck seeded as `agentdecker` is seeded as `firstmate` and displayed as
-  **FirstMate**, and the authorization gate on proposing pipeline templates and runs keys on the new
-  id. On a migrated home (FS-10.R17) startup renames an existing `roles/agentdecker.json` to
-  `roles/firstmate.json`, carrying every field across unchanged, and rewrites the stored role id;
-  agents already launched under the old role keep working and show the new name. If a
-  `firstmate` role already exists, or the old file is unreadable, startup leaves both alone and says
-  so rather than merging or overwriting. The role's prompt text then follows R47 exactly as any
-  other seeded role: it is replaced only when its bytes match a digest of a prompt this product
-  previously shipped for that role, so a person who edited it keeps their edit under the new id.
+- **R48 — retired 2026-10-03:** Startup role conversion replaced by R52 and supervised cutover.
+- **R52** `(planned)` — Chuck seeds `firstmate`, displayed as **FirstMate**, and pipeline-proposal
+  authorization accepts that id, not `agentdecker`. There is no automatic legacy-role conversion,
+  alias or existing-process identity repair. The supervised cutover (FS-10.R25) preserves edited
+  role content and adjusts the concrete installation's references offline; it does not overwrite
+  conflicting roles or discard custom fields. Existing exact-match prompt refresh R47 remains,
+  but the rename adds no legacy-role migration/digest machinery. Fresh and prepared homes use the
+  same ordinary seeding and authorization paths.
 
 
 
@@ -216,7 +214,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   mandate; no separate coordinator, `pm`, or `teammate` is seeded. The default remains
   `implementer`, all four inherit the existing permission policy, and role editing retains its
   current fields and future-launch scope. FS-18.R16 owns their standing guidance. The separate
-  R48 product rename governs the resident operator's eventual spelling; this change neither
+  R52 product rename governs the resident operator's eventual spelling; this change neither
   performs nor reverses that rename.
 - **R51 — Consolidation preserves configured roles and references.** Existing
   `pm` and `teammate` files remain ordinary
@@ -429,12 +427,11 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   (R14, A7) is otherwise unchanged, so a populated home is still never clobbered. *Verified:*
   `TestMigrateSupersededRolePromptsExactOnly`, `TestMigrateSupersededRolePromptsSkipsUnseededRole`;
   FS-18.A9 covers the per-role failure isolation and package gating.
-- **A28** (R48) — (planned) A migrated home whose `roles/agentdecker.json` carries user-edited
-  fields comes up with `roles/firstmate.json` holding those fields byte-for-byte under the new id,
-  the pipeline-proposal gate accepting the renamed role and rejecting the old id, and an existing
-  agent that was launched as `agentdecker` still addressable and displayed as FirstMate. A home that
-  already has both roles leaves both files untouched. *Verified:* role-rename migration tests plus
-  a pipeline-tool authorization test on the new id.
+- **A28 — retired 2026-10-03:** Automatic role migration replaced by A32 and FS-10.A14.
+- **A32** `(planned)` (R52) — A fresh home seeds FirstMate and pipeline-proposal authorization
+  accepts `firstmate` and rejects `agentdecker`; a prepared customized FirstMate role survives
+  startup unchanged under R47. *Verify by* seed/pipeline authorization fixtures. Preservation of
+  the operator's old customized role and references is checked in the FS-10.A14 cutover rehearsal.
 
 - **A29 (shipped 2026-09-26)** (R49) — Component tests exercise Claude and Codex with the compact Config step,
   and OpenCode/OpenHands with Project → Launch and a matching progress indicator. A resumed wizard

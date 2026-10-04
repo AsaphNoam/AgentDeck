@@ -58,7 +58,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`simplify-agent-and-automation-setup.md`](simplify-agent-and-automation-setup.md) — reduce setup
   overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
 - [`rename-product-to-chuck.md`](rename-product-to-chuck.md) — rename AgentDeck to Chuck
-  across identity, install, state, agent-facing surfaces and UI, with a one-time state migration.
+  across identity, install, agent-facing surfaces and UI, with one supervised data-preserving
+  cutover and restarted sessions instead of a general migration mechanism.
 - [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
   give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,
   project-page pipeline start, agent management, and tracked-file views; remove phone task UI.
