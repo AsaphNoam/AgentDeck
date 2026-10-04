@@ -1,6 +1,6 @@
 # Rename the product to Chuck
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct request, 2026-10-02: rename AgentDeck to Chuck. Scope revised 2026-10-03–04:
 the sole operator accepts a supervised cutover and restarted sessions instead of general backward
 compatibility; preserve valuable data rather than silently starting empty.

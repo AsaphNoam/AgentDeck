@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `rename-product-to-chuck.md` (in progress; see **Active change**).
 - **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
   GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
   manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
@@ -16,9 +16,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   project-grouped work in motion, notifications that open the conversation, exact context tokens,
   and the phone desktop flow. The operator package and README already matched the range.
   Credentialed Claude/Codex gates remain owed.
-- **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
-  cutover, new sessions, no general legacy migration (FS-10.R25–R26).
-  `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
+- **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
   resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
   provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,
@@ -37,8 +35,20 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
--run TestTaskWireFixture`.
+`rename-product-to-chuck.md` — in progress (started 2026-10-04). Module path becomes
+`github.com/AsaphNoam/Chuck`; release repo `AsaphNoam/Chuck` (GitHub rename is operational).
+
+Slices:
+1. Go/scripts/release identity: module, `cmd/chuck`, `CHUCK_*`, `~/.chuck`, install tree, MCP
+   name/header, hook scripts, tmux prefix, FirstMate role, `operating-chuck`, authored strings,
+   annotation prefix with legacy recognition, CI old-name assertion. Keep historical
+   `testdata/superseded_*` bytes; drop the `agentdecker` digest entry (no new digest machinery).
+2. UI: branding, renamed storage keys with copy-forward (TS-08.R58), SharedWorker, phone surfaces.
+3. Docs: README and non-archived docs/specs prose (delegated pass, reviewed here), cutover runbook
+   (FS-10.R25), planned→shipped marks; closure matrix + `make dist`.
+
+Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+-run TestTaskWireFixture` (becomes `CHUCK_UPDATE_TASK_FIXTURE` after slice 1).
 
 ## Acceptance gates still owed
 
