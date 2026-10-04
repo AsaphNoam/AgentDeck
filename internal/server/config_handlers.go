@@ -546,11 +546,14 @@ type backendsResponse struct {
 	Credentials    map[string]credcheck.CredResult             `json:"credentials,omitempty"`
 	CodexRuntime   config.CodexRuntime                         `json:"codex_runtime"`
 	BackendSupport map[string]map[string]backend.LaunchSupport `json:"backend_support"`
+	// ProviderRuntimes is read-only next-start metadata (TS-03.R52); like
+	// BackendSupport it is never persisted or hashed into the ETag.
+	ProviderRuntimes map[string]map[string]providerRuntime `json:"provider_runtimes"`
 }
 
 // newBackendsResponse is the one builder for every GET (normal and fallback)
 // and successful PUT backends body, so the support projection cannot drift.
-func newBackendsResponse(b config.BackendsConfig, credentials map[string]credcheck.CredResult) backendsResponse {
+func (s *Server) newBackendsResponse(b config.BackendsConfig, credentials map[string]credcheck.CredResult) backendsResponse {
 	support := make(map[string]map[string]backend.LaunchSupport, len(backend.Types()))
 	for _, typ := range backend.Types() {
 		byInterface := make(map[string]backend.LaunchSupport, len(backend.Interfaces))
@@ -560,10 +563,11 @@ func newBackendsResponse(b config.BackendsConfig, credentials map[string]credche
 		support[typ] = byInterface
 	}
 	return backendsResponse{
-		BackendsConfig: b,
-		Credentials:    credentials,
-		CodexRuntime:   config.CurrentCodexRuntime(),
-		BackendSupport: support,
+		BackendsConfig:   b,
+		Credentials:      credentials,
+		CodexRuntime:     config.CurrentCodexRuntime(),
+		BackendSupport:   support,
+		ProviderRuntimes: s.providerRuntimes(b),
 	}
 }
 
@@ -646,7 +650,7 @@ func (s *Server) handlePutBackends(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("ETag", backendCatalogETag(body))
-	writeJSON(w, http.StatusOK, newBackendsResponse(body, credentials))
+	writeJSON(w, http.StatusOK, s.newBackendsResponse(body, credentials))
 }
 
 // ---- Config GET/PUT handlers + onboarding gate ----

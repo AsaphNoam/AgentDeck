@@ -56,6 +56,7 @@ func (s *Server) routeTable() []routeEntry {
 	api("GET /api/backends", s.handleBackends)
 	api("POST /api/backends", s.handleCreateBackend)
 	api("PUT /api/backends", s.handlePutBackends)
+	api("POST /api/backends/{id}/refresh-provider", s.handleRefreshProvider)
 	api("GET /api/config", s.handleGetConfig)
 	api("PUT /api/config", s.handlePutConfig)
 	api("GET /api/remote", s.handleGetRemote)

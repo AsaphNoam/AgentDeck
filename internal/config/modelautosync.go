@@ -63,23 +63,48 @@ func ImportConfiguredModels(bc *BackendsConfig, backendID string) int {
 	if !ok {
 		return 0
 	}
-	var catalog map[string]Model
-	matchProvider := false
-	switch backend.Type {
-	case "codex-acp":
-		catalog, _ = ReadCodexModelCatalog(CodexModelCatalogPath())
-	case "claude-acp":
-		// Claude keys by selector, so a selector already used as an existing
-		// entry's provider string is already represented (FS-09.R45).
-		catalog, _ = ReadClaudeConfiguredModels(ClaudeSettingsPath())
-		matchProvider = true
-	default:
+	if backend.Type != "codex-acp" && backend.Type != "claude-acp" {
 		return 0
 	}
+	catalog, matchProvider, _ := readProviderCatalog(backend.Type)
 	backend.AutoSyncModels = true
 	added := addModels(&backend, catalog, matchProvider)
 	bc.Backends[backendID] = backend
 	return added
+}
+
+// readProviderCatalog is the one local candidate reader per provider type:
+// Codex's personal model cache, or Claude's configured user-level selectors
+// (which key by selector, so matchProvider). It never queries a provider or
+// the network.
+func readProviderCatalog(backendType string) (catalog map[string]Model, matchProvider bool, err error) {
+	switch backendType {
+	case "codex-acp":
+		catalog, err = ReadCodexModelCatalog(CodexModelCatalogPath())
+		return catalog, false, err
+	case "claude-acp":
+		catalog, err = ReadClaudeConfiguredModels(ClaudeSettingsPath())
+		return catalog, true, err
+	}
+	return nil, false, nil
+}
+
+// RefreshBackendModels runs one opted-in backend's add-only import for an
+// explicit Refresh provider (FS-09.R72, TS-04.R73). It never enables autosync,
+// changes defaults or edits existing entries. enabled reports opt-in;
+// available reports whether the local candidate source could be read.
+func RefreshBackendModels(bc *BackendsConfig, backendID string) (enabled, available bool, added int) {
+	backend, ok := bc.Backends[backendID]
+	if !ok || !backend.AutoSyncModels {
+		return false, false, 0
+	}
+	catalog, matchProvider, err := readProviderCatalog(backend.Type)
+	if err != nil {
+		return true, false, 0
+	}
+	added = addModels(&backend, catalog, matchProvider)
+	bc.Backends[backendID] = backend
+	return true, true, added
 }
 
 // AutoSyncBackends imports configured provider models into opted-in backends on

@@ -710,7 +710,7 @@ unchanged. The phone entry keeps TS-13's Web Push click route. Verify with compo
 click a rendered toast and its close control, and an `sse.test.ts` case that dispatches `click` on
 a stubbed `Notification` and asserts focus, route, and `close()`.
 
-**R52 `(planned)` — Provider runtime metadata is scoped and read-only.** GET/PUT backend responses
+**R52 — Provider runtime metadata is scoped and read-only.** GET/PUT backend responses
 add `provider_runtimes`, keyed first by configured backend id and then model id, for Claude/Codex
 only. Each entry is `{source:"detected"|"ambient"|"backend"|"model"|"bundled",
 state:"available"|"missing"|"not_executable"|"invalid"|"bundle_unavailable", path?, version?, checked_at?}`. An available
@@ -726,7 +726,7 @@ draft-execution endpoint. `backend_support` retains its independent meaning.
 GET performs no version/status command or catalog import for this metadata. The phone projection
 and allowlist remain unchanged; no executable paths or this field cross that boundary.
 
-**R53 `(planned)` — Explicit provider refresh is one bounded desktop operation.** Add
+**R53 — Explicit provider refresh is one bounded desktop operation.** Add
 `POST /api/backends/{id}/refresh-provider` to R5's Config family, guarded by the existing local-only
 chain and excluded from the tailnet allowlist. It accepts only optional `{model_id}` (defaulting
 to that backend's default model), with a 4 KiB body limit and the existing catalog `If-Match`

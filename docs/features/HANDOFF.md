@@ -54,9 +54,11 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
 4. **Done 2026-10-04:** typed `provider_incompatible` (Claude too-old, source-aware guidance via
    `LaunchSpec.ProviderSource`), resume `session/load` no longer falls back to `session/new` on it,
    phone routes redact provider error paths (`remoteProviderErrorFilter`). TS-04.R76 shipped.
-5. **Next:** `provider_runtimes` metadata on GET/PUT, bounded `--version` probe, `POST
-   /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
-6. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
+5. **Done 2026-10-04:** `provider_runtimes` on GET/PUT (stat-only; observation reused ≤60s per
+   executable identity), `ProbeVersion` (2 s/8 KiB/2 slots), `POST
+   /api/backends/{id}/refresh-provider` (If-Match, 4 KiB, 2 active → 429, lock-revalidated add-only
+   import, no observation on 409). TS-03.R52–R53, TS-04.R72–R73 shipped; route remote-denied.
+6. **Next:** UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
 7. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
    owed credentialed gate (TS-06.R31, needs authorization).
 
@@ -170,6 +172,9 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: provider refresh API.** Slice 5 adds read-only `provider_runtimes`, a bounded
+  `--version` probe and the desktop-only Refresh provider endpoint with its add-only import and
+  concurrency/staleness guards. Server/config/backend suites pass.
 - **2026-10-04 — Work: source-aware provider recovery.** Slice 4: a recognized too-old Claude is a
   typed `provider_incompatible` naming the selected source's repair; resume refuses to replace the
   conversation on it; phone errors drop executable paths. Server/runtime suites pass.

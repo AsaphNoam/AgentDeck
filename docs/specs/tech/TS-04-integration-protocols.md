@@ -904,7 +904,7 @@ guarantees do not change. Do not redefine personal-home ownership from backend `
 this change: login/readiness must use the same process-owned personal source as refresh, overriding
 scoped home values consistently with launch, rather than authenticating a profile launch will not use.
 
-**R72 `(planned)` — Version observation is bounded and never a version-equality gate.**
+**R72 — Version observation is bounded and never a version-equality gate.**
 On explicit Refresh provider, existing save/readiness actions or an actual process-start operation,
 the selected executable may be asked for `--version` without a shell or model turn. Bound a version
 probe to two seconds and 8 KiB combined captured output; share a two-probe concurrency limit and
@@ -922,7 +922,7 @@ No persistent version registry, history migration or background updater/poller i
 last checked, not the guaranteed version of a later spawn. Login/version/readiness errors use the
 existing bounded failure vocabulary and no automatic prompt retry.
 
-**R73 `(planned)` — Catalog freshness is independent of packaged executable versions.**
+**R73 — Catalog freshness is independent of packaged executable versions.**
 Remove `AGENTDECK_CODEX_VERSION` as runtime/catalog authority and the equality rejection in
 `ReadCodexModelCatalog`; preserve schema validation, visible entries and add-only merge. Continue
 reading the existing personal Codex home and Claude settings source; neither the private session
@@ -1131,7 +1131,10 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   `session/load` escape, and phone redaction `remoteProviderErrorFilter`; pinned by
   `TestModelRejectionReportsAnOutdatedSelectedClaude`,
   `TestResumeProviderIncompatibilityDoesNotReplaceTheSession` and
-  `TestRemoteProviderErrorsRedactPaths`.
+  `TestRemoteProviderErrorsRedactPaths`. Observation/refresh (R72/R73): `ProbeVersion` in
+  `internal/backend/providerexec/probe.go`, `config.RefreshBackendModels`, and
+  `internal/server/provider_refresh.go`; pinned by `TestProbeVersionIsBounded` and the
+  `TestRefreshProvider*` tests.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,
   `TestTerminalDriverUnavailableRejected`.

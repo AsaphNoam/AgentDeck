@@ -74,6 +74,8 @@ var remoteDenied = map[string]bool{
 	"POST /api/projects": true, "PUT /api/projects/{project}": true, "DELETE /api/projects/{project}": true,
 	// The backend catalog carries backend and model env, which may hold keys.
 	"GET /api/backends": true, "POST /api/backends": true, "PUT /api/backends": true,
+	// Provider refresh executes a desktop CLI and reports paths (TS-03.R53).
+	"POST /api/backends/{id}/refresh-provider": true,
 	"PUT /api/config": true, "GET /api/remote": true, "PUT /api/remote": true,
 	"POST /api/remote/pairings": true, "POST /api/remote/pairings/{id}/allow": true,
 	"POST /api/remote/pairings/{id}/decline": true, "GET /api/remote/devices": true,

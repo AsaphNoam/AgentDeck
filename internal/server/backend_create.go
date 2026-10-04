@@ -199,4 +199,7 @@ func (s *Server) invalidateOnboardingCache() {
 	s.onboardingCacheMu.Lock()
 	s.onboardingCache = nil
 	s.onboardingCacheMu.Unlock()
+	// Every catalog write lands here, and a changed catalog invalidates
+	// runtime observations too (TS-03.R54, TS-04.R72).
+	s.discardProviderObservations()
 }

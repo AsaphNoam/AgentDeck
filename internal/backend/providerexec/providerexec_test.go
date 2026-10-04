@@ -1,10 +1,12 @@
 package providerexec
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func writeExe(t *testing.T, path string) string {
@@ -144,5 +146,38 @@ func TestResolveHomeFallbackAndNonExecutable(t *testing.T) {
 	sel, _ = Resolve(Input{BackendType: "codex-acp", BackendEnv: map[string]string{"CODEX_PATH": plain}})
 	if sel.State != StateNotExecutable {
 		t.Fatalf("non-executable override = %+v", sel)
+	}
+}
+
+// TS-04.R72: the probe parses a version, and timeout, failure, garbage or
+// huge output all stay unknown.
+func TestProbeVersionIsBounded(t *testing.T) {
+	write := func(body string) string {
+		p := filepath.Join(t.TempDir(), "p")
+		if err := os.WriteFile(p, []byte("#!/bin/sh\n"+body), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	ctx := context.Background()
+	if v := ProbeVersion(ctx, write(`echo "2.1.286 (Claude Code)"`), nil); v != "2.1.286" {
+		t.Errorf("claude version = %q", v)
+	}
+	if v := ProbeVersion(ctx, write(`echo "codex-cli 0.159.2"`), nil); v != "0.159.2" {
+		t.Errorf("codex version = %q", v)
+	}
+	for name, body := range map[string]string{
+		"garbage": `echo "no version here"`,
+		"failure": `echo "1.2.3"; exit 2`,
+		"huge":    `yes x | head -c 100000; echo 9.9.9`,
+		"timeout": `sleep 5; echo 1.2.3`,
+	} {
+		start := time.Now()
+		if v := ProbeVersion(ctx, write(body), nil); v != "" {
+			t.Errorf("%s: version = %q, want unknown", name, v)
+		}
+		if time.Since(start) > 4*time.Second {
+			t.Errorf("%s: probe was not bounded", name)
+		}
 	}
 }
