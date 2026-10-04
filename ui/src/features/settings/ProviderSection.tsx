@@ -45,7 +45,7 @@ export function ProviderSection({
   const modelOverride = Object.values(backend.models ?? {}).some((m) => (m.env?.[key] ?? "") !== "");
   const described = runtime && describeProviderRuntime(backend.type, runtime);
   return (
-    <fieldset className="backend-provider-section" data-slot="provider">
+    <fieldset className="backend-provider-section">
       <legend>Provider</legend>
       <div className="backend-provider-modes" role="radiogroup" aria-label={`${name} provider`}>
         <label className="backend-autosync-label">
