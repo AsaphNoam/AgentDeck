@@ -676,13 +676,13 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **A34 — retired 2026-10-03:** Unshipped automatic launch retry replaced by A41.
 - **A35 — retired 2026-10-03:** Unshipped bundle-selection error cases replaced by A38/A41.
 - **A36 — retired 2026-10-03:** Unshipped update-triggered reversion removed; A39 proves preservation.
-- **A37** `(planned)` (R68, R70, R75) — In Installed mode, with old private provider dependencies and newer fake user
+- **A37** (R68, R70, R75) — In Installed mode, with old private provider dependencies and newer fake user
   CLIs, every process-start path selects the user CLI while the packaged adapter/Node stay managed.
   Replace a launcher/symlink while the dashboard stays open: the next start uses the replacement,
   the already-running process receives no signal, and resumed native identity/profile is unchanged.
   *Verify by* executable-marker integration tests across launch/resume/switch/rollback, clone,
   task/pipeline activation and wake, plus Claude terminal drivers and built-wrapper tests.
-- **A38** `(planned)` (R72, R74, R76–R77) — Installed-mode model/backend/ambient overrides and discovery obey their
+- **A38** (R72, R74, R76–R77) — Installed-mode model/backend/ambient overrides and discovery obey their
   precedence, including an invalid winning override. No provider invocation occurs during a catalog
   GET; timeout, large output, malformed version and unknown status remain bounded/unknown, while a
   known missing executable fails start before registration or stopping a switch's current runtime.
@@ -699,13 +699,13 @@ Configuration-source federation for Claude/Codex is FS-08.
   same provider as chat/terminal, with the appropriate personal auth profile rather than Codex's
   private session store. Missing/status-unsupported cases do not masquerade as bad credentials.
   *Verify by* CLI/prober child-argv/env fixtures and an authorized real sign-in/readiness check.
-- **A43** `(planned)` (R72, R74) — Real GET/PUT/refresh response JSON and browser schemas agree;
+- **A43** (R72, R74) — Real GET/PUT/refresh response JSON and browser schemas agree;
   metadata never persists or changes the editable catalog ETag, stale versions are not called
   current, a refresh rejected for a concurrent config change publishes no observation even to a
   concurrent GET, and no paths/env/probe operation become available through the phone route allowlist.
   *Verify by* serialization, metadata-free save, stale-probe and remote projection/allowlist tests.
 - **A44 — retired 2026-10-03:** Broad cross-version matrix replaced by bounded A46/TS-06.R31.
-- **A45** `(planned)` (R70, R75–R76) — An omitted mode uses Installed. Saving Bundle selects the
+- **A45** (R70, R75–R76) — An omitted mode uses Installed. Saving Bundle selects the
   current release's single provider in the child environment despite all executable override layers;
   stored overrides are unchanged and returning to Installed
   restores those overrides. Both sources use the same launch/auth/terminal resolver. Config/ETag,
@@ -732,8 +732,9 @@ Configuration-source federation for Claude/Codex is FS-08.
   terminal, readiness and sign-in; Settings owns the choice, executable path and Refresh provider;
   New Agent reports the saved next-start provider. Onboarding rechecks readiness through its
   existing Validate & Continue save rather than a separate Refresh provider button (review note).
-  R78's Steer/feature audit and A37–A38/A40/A42–A43/A45–A47's acceptance closure, including the
-  capped credentialed runs, remain planned. No cross-version compatibility receipt is implied by
+  The TS-04.R77 audit found no actionable provider dependency; R78 stays planned until the capped
+  TS-06.R31 smoke exercises Steer on an installed Claude Code. A37/A38/A43/A45 are met by automated
+  tests; A40/A42/A46/A47 still owe their rendered journeys or authorized credentialed runs. No cross-version compatibility receipt is implied by
   the historical audit.
 
 - **Bounded launch-support projection shipped 2026-09-29.** R60–R63 and A30–A32 cover the

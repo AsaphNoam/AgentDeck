@@ -971,7 +971,7 @@ failures retain bounded diagnostics, never a guessed minimum/maximum version. Do
 native history, downgrade a session format, switch sources or replay prompts. Remote errors redact
 paths and offer desktop Settings guidance, not new remote config authority.
 
-**R77 `(planned)` — Provider-dependent feature checks stay at the existing integration boundary.**
+**R77 — Provider-dependent feature checks stay at the existing integration boundary.**
 For the exposed structured surfaces (model/effort/fast settings, steering, clone, native children,
 background work and file reports), perform one implementation-time source audit of the current
 adapter's underlying provider assumptions. Record only actionable dependencies in existing
@@ -1135,6 +1135,14 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   `internal/backend/providerexec/probe.go`, `config.RefreshBackendModels`, and
   `internal/server/provider_refresh.go`; pinned by `TestProbeVersionIsBounded` and the
   `TestRefreshProvider*` tests.
+- Provider-feature audit (R77, 2026-10-04, claude-agent-acp 0.75.1 / codex-acp 1.12.0): model,
+  effort and fast use each session's live option list plus the typed too-old rejection; fork is
+  Codex `thread/fork` or the Claude SDK's own transcript copy, both failing with an error; Codex
+  steer is `turn/steer` and background stop is an adapter request, both surfacing refusal; file
+  reports are fail-open `unavailable`; native subagents only appear when the CLI emits them. Both
+  adapters advertise steering, fork and subagents statically. No verified provider minimum exists
+  for Claude steering (a stream-injected user message), so no version guard is added; its behavior
+  on a non-bundled CLI is covered by the TS-06.R31 smoke. No actionable dependency was found.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,
   `TestTerminalDriverUnavailableRejected`.

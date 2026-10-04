@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `use-installed-provider-clis.md` (in progress; see Active change).
+- **Active change:** none.
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -22,7 +22,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
   cutover, new sessions, no general legacy migration (FS-10.R25–R26).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+- **Review units:** `use-installed-provider-clis` (2026-10-04, `4d1e9cc`..HEAD: shared provider
+  resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
+  provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,
+  FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) is available. Review note:
+  onboarding rechecks readiness via Validate & Continue, not a separate Refresh provider button.
+  The test-only `post-release-flaky-test-synchronization` fixes are available.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
@@ -35,42 +40,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-`docs/ready-changes/use-installed-provider-clis.md` — Installed provider by default, explicit
-AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
-
-1. **Done 2026-10-04:** Codex cache `client_version` is provenance only (FS-09.R71 shipped,
-   R59/A29 retired); deprecated `codex_runtime` is always `{catalog_status:"unverified"}`.
-2. **Done 2026-10-04:** `provider_mode` field/validation; resolver `internal/backend/providerexec`
-   (`ForBackend`, `SystemDirs` test seam) applied as the final child-env layer in `composeChildEnv`
-   for launch/resume/switch (pre-stop check in `validateSwitchTarget`), `LaunchSpec.ProviderExecutable`
-   for Claude terminal, credcheck readiness, and `agentdeck auth --backend/--model` (TS-04.R71
-   shipped). Typed `provider_executable_missing|invalid`/`bundled_provider_unavailable` (422).
-   `internal/server/main_test.go` sets inert ambient executables so the suite is hermetic.
-3. **Done 2026-10-04:** wrapper only exports `AGENTDECK_RUNTIME_ROOT`; adapters launch as private
-   node + entrypoint (`backend.LaunchCommand`); layout requires bundled natives
-   (`providerexec.BundledRelPath`), manifest gains `claude`; `assemble.sh` probes both natives
-   (not run locally: needs the Node tarball — release CI exercises it). `agentdeck auth` exits 3
-   when no provider is usable; `scripts/release/install.sh` then skips sign-in.
-4. **Done 2026-10-04:** typed `provider_incompatible` (Claude too-old, source-aware guidance via
-   `LaunchSpec.ProviderSource`), resume `session/load` no longer falls back to `session/new` on it,
-   phone routes redact provider error paths (`remoteProviderErrorFilter`). TS-04.R76 shipped.
-5. **Done 2026-10-04:** `provider_runtimes` on GET/PUT (stat-only; observation reused ≤60s per
-   executable identity), `ProbeVersion` (2 s/8 KiB/2 slots), `POST
-   /api/backends/{id}/refresh-provider` (If-Match, 4 KiB, 2 active → 429, lock-revalidated add-only
-   import, no observation on 409). TS-03.R52–R53, TS-04.R72–R73 shipped; route remote-denied.
-6. **Done 2026-10-04:** Settings `ProviderSection` (mode radios, executable path editing only the
-   override key, inactive-override note, next-start line, Refresh provider disabled while the
-   draft is dirty), New Agent provider line, source-aware onboarding guidance and
-   `--backend` command. FS-09.R68/R70/R72/R74–R77, FS-10.R21/R23, TS-03.R54, TS-04.R75 shipped.
-   **Review note:** onboarding keeps Validate & Continue as its readiness recheck instead of a
-   separate Refresh provider button.
-7. **Docs done 2026-10-04:** README install/update/rollback/CLI, installer header and
-   `operate-agents.md` describe Installed default, explicit bundle and pre-policy rollback
-   (FS-10.R24, TS-06.R30 shipped). **Next:** the TS-04.R77 adapter-feature audit (a background
-   audit was started; if lost, rerun it), FS-09.R78, then the closure matrix, A-item audit and
-   the owed TS-06.R31 credentialed gate (needs authorization).
-
-Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
@@ -93,6 +63,13 @@ Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./inte
   for the new dashboard, project, agent-management, Files/Commands, and retired task flow also remains
   owed.
 - TS-06.R21: credentialed Claude and Codex login/chat checks.
+- TS-06.R31 / FS-09.A40/A42/A46/A47/R78, FS-10.A10–A12 (installed providers): at most four real
+  combinations — Claude and Codex, each with the current bundle and one current installed CLI —
+  running the finite smoke (fresh chat, native resume, model/effort, one approval/denial and
+  cancel, Steer, a role/skill and an MCP action), plus two rendered fake-provider journeys
+  (Installed update → Refresh → choose new model; missing Installed → Bundle save → retry →
+  back to Installed with overrides). Needs authorization and credentials; `assemble.sh`'s native
+  probes run first in release CI. The Claude 5.5 finding below closes only with that receipt.
 - TS-06.R26: the credentialed Codex 1.12.0 receipt gating FS-03.A41/A42 and FS-01.A20.
 - FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove
   with Codex capabilities.
@@ -180,6 +157,11 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: finished installed-provider default with explicit bundle.** TS-04.R77
+  audit found no actionable provider dependency (recorded in TS-04 traceability); A37/A38/A43/A45
+  verified by tests. Rendered Settings check against the built binary with a fake installed Claude
+  (refresh, Bundle toggle) passed. Closure: `make test`, full UI suite (589), `make dist`, focused
+  `-race` on resolver/refresh. Ready file removed; credentialed/rendered gates owed.
 - **2026-10-04 — Work: provider choice in Settings and New Agent.** Slice 6 adds the Installed /
   AgentDeck bundle choice, executable path, next-start provider and Refresh provider to Settings,
   reports the provider in New Agent, and makes onboarding guidance source-aware. Full UI suite
