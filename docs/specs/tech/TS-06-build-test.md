@@ -194,7 +194,7 @@ and never contact a real tailnet or push service; FS-20's manual gates own those
 **R28 — retired 2026-10-03:** Dependency-only bundle policy replaced by explicit choice in R30.
 **R29 — retired 2026-10-03:** Broad compatibility gate replaced by finite verification in R31.
 
-**R30 `(planned)` — One current managed bundle per provider, one shared integration stack.**
+**R30 — One current managed bundle per provider, one shared integration stack.**
 Preserve the immutable Node/ACP/SDK closure, verified manifest and Codex steering patch. Expose the
 release's existing Claude native dependency and directly pinned Codex as the single supported
 Bundle choice for each provider; identify deterministic entrypoints/versions in the verified layout.

@@ -20,8 +20,18 @@ start, a change lives in [ready changes](docs/ready-changes/README.md).
 ## Install a macOS release
 
 AgentDeck releases currently support **Apple-silicon Macs only**. They include the AgentDeck binary,
-private Node runtime, and pinned Claude/Codex ACP adapters—no repository checkout, Go, Node, npm,
-Homebrew, administrator access, or global adapter installation is needed.
+private Node runtime, pinned Claude/Codex ACP adapters, and one bundled copy each of Claude Code and
+Codex—no repository checkout, Go, Node, npm, Homebrew, administrator access, or global adapter
+installation is needed.
+
+By default every Claude or Codex backend runs **your installed** Claude Code or Codex, so updating it
+(`claude update`, `npm i -g @openai/codex`, Homebrew…) makes newer models usable at the next agent
+start without an AgentDeck release. Install them from the official
+[Claude Code](https://code.claude.com/docs/en/setup) or [Codex](https://developers.openai.com/codex/cli)
+instructions. In **Settings → Backends** a backend can instead choose the **AgentDeck bundle**, which
+changes only when AgentDeck updates. AgentDeck never installs, updates, or switches providers on its
+own; neither choice promises new models, account access, or that a native session can move back to an
+older provider version.
 
 ```sh
 curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/install.sh | bash
@@ -30,7 +40,8 @@ curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/insta
 Pass `--version X.Y.Z` to select a release, `--no-start` to install without launching the dashboard,
 or `--non-interactive` for scripts. The installer verifies the release archive against its published
 SHA-256 manifest before activation. It may offer to add its one command directory to your zsh profile
-and to sign in to Claude; it never collects credentials itself. After installation, use:
+and to sign in to Claude (skipped with guidance when no Claude Code is installed); it never collects
+credentials itself. After installation, use:
 
 ```sh
 agentdeck auth claude       # or: agentdeck auth codex
@@ -41,6 +52,11 @@ agentdeck update            # asks before downloading
 agentdeck update --yes      # non-interactive update
 agentdeck update --rollback
 ```
+
+`agentdeck update` changes AgentDeck and its bundled copies only; it never touches your installed
+providers, and each backend keeps its provider choice. `--rollback` restores the previous AgentDeck
+release, not a provider version or native session format. A release from before this provider choice
+(0.8.x and earlier) always ran its bundled providers, so rolling back to one restores that behavior.
 
 Release artifacts are intentionally **not code-signed or notarized**. macOS may ask you to approve
 an unidentified developer on first open. Do not bypass Gatekeeper or enter an administrator password
@@ -55,7 +71,8 @@ signing they do not independently authenticate a compromised release account or 
 - macOS or Linux. The default terminal runtime is an embedded xterm.js/PTY bridge;
   tmux is optional and the optional iTerm2 driver is macOS-only.
 - At least one authenticated agent backend. `install.sh` installs the pinned official Claude ACP
-  adapter only when requested (`INSTALL_ACP=1`); chat launch needs the selected adapter on `PATH`.
+  adapter only when requested (`INSTALL_ACP=1`); chat launch needs the selected adapter on `PATH`
+  and an installed Claude Code or Codex. Source builds have no AgentDeck bundle.
 - `curl` and `jq` for shell-hook integrations used by terminal agents.
 
 ## Quickstart
@@ -100,7 +117,7 @@ cd ui && npm ci && npm run dev   # http://localhost:5173
 | `agentdeck dashboard start [--port N] [--detach]` | start the server (foreground or backgrounded) |
 | `agentdeck dashboard stop` | stop the server via pidfile |
 | `agentdeck dashboard open` | open the UI in the default browser |
-| `agentdeck auth <claude\|codex>` | run the selected private adapter's provider sign-in flow |
+| `agentdeck auth <claude\|codex> [--backend ID] [--model ID]` | sign in with the provider that backend/model launches (default backend otherwise) |
 | `agentdeck update [--check\|--yes\|--rollback]` | explicitly check, install, or roll back a release |
 | `agentdeck <role>@<project> [--backend B] [--model M] [--name N]` | launch an agent (resumes a single inactive match by default; `--new` forces a fresh one) |
 | `agentdeck resume <agent_id>` | resume a specific inactive persisted session |

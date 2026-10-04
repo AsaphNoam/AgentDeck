@@ -108,7 +108,7 @@ person's provider credentials or AgentDeck configuration.
   not installation failure. This supersedes R5/A3's implicit bundled sign-in and qualifies R1/R3:
   a separately installed provider is not necessary if the user explicitly selects Bundle. No provider
   installer or independent bundle updater runs automatically.
-- **R24** `(planned)` — Installed providers update through their own installer/package manager;
+- **R24** — Installed providers update through their own installer/package manager;
   bundled providers update only with AgentDeck releases. An application update changes its managed
   stack but preserves each backend's mode and saved overrides; it never updates the user's CLI or
   automatically reverts Installed to Bundle. A running dashboard keeps its own release's bundle;

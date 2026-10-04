@@ -3,7 +3,9 @@
 # install.sh — install AgentDeck from GitHub Releases on an Apple-silicon Mac.
 #
 # This bootstrap downloads a pre-built, self-contained release (the AgentDeck
-# binary, a private Node runtime, and the official Claude/Codex ACP adapters),
+# binary, a private Node runtime, the official Claude/Codex ACP adapters, and
+# one bundled Claude Code/Codex a backend may explicitly choose; by default
+# backends use the user's own installed providers, FS-10.R23),
 # verifies its SHA-256, and hands off to the bundled binary's own verified,
 # atomic install transaction (`agentdeck release install`). It never compiles Go,
 # runs npm, builds the UI, or installs anything globally (FS-10.R1–R3, TS-06.R17).

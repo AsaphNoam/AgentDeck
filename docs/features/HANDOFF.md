@@ -64,8 +64,11 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
    `--backend` command. FS-09.R68/R70/R72/R74–R77, FS-10.R21/R23, TS-03.R54, TS-04.R75 shipped.
    **Review note:** onboarding keeps Validate & Continue as its readiness recheck instead of a
    separate Refresh provider button.
-7. **Next:** Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
-   owed credentialed gate (TS-06.R31, needs authorization).
+7. **Docs done 2026-10-04:** README install/update/rollback/CLI, installer header and
+   `operate-agents.md` describe Installed default, explicit bundle and pre-policy rollback
+   (FS-10.R24, TS-06.R30 shipped). **Next:** the TS-04.R77 adapter-feature audit (a background
+   audit was started; if lost, rerun it), FS-09.R78, then the closure matrix, A-item audit and
+   the owed TS-06.R31 credentialed gate (needs authorization).
 
 Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`.
