@@ -1,9 +1,12 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
@@ -160,4 +163,51 @@ func TestMissingProviderFailsBeforeSideEffects(t *testing.T) {
 	if after.LastSessionID != before.LastSessionID {
 		t.Fatalf("native identity changed: %q -> %q", before.LastSessionID, after.LastSessionID)
 	}
+}
+
+// FS-09.R74/A43, TS-04.R76: a phone launch that hits a missing provider gets
+// the typed code and desktop Settings guidance, but no executable path.
+func TestRemoteProviderErrorsRedactPaths(t *testing.T) {
+	s := testServer(t, true)
+	if err := s.configStore.WriteProject("my-app", config.Project{Title: "App", Cwd: t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.configStore.WriteRole("impl", config.Role{Title: "Impl"}); err != nil {
+		t.Fatal(err)
+	}
+	backends, _ := s.configStore.ReadBackends()
+	id := s.defaultBackendIDFor(t, backends)
+	setBackendProvider(t, s, id, "", map[string]string{"CLAUDE_CODE_EXECUTABLE": "/Users/secret/bin/claude"})
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions", `{"role":"impl","project":"my-app"}`, token))
+	if rec.Code != 422 || errorCode(t, rec) != rt.CodeProviderExecutableMissing {
+		t.Fatalf("phone launch = %d %s", rec.Code, rec.Body)
+	}
+	if body := rec.Body.String(); strings.Contains(body, "/Users/secret") || !strings.Contains(body, "Settings on the Mac") {
+		t.Fatalf("phone error leaked a path or lacks guidance: %s", body)
+	}
+	// The desktop route keeps the path for repair.
+	ts := httptest.NewServer(s.routes())
+	t.Cleanup(ts.Close)
+	_, body := post(t, ts.URL+"/api/sessions", map[string]string{"role": "impl", "project": "my-app"})
+	if !strings.Contains(string(body), "/Users/secret/bin/claude") {
+		t.Fatalf("desktop error lost the path: %s", body)
+	}
+}
+
+func (s *Server) defaultBackendIDFor(t *testing.T, b config.BackendsConfig) string {
+	t.Helper()
+	for id, be := range b.Backends {
+		if be.Default {
+			if be.Type != "claude-acp" {
+				t.Skipf("default backend is %s", be.Type)
+			}
+			return id
+		}
+	}
+	t.Fatal("no default backend")
+	return ""
 }

@@ -51,9 +51,9 @@ text frame with `cols`/`rows` requests resize. Viewer disconnect never stops the
 initialize, unavailable credentials, and unsupported interface/backend combinations return bounded,
 backend-specific errors. AgentDeck does not claim a capability solely because a binary exists.
 A session setting the provider refuses reports only the JSON-RPC message, except that a recognized
-Claude `claude_code_version_too_old` rejection names the bundled Claude Code version, the required
-version, and that updating AgentDeck (not the person's own `claude` CLI) is the recovery; no other
-provider error data is returned.
+Claude `claude_code_version_too_old` rejection names the selected Claude Code version, the required
+version, and R76's source-specific repair (update that Claude Code, or for an explicit bundle choose
+Installed/update AgentDeck); no other provider error data is returned.
 
 **R10 — retired 2026-08-14:** Startup bounds and diagnostics shipped as R22; optional-integration
 flag fallback/probing remains planned as R23.
@@ -959,7 +959,7 @@ Canonicalization is only for validation/exclusion and observation freshness. All
 this resolver, not separate installed/bundled lifecycle implementations. This supersedes provider
 default ownership in R13/R15/R61, not ACP/SDK delivery or patches. OpenCode/OpenHands are unchanged.
 
-**R76 `(planned)` — Recovery distinguishes selected source without replay or migration.**
+**R76 — Recovery distinguishes selected source without replay or migration.**
 Use the shared API envelope for `provider_executable_missing`, `provider_executable_invalid`,
 `bundled_provider_unavailable` and `provider_incompatible`. Every provider error identifies its
 effective source (including `bundled` for bundle errors). Include only safe provider/source,
@@ -1126,7 +1126,12 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   and typed errors in `internal/server/provider_runtime.go`, readiness in `internal/backend/credcheck`
   and sign-in target selection in `internal/cli/auth.go`; pinned by
   `TestProviderSelectionReachesEveryLifecycleComposer`, `TestMissingProviderFailsBeforeSideEffects`,
-  `TestClaudeProberUsesTheSelectedExecutable` and `TestSelectAuthTarget`.
+  `TestClaudeProberUsesTheSelectedExecutable` and `TestSelectAuthTarget`. Recovery (R76):
+  `ProviderTooOldError`/`withProviderGuidance` in `internal/runtime/chat.go`, the resume
+  `session/load` escape, and phone redaction `remoteProviderErrorFilter`; pinned by
+  `TestModelRejectionReportsAnOutdatedSelectedClaude`,
+  `TestResumeProviderIncompatibilityDoesNotReplaceTheSession` and
+  `TestRemoteProviderErrorsRedactPaths`.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,
   `TestTerminalDriverUnavailableRejected`.

@@ -252,7 +252,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	}
 	// Select the provider executable before any side effect, so a missing or
 	// invalid provider fails cleanly with nothing to unwind (TS-04.R71).
-	providerEnv, providerExe, ae := providerLaunchLayer(backend, model)
+	providerEnv, provider, ae := providerLaunchLayer(backend, model)
 	if ae != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, ae
 	}
@@ -371,7 +371,8 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		Fast:               req.Fast,
 		Driver:             driver,
 		Env:                composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir), providerEnv),
-		ProviderExecutable: providerExe,
+		ProviderExecutable: provider.Path,
+		ProviderSource:     provider.Source,
 		SkipPerms:          resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
 		HookToken:          token,
 		MCPServers:         []runtime.MCPServerSpec{mcpSpec},
@@ -770,6 +771,8 @@ func launchStartError(err error) *runtime.APIError {
 		return apiError(runtime.CodeNotImplemented, err.Error())
 	case errors.Is(err, runtime.ErrAlreadyStarted):
 		return apiError(runtime.CodeConflict, err.Error())
+	case errors.Is(err, runtime.ErrProviderIncompatible):
+		return providerIncompatibleError(err)
 	case errors.Is(err, runtime.ErrForkUnavailable):
 		return cloneUnavailable(state.CloneReasonNoFork)
 	default:

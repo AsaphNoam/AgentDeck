@@ -181,6 +181,12 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_LOAD_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, decodeSessionRequest(msg.Params, loadSessionMembers), 0o600)
 		}
+		// FAKEACP_LOAD_REJECT_DATA fails session/load the way the Claude adapter
+		// reports a provider error: a bare `Internal error` with provider data.
+		if data := os.Getenv("FAKEACP_LOAD_REJECT_DATA"); data != "" {
+			writeMessage(rpcMessage{JSONRPC: "2.0", ID: msg.ID, Error: &rpcError{Code: -32603, Message: "Internal error", Data: json.RawMessage(data)}})
+			return
+		}
 		initConfigOptions()
 		// A real adapter may restore native context by replaying the prior
 		// conversation as session/update frames before it answers session/load.

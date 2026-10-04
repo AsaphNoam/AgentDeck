@@ -1230,6 +1230,13 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 			}
 		case errors.Is(loadErr, context.DeadlineExceeded), errors.Is(loadErr, errTransportClosed):
 			return nil, c.startupFailure(as, spec.BackendType, "session/load", loadErr)
+		case claudeVersionTooOld(loadErr) != nil:
+			// A recognized provider incompatibility is not a missing rollout:
+			// replacing the session would hide it and abandon the conversation.
+			// Fail and keep the native identity for an explicit retry after the
+			// provider is repaired (FS-09.R70, TS-04.R76).
+			as.shutdown()
+			return nil, fmt.Errorf("runtime: Claude session/load: %w", withProviderGuidance(claudeVersionTooOld(loadErr), spec))
 		default:
 			// A non-fatal load error (e.g. the adapter cannot find the prior
 			// rollout) degrades to a fresh session, but never silently: the
@@ -2387,21 +2394,58 @@ func deliveredModelID(spec LaunchSpec) string {
 // executable it embeds is too old for the requested model.
 var claudeVersionTooOldPattern = regexp.MustCompile(`Claude Code ([0-9][0-9A-Za-z.+-]{0,31}) does not support this model; version ([0-9][0-9A-Za-z.+-]{0,31}) or newer is required`)
 
-// claudeVersionTooOldHint turns a recognized `claude_code_version_too_old`
-// rejection into a bounded recovery message naming both versions. The adapter
-// reports only `Internal error` as the message, so without this the person never
-// learns that AgentDeck's own Claude runtime, not their installed CLI, is too old
-// (TS-04.R9, INV §8). Anything else in the provider data stays unreported.
-func claudeVersionTooOldHint(err error) string {
+// ProviderTooOldError is a recognized provider-version incompatibility: the
+// selected Claude Code reported that it is older than a model requires. It
+// wraps ErrProviderIncompatible so callers can map it to a typed error and stop
+// a resume from replacing the conversation (TS-04.R76). Only the two parsed
+// versions are reported; withProviderGuidance adds the source-aware repair
+// where the selection is known (INV §8).
+type ProviderTooOldError struct {
+	Have, Need string
+}
+
+func (e *ProviderTooOldError) Error() string {
+	return fmt.Sprintf("the selected Claude Code is %s, and this model needs Claude Code %s or newer", e.Have, e.Need)
+}
+
+func (e *ProviderTooOldError) Unwrap() error { return ErrProviderIncompatible }
+
+// claudeVersionTooOld recognizes a `claude_code_version_too_old` rejection.
+// The adapter reports only `Internal error` as the message, so without this the
+// person never learns which version is too old (TS-04.R9, INV §8). Anything
+// else in the provider data stays unreported.
+func claudeVersionTooOld(err error) *ProviderTooOldError {
 	var rpcErr *rpcError
 	if !errors.As(err, &rpcErr) || !strings.Contains(string(rpcErr.Data), "claude_code_version_too_old") {
-		return ""
+		return nil
 	}
 	m := claudeVersionTooOldPattern.FindStringSubmatch(string(rpcErr.Data))
 	if m == nil {
-		return ""
+		return nil
 	}
-	return fmt.Sprintf("AgentDeck's bundled Claude chat runtime is Claude Code %s, and this model needs Claude Code %s or newer; updating your own claude CLI does not change it, so update AgentDeck", m[1], m[2])
+	return &ProviderTooOldError{Have: m[1], Need: m[2]}
+}
+
+// providerUpdateGuidance is the repair for an incompatible selected provider,
+// by source (FS-09.R77). It never switches source or retries on its own.
+func providerUpdateGuidance(spec LaunchSpec) string {
+	if spec.ProviderSource == "bundled" {
+		return "this backend uses the AgentDeck bundle; choose Installed provider for it in Settings, or update AgentDeck, then retry"
+	}
+	if spec.ProviderExecutable != "" {
+		return fmt.Sprintf("update the Claude Code at %s, then retry", spec.ProviderExecutable)
+	}
+	return "update your Claude Code, then retry"
+}
+
+// withProviderGuidance appends source-aware guidance to a recognized
+// incompatibility, leaving every other error unchanged.
+func withProviderGuidance(err error, spec LaunchSpec) error {
+	var tooOld *ProviderTooOldError
+	if errors.As(err, &tooOld) {
+		return fmt.Errorf("%w; %s", err, providerUpdateGuidance(spec))
+	}
+	return err
 }
 
 // setConfigOption sends one session configuration option and folds the peer's
@@ -2422,8 +2466,8 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 		"sessionId": sessionID, "configId": id, "value": value,
 	})
 	if err != nil {
-		if hint := claudeVersionTooOldHint(err); hint != "" {
-			return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, hint)
+		if tooOld := claudeVersionTooOld(err); tooOld != nil {
+			return fmt.Errorf("%w: %s: %w", ErrSettingRejected, id, tooOld)
 		}
 		return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, err)
 	}
@@ -2475,7 +2519,7 @@ func applySessionConfig(ctx context.Context, transport *Transport, ad backend.Ba
 	modelID, effortID, fastID := ad.SessionConfigIDs()
 	if (spec.BackendType == "codex-acp" || spec.BackendType == "claude-acp") && spec.ModelID != "" {
 		if err := applyRequiredOption(ctx, transport, sessionID, modelID, spec.ModelID, advertised); err != nil {
-			return sessionConfigResult{}, err
+			return sessionConfigResult{}, withProviderGuidance(err, spec)
 		}
 	}
 	if spec.Effort != "" {

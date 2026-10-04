@@ -463,7 +463,7 @@ func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent
 	}
 	// Re-select the provider for this process start before any side effect: a
 	// missing provider fails the resume and keeps the conversation (FS-09.R70).
-	providerEnv, providerExe, ae := providerLaunchLayer(be, model)
+	providerEnv, provider, ae := providerLaunchLayer(be, model)
 	if ae != nil {
 		return runtime.LaunchSpec{}, ae
 	}
@@ -514,7 +514,8 @@ func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent
 		Effort:             agent.Effort,
 		Fast:               agent.Fast,
 		Env:                composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir), providerEnv),
-		ProviderExecutable: providerExe,
+		ProviderExecutable: provider.Path,
+		ProviderSource:     provider.Source,
 		SkipPerms:          snap.SkipPermissions,
 		HookToken:          token,
 		MCPServers:         []runtime.MCPServerSpec{mcpSpec},
@@ -536,6 +537,8 @@ func resumeStartError(err error) *runtime.APIError {
 		return apiError(runtime.CodeNotImplemented, err.Error())
 	case errors.Is(err, runtime.ErrAlreadyStarted):
 		return apiError(runtime.CodeConflict, err.Error())
+	case errors.Is(err, runtime.ErrProviderIncompatible):
+		return providerIncompatibleError(err)
 	default:
 		return apiError(runtime.CodeRuntimeStartFailed, err.Error())
 	}

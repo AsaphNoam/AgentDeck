@@ -408,7 +408,7 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 
 	// validateSwitchTarget already proved the provider selectable before the
 	// stop; re-resolve here because this is the actual process start.
-	providerEnv, providerExe, pae := providerLaunchLayer(be, model)
+	providerEnv, provider, pae := providerLaunchLayer(be, model)
 	if pae != nil {
 		return runtime.LaunchSpec{}, pae
 	}
@@ -456,7 +456,8 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 		Effort:             target.Effort,
 		Fast:               target.Fast,
 		Env:                composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir), providerEnv),
-		ProviderExecutable: providerExe,
+		ProviderExecutable: provider.Path,
+		ProviderSource:     provider.Source,
 		SkipPerms:          snap.SkipPermissions,
 		HookToken:          token,
 		MCPServers:         []runtime.MCPServerSpec{mcpSpec},

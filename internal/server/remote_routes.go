@@ -258,7 +258,7 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		if fields != nil {
 			h = remoteFieldFilter(fields, h)
 		}
-		authed.Handle(e.pattern, h)
+		authed.Handle(e.pattern, remoteProviderErrorFilter(h))
 	}
 	// Tailnet-only phone routes (TS-03.R46).
 	authed.HandleFunc("GET /api/remote/home", s.handleRemoteHome)

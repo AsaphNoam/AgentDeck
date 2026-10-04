@@ -54,7 +54,10 @@ type LaunchSpec struct {
 	// directly; chat receives it through the adapter's override key in Env.
 	// Empty for other backend types.
 	ProviderExecutable string
-	SkipPerms          bool // effective skip_permissions after role/global resolution
+	// ProviderSource is the winning selection source ("bundled" for an
+	// explicit AgentDeck bundle), so failures name the right repair.
+	ProviderSource string
+	SkipPerms      bool // effective skip_permissions after role/global resolution
 	// AutoApproveTools is the current code-derived set of AgentDeck MCP tool
 	// identities allowed once without entering the human permission gate.
 	AutoApproveTools map[string]struct{}

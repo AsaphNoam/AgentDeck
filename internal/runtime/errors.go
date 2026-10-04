@@ -57,6 +57,10 @@ var (
 	// BR-1 shipped, so accepting the RPC envelope as success is not enough
 	// (INV §12).
 	ErrSettingIgnored = errors.New("runtime: provider ignored the setting")
+	// ErrProviderIncompatible: the selected provider executable is a version the
+	// request or native session cannot use (TS-04.R76). Resume never replaces a
+	// conversation to hide it.
+	ErrProviderIncompatible = errors.New("runtime: selected provider is incompatible")
 )
 
 // Error code vocabulary (techspec §7.7). These are the project-wide error codes
@@ -138,6 +142,7 @@ const (
 	CodeProviderExecutableMissing = "provider_executable_missing"  // 422
 	CodeProviderExecutableInvalid = "provider_executable_invalid"  // 422
 	CodeBundledProviderMissing    = "bundled_provider_unavailable" // 422
+	CodeProviderIncompatible      = "provider_incompatible"        // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -165,7 +170,8 @@ func statusForCode(code string) int {
 	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
 		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable,
 		CodeBackgroundTaskControlUnavailable, CodeCloneUnavailable,
-		CodeProviderExecutableMissing, CodeProviderExecutableInvalid, CodeBundledProviderMissing:
+		CodeProviderExecutableMissing, CodeProviderExecutableInvalid, CodeBundledProviderMissing,
+		CodeProviderIncompatible:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400

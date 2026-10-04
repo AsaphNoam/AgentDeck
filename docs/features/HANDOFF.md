@@ -51,10 +51,13 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
    (`providerexec.BundledRelPath`), manifest gains `claude`; `assemble.sh` probes both natives
    (not run locally: needs the Node tarball — release CI exercises it). `agentdeck auth` exits 3
    when no provider is usable; `scripts/release/install.sh` then skips sign-in.
-4. **Next:** resume/wake no-fallback for recognized incompatibility (TS-04.R76), `provider_runtimes` metadata, bounded
-   `--version` probe, `POST /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
-5. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
-6. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
+4. **Done 2026-10-04:** typed `provider_incompatible` (Claude too-old, source-aware guidance via
+   `LaunchSpec.ProviderSource`), resume `session/load` no longer falls back to `session/new` on it,
+   phone routes redact provider error paths (`remoteProviderErrorFilter`). TS-04.R76 shipped.
+5. **Next:** `provider_runtimes` metadata on GET/PUT, bounded `--version` probe, `POST
+   /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
+6. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
+7. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
    owed credentialed gate (TS-06.R31, needs authorization).
 
 Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
@@ -167,6 +170,9 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: source-aware provider recovery.** Slice 4: a recognized too-old Claude is a
+  typed `provider_incompatible` naming the selected source's repair; resume refuses to replace the
+  conversation on it; phone errors drop executable paths. Server/runtime suites pass.
 - **2026-10-04 — Work: release runtime stops shadowing providers.** Slice 3: the wrapper only
   publishes the managed root, adapters run via private Node by absolute path, bundled Claude/Codex
   natives are verified layout entries with manifest versions, and the installer skips sign-in when
