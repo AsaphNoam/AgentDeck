@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // A windowed transcript read is bounded in events and bytes at admission, so a

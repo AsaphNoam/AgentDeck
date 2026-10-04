@@ -126,14 +126,14 @@ func TestAddListRemoveWorktree(t *testing.T) {
 	ctx := context.Background()
 	checkout := filepath.Join(t.TempDir(), "fork")
 
-	if err := g.AddWorktree(ctx, repo, checkout, "agentdeck/fork", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, checkout, "chuck/fork", "main"); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(checkout, "README.md")); err != nil {
 		t.Fatalf("checkout content missing: %v", err)
 	}
 
-	exists, err := g.BranchExists(ctx, repo, "agentdeck/fork")
+	exists, err := g.BranchExists(ctx, repo, "chuck/fork")
 	if err != nil {
 		t.Fatalf("BranchExists: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestAddListRemoveWorktree(t *testing.T) {
 	}
 	var found bool
 	for _, e := range entries {
-		if e.Branch == "agentdeck/fork" {
+		if e.Branch == "chuck/fork" {
 			found = true
 		}
 	}
@@ -163,7 +163,7 @@ func TestAddListRemoveWorktree(t *testing.T) {
 	}
 	// The branch is the durable thing and survives removing its checkout
 	// (FS-19.R8).
-	exists, err = g.BranchExists(ctx, repo, "agentdeck/fork")
+	exists, err = g.BranchExists(ctx, repo, "chuck/fork")
 	if err != nil {
 		t.Fatalf("BranchExists after removal: %v", err)
 	}
@@ -180,10 +180,10 @@ func TestAddWorktreeRefusesExistingBranch(t *testing.T) {
 	ctx := context.Background()
 	base := t.TempDir()
 
-	if err := g.AddWorktree(ctx, repo, filepath.Join(base, "one"), "agentdeck/dup", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, filepath.Join(base, "one"), "chuck/dup", "main"); err != nil {
 		t.Fatalf("first AddWorktree: %v", err)
 	}
-	if err := g.AddWorktree(ctx, repo, filepath.Join(base, "two"), "agentdeck/dup", "main"); err == nil {
+	if err := g.AddWorktree(ctx, repo, filepath.Join(base, "two"), "chuck/dup", "main"); err == nil {
 		t.Fatal("second AddWorktree on the same branch succeeded")
 	}
 }
@@ -231,7 +231,7 @@ func TestRecreateCheckoutFromExistingBranch(t *testing.T) {
 	ctx := context.Background()
 	checkout := filepath.Join(t.TempDir(), "fork")
 
-	if err := g.AddWorktree(ctx, repo, checkout, "agentdeck/recreate", "main"); err != nil {
+	if err := g.AddWorktree(ctx, repo, checkout, "chuck/recreate", "main"); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 	// Delete the directory out of band, exactly as a person clearing disk space
@@ -242,7 +242,7 @@ func TestRecreateCheckoutFromExistingBranch(t *testing.T) {
 	if err := g.PruneWorktrees(ctx, repo); err != nil {
 		t.Fatalf("PruneWorktrees: %v", err)
 	}
-	if err := g.AddWorktreeExisting(ctx, repo, checkout, "agentdeck/recreate"); err != nil {
+	if err := g.AddWorktreeExisting(ctx, repo, checkout, "chuck/recreate"); err != nil {
 		t.Fatalf("AddWorktreeExisting: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(checkout, "README.md")); err != nil {

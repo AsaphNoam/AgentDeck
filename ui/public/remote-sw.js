@@ -1,8 +1,8 @@
-// AgentDeck phone service worker (TS-08.R73). It only displays pushed
+// Chuck phone service worker (TS-08.R73). It only displays pushed
 // attention notifications, routes a tap to the matching card, and keeps the
 // app shell available. It never caches API responses: the Mac is the only
 // source of truth, and stale data must look stale (FS-20.R23).
-const SHELL = "agentdeck-shell-v1";
+const SHELL = "chuck-shell-v1";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
@@ -53,11 +53,11 @@ self.addEventListener("push", (event) => {
   } catch {
     payload = {};
   }
-  const title = typeof payload.title === "string" ? payload.title : "AgentDeck";
+  const title = typeof payload.title === "string" ? payload.title : "Chuck";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: typeof payload.body === "string" ? payload.body : "",
-      tag: typeof payload.tag === "string" ? payload.tag : "agentdeck",
+      tag: typeof payload.tag === "string" ? payload.tag : "chuck",
       renotify: true,
       icon: "/remote-icon.svg",
       data: { url: typeof payload.url === "string" && payload.url.startsWith("/") ? payload.url : "/" },

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // FS-20.A6 — with keep-awake on, the assertion is held exactly while work is

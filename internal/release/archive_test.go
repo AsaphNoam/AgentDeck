@@ -41,7 +41,7 @@ func buildFakeVersion(t *testing.T, parent, version string) string {
 func testComponents(version string) map[string]string {
 	return map[string]string{
 		"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0",
-		"claude": "2.1.257", "codex": "0.154.0", "agentdeck": version,
+		"claude": "2.1.257", "codex": "0.154.0", "chuck": version,
 	}
 }
 
@@ -75,7 +75,7 @@ func TestPackageRelease(t *testing.T) {
 // and matching release manifest.
 func releaseFrom(t *testing.T, srcDir, version string) (string, ReleaseManifest) {
 	t.Helper()
-	archive := filepath.Join(t.TempDir(), "agentdeck-"+version+"-"+Target+".tar.gz")
+	archive := filepath.Join(t.TempDir(), "chuck-"+version+"-"+Target+".tar.gz")
 	if err := CreateArchive(srcDir, archive); err != nil {
 		t.Fatalf("CreateArchive: %v", err)
 	}
@@ -104,12 +104,12 @@ func TestStageAndActivateRoundTrip(t *testing.T) {
 		t.Fatalf("staged layout invalid: %v", err)
 	}
 	// Executable bit survives the archive round-trip.
-	info, err := os.Stat(filepath.Join(l.VersionDir(name), "libexec/agentdeck"))
+	info, err := os.Stat(filepath.Join(l.VersionDir(name), "libexec/chuck"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Mode().Perm()&0o100 == 0 {
-		t.Fatalf("libexec/agentdeck lost its executable bit: %o", info.Mode().Perm())
+		t.Fatalf("libexec/chuck lost its executable bit: %o", info.Mode().Perm())
 	}
 	if err := l.Activate(name); err != nil {
 		t.Fatalf("Activate: %v", err)

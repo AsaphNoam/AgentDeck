@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/remote"
 )
 
 // fakeTailnetNode is a running tailnet node with HTTPS on, backed by a local
@@ -48,7 +48,7 @@ var errNoPeer = &net.AddrError{Err: "no such peer"}
 func remoteTestServer(t *testing.T) (*Server, *fakeTailnetNode) {
 	t.Helper()
 	s := testServer(t, true)
-	node := &fakeTailnetNode{domain: "agentdeck.tail1.ts.net", peers: map[string]remote.Peer{}}
+	node := &fakeTailnetNode{domain: "chuck.tail1.ts.net", peers: map[string]remote.Peer{}}
 	s.newRemoteNode = func() (remote.Node, error) { return node, nil }
 	s.remote = s.newRemoteManager()
 	s.remote.SetPollInterval(time.Millisecond)
@@ -90,7 +90,7 @@ func TestRemoteToggleLifecycle(t *testing.T) {
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
-	if err := json.Unmarshal(doGET(t, h, "/api/remote").Body.Bytes(), &v); err != nil || v.Address != "https://agentdeck.tail1.ts.net" {
+	if err := json.Unmarshal(doGET(t, h, "/api/remote").Body.Bytes(), &v); err != nil || v.Address != "https://chuck.tail1.ts.net" {
 		t.Fatalf("on GET = %+v, %v", v, err)
 	}
 	cfg, _ := s.configStore.ReadConfig()

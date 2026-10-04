@@ -13,9 +13,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 // contextMCPSession connects an MCP client to the dashboard's real /mcp route

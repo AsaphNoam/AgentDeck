@@ -109,7 +109,7 @@ export function RunStartForm({
     setPendingRequest(null);
     setConflicts([]);
     setDiagnostics([]);
-    setNotice("Review the exact AgentDecker run proposal before confirming Start.");
+    setNotice("Review the exact FirstMate run proposal before confirming Start.");
     setError(null);
     setStep(0);
   }, [proposalSeed]);
@@ -299,7 +299,7 @@ export function RunStartForm({
       {proposal && (!stepMode || step === 1) && <pre className="pipeline-proposal-payload">{JSON.stringify(proposal.payload, null, 2)}</pre>}
       {conflicts.length > 0 && <div className="pipeline-warning">
         <strong>Shared project workspace</strong>
-        <p>These active agents or runs use the same project directory. AgentDeck does not isolate their filesystem changes.</p>
+        <p>These active agents or runs use the same project directory. Chuck does not isolate their filesystem changes.</p>
         <ul>{conflicts.map((conflict) => <li key={`${conflict.kind}-${conflict.id}`}>{conflict.kind}: {conflict.name} <code>{conflict.id}</code></li>)}</ul>
         <button type="button" disabled={start.isPending} onClick={() => submit(true)}>Confirm shared workspace and start</button>
       </div>}

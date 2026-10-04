@@ -14,7 +14,7 @@ type ConfigSources struct {
 	Sources map[string]SourceBinding `json:"sources"`
 }
 
-// SourceBinding links one AgentDeck backend to a native provider root.
+// SourceBinding links one Chuck backend to a native provider root.
 type SourceBinding struct {
 	Provider  string          `json:"provider"`
 	Mode      string          `json:"mode"`
@@ -25,7 +25,7 @@ type SourceBinding struct {
 	Approved  []string        `json:"approved_roots"`
 }
 
-// SourceOverrides contains explicit AgentDeck-owned values layered over a
+// SourceOverrides contains explicit Chuck-owned values layered over a
 // native source. A non-nil Model pointing at the empty string means to use the
 // native/default model.
 type SourceOverrides struct {

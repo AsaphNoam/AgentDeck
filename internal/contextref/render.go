@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 // transcriptRenderer turns a resolved span into deterministic plain text. It
@@ -62,7 +62,7 @@ func (r *transcriptRenderer) event(ev runtime.Event) error {
 	if err != nil {
 		// A single undecodable record must not abort the span (INV §7).
 		r.flush()
-		r.emit(fmt.Sprintf("[AgentDeck could not decode the %s record at sequence %d]\n\n", ev.Type, ev.Seq))
+		r.emit(fmt.Sprintf("[Chuck could not decode the %s record at sequence %d]\n\n", ev.Type, ev.Seq))
 		return nil
 	}
 	switch p.Disposition {
@@ -70,7 +70,7 @@ func (r *transcriptRenderer) event(ev runtime.Event) error {
 		return nil
 	case transcript.DispositionUnknown:
 		r.flush()
-		r.emit(fmt.Sprintf("[AgentDeck could not render an unknown event type %q at sequence %d]\n\n", ev.Type, ev.Seq))
+		r.emit(fmt.Sprintf("[Chuck could not render an unknown event type %q at sequence %d]\n\n", ev.Type, ev.Seq))
 		return nil
 	}
 	if p.Type == runtime.EvAssistantText {
@@ -183,7 +183,7 @@ func renderProjection(p transcript.Projection) string {
 	default:
 		// Unreachable while ProjectEvent classifies every registered type, but a
 		// silent empty string would be exactly the drop the registry prevents.
-		return line(fmt.Sprintf("[AgentDeck has no renderer for event type %q]", p.Type))
+		return line(fmt.Sprintf("[Chuck has no renderer for event type %q]", p.Type))
 	}
 }
 

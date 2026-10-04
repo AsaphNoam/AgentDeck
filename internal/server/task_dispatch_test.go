@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/configsource"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/configsource"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // INV §5 / FS-16.R7 — cancellation serializes with only its own task's effect;
@@ -783,7 +783,7 @@ func TestAnUnsatisfyingResultParksTheDependent(t *testing.T) {
 }
 
 // FS-16.R16 — an assignee that goes away before recording a result leaves its
-// task interrupted and needing attention, with its claim released. AgentDeck
+// task interrupted and needing attention, with its claim released. Chuck
 // never converts a process event into success or failure.
 func TestAnAgentThatGoesAwayLeavesItsTaskInterrupted(t *testing.T) {
 	srv, ts := wakeTestServer(t)
@@ -878,7 +878,7 @@ func TestRestartResolvesUnfinishedTasksFromTheirOwnRows(t *testing.T) {
 	waitRunning(t, srv, reportedRunning.AssignedAgentID, false)
 
 	// Neither borrowed conversation was touched: R4's promise does not lapse
-	// because AgentDeck restarted.
+	// because Chuck restarted.
 	for _, agentID := range []string{borrowedRunning, borrowedStarting} {
 		if _, err := srv.stateStore.ReadRunning(agentID); err != nil {
 			t.Fatalf("recovery stopped a runtime a task only borrowed: %v", err)
@@ -1011,7 +1011,7 @@ func waitTaskAttempts(t *testing.T, srv *Server, taskID string, want int) state.
 }
 
 // bindSourceEffortOverride binds the claude backend to a fixture Claude tree
-// whose AgentDeck-owned overrides name an effort, so a launch composed for the
+// whose Chuck-owned overrides name an effort, so a launch composed for the
 // seeded project has a source-level effort to lose to an explicit one.
 func bindSourceEffortOverride(t *testing.T, srv *Server, override string) {
 	t.Helper()

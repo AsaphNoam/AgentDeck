@@ -262,7 +262,7 @@ describe("ProjectDashboard", () => {
           base["app-fork"] = {
             title: "App fork", color: [100, 116, 139], cwd: "/home/wt/app-fork", add_dirs: [],
             context_prompt: "", archived: false, repo_backed: true,
-            worktree: { owned: true, branch: "agentdeck/app-fork" },
+            worktree: { owned: true, branch: "chuck/app-fork" },
           };
         }
         return HttpResponse.json(base);
@@ -272,7 +272,7 @@ describe("ProjectDashboard", () => {
       })),
       http.post("/api/projects/app/worktree-fork", async ({ request }) => {
         forked = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ project: { project: "app-fork" }, branch: "agentdeck/app-fork", base: "develop" }, { status: 201 });
+        return HttpResponse.json({ project: { project: "app-fork" }, branch: "chuck/app-fork", base: "develop" }, { status: 201 });
       }),
     );
 
@@ -284,20 +284,20 @@ describe("ProjectDashboard", () => {
     // Title comes from the source, the branch is derived from it, and the base
     // is the server's effective base — never guessed on the client.
     expect((await screen.findByLabelText("Title")) as HTMLInputElement).toHaveValue("App");
-    expect(screen.getByLabelText("Branch")).toHaveValue("agentdeck/app");
+    expect(screen.getByLabelText("Branch")).toHaveValue("chuck/app");
     await waitFor(() => expect(screen.getByLabelText("Base")).toHaveValue("develop"));
 
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "App fork" } });
     // The branch follows the title until it is edited by hand.
-    expect(screen.getByLabelText("Branch")).toHaveValue("agentdeck/app-fork");
+    expect(screen.getByLabelText("Branch")).toHaveValue("chuck/app-fork");
 
     const before = listCalls;
     fireEvent.click(screen.getByRole("button", { name: "Create worktree project" }));
     await waitFor(() => expect(forked).not.toBeNull());
-    expect(forked).toMatchObject({ title: "App fork", branch: "agentdeck/app-fork", base: "develop" });
+    expect(forked).toMatchObject({ title: "App fork", branch: "chuck/app-fork", base: "develop" });
     // The grid refetches by itself: no manual refresh (FS-02.R60).
     await waitFor(() => expect(listCalls).toBeGreaterThan(before));
-    expect(await screen.findByText("⑂ agentdeck/app-fork")).toBeInTheDocument();
+    expect(await screen.findByText("⑂ chuck/app-fork")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
@@ -330,7 +330,7 @@ describe("ProjectDashboard", () => {
         owned: false, repo_backed: true, branch: "", base: "main", dirty: false, dirty_known: true,
       })),
       http.post("/api/projects/app/worktree-fork", () => HttpResponse.json(
-        { project: { project: "app-fork" }, branch: "agentdeck/app", base: "main", warning: "setup command failed: npm ci exploded" },
+        { project: { project: "app-fork" }, branch: "chuck/app", base: "main", warning: "setup command failed: npm ci exploded" },
         { status: 201 },
       )),
     );
@@ -353,11 +353,11 @@ describe("ProjectDashboard", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
-          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => HttpResponse.json({
-        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: true, dirty_known: true,
+        owned: true, repo_backed: true, branch: "chuck/fork", base: "main", dirty: true, dirty_known: true,
       })),
       http.post("/api/projects/fork/archive", async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
@@ -385,11 +385,11 @@ describe("ProjectDashboard", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
-          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => HttpResponse.json({
-        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: false,
+        owned: true, repo_backed: true, branch: "chuck/fork", base: "main", dirty: false, dirty_known: false,
       })),
     );
     renderDashboard();
@@ -405,7 +405,7 @@ describe("ProjectDashboard", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
-          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => new Promise<HttpResponse>((resolve) => { resolveStatus = resolve; })),
@@ -419,7 +419,7 @@ describe("ProjectDashboard", () => {
     expect(screen.getByRole("button", { name: "Archive project" })).toBeDisabled();
 
     resolveStatus?.(HttpResponse.json({
-      owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: true,
+      owned: true, repo_backed: true, branch: "chuck/fork", base: "main", dirty: false, dirty_known: true,
     }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Archive project" })).toBeEnabled());
   });
@@ -429,7 +429,7 @@ describe("ProjectDashboard", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
-          archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+          archived: false, repo_backed: true, worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => HttpResponse.json({ error: { message: "Git unavailable" } }, { status: 500 })),

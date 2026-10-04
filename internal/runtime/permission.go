@@ -37,16 +37,16 @@ func (c *ChatRuntime) onRequest(as *agentState, req *IncomingRequest) {
 	}
 
 	identity := permissionToolIdentity(req.Params)
-	_, agentDeckTool := as.autoApproveTools[identity]
+	_, chuckTool := as.autoApproveTools[identity]
 	autoData, autoKinds := mapPermissionRequest(req.Params, "", true)
 	autoData.ToolCallID = scope.toolCallID(autoData.ToolCallID)
 	_, hasAllowOnce := autoKinds["allow_once"]
-	// skip_permissions auto-approves any tool. AgentDeck-owned actions use the
+	// skip_permissions auto-approves any tool. Chuck-owned actions use the
 	// same recorded shape, but only when an allow-once option is available.
-	if as.skipPerms || (agentDeckTool && hasAllowOnce) {
+	if as.skipPerms || (chuckTool && hasAllowOnce) {
 		c.emitIn(as, scope, EvPermissionRequest, autoData)
 		optID, ok := selectOption(autoKinds, "approve")
-		if agentDeckTool && !as.skipPerms {
+		if chuckTool && !as.skipPerms {
 			optID, ok = autoKinds["allow_once"]
 		}
 		if !ok {

@@ -38,7 +38,7 @@ export function VisualMatrix() {
       <PageHeader
         eyebrow="Development fixture"
         title="Presentation matrix"
-        description="Deterministic AgentDeck core surfaces for visual contract review."
+        description="Deterministic Chuck core surfaces for visual contract review."
         actions={(
           <div className="visual-matrix-controls">
             <label className="visual-matrix-toggle">
@@ -48,7 +48,7 @@ export function VisualMatrix() {
                 value={appearance}
                 onChange={(event) => setAppearance(effectiveAppearance(event.target.value))}
               >
-                <option value="core">AgentDeck Core</option>
+                <option value="core">Chuck Core</option>
                 <option value="sky-grove">Sky & Grove</option>
                 <option value="studio">Studio</option>
               </select>
@@ -150,7 +150,7 @@ export function VisualMatrix() {
                 <strong data-slot="identity">{state === "waiting_input" ? "Needs a decision from the orchestration and delivery reviewer" : state === "error" ? "unbroken-agent-name-that-must-not-escape-the-card-boundary" : `${state} agent`}</strong>
                 <StateBadge state={state} />
               </div>
-              <p className="agent-subtitle" data-slot="metadata">builder · AgentDeck demo</p>
+              <p className="agent-subtitle" data-slot="metadata">builder · Chuck demo</p>
               <span className="model-pill">codex · gpt-fixture-{index + 1}</span>
               <div className="message-indicators" data-slot="indicators">
                 {index === 2 && <span className="mail-badge">Mail 3</span>}
@@ -165,7 +165,7 @@ export function VisualMatrix() {
               <strong data-slot="identity">Stopped agent</strong>
               <StateBadge state="busy" />
             </div>
-            <p className="agent-subtitle" data-slot="metadata">reviewer · AgentDeck demo</p>
+            <p className="agent-subtitle" data-slot="metadata">reviewer · Chuck demo</p>
             <span className="terminal-pill">terminal · xterm</span>
             <small className="stopped-label">stopped</small>
           </article>
@@ -315,7 +315,7 @@ const fixtureProjects = ["Alpha", "Bravo workspace with a long title", "Charlie"
 function ShellNavFixture({ visible, overflow, currentProjectID }: Parameters<typeof ProjectNav>[0]) {
   return (
     <div className="app-header visual-matrix-shell">
-      <div className="app-logo">AgentDeck</div>
+      <div className="app-logo">Chuck</div>
       <nav className="app-nav" aria-label="Fixture primary navigation"><a href="#dashboard">Dashboard</a><a href="#tasks">Tasks</a><a href="#pipelines">Pipelines</a><a href="#archive">Archive</a><a href="#settings">Settings</a></nav>
       <ProjectNav visible={visible} overflow={overflow} currentProjectID={currentProjectID} />
       <div className="app-connection"><span className="connection-status">Connected</span></div>

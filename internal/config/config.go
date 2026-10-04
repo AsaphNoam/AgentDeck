@@ -1,14 +1,14 @@
 package config
 
-// Store is the typed config file store over ~/.agentdeck/. It holds only the
+// Store is the typed config file store over ~/.chuck/. It holds only the
 // resolved, absolute home directory; all config data lives on disk. A *Store is
 // safe for concurrent use to the extent the filesystem is: writes are atomic
 // (write-temp-then-rename) so readers never observe partial files.
 type Store struct {
-	home string // absolute, resolved from AGENTDECK_HOME or ~/.agentdeck
+	home string // absolute, resolved from CHUCK_HOME or ~/.chuck
 }
 
-// New resolves the home directory (honoring AGENTDECK_HOME and leading "~") but
+// New resolves the home directory (honoring CHUCK_HOME and leading "~") but
 // does NOT create any directories. Call EnsureLayout to create the layout.
 func New() (*Store, error) {
 	home, err := resolveHome()

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# install.sh — build the AgentDeck UI + Go binary and install `agentdeck` on PATH.
+# install.sh — build the Chuck UI + Go binary and install `chuck` on PATH.
 #
 # Steps:
 #   1. Build the React/Vite UI -> ui/dist.
 #   2. Copy ui/dist into the Go embed location (internal/server/ui/dist).
 #   3. Build the Go binary with version ldflags.
 #   4. Install the binary into an on-PATH bin dir.
-#   5. Seed ~/.agentdeck on first run (the binary seeds lazily on `dashboard start`).
+#   5. Seed ~/.chuck on first run (the binary seeds lazily on `dashboard start`).
 #
 # Prereqs: Go 1.25+, Node 20+, npm. Node is build-time only unless the optional
 # Claude ACP adapter is installed; that adapter requires Node 22+ at runtime.
@@ -17,8 +17,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-BINARY="agentdeck"
-PKG="github.com/agentdeck/agentdeck"
+BINARY="chuck"
+PKG="github.com/AsaphNoam/Chuck"
 VERSION_PKG="${PKG}/internal/version"
 EMBED_DIR="internal/server/ui/dist"
 
@@ -44,7 +44,7 @@ command -v npm  >/dev/null 2>&1 || { echo "error: npm is required"; exit 1; }
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "${NODE_MAJOR}" -lt 20 ]; then
-  echo "error: Node 20+ is required to build AgentDeck"
+  echo "error: Node 20+ is required to build Chuck"
   exit 1
 fi
 
@@ -72,7 +72,7 @@ echo "==> Building ${BINARY} (version ${VERSION}, commit ${COMMIT})"
 mkdir -p bin
 # -tags sqlite_fts5 is required: the archive search path uses FTS5 MATCH/snippet/
 # bm25, which error at runtime on the untagged plain-table fallback.
-go build -tags sqlite_fts5 -ldflags "${LDFLAGS}" -o "bin/${BINARY}" ./cmd/agentdeck
+go build -tags sqlite_fts5 -ldflags "${LDFLAGS}" -o "bin/${BINARY}" ./cmd/chuck
 
 # Choose an install dir on PATH, preferring a user-writable location.
 INSTALL_DIR="${INSTALL_DIR:-}"
@@ -96,9 +96,9 @@ echo
 echo "Installed ${BINARY} $("${INSTALL_DIR}/${BINARY}" --version 2>/dev/null || echo '')"
 case ":${PATH}:" in
   *":${INSTALL_DIR}:"*) ;;
-  *) echo "note: ${INSTALL_DIR} is not on your PATH; add it to use 'agentdeck' directly." ;;
+  *) echo "note: ${INSTALL_DIR} is not on your PATH; add it to use 'chuck' directly." ;;
 esac
 echo
 echo "Next:"
-echo "  agentdeck dashboard start    # seeds ~/.agentdeck on first run, binds 127.0.0.1:4317"
-echo "  agentdeck dashboard open     # open the UI in your browser"
+echo "  chuck dashboard start    # seeds ~/.chuck on first run, binds 127.0.0.1:4317"
+echo "  chuck dashboard open     # open the UI in your browser"

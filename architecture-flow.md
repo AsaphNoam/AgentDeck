@@ -1,4 +1,4 @@
-# AgentDeck architecture flow
+# Chuck architecture flow
 
 Descriptive orientation only. Binding boundaries, protocols, data rules, and security constraints
 live in [TS-01](docs/specs/tech/TS-01-architecture.md),
@@ -53,10 +53,10 @@ publish on the successful path. SSE reconnect starts with a snapshot/hydration b
 ## Data authority
 
 ```text
-AgentDeck JSON config     human/server edited, atomic owner-only files
+Chuck JSON config     human/server edited, atomic owner-only files
 Native Claude/Codex      provider input when linked/mirrored; composed by TS-07 precedence
 state.db                 server-sole-writer identity, runtime state, messages, index
-transcript.ndjson        AgentDeck normalized append-only chat history
+transcript.ndjson        Chuck normalized append-only chat history
 mirror/effective views   redacted, regenerable federation projections
 ```
 

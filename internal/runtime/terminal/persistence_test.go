@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/index"
-	rt "github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/index"
+	rt "github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 // withPersistence wires the terminal runtime to a real transcript writer + indexer

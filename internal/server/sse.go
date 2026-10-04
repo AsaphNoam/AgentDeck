@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/bus"
+	"github.com/AsaphNoam/Chuck/internal/bus"
 )
 
 const sseKeepalive = 10 * time.Second

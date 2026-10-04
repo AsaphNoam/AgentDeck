@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 		return fmt.Errorf("state: check max migration: %w", err)
 	}
 	if maxApplied > latestKnownMigration {
-		return fmt.Errorf("state: database was created by a newer binary (migration %d > %d known); upgrade agentdeck", maxApplied, latestKnownMigration)
+		return fmt.Errorf("state: database was created by a newer binary (migration %d > %d known); upgrade chuck", maxApplied, latestKnownMigration)
 	}
 	return nil
 }

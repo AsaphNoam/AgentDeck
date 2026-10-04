@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // stoppedPipelineAgent writes the exact shape of the field report's earlier
@@ -50,7 +50,7 @@ VALUES ('pr_1','t_1','Ship','` + project + `','ship','running','2026-09-01T10:00
 // stopped agent remains an ordinary task and mail target, and mail wakes it.
 func TestStoppedPipelineAgentRemainsAddressable(t *testing.T) {
 	f := newContextFixture(t)
-	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
+	liveAgent(t, f.store, "a_coord", "Atlas", "firstmate", "my-app")
 	f.srv.RegisterSession("tok-coord", "a_coord", "gen-a_coord")
 	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) {
 		return f.store.AddressableAgents()
@@ -96,7 +96,7 @@ func TestStoppedPipelineAgentRemainsAddressable(t *testing.T) {
 // Resume.
 func TestSnapshotlessPipelineAgentGetsOrdinaryRefusal(t *testing.T) {
 	f := newContextFixture(t)
-	liveAgent(t, f.store, "a_coord", "Atlas", "agentdecker", "my-app")
+	liveAgent(t, f.store, "a_coord", "Atlas", "firstmate", "my-app")
 	f.srv.RegisterSession("tok-coord", "a_coord", "gen-a_coord")
 	f.srv.SetAddressableAgents(func() ([]state.LiveAgent, error) {
 		return f.store.AddressableAgents()

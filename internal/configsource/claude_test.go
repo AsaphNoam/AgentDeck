@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 func TestClaudeResolverPrecedence(t *testing.T) {
@@ -45,12 +45,12 @@ func TestClaudeResolverPrecedence(t *testing.T) {
 		t.Fatalf("Resolve: %v report=%+v", err, report)
 	}
 	if effective.Model == nil || *effective.Model != "override-model" {
-		t.Fatalf("model = %v, want AgentDeck override", effective.Model)
+		t.Fatalf("model = %v, want Chuck override", effective.Model)
 	}
 	if effective.Effort == nil || *effective.Effort != "high" {
 		t.Fatalf("effort = %v, want managed high", effective.Effort)
 	}
-	if got := effective.Provenance["model"].Scope; got != "agentdeck_override" {
+	if got := effective.Provenance["model"].Scope; got != "chuck_override" {
 		t.Errorf("model provenance = %q", got)
 	}
 	if got := effective.Provenance["effort"].Scope; got != "managed" {
@@ -81,7 +81,7 @@ func TestClaudeResolverPrecedence(t *testing.T) {
 		t.Fatal("unchanged source did not produce deterministic effective/report output")
 	}
 
-	// A managed value is a constraint and therefore wins even over AgentDeck.
+	// A managed value is a constraint and therefore wins even over Chuck.
 	writeClaudeTestFile(t, filepath.Join(root, "managed-settings.json"), `{"model":"managed-model","effortLevel":"high"}`)
 	effective, _, err = NewClaudeResolver(home).Resolve(context.Background(), binding, config.Project{Cwd: project})
 	if err != nil {

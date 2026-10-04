@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 func projectionEvent(t *testing.T, typ string, data any) runtime.Event {

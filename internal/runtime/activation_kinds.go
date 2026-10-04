@@ -1,6 +1,6 @@
 package runtime
 
-import "github.com/agentdeck/agentdeck/internal/state"
+import "github.com/AsaphNoam/Chuck/internal/state"
 
 // ActivationKind is the code-owned contract for one host-owned turn kind: the
 // fixed instruction the provider receives and the status the dashboard shows

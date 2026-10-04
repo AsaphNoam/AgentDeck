@@ -25,7 +25,7 @@ import (
 // vapidSubject is the VAPID "sub" claim. Apple requires an https or mailto
 // URL; the project URL avoids disclosing the person's tailnet name to push
 // services.
-const vapidSubject = "https://github.com/agentdeck/agentdeck"
+const vapidSubject = "https://github.com/AsaphNoam/Chuck"
 
 // PushPayloadLimit bounds a notification payload (TS-13.R11).
 const PushPayloadLimit = 4096

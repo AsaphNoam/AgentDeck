@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // FS-18.A8: a failed secure installation warns, advertises no package, and a
@@ -19,7 +19,7 @@ func TestPrepareAgentKnowledgeFailureThenRetry(t *testing.T) {
 		t.Skip("symlink permissions vary on Windows")
 	}
 	home := t.TempDir()
-	t.Setenv("AGENTDECK_HOME", home)
+	t.Setenv("CHUCK_HOME", home)
 	store, err := config.New()
 	if err != nil {
 		t.Fatal(err)
@@ -27,13 +27,13 @@ func TestPrepareAgentKnowledgeFailureThenRetry(t *testing.T) {
 	if err := store.EnsureLayout(); err != nil {
 		t.Fatal(err)
 	}
-	legacyData, err := os.ReadFile(filepath.Join("..", "config", "testdata", "superseded_agentdecker_prompt.txt"))
+	legacyData, err := os.ReadFile(filepath.Join("..", "config", "testdata", "superseded_implementer_prompt.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	legacy := strings.TrimSuffix(string(legacyData), "\n")
 	original := config.Role{Title: "Custom", SystemPrompt: legacy, SkipPermissions: nil}
-	if err := store.WriteRole("agentdecker", original); err != nil {
+	if err := store.WriteRole("implementer", original); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +47,7 @@ func TestPrepareAgentKnowledgeFailureThenRetry(t *testing.T) {
 	if failed.Available || !strings.Contains(logs.String(), "continuing without it") {
 		t.Fatalf("failed preparation = %+v, logs=%s", failed, logs.String())
 	}
-	role, err := store.ReadRole("agentdecker")
+	role, err := store.ReadRole("implementer")
 	if err != nil || role != original {
 		t.Fatalf("install failure changed role: %+v, %v", role, err)
 	}
@@ -62,8 +62,8 @@ func TestPrepareAgentKnowledgeFailureThenRetry(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(succeeded.SkillDir, "SKILL.md")); err != nil {
 		t.Fatalf("retry did not publish direct skill path: %v", err)
 	}
-	role, err = store.ReadRole("agentdecker")
-	if err != nil || role.Title != original.Title || role.SystemPrompt == legacy || !strings.Contains(role.SystemPrompt, "AgentDeck's resident operator") {
+	role, err = store.ReadRole("implementer")
+	if err != nil || role.Title != original.Title || role.SystemPrompt == legacy || !strings.Contains(role.SystemPrompt, "You are an implementer") {
 		t.Fatalf("retry did not migrate the exact legacy role: %+v, %v", role, err)
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // assignTask creates a task already assigned to agentID in the given state, the

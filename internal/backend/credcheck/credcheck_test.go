@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 func TestMergeEnv(t *testing.T) {

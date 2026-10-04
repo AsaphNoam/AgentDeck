@@ -241,11 +241,11 @@ func TestCanonicalToolNameWinsOverFallback(t *testing.T) {
 	if got := unnamed[0].Data.(ToolCallData); got.Name != "edit" {
 		t.Fatalf("unnamed = %+v", got)
 	}
-	perm := json.RawMessage(`{"sessionId":"s","toolCall":{"toolCallId":"t1","name":"exec_command","title":"mcp__agentdeck__send"},"options":[]}`)
+	perm := json.RawMessage(`{"sessionId":"s","toolCall":{"toolCallId":"t1","name":"exec_command","title":"mcp__chuck__send"},"options":[]}`)
 	if data, _ := mapPermissionRequest(perm, "", false); data.Name != "exec_command" {
 		t.Fatalf("permission name = %q", data.Name)
 	}
-	if id := permissionToolIdentity(perm); id != "mcp__agentdeck__send" {
+	if id := permissionToolIdentity(perm); id != "mcp__chuck__send" {
 		t.Fatalf("permission identity = %q", id)
 	}
 }

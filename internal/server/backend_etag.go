@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // backendCatalogETag is a strong validator for the complete backend document.

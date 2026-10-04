@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/backend"
 )
 
-// The pinned ACP session-request schemas are the oracle for what AgentDeck may
+// The pinned ACP session-request schemas are the oracle for what Chuck may
 // put on a session/new or session/load wire. Both lists are transcribed from the
 // protocol schema the pinned adapters decode with (TS-04.R47), NOT read back out
 // of sessionNewParams/sessionLoadParams: an oracle copied from the builder it
@@ -24,7 +24,7 @@ var (
 )
 
 // acpOutOfSchemaMembers records, per backend type, the top-level members
-// AgentDeck still sends outside that schema. A pinned decoder strips them, so
+// Chuck still sends outside that schema. A pinned decoder strips them, so
 // every entry is an *unverified* delivery path rather than a working one, and
 // FS-09.A6 keeps the claim gated until the CLI is installed and its real
 // mechanism is checked at the effective provider. TS-04.R47 deliberately leaves

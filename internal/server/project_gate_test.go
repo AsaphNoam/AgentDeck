@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // corruptProject overwrites the durable project definition with unparseable JSON

@@ -9,20 +9,20 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/AsaphNoam/Chuck/internal/release"
 )
 
 // newFetcher builds the release fetcher; tests override it to avoid network.
 var newFetcher = func(repo string) release.Fetcher { return release.NewGitHubFetcher(repo) }
 
-// newUpdateCmd builds `agentdeck update`, the only update mechanism. It contacts
+// newUpdateCmd builds `chuck update`, the only update mechanism. It contacts
 // GitHub only when invoked, never in the background (FS-10.R7, TS-06.R19).
 func newUpdateCmd() *cobra.Command {
 	var check, yes, rollback bool
 	var repo string
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update AgentDeck to the latest release, or roll back",
+		Short: "Update Chuck to the latest release, or roll back",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			layout, err := release.Open()
 			if err != nil {
@@ -85,7 +85,7 @@ func runUpdate(cmd *cobra.Command, layout *release.Layout, f release.Fetcher, ch
 		return err
 	}
 	if !hasCur {
-		return errors.New("no AgentDeck release is installed; run the installer first")
+		return errors.New("no Chuck release is installed; run the installer first")
 	}
 
 	m, err := f.Latest(cmd.Context())
@@ -93,24 +93,24 @@ func runUpdate(cmd *cobra.Command, layout *release.Layout, f release.Fetcher, ch
 		return err
 	}
 	if !release.UpdateAvailable(cur, m.Version) {
-		fmt.Fprintf(out, "AgentDeck is up to date (%s)\n", cur)
+		fmt.Fprintf(out, "Chuck is up to date (%s)\n", cur)
 		return nil
 	}
 	if check {
-		fmt.Fprintf(out, "update available: %s -> %s\nrun 'agentdeck update' to install\n", cur, m.Version)
+		fmt.Fprintf(out, "update available: %s -> %s\nrun 'chuck update' to install\n", cur, m.Version)
 		return nil
 	}
 	if !yes {
 		if !isInteractive(cmd) {
 			return fmt.Errorf("update available %s -> %s; re-run with --yes to install non-interactively", cur, m.Version)
 		}
-		if !confirm(cmd, fmt.Sprintf("Update AgentDeck %s -> %s?", cur, m.Version)) {
+		if !confirm(cmd, fmt.Sprintf("Update Chuck %s -> %s?", cur, m.Version)) {
 			fmt.Fprintln(out, "update cancelled")
 			return nil
 		}
 	}
 
-	tmp, err := os.MkdirTemp("", "agentdeck-update-*")
+	tmp, err := os.MkdirTemp("", "chuck-update-*")
 	if err != nil {
 		return err
 	}

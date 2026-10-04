@@ -1,4 +1,4 @@
-// Package messaging hosts AgentDeck's in-process, token-bound MCP tools for
+// Package messaging hosts Chuck's in-process, token-bound MCP tools for
 // coordination, tasks, pipelines, and context links.
 package messaging
 
@@ -9,16 +9,16 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/contextref"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/version"
+	"github.com/AsaphNoam/Chuck/internal/contextref"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/version"
 )
 
 // TokenHeader is the HTTP header carrying a per-agent session token on the
 // streamable HTTP transport (techspec §3.6). The dashboard maps token→agent_id
 // at registration so identity is bound to the session, never to a tool argument.
-const TokenHeader = "X-AgentDeck-Token"
+const TokenHeader = "X-Chuck-Token"
 
 // Server is the dashboard's in-process MCP messaging server. It owns one
 // mcp.Server shared by all agents and the token→agent_id session registry.
@@ -80,7 +80,7 @@ func addTool[In, Out any](s *Server, tool *mcp.Tool, handler mcp.ToolHandlerFor[
 	mcp.AddTool(s.mcp, tool, handler)
 }
 
-// ToolNames returns the registered AgentDeck action names. Registration and
+// ToolNames returns the registered Chuck action names. Registration and
 // permission identity composition share this exact source (INV §2).
 func (s *Server) ToolNames() []string { return append([]string{}, s.tools...) }
 
@@ -205,7 +205,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}
 
 	s.mcp = mcp.NewServer(&mcp.Implementation{
-		Name:    "agentdeck-messaging",
+		Name:    "chuck-messaging",
 		Version: version.String(),
 	}, nil)
 	addTool(s, &mcp.Tool{
@@ -234,7 +234,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, s.handleGetAssignedTask)
 	addTool(s, &mcp.Tool{
 		Name:        "create_task",
-		Description: "Create durable work that AgentDeck starts when its prerequisites are satisfied. Assign it to an existing agent by role@project, name, or agent_id, or omit the target to have a new agent launched.",
+		Description: "Create durable work that Chuck starts when its prerequisites are satisfied. Assign it to an existing agent by role@project, name, or agent_id, or omit the target to have a new agent launched.",
 	}, s.handleCreateTask)
 	addTool(s, &mcp.Tool{
 		Name:        "cancel_task",

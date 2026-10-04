@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // ClaudeResolver resolves the documented, display-safe subset of Claude Code
@@ -112,15 +112,15 @@ func (r *ClaudeResolver) resolve(ctx context.Context, binding Binding, project c
 		}
 	}
 
-	// AgentDeck overrides sit above ordinary native layers but never above
+	// Chuck overrides sit above ordinary native layers but never above
 	// managed policy. A pointer to "" deliberately means inherit/default.
 	if binding.Overrides.Model != nil {
 		effective.Model = binding.Overrides.Model
-		effective.Provenance["model"] = FieldProvenance{Scope: "agentdeck_override", Key: "overrides.model"}
+		effective.Provenance["model"] = FieldProvenance{Scope: "chuck_override", Key: "overrides.model"}
 	}
 	if binding.Overrides.Effort != nil {
 		effective.Effort = binding.Overrides.Effort
-		effective.Provenance["effort"] = FieldProvenance{Scope: "agentdeck_override", Key: "overrides.effort"}
+		effective.Provenance["effort"] = FieldProvenance{Scope: "chuck_override", Key: "overrides.effort"}
 	}
 
 	managedFile := filepath.Join(binding.Root, "managed-settings.json")

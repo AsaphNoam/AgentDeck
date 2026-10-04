@@ -6,7 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
 )
 
 type proposeTemplateArgs struct {
@@ -19,8 +19,8 @@ func (s *Server) handleProposePipelineTemplate(_ context.Context, req *mcp.CallT
 	if !ok {
 		return sessionUnknown()
 	}
-	if !s.isAgentDecker(identity.AgentID) {
-		return errResult(map[string]any{"ok": false, "error": "proposal_forbidden", "message": "Only a token-bound AgentDecker role session may propose pipelines."})
+	if !s.isFirstMate(identity.AgentID) {
+		return errResult(map[string]any{"ok": false, "error": "proposal_forbidden", "message": "Only a token-bound FirstMate role session may propose pipelines."})
 	}
 	s.mu.RLock()
 	manager := s.pipelines
@@ -44,8 +44,8 @@ func (s *Server) handleProposePipelineRun(ctx context.Context, req *mcp.CallTool
 	if !ok {
 		return sessionUnknown()
 	}
-	if !s.isAgentDecker(identity.AgentID) {
-		return errResult(map[string]any{"ok": false, "error": "proposal_forbidden", "message": "Only a token-bound AgentDecker role session may propose pipelines."})
+	if !s.isFirstMate(identity.AgentID) {
+		return errResult(map[string]any{"ok": false, "error": "proposal_forbidden", "message": "Only a token-bound FirstMate role session may propose pipelines."})
 	}
 	s.mu.RLock()
 	manager := s.pipelines
@@ -60,9 +60,9 @@ func (s *Server) handleProposePipelineRun(ctx context.Context, req *mcp.CallTool
 	return jsonResult(map[string]any{"ok": true, "proposal": proposal})
 }
 
-func (s *Server) isAgentDecker(agentID string) bool {
+func (s *Server) isFirstMate(agentID string) bool {
 	agent, err := s.store.ReadAgent(agentID)
-	return err == nil && agent.Role == "agentdecker" && agent.Interface == "chat"
+	return err == nil && agent.Role == "firstmate" && agent.Interface == "chat"
 }
 
 func pipelineToolError(err error) (*mcp.CallToolResult, any, error) {

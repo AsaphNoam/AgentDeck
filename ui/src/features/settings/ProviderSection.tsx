@@ -27,7 +27,7 @@ export interface ProviderSectionProps {
 }
 
 // ProviderSection is a Claude/Codex backend's provider choice (FS-09.R72,
-// R75–R77): Installed by default or the AgentDeck bundle, the advanced
+// R75–R77): Installed by default or the Chuck bundle, the advanced
 // executable path, the saved next-start provider, and Refresh provider.
 export function ProviderSection({
   backendId,
@@ -57,18 +57,18 @@ export function ProviderSection({
         </label>
         <label className="backend-autosync-label">
           <input type="radio" name={`provider-mode-${backendId}`} checked={bundled} onChange={() => onModeChange("bundled")} />
-          AgentDeck bundle
+          Chuck bundle
         </label>
       </div>
       <p className="backend-provider-hint">
-        Installed follows your own {name} updates; the AgentDeck bundle changes only when AgentDeck updates.
+        Installed follows your own {name} updates; the Chuck bundle changes only when Chuck updates.
         Neither promises new models or account access, or that a session can move back to an older version.
         A change applies to the next process start, not running agents.
       </p>
       {bundled ? (
         (executable !== "" || modelOverride) && (
           <p className="backend-provider-hint">
-            Executable paths ({key}) are inactive while the AgentDeck bundle is selected. They are kept and apply again under Installed provider.
+            Executable paths ({key}) are inactive while the Chuck bundle is selected. They are kept and apply again under Installed provider.
           </p>
         )
       ) : (

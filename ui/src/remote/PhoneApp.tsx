@@ -34,7 +34,7 @@ function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
           </button>
         ) : (
           <>
-            <span className="phone-brand">AgentDeck</span>
+            <span className="phone-brand">Chuck</span>
             <span className="phone-header-actions">
               <button type="button" aria-label="This phone" onClick={() => navigate("/phone")}>
                 ⚙

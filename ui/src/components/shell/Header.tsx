@@ -1,13 +1,13 @@
 import { Link, NavLink } from "react-router-dom";
 import { ConnectionDot } from "./ConnectionDot";
-import { AgentDeckMark } from "./AgentDeckMark";
+import { ChuckMark } from "./ChuckMark";
 import { ActiveProjectNav } from "./ActiveProjectNav";
 
 export function Header() {
   return (
     <header className="app-header" data-ui="app-shell" data-slot="header">
       <Link to="/" className="app-logo" data-slot="brand">
-        <AgentDeckMark />
+        <ChuckMark />
       </Link>
       <nav className="app-nav" data-slot="navigation" aria-label="Primary navigation">
         <NavLink to="/" end>Dashboard</NavLink>

@@ -297,7 +297,7 @@ class SharedWorkerEventSource implements EventSourceLike {
 
   constructor(onTransportFailure: () => void, private readonly onMessage: () => void) {
     const worker = new SharedWorker(new URL("./sse-shared-worker.ts", import.meta.url), {
-      name: "agentdeck-events",
+      name: "chuck-events",
       type: "module",
     });
     // An `error` on the SharedWorker itself means its script never loaded or

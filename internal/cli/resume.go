@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // runResumeByID POSTs to /api/sessions/{id}/resume and prints the result.
@@ -23,7 +23,7 @@ func runResumeByID(agentID string) int {
 
 	resp, body, err := postResume(port, agentID, nil)
 	if err != nil {
-		fmt.Printf("could not reach dashboard on 127.0.0.1:%d — run `agentdeck dashboard start` first (%v)\n", port, err)
+		fmt.Printf("could not reach dashboard on 127.0.0.1:%d — run `chuck dashboard start` first (%v)\n", port, err)
 		return 1
 	}
 	if resp.StatusCode != http.StatusOK {

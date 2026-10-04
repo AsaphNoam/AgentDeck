@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // Disposition is a projection's explicit classification of a normalized event.

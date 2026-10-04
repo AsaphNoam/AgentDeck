@@ -27,7 +27,7 @@ describe("chat drafts", () => {
   });
 
   it("starts empty on malformed storage and leaves callers usable when storage fails", () => {
-    localStorage.setItem("agentdeck-chat-drafts", "not json");
+    localStorage.setItem("chuck-chat-drafts", "not json");
     expect(getChatDraft("a_one")).toBe("");
 
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota exceeded"); });

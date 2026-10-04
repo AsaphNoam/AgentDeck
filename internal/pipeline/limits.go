@@ -1,6 +1,6 @@
 package pipeline
 
-import "github.com/agentdeck/agentdeck/internal/state"
+import "github.com/AsaphNoam/Chuck/internal/state"
 
 // Limits is the single authority for pipeline JSON, prompt, report, proposal,
 // and list bounds (TS-09.R19). Values are deliberately conservative for a local

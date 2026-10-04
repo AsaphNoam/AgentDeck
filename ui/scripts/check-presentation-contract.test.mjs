@@ -13,7 +13,7 @@ function fixture({
   skins = [],
   skinCss = {},
 } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "agentdeck-presentation-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "chuck-presentation-"));
   fs.mkdirSync(path.join(root, "src", "presentation"), { recursive: true });
   fs.mkdirSync(path.join(root, "src", "styles", "components"), { recursive: true });
   fs.mkdirSync(path.join(root, "src", "styles", "skins"), { recursive: true });

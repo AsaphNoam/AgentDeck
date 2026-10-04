@@ -8,9 +8,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 type fixture struct {
@@ -587,7 +587,7 @@ INSERT INTO pipeline_attempts(attempt_id, run_id, stage_id, attempt_no, visit_no
                               backend, model, state, report_outcome, report_summary, report_details,
                               report_checks, report_outputs_json, reported_at, quiescent_at, created_at, updated_at)
 VALUES ('pa_1','pr_1','s1',1,1,?,?,'claude-acp','sonnet','reported','success','the stage passed','full details',
-        'make test','{"artifact":"bin/agentdeck"}',?,?,?,?)`,
+        'make test','{"artifact":"bin/chuck"}',?,?,?,?)`,
 		agentID, generation, reportedAt, quiescentAt, now, now); err != nil {
 		t.Fatalf("insert attempt: %v", err)
 	}
@@ -611,7 +611,7 @@ func TestSharePipelineReportWindow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read report: %v", err)
 	}
-	for _, want := range []string{"success", "the stage passed", "full details", "make test", "bin/agentdeck"} {
+	for _, want := range []string{"success", "the stage passed", "full details", "make test", "bin/chuck"} {
 		if !strings.Contains(page.Text, want) {
 			t.Errorf("report page missing %q: %q", want, page.Text)
 		}
@@ -655,7 +655,7 @@ VALUES ('tk_1','proj','Stage one','do the stage','launch','finished','success','
 		t.Fatalf("insert stage task: %v", err)
 	}
 	if _, err := f.store.DB().Exec(`
-INSERT INTO task_result_outputs(task_id, name, value) VALUES ('tk_1','artifact','bin/agentdeck')`); err != nil {
+INSERT INTO task_result_outputs(task_id, name, value) VALUES ('tk_1','artifact','bin/chuck')`); err != nil {
 		t.Fatalf("insert stage task output: %v", err)
 	}
 	if _, err := f.store.DB().Exec(`
@@ -690,7 +690,7 @@ func TestSharePipelineReportResolvesTaskBackedResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read report: %v", err)
 	}
-	for _, want := range []string{"success", "the stage passed", "full details", "bin/agentdeck"} {
+	for _, want := range []string{"success", "the stage passed", "full details", "bin/chuck"} {
 		if !strings.Contains(page.Text, want) {
 			t.Errorf("report page missing %q: %q", want, page.Text)
 		}

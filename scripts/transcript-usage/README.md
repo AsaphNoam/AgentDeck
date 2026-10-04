@@ -10,7 +10,7 @@ part of its input total—so do not add unlike columns into a synthetic total.
 scripts/transcript-usage/audit.py --from 2026-08-01 --to 2026-08-31 \
   --claude-root ~/.claude/projects --codex-root ~/.codex/sessions --json
 
-# Compare one AgentDeck project across both providers
-scripts/transcript-usage/audit.py --cwd /Users/mcnoam/Projects/AgentDeck \
+# Compare one Chuck project across both providers
+scripts/transcript-usage/audit.py --cwd /Users/mcnoam/Projects/Chuck \
   --from 2026-08-01 --to 2026-08-31 --json
 ```

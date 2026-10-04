@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // TestReadAllSkipsOversizedRecord guards the BLOCKING finding that a single

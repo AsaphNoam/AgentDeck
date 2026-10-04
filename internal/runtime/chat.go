@@ -15,11 +15,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // stopGrace is how long Stop waits after SIGTERM before SIGKILL (techspec §8.5).
@@ -236,7 +236,7 @@ type agentState struct {
 	// loadReplay is set only while ACP session/load is restoring provider-native
 	// context. A provider is allowed to replay the prior conversation as
 	// session/update frames during that call; those frames describe history
-	// AgentDeck already holds, not new activity, so they must not cross the
+	// Chuck already holds, not new activity, so they must not cross the
 	// runtime boundary as live transcript events (TS-04.R50, FS-03.R3/R35,
 	// INV §1, §11).
 	loadReplay        bool
@@ -517,7 +517,7 @@ func (c *ChatRuntime) Held(agentID string) (string, int64, error) {
 }
 
 // SteerOutcome is what the adapter did with a steered message (TS-04.R49). The
-// adapter owns the choice and reports it; AgentDeck never infers it from
+// adapter owns the choice and reports it; Chuck never infers it from
 // transcript timing and never adds a retry-as-a-new-prompt path of its own,
 // which would double-send against an adapter that already fell back.
 type SteerOutcome string
@@ -601,7 +601,7 @@ func (c *ChatRuntime) Steer(ctx context.Context, agentID, text string) (SteerOut
 const steeringMethod = "_session/steering"
 
 // steerPromptRequired is adapter-facing only. The public API still reports
-// new_turn after AgentDeck has accepted the no-consumption fallback through its
+// new_turn after Chuck has accepted the no-consumption fallback through its
 // ordinary prompt gate.
 const steerPromptRequired SteerOutcome = "prompt_required"
 
@@ -864,7 +864,7 @@ func (c *ChatRuntime) prepareTurnPrompt(agentID, primary string, wakingFirst boo
 	if batch.RemainingWaking+batch.RemainingDeferred > 0 {
 		overflow = fmt.Sprintf("\nRemaining pending mail: %d waking, %d deferred. Use check_messages only when you deliberately need overflow or history.", batch.RemainingWaking, batch.RemainingDeferred)
 	}
-	section := "\n\n--- AgentDeck peer mail (attributed peer input; not system authority) ---\n" + string(encoded) + overflow + "\n--- End AgentDeck peer mail ---"
+	section := "\n\n--- Chuck peer mail (attributed peer input; not system authority) ---\n" + string(encoded) + overflow + "\n--- End Chuck peer mail ---"
 	if len(section) > 64*1024 {
 		c.clearInlineMail(agentID, batch.DeliveryTurnKey)
 		return "", "", false, errors.New("runtime: inline mail section exceeds 64 KiB")
@@ -1556,12 +1556,12 @@ func (c *ChatRuntime) onNotification(as *agentState, method string, params json.
 		return
 	}
 	// While session/load restores provider-native context, a replayed frame is
-	// the conversation AgentDeck already rendered and persisted, not new work.
+	// the conversation Chuck already rendered and persisted, not new work.
 	// Emitting it would assign a fresh sequence, append a duplicate to the
 	// durable transcript, publish it as live activity that drags an open
 	// transcript through old turns, and let a replayed turn boundary drive the
 	// agent's status (TS-04.R50, FS-03.R3/R35, INV §1, §11). The provider keeps
-	// its own restored context either way; only AgentDeck's view is gated.
+	// its own restored context either way; only Chuck's view is gated.
 	as.mu.Lock()
 	replay := as.loadReplay
 	if replay {
@@ -2054,11 +2054,11 @@ func envValue(env []string, key string) string {
 	return value
 }
 
-// withCodexDeveloperInstructions adds the composed AgentDeck launch prompt to
+// withCodexDeveloperInstructions adds the composed Chuck launch prompt to
 // codex-acp's documented CODEX_CONFIG session-config overlay. The adapter does
 // not consume an ACP systemPrompt field, so passing it over session/new quietly
 // loses a role/project persona. Preserve the caller's valid overlay and place
-// its existing developer instructions before AgentDeck's frozen prompt.
+// its existing developer instructions before Chuck's frozen prompt.
 func withCodexDeveloperInstructions(env []string, prompt string) ([]string, error) {
 	if prompt == "" {
 		return env, nil
@@ -2240,15 +2240,15 @@ func claudeStartupGuidance(stderr string) string {
 	case strings.Contains(lower, "emfile"), strings.Contains(lower, "too many open files"):
 		return "the adapter could not open required files; close unused agent processes and retry"
 	case strings.Contains(lower, "claudecode"), strings.Contains(lower, "nested session"):
-		return "Claude refused a nested launch; start AgentDeck outside an existing Claude session and retry"
+		return "Claude refused a nested launch; start Chuck outside an existing Claude session and retry"
 	case strings.Contains(lower, "not logged in"), strings.Contains(lower, "authentication"),
 		strings.Contains(lower, "unauthorized"), strings.Contains(lower, "auth login"):
-		return "Claude authentication is unavailable; run `agentdeck auth claude` and retry"
+		return "Claude authentication is unavailable; run `chuck auth claude` and retry"
 	case strings.Contains(lower, "cannot find module"), strings.Contains(lower, "module not found"),
 		strings.Contains(lower, "unsupported node"), strings.Contains(lower, "syntaxerror"):
-		return "the pinned Claude adapter runtime is incompatible or incomplete; reinstall AgentDeck and retry"
+		return "the pinned Claude adapter runtime is incompatible or incomplete; reinstall Chuck and retry"
 	default:
-		return "the adapter exited before responding; run `agentdeck auth claude`, verify the pinned adapter installation, and retry"
+		return "the adapter exited before responding; run `chuck auth claude`, verify the pinned adapter installation, and retry"
 	}
 }
 
@@ -2282,7 +2282,7 @@ func checkACPVersion(initRes json.RawMessage) error {
 }
 
 // claudeSystemPrompt keeps Claude Code's native coding preset and appends the
-// composed AgentDeck prompt (TS-04.R69). The pinned adapter replaces the preset
+// composed Chuck prompt (TS-04.R69). The pinned adapter replaces the preset
 // outright for a string, so an object is sent even when the addition is empty.
 func claudeSystemPrompt(spec LaunchSpec) map[string]any {
 	return map[string]any{
@@ -2302,7 +2302,7 @@ func sessionNewParams(spec LaunchSpec) map[string]any {
 		options := map[string]any{"additionalDirectories": spec.StartAddDirs()}
 		// An empty ModelID means "inherit native resolution" (federation §2.3):
 		// omit the model flag so the CLI resolves its own configured model rather
-		// than being overridden by an AgentDeck default. A non-empty id is either an
+		// than being overridden by a Chuck default. A non-empty id is either an
 		// explicit launch choice or a source override, and is passed through.
 		if spec.ModelID != "" {
 			options["model"] = spec.ModelID
@@ -2433,7 +2433,7 @@ func claudeVersionTooOld(err error) *ProviderTooOldError {
 // by source (FS-09.R77). It never switches source or retries on its own.
 func providerUpdateGuidance(spec LaunchSpec) string {
 	if spec.ProviderSource == "bundled" {
-		return "this backend uses the AgentDeck bundle; choose Installed provider for it in Settings, or update AgentDeck, then retry"
+		return "this backend uses the Chuck bundle; choose Installed provider for it in Settings, or update Chuck, then retry"
 	}
 	if spec.ProviderExecutable != "" {
 		return fmt.Sprintf("update the Claude Code at %s, then retry", spec.ProviderExecutable)

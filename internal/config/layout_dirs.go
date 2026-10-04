@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// EnsureLayout creates every directory of the ~/.agentdeck/ layout (§3). It is
+// EnsureLayout creates every directory of the ~/.chuck/ layout (§3). It is
 // idempotent (mkdir -p semantics) and never deletes or overwrites existing data.
 // If home exists but is a regular file (not a directory) it returns a clear error.
 func (s *Store) EnsureLayout() error {

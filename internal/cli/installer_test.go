@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/AsaphNoam/Chuck/internal/release"
 	"github.com/creack/pty"
 )
 
@@ -24,15 +26,15 @@ func buildBootstrapFixture(t *testing.T, version, dir string) (archive, manifest
 	t.Helper()
 	versionDir := filepath.Join(dir, release.VersionDirName(version))
 	files := map[string]string{
-		"libexec/agentdeck": `#!/bin/sh
+		"libexec/chuck": `#!/bin/sh
 set -eu
 case "${1:-}:${2:-}" in
 release:install)
-  mkdir -p "$AGENTDECK_APP_ROOT/bin"
-  cp "$0" "$AGENTDECK_APP_ROOT/bin/agentdeck"
+  mkdir -p "$CHUCK_APP_ROOT/bin"
+  cp "$0" "$CHUCK_APP_ROOT/bin/chuck"
   ;;
-auth:*|dashboard:*) printf '%s\n' "$*" >> "$AGENTDECK_TEST_CALL_LOG" ;;
---version:*) echo "agentdeck version test" ;;
+auth:*|dashboard:*) printf '%s\n' "$*" >> "$CHUCK_TEST_CALL_LOG" ;;
+--version:*) echo "chuck version test" ;;
 esac
 `,
 		"runtime/node/bin/node": "#!/bin/sh\n",
@@ -55,11 +57,11 @@ esac
 	}
 	if err := release.WriteInternalManifest(versionDir, release.InternalManifest{
 		Version: version, Target: release.Target,
-		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0", "claude": "2.1.257", "codex": "0.154.0", "agentdeck": version},
+		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0", "claude": "2.1.257", "codex": "0.154.0", "chuck": version},
 	}); err != nil {
 		t.Fatal(err)
 	}
-	archive = filepath.Join(dir, "agentdeck-"+version+"-"+release.Target+".tar.gz")
+	archive = filepath.Join(dir, "chuck-"+version+"-"+release.Target+".tar.gz")
 	if err := release.CreateArchive(versionDir, archive); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +107,7 @@ out=""
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; shift ;; esac
 done
-case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$AGENTDECK_TEST_ARCHIVE" "$out" ;; esac`)
+case "$url" in *manifest.json) cp "$CHUCK_TEST_MANIFEST" "$out" ;; *) cp "$CHUCK_TEST_ARCHIVE" "$out" ;; esac`)
 
 	home := filepath.Join(fixture, "home")
 	appRoot := filepath.Join(fixture, "app")
@@ -115,17 +117,26 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	cmd.Env = append(os.Environ(),
 		"PATH="+fakeBin+":"+os.Getenv("PATH"),
 		"HOME="+home,
-		"AGENTDECK_APP_ROOT="+appRoot,
-		"AGENTDECK_TEST_ARCHIVE="+archive,
-		"AGENTDECK_TEST_MANIFEST="+manifest,
-		"AGENTDECK_TEST_CALL_LOG="+callLog,
+		"CHUCK_APP_ROOT="+appRoot,
+		"CHUCK_TEST_ARCHIVE="+archive,
+		"CHUCK_TEST_MANIFEST="+manifest,
+		"CHUCK_TEST_CALL_LOG="+callLog,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("bootstrap install: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(appRoot, "bin", "agentdeck")); err != nil {
+	if _, err := os.Stat(filepath.Join(appRoot, "bin", "chuck")); err != nil {
 		t.Fatalf("stable shim missing: %v", err)
+	}
+	// FS-10.A7: no old-named command or path anywhere in the install tree.
+	if err := filepath.WalkDir(appRoot, func(path string, _ fs.DirEntry, err error) error {
+		if err == nil && strings.Contains(strings.ToLower(filepath.Base(path)), "agentdeck") {
+			return fmt.Errorf("old-named install entry %s", path)
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if calls, err := os.ReadFile(callLog); err == nil && strings.TrimSpace(string(calls)) != "" {
 		t.Fatalf("non-interactive install invoked post-install commands: %q", calls)
@@ -133,7 +144,7 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	if _, err := os.Stat(filepath.Join(home, ".zshrc")); !os.IsNotExist(err) {
 		t.Fatalf("non-interactive install edited a shell profile: %v", err)
 	}
-	if !strings.Contains(string(out), "Start AgentDeck when ready") {
+	if !strings.Contains(string(out), "Start Chuck when ready") {
 		t.Fatalf("missing manual-start guidance: %s", out)
 	}
 }
@@ -156,9 +167,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; shift ;; esac
 done
 case "$url" in
-  *install.sh) cp "$AGENTDECK_TEST_BOOTSTRAP" "$out" ;;
-  *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;;
-  *) cp "$AGENTDECK_TEST_ARCHIVE" "$out" ;;
+  *install.sh) cp "$CHUCK_TEST_BOOTSTRAP" "$out" ;;
+  *manifest.json) cp "$CHUCK_TEST_MANIFEST" "$out" ;;
+  *) cp "$CHUCK_TEST_ARCHIVE" "$out" ;;
 esac`)
 
 	home := filepath.Join(fixture, "home")
@@ -182,17 +193,17 @@ esac`)
 		"PATH="+fakeBin+":"+os.Getenv("PATH"),
 		"HOME="+home,
 		"TMPDIR="+tmpDir,
-		"AGENTDECK_APP_ROOT="+appRoot,
-		"AGENTDECK_TEST_BOOTSTRAP="+installer,
-		"AGENTDECK_TEST_ARCHIVE="+archive,
-		"AGENTDECK_TEST_MANIFEST="+manifest,
-		"AGENTDECK_TEST_CALL_LOG="+callLog,
+		"CHUCK_APP_ROOT="+appRoot,
+		"CHUCK_TEST_BOOTSTRAP="+installer,
+		"CHUCK_TEST_ARCHIVE="+archive,
+		"CHUCK_TEST_MANIFEST="+manifest,
+		"CHUCK_TEST_CALL_LOG="+callLog,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("piped bootstrap install: %v\n%s", err, out)
 	}
-	if _, err := os.Stat(filepath.Join(appRoot, "bin", "agentdeck")); err != nil {
+	if _, err := os.Stat(filepath.Join(appRoot, "bin", "chuck")); err != nil {
 		t.Fatalf("stable shim missing: %v", err)
 	}
 	if calls, err := os.ReadFile(callLog); err == nil && strings.TrimSpace(string(calls)) != "" {
@@ -228,7 +239,7 @@ func TestBootstrapLockReexecPreservesNoStartAndNonInteractive(t *testing.T) {
 			}
 			writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
 			writeBootstrapCommand(t, fakeBin, "lockf", "while [ \"$#\" -gt 0 ]; do\n  case \"$1\" in\n    -k) shift ;;\n    -t) shift 2 ;;\n    *) break ;;\n  esac\ndone\nshift\nexec \"$@\"")
-			writeBootstrapCommand(t, fakeBin, "curl", "out=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) url=\"$1\"; shift ;; esac\ndone\ncase \"$url\" in *manifest.json) cp \"$AGENTDECK_TEST_MANIFEST\" \"$out\" ;; *) cp \"$AGENTDECK_TEST_ARCHIVE\" \"$out\" ;; esac")
+			writeBootstrapCommand(t, fakeBin, "curl", "out=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) url=\"$1\"; shift ;; esac\ndone\ncase \"$url\" in *manifest.json) cp \"$CHUCK_TEST_MANIFEST\" \"$out\" ;; *) cp \"$CHUCK_TEST_ARCHIVE\" \"$out\" ;; esac")
 
 			home := filepath.Join(fixture, "home")
 			appRoot := filepath.Join(fixture, "app")
@@ -238,10 +249,10 @@ func TestBootstrapLockReexecPreservesNoStartAndNonInteractive(t *testing.T) {
 			cmd.Env = append(os.Environ(),
 				"PATH="+fakeBin+":"+filepath.Join(appRoot, "bin")+":"+os.Getenv("PATH"),
 				"HOME="+home,
-				"AGENTDECK_APP_ROOT="+appRoot,
-				"AGENTDECK_TEST_ARCHIVE="+archive,
-				"AGENTDECK_TEST_MANIFEST="+manifest,
-				"AGENTDECK_TEST_CALL_LOG="+callLog,
+				"CHUCK_APP_ROOT="+appRoot,
+				"CHUCK_TEST_ARCHIVE="+archive,
+				"CHUCK_TEST_MANIFEST="+manifest,
+				"CHUCK_TEST_CALL_LOG="+callLog,
 			)
 			ptmx, err := pty.Start(cmd)
 			if err != nil {
@@ -295,15 +306,15 @@ func TestBootstrapContenderExitsDuringDownload(t *testing.T) {
 	}
 	writeBootstrapCommand(t, fakeBin, "uname", `case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; *) exit 1 ;; esac`)
 	writeBootstrapCommand(t, fakeBin, "curl", `
-if [ -n "${AGENTDECK_TEST_CURL_STARTED:-}" ]; then
-  : > "$AGENTDECK_TEST_CURL_STARTED"
+if [ -n "${CHUCK_TEST_CURL_STARTED:-}" ]; then
+  : > "$CHUCK_TEST_CURL_STARTED"
   sleep 2
 fi
 out=""
 while [ "$#" -gt 0 ]; do
   case "$1" in -o) out="$2"; shift 2 ;; *) url="$1"; shift ;; esac
 done
-case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$AGENTDECK_TEST_ARCHIVE" "$out" ;; esac`)
+case "$url" in *manifest.json) cp "$CHUCK_TEST_MANIFEST" "$out" ;; *) cp "$CHUCK_TEST_ARCHIVE" "$out" ;; esac`)
 
 	home := filepath.Join(fixture, "home")
 	appRoot := filepath.Join(fixture, "app")
@@ -312,12 +323,12 @@ case "$url" in *manifest.json) cp "$AGENTDECK_TEST_MANIFEST" "$out" ;; *) cp "$A
 	baseEnv := append(os.Environ(),
 		"PATH="+fakeBin+":"+os.Getenv("PATH"),
 		"HOME="+home,
-		"AGENTDECK_APP_ROOT="+appRoot,
-		"AGENTDECK_TEST_ARCHIVE="+archive,
-		"AGENTDECK_TEST_MANIFEST="+manifest,
+		"CHUCK_APP_ROOT="+appRoot,
+		"CHUCK_TEST_ARCHIVE="+archive,
+		"CHUCK_TEST_MANIFEST="+manifest,
 	)
 	first := exec.Command("bash", installer, "--version", "1.0.0", "--non-interactive")
-	first.Env = append(baseEnv, "AGENTDECK_TEST_CURL_STARTED="+started)
+	first.Env = append(baseEnv, "CHUCK_TEST_CURL_STARTED="+started)
 	if err := first.Start(); err != nil {
 		t.Fatal(err)
 	}

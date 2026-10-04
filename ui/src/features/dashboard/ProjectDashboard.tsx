@@ -203,7 +203,7 @@ export function ProjectArchiveDialog({ id, title, ownsCheckout, error, pending, 
   const dirtyLine = checkingStatus
     ? "Checking for uncommitted changes…"
     : status.isError || !status.data || !status.data.dirty_known
-      ? "AgentDeck could not read this checkout, so it cannot tell whether it holds uncommitted changes."
+      ? "Chuck could not read this checkout, so it cannot tell whether it holds uncommitted changes."
       : status.data.dirty
         ? "This checkout holds uncommitted changes, which deleting it would lose."
         : "This checkout has no uncommitted changes.";

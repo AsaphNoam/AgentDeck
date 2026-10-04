@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/credcheck"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // testServerWithOkCreds builds a server that returns "ok" for all cred checks.
@@ -48,7 +48,7 @@ func TestGetBackendsFallsBackForIncompleteDocument(t *testing.T) {
 // never reports a bundled/default path or version.
 func TestGetBackendsKeepsDeprecatedCodexRuntimeUnverified(t *testing.T) {
 	t.Setenv("CODEX_PATH", "/private/runtime/codex")
-	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	t.Setenv("CHUCK_CODEX_VERSION", "0.144.0")
 	srv := testServer(t, false)
 	rec := doGET(t, srv.routes(), "/api/backends")
 	var got map[string]json.RawMessage

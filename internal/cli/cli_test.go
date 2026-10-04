@@ -167,7 +167,7 @@ func TestVersionFlag(t *testing.T) {
 		t.Fatalf("--version: %v", err)
 	}
 	s := out.String()
-	if !strings.Contains(s, "agentdeck version") || strings.TrimSpace(s) == "agentdeck version" {
+	if !strings.Contains(s, "chuck version") || strings.TrimSpace(s) == "chuck version" {
 		t.Fatalf("--version output = %q, want non-empty version line", s)
 	}
 }

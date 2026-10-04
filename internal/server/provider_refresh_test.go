@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
-	"github.com/agentdeck/agentdeck/internal/config"
-	rt "github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/backend/credcheck"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	rt "github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // refreshFixture seeds one Claude backend whose provider is a marker script
@@ -100,7 +100,7 @@ func TestRefreshProviderObservesVersionWithoutExecOnRead(t *testing.T) {
 	if etagAfter != etag {
 		t.Fatal("runtime metadata changed the catalog ETag")
 	}
-	if strings.Contains(string(mustRead(t, filepath.Join(os.Getenv("AGENTDECK_HOME"), "backends.json"))), "2.1.300") {
+	if strings.Contains(string(mustRead(t, filepath.Join(os.Getenv("CHUCK_HOME"), "backends.json"))), "2.1.300") {
 		t.Fatal("runtime metadata was persisted")
 	}
 }

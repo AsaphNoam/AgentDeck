@@ -15,15 +15,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/remote"
 )
 
-// In the `dev` build only, AGENTDECK_DEV_FAKE_TAILNET=localhost:<port> swaps
+// In the `dev` build only, CHUCK_DEV_FAKE_TAILNET=localhost:<port> swaps
 // the embedded tailnet node for a local HTTPS listener with a self-signed
 // certificate and one fixed peer, so the phone app can be driven in a local
 // browser. Release builds never contain this file (TS-06.R27).
 func init() {
-	addr := os.Getenv("AGENTDECK_DEV_FAKE_TAILNET")
+	addr := os.Getenv("CHUCK_DEV_FAKE_TAILNET")
 	if addr == "" {
 		return
 	}

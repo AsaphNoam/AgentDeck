@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	rt "github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	rt "github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func TestITermLaunchCommandKeepsEnvironmentSecretsOutOfVisibleCommand(t *testing.T) {
 	command, envPath, err := itermLaunchCommand(TabSpec{
 		Command: []string{"claude", "--model", "sonnet"},
-		Env:     []string{"API_KEY=secret value", "AGENTDECK_HOOK_TOKEN=hook-secret"},
+		Env:     []string{"API_KEY=secret value", "CHUCK_HOOK_TOKEN=hook-secret"},
 	})
 	if err != nil {
 		t.Fatal(err)

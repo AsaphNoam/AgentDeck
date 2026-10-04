@@ -85,7 +85,7 @@ func itermLaunchCommand(spec TabSpec) (string, string, error) {
 	if len(spec.Env) == 0 {
 		return command, "", nil
 	}
-	tmp, err := os.CreateTemp("", "agentdeck-iterm-env-*")
+	tmp, err := os.CreateTemp("", "chuck-iterm-env-*")
 	if err != nil {
 		return "", "", fmt.Errorf("terminal: reserve iTerm environment path: %w", err)
 	}

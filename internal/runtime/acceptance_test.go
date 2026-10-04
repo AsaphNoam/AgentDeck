@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func acceptanceCmd() string {

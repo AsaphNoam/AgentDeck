@@ -63,11 +63,11 @@ describe("ScopedProjectDashboard worktree surface", () => {
     server.use(http.get("/api/projects", () => HttpResponse.json({
       fork: {
         title: "Fork", color: [100, 116, 139], cwd: "/home/wt/fork", add_dirs: [], context_prompt: "",
-        archived: false, repo_backed: true, worktree: { owned: true, branch: "agentdeck/fork" },
+        archived: false, repo_backed: true, worktree: { owned: true, branch: "chuck/fork" },
       },
     })));
     renderScoped("fork");
-    expect(await screen.findByText("⑂ agentdeck/fork")).toBeInTheDocument();
+    expect(await screen.findByText("⑂ chuck/fork")).toBeInTheDocument();
   });
 
   it("opens the creation form from the header", async () => {

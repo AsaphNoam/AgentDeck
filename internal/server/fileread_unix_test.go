@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // nonRegularRoot returns a working directory whose path is short enough for a

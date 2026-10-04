@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func decodeTask(t *testing.T, body []byte) state.Task {

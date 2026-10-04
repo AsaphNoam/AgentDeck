@@ -13,7 +13,7 @@ const server = setupServer(
     return HttpResponse.json({
       agent_id: "a_archive",
       events: [
-        { seq: 1, type: "session_meta", ts: "t1", data: { name: "Atlas", project: "agentdeck", backend: "codex", model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
+        { seq: 1, type: "session_meta", ts: "t1", data: { name: "Atlas", project: "chuck", backend: "codex", model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
         { seq: 2, type: "assistant_text", ts: "t2", data: { delta: "Sure, " } },
         { seq: 3, type: "assistant_text", ts: "t3", data: { delta: "I'll " } },
         { seq: 4, type: "assistant_text", ts: "t4", data: { delta: "do that." } },
@@ -37,9 +37,9 @@ describe("ArchiveAgentPage switched session identity", () => {
     server.use(http.get("/api/sessions/a_switched/transcript", () => HttpResponse.json({
       agent_id: "a_switched",
       events: [
-        { seq: 1, type: "session_meta", ts: "t1", data: { name: "Atlas", project: "agentdeck", backend: "codex", model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
+        { seq: 1, type: "session_meta", ts: "t1", data: { name: "Atlas", project: "chuck", backend: "codex", model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
         { seq: 2, type: "assistant_text", ts: "t2", data: { delta: "working" } },
-        { seq: 3, type: "session_meta", ts: "t3", data: { name: "Atlas", project: "agentdeck", backend: "claude", model: "sonnet", interface: "chat", created_at: "2026-07-24T12:30:00Z", resumed_at: "2026-07-25T09:00:00Z" } },
+        { seq: 3, type: "session_meta", ts: "t3", data: { name: "Atlas", project: "chuck", backend: "claude", model: "sonnet", interface: "chat", created_at: "2026-07-24T12:30:00Z", resumed_at: "2026-07-25T09:00:00Z" } },
       ],
     })));
 
@@ -51,8 +51,8 @@ describe("ArchiveAgentPage switched session identity", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("agentdeck · claude · sonnet · Normal speed")).toBeInTheDocument();
-    expect(screen.queryByText("agentdeck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
+    expect(await screen.findByText("chuck · claude · sonnet · Normal speed")).toBeInTheDocument();
+    expect(screen.queryByText("chuck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
   });
@@ -71,7 +71,7 @@ describe("ArchiveAgentPage", () => {
     expect(await screen.findByText("Sure, I'll do that.")).toBeInTheDocument();
     expect(document.querySelectorAll("article.assistant-message")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
-    expect(screen.getByText("agentdeck · codex · gpt-5.6-sol · Normal speed")).toBeInTheDocument();
+    expect(screen.getByText("chuck · codex · gpt-5.6-sol · Normal speed")).toBeInTheDocument();
     expect(screen.getByText(/Archived · read-only/)).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
   });

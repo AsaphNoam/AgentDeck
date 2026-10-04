@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/configsource"
+	"github.com/AsaphNoam/Chuck/internal/backend/credcheck"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/configsource"
 )
 
 // FS-04.A20 (R40) / FS-08.A11 (R34) / FS-09.A20 (R47) — item-scoped backend

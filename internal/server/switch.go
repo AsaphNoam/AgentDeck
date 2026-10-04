@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // switchCancelTimeout bounds the wait for an in-flight turn to settle before the
@@ -44,7 +44,7 @@ type switchRuntimeResponse struct {
 // handleSwitchRuntime implements POST /api/sessions/{id}/switch-runtime
 // (techspec §5.1–5.4): stop the current runtime, persist the new identity, and
 // resume on the same agent_id. Same-backend compatible switches use native
-// resume; cross-backend/incompatible switches use a bounded AgentDeck transcript
+// resume; cross-backend/incompatible switches use a bounded Chuck transcript
 // history primer.
 func (s *Server) handleSwitchRuntime(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

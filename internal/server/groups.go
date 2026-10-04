@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 const releaseGroupWorkers = 4

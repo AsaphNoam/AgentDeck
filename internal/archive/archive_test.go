@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // TestEmptyArchiveMarshalsResultsArray guards the J8/S1 blocker: an empty archive

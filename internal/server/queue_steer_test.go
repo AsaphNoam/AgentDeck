@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // busyChatServer launches one chat agent on the hold_turn scenario and leaves a

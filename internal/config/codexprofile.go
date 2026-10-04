@@ -12,9 +12,9 @@ import (
 
 // Codex session-isolation profile (FS-09.R43/R44, TS-02.R19, TS-04.R20/R21).
 //
-// AgentDeck runs every codex-acp child with CODEX_HOME pointed at a private,
+// Chuck runs every codex-acp child with CODEX_HOME pointed at a private,
 // owner-only directory (`<home>/codex`) so the child's rollouts and native
-// session index stay there and AgentDeck-created Codex conversations never enter
+// session index stay there and Chuck-created Codex conversations never enter
 // the user's personal `codex` resume picker or app history. The child still needs
 // the user's real Codex setup, so before every child start this file makes a
 // one-way managed mirror of the personal Codex home's SETUP into the profile:
@@ -54,7 +54,7 @@ var codexSetupEntries = map[string]struct{}{
 	"plugins":         {}, // plugins
 }
 
-// codexProfileManifest records only the top-level destination names AgentDeck
+// codexProfileManifest records only the top-level destination names Chuck
 // refreshed into the profile, so a later personal removal removes the stale
 // private copy without ever touching the child's own session/history data or any
 // other unmanaged Codex state (TS-02.R19).
@@ -73,8 +73,8 @@ var codexProfileMu sync.Mutex
 // generation (INV §5/§15).
 var writeCodexProfileManifest = writeJSONAtomic
 
-// CodexProfileDir returns the AgentDeck-owned CODEX_HOME for codex-acp children
-// under the given AgentDeck home. It is the single source of truth for both the
+// CodexProfileDir returns the Chuck-owned CODEX_HOME for codex-acp children
+// under the given Chuck home. It is the single source of truth for both the
 // composed child-env value and the refresh target (INV §2).
 func CodexProfileDir(home string) string {
 	return filepath.Join(home, dirCodexProfile)
@@ -111,7 +111,7 @@ func WithRefreshedCodexProfile(profileDir string, start func() error) error {
 
 func refreshCodexProfile(profileDir string) error {
 	// Resolve and reject source/profile overlap before creating or chmodding the
-	// destination. In particular, CODEX_HOME=<agentdeck-home> must not cause us
+	// destination. In particular, CODEX_HOME=<chuck-home> must not cause us
 	// to create the profile inside the personal source before rejecting it.
 	root, err := resolveCodexSource(profileDir)
 	if err != nil {
@@ -455,7 +455,7 @@ func isSafeCodexName(name string) bool {
 }
 
 // personalCodexHome resolves the user's effective personal Codex home from the
-// AgentDeck process environment: `$CODEX_HOME` if set, else `~/.codex`. AgentDeck
+// Chuck process environment: `$CODEX_HOME` if set, else `~/.codex`. Chuck
 // never rewrites its own CODEX_HOME, so this always names the real personal home
 // even while children run with the isolated one (FS-09.R44).
 func personalCodexHome() (string, error) { return PersonalCodexHome() }

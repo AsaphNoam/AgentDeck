@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"syscall"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // ReconcileStale is called on server start. It scans the running rows for stale

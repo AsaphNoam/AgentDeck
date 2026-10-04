@@ -88,7 +88,7 @@ describe("BackendStep", () => {
   });
 
   // FS-04.R33: onboarding no longer asks for model identifiers at all. The step
-  // must present neither an AgentDeck model id nor a provider model string.
+  // must present neither a Chuck model id nor a provider model string.
   it("asks for no model id or provider model string", async () => {
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
     await waitForLoaded();
@@ -146,7 +146,7 @@ describe("BackendStep", () => {
   });
 
   // FS-10.R23/A10: a missing installed Claude points at installation or the
-  // explicit AgentDeck bundle, not at credentials.
+  // explicit Chuck bundle, not at credentials.
   it("explains a missing provider in human terms", async () => {
     server.use(
       http.put("/api/backends", () =>
@@ -159,7 +159,7 @@ describe("BackendStep", () => {
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
     await waitForLoaded();
     fireEvent.click(screen.getByText("Validate & Continue"));
-    expect(await screen.findByText(/Claude Code was not found.*choose AgentDeck bundle/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Claude Code was not found.*choose Chuck bundle/i)).toBeInTheDocument();
     expect(screen.queryByText(/cli_not_installed/)).toBeNull();
   });
 
@@ -178,7 +178,7 @@ describe("BackendStep", () => {
     renderWithQuery(<BackendStep onDone={vi.fn()} />);
     await waitForLoaded();
     fireEvent.click(screen.getByText("Validate & Continue"));
-    expect(await screen.findByText(/too old for AgentDeck's readiness check/i)).toBeInTheDocument();
+    expect(await screen.findByText(/too old for Chuck's readiness check/i)).toBeInTheDocument();
     expect(screen.queryByText(/sign-in or API key/i)).toBeNull();
     expect(screen.queryByText(/cli_incompatible/)).toBeNull();
     expect(screen.getByText("Check again")).toBeInTheDocument();
@@ -201,7 +201,7 @@ describe("BackendStep", () => {
     renderWithQuery(<BackendStep onDone={onDone} />);
     await waitForLoaded();
 
-    expect(screen.getByText(/agentdeck auth claude/)).toBeInTheDocument();
+    expect(screen.getByText(/chuck auth claude/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Validate & Continue"));
     expect(await screen.findByText(/is not signed in/i)).toBeInTheDocument();
@@ -221,7 +221,7 @@ describe("BackendStep", () => {
 
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "codex-acp" } });
 
-    expect(screen.getByText(/agentdeck auth codex/)).toBeInTheDocument();
+    expect(screen.getByText(/chuck auth codex/)).toBeInTheDocument();
     expect(screen.getByText(/OpenAI API key \(optional\)/i)).toBeInTheDocument();
     expect(screen.getByText(/only an alternative/i)).toBeInTheDocument();
   });

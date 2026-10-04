@@ -4,6 +4,6 @@
 # handoff sections by name only when this header or the task points at them.
 H="${CLAUDE_PROJECT_DIR:-.}/docs/features/HANDOFF.md"
 [ -f "$H" ] || exit 0
-echo "AgentDeck handoff — current position and active change (auto-injected; this is the handoff read, AGENT-WORKFLOW §1.1 — do not re-read the file, open other sections by name only when this points at them):"
+echo "Chuck handoff — current position and active change (auto-injected; this is the handoff read, AGENT-WORKFLOW §1.1 — do not re-read the file, open other sections by name only when this points at them):"
 awk '/^## /{n++} n==3{exit} {print}' "$H"
 exit 0

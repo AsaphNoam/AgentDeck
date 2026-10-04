@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	adapter "github.com/agentdeck/agentdeck/internal/backend"
+	adapter "github.com/AsaphNoam/Chuck/internal/backend"
 )
 
 // ValidSlug reports whether s is a valid role/project id. The id must begin
@@ -32,8 +32,8 @@ const projectIDTimestamp = len("-20060102t150405z")
 
 // GenerateProjectID derives a unique, filesystem-safe project id from a title
 // (FS-04.R31). The result is a lowercase slug of the title plus a local-time
-// timestamp suffix, e.g. title "AgentDeck Demo" at 2026-07-14 20:28:25 local ->
-// "agentdeck-demo-20260714t202825z". The whole id always satisfies ValidSlug.
+// timestamp suffix, e.g. title "Chuck Demo" at 2026-07-14 20:28:25 local ->
+// "chuck-demo-20260714t202825z". The whole id always satisfies ValidSlug.
 // Callers that supply their own id bypass this; it is only used when POST
 // /api/projects omits the id.
 func GenerateProjectID(title string, now time.Time) string {
@@ -231,7 +231,7 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 				errs = append(errs, FieldError{
 					Field:   fmt.Sprintf("backends.%s.provider_mode", id),
 					Code:    "unsupported",
-					Message: "an AgentDeck bundle is available only for Claude and Codex backends",
+					Message: "a Chuck bundle is available only for Claude and Codex backends",
 				})
 			}
 		default:

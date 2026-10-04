@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // Reasoning is live-only runtime activity (FS-03.R57, TS-01.R35, TS-04.R63):

@@ -14,7 +14,7 @@ function proposedName() {
   return "Phone";
 }
 
-const startAgain = "That code did not work. Show a new code in AgentDeck on your Mac and try again.";
+const startAgain = "That code did not work. Show a new code in Chuck on your Mac and try again.";
 
 export function PairScreen({ onPaired }: { onPaired: () => void }) {
   const [code, setCode] = useState(() => window.location.hash.replace(/^#/, "").toUpperCase());
@@ -32,11 +32,11 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
   if (isIOS() && !isStandalone()) {
     return (
       <main className="phone-screen phone-center">
-        <h1>Add AgentDeck to your Home Screen</h1>
+        <h1>Add Chuck to your Home Screen</h1>
         <p>On iPhone, pairing has to happen inside the installed app.</p>
         <ol className="phone-steps">
           <li>Tap the Share button, then <strong>Add to Home Screen</strong>.</li>
-          <li>Open AgentDeck from your Home Screen.</li>
+          <li>Open Chuck from your Home Screen.</li>
           <li>Enter the pairing code there{code ? ":" : "."}</li>
         </ol>
         {code && <p className="phone-code">{code}</p>}
@@ -68,7 +68,7 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
       <main className="phone-screen phone-center" aria-live="polite">
         <h1>Allow this phone on your Mac</h1>
         <p>
-          AgentDeck on your Mac is asking <strong>Allow this phone?</strong> for “{name.trim()}”.
+          Chuck on your Mac is asking <strong>Allow this phone?</strong> for “{name.trim()}”.
         </p>
       </main>
     );
@@ -78,7 +78,7 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
     <main className="phone-screen phone-center">
       <h1>Pair this phone</h1>
       <p>
-        On your Mac, open AgentDeck → Settings → Remote → <strong>Pair a phone</strong>. This phone needs the Tailscale app,
+        On your Mac, open Chuck → Settings → Remote → <strong>Pair a phone</strong>. This phone needs the Tailscale app,
         signed in to the same tailnet.
       </p>
       <form
@@ -115,7 +115,7 @@ export function UnpairedScreen({ onPairAgain }: { onPairAgain: () => void }) {
   return (
     <main className="phone-screen phone-center">
       <h1>This phone was unpaired</h1>
-      <p>It can no longer see or control AgentDeck. Pair it again from AgentDeck on your Mac.</p>
+      <p>It can no longer see or control Chuck. Pair it again from Chuck on your Mac.</p>
       <button
         type="button"
         className="phone-primary"

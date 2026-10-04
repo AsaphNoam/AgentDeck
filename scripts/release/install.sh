@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# install.sh — install AgentDeck from GitHub Releases on an Apple-silicon Mac.
+# install.sh — install Chuck from GitHub Releases on an Apple-silicon Mac.
 #
-# This bootstrap downloads a pre-built, self-contained release (the AgentDeck
+# This bootstrap downloads a pre-built, self-contained release (the Chuck
 # binary, a private Node runtime, the official Claude/Codex ACP adapters, and
 # one bundled Claude Code/Codex a backend may explicitly choose; by default
 # backends use the user's own installed providers, FS-10.R23),
 # verifies its SHA-256, and hands off to the bundled binary's own verified,
-# atomic install transaction (`agentdeck release install`). It never compiles Go,
+# atomic install transaction (`chuck release install`). It never compiles Go,
 # runs npm, builds the UI, or installs anything globally (FS-10.R1–R3, TS-06.R17).
 #
 # Requirements: macOS on Apple silicon (arm64) and the standard command-line
@@ -20,25 +20,25 @@
 #   ./install.sh [--version X.Y.Z] [--no-start] [--non-interactive]
 #
 # Environment overrides:
-#   AGENTDECK_VERSION   pin a version (same as --version)
-#   AGENTDECK_REPO      GitHub owner/repo (default: AsaphNoam/AgentDeck)
-#   AGENTDECK_APP_ROOT  application root (default: ~/Library/Application Support/AgentDeck)
+#   CHUCK_VERSION   pin a version (same as --version)
+#   CHUCK_REPO      GitHub owner/repo (default: AsaphNoam/Chuck)
+#   CHUCK_APP_ROOT  application root (default: ~/Library/Application Support/Chuck)
 
 # The documented `curl | bash` form gives Bash no script path: `$0` is simply
 # `bash`. The operation lock must re-execute the entire bootstrap, so first
 # materialize that input as a private temporary file. Running a downloaded file
 # directly skips this small bootstrap step.
 if [ ! -f "$0" ]; then
-  bootstrap="$(mktemp "${TMPDIR:-/tmp}/agentdeck-bootstrap.XXXXXX")" || {
+  bootstrap="$(mktemp "${TMPDIR:-/tmp}/chuck-bootstrap.XXXXXX")" || {
     echo "error: could not create a temporary installer file" >&2
     exit 1
   }
   trap 'rm -f "$bootstrap"' EXIT
-  bootstrap_repo="${AGENTDECK_REPO:-AsaphNoam/AgentDeck}"
+  bootstrap_repo="${CHUCK_REPO:-AsaphNoam/Chuck}"
   if ! curl -fsSL --proto '=https' \
     "https://github.com/${bootstrap_repo}/releases/latest/download/install.sh" \
     -o "$bootstrap"; then
-    echo "error: could not download the AgentDeck installer (check your network and retry)" >&2
+    echo "error: could not download the Chuck installer (check your network and retry)" >&2
     exit 1
   fi
   chmod 700 "$bootstrap" || {
@@ -49,19 +49,19 @@ if [ ! -f "$0" ]; then
   # cannot delete a file the replacement still has to read. Hand the path down
   # instead: the last process to read the script — the lock-holding child —
   # removes it on every exit path (invariant §4).
-  export AGENTDECK_BOOTSTRAP_FILE="$bootstrap"
+  export CHUCK_BOOTSTRAP_FILE="$bootstrap"
   exec bash "$bootstrap" "$@"
 fi
 
 set -euo pipefail
 umask 077
 
-REPO="${AGENTDECK_REPO:-AsaphNoam/AgentDeck}"
-VERSION="${AGENTDECK_VERSION:-}"
+REPO="${CHUCK_REPO:-AsaphNoam/Chuck}"
+VERSION="${CHUCK_VERSION:-}"
 TARGET="darwin-arm64"
 NO_START=0
 NONINTERACTIVE=0
-app_root="${AGENTDECK_APP_ROOT:-$HOME/Library/Application Support/AgentDeck}"
+app_root="${CHUCK_APP_ROOT:-$HOME/Library/Application Support/Chuck}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -76,16 +76,16 @@ confirm() {
   case "$answer" in y|Y|yes|YES|Yes) return 0 ;; *) return 1 ;; esac
 }
 
-# append_path_entry adds exactly one AgentDeck-owned PATH entry. The installer
+# append_path_entry adds exactly one Chuck-owned PATH entry. The installer
 # only calls it after an interactive confirmation, never in CI or a piped run
 # (FS-10.R12). The root is emitted in a double-quoted shell string with the
-# special characters escaped first, so a custom AGENTDECK_APP_ROOT cannot alter
+# special characters escaped first, so a custom CHUCK_APP_ROOT cannot alter
 # the shell profile syntax.
 append_path_entry() {
   profile="${ZDOTDIR:-$HOME}/.zshrc"
-  marker="# Added by AgentDeck installer"
+  marker="# Added by Chuck installer"
   if [ -f "$profile" ] && grep -Fqx "$marker" "$profile"; then
-    echo "==> AgentDeck PATH entry is already in ${profile}"
+    echo "==> Chuck PATH entry is already in ${profile}"
     return 0
   fi
   parent="$(dirname "$profile")"
@@ -95,7 +95,7 @@ append_path_entry() {
     printf '\n%s\n' "$marker"
     printf 'export PATH="%s:$PATH"\n' "$escaped_root"
   } >>"$profile" || return 1
-  echo "==> Added ${app_root}/bin to PATH in ${profile}. Open a new terminal to use 'agentdeck'."
+  echo "==> Added ${app_root}/bin to PATH in ${profile}. Open a new terminal to use 'chuck'."
 }
 
 # --- Parse arguments -------------------------------------------------------
@@ -122,7 +122,7 @@ fi
 os="$(uname -s)"
 arch="$(uname -m)"
 if [ "$os" != "Darwin" ] || [ "$arch" != "arm64" ]; then
-  die "AgentDeck's release installer currently supports only macOS on Apple silicon (arm64).
+  die "Chuck's release installer currently supports only macOS on Apple silicon (arm64).
 Detected: ${os}/${arch}. Build from source instead: https://github.com/${REPO}#build-from-source"
 fi
 
@@ -136,7 +136,7 @@ done
 # the bundled binary receives --lock-held when it takes over activation. A
 # contender therefore exits before it can change the selected runtime or stage
 # another release (FS-10.R13, TS-06.R19).
-if [ "${AGENTDECK_INSTALL_LOCK_HELD:-}" != "1" ]; then
+if [ "${CHUCK_INSTALL_LOCK_HELD:-}" != "1" ]; then
   mkdir -p "$app_root" || die "could not create application root: ${app_root}"
   chmod 700 "$app_root" || die "could not secure application root: ${app_root}"
   : >"$app_root/install.lock" || die "could not create install lock"
@@ -152,7 +152,7 @@ if [ "${AGENTDECK_INSTALL_LOCK_HELD:-}" != "1" ]; then
     set -- "$@" --non-interactive
   fi
   exec lockf -k -t 0 "$app_root/install.lock" env \
-    AGENTDECK_INSTALL_LOCK_HELD=1 AGENTDECK_VERSION="$VERSION" "$0" "$@"
+    CHUCK_INSTALL_LOCK_HELD=1 CHUCK_VERSION="$VERSION" "$0" "$@"
 fi
 
 # Only the lock holder reaches this point, and it is the last process to read the
@@ -163,10 +163,10 @@ fi
 # mktemp produces, so a real `bash install.sh` can never delete its own input.
 staging=""
 bootstrap_file=""
-case "${AGENTDECK_BOOTSTRAP_FILE:-}" in
-  */agentdeck-bootstrap.??????)
-    if [ -f "$AGENTDECK_BOOTSTRAP_FILE" ] && [ "$AGENTDECK_BOOTSTRAP_FILE" = "$0" ]; then
-      bootstrap_file="$AGENTDECK_BOOTSTRAP_FILE"
+case "${CHUCK_BOOTSTRAP_FILE:-}" in
+  */chuck-bootstrap.??????)
+    if [ -f "$CHUCK_BOOTSTRAP_FILE" ] && [ "$CHUCK_BOOTSTRAP_FILE" = "$0" ]; then
+      bootstrap_file="$CHUCK_BOOTSTRAP_FILE"
     fi
     ;;
 esac
@@ -193,12 +193,12 @@ if [ -z "$VERSION" ]; then
   VERSION="${tag#v}"
 fi
 tag="v${VERSION}"
-archive_name="agentdeck-${VERSION}-${TARGET}.tar.gz"
+archive_name="chuck-${VERSION}-${TARGET}.tar.gz"
 
 # --- Download to a same-run staging dir ------------------------------------
-staging="$(mktemp -d "${TMPDIR:-/tmp}/agentdeck-install.XXXXXX")"
+staging="$(mktemp -d "${TMPDIR:-/tmp}/chuck-install.XXXXXX")"
 
-echo "==> Downloading AgentDeck ${VERSION} (${TARGET})"
+echo "==> Downloading Chuck ${VERSION} (${TARGET})"
 curl -fSL --proto '=https' "${dl}/${tag}/${archive_name}" -o "${staging}/${archive_name}" \
   || die "download failed for ${archive_name} (release ${tag} may not exist for this platform)"
 curl -fsSL --proto '=https' "${dl}/${tag}/manifest.json" -o "${staging}/manifest.json" \
@@ -222,7 +222,7 @@ echo "==> Checksum verified"
 # The bundled binary re-verifies the archive and performs the real atomic,
 # staged install into the application root (INV §2: one verified transaction).
 tar -xzf "${staging}/${archive_name}" -C "${staging}"
-bundled="${staging}/agentdeck-${VERSION}-${TARGET}/libexec/agentdeck"
+bundled="${staging}/chuck-${VERSION}-${TARGET}/libexec/chuck"
 [ -x "$bundled" ] || die "release archive is missing its bundled binary (corrupt download)"
 
 echo "==> Installing"
@@ -232,16 +232,16 @@ echo "==> Installing"
   --lock-held
 
 # --- Report the stable command --------------------------------------------
-shim="${app_root}/bin/agentdeck"
+shim="${app_root}/bin/chuck"
 echo
-echo "AgentDeck ${VERSION} is installed."
+echo "Chuck ${VERSION} is installed."
 echo "  command: ${shim}"
 echo
 
 if ! on_path "${app_root}/bin"; then
   echo
   echo "note: ${app_root}/bin is not on your PATH."
-  if [ "$INTERACTIVE" = "1" ] && confirm "Add the AgentDeck command directory to ${ZDOTDIR:-$HOME}/.zshrc?"; then
+  if [ "$INTERACTIVE" = "1" ] && confirm "Add the Chuck command directory to ${ZDOTDIR:-$HOME}/.zshrc?"; then
     append_path_entry || echo "could not update your zsh profile; use the absolute command path above."
   else
     echo "Use the absolute command path above, or add it to your shell profile later."
@@ -250,7 +250,7 @@ fi
 
 if [ "$INTERACTIVE" = "1" ]; then
   # Exit 3: no usable Claude provider yet. The command already printed install
-  # or AgentDeck-bundle guidance; skip sign-in rather than fail (FS-10.R23).
+  # or Chuck-bundle guidance; skip sign-in rather than fail (FS-10.R23).
   claude_status=0
   "$shim" auth claude --check || claude_status=$?
   if [ "$claude_status" = "0" ] || [ "$claude_status" = "3" ]; then
@@ -264,7 +264,7 @@ fi
 
 if [ "$NO_START" = "1" ] || [ "$INTERACTIVE" != "1" ]; then
   echo
-  echo "Start AgentDeck when ready: \"${shim}\" dashboard start --detach"
+  echo "Start Chuck when ready: \"${shim}\" dashboard start --detach"
   exit 0
 fi
 
@@ -277,7 +277,7 @@ if "$shim" dashboard start --detach; then
     echo "Dashboard is running, but the browser could not be opened. Open http://127.0.0.1:4317/ yourself."
   fi
 else
-  home="${AGENTDECK_HOME:-$HOME/.agentdeck}"
+  home="${CHUCK_HOME:-$HOME/.chuck}"
   echo "Installation succeeded, but the dashboard did not start."
   echo "Retry with: \"${shim}\" dashboard start --detach"
   echo "Log: ${home}/dashboard.log"

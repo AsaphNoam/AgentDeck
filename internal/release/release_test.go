@@ -49,7 +49,7 @@ func TestAppRootDefaultsToApplicationSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppRoot: %v", err)
 	}
-	want := filepath.Join(home, "Library", "Application Support", "AgentDeck")
+	want := filepath.Join(home, "Library", "Application Support", "Chuck")
 	if got != want {
 		t.Fatalf("AppRoot = %q, want %q", got, want)
 	}
@@ -86,7 +86,7 @@ func TestEnsureLayoutTightensExistingDir(t *testing.T) {
 }
 
 func TestVersionDirName(t *testing.T) {
-	if got := VersionDirName("1.2.3"); got != "agentdeck-1.2.3-darwin-arm64" {
+	if got := VersionDirName("1.2.3"); got != "chuck-1.2.3-darwin-arm64" {
 		t.Fatalf("VersionDirName = %q", got)
 	}
 }

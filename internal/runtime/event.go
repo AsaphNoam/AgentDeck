@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // EventType constants name the normalized transcript event kinds (techspec §4.2).
-// These are AgentDeck's own vocabulary, independent of the ACP wire shape, so a
+// These are Chuck's own vocabulary, independent of the ACP wire shape, so a
 // new backend never changes anything downstream. New types may be added; existing
 // payload fields are append-only (techspec §11).
 const (
@@ -131,7 +131,7 @@ type ErrorData struct {
 
 // BackendSwitchData marks a cross-backend history hand-off in the durable
 // transcript so archive/chat views can render a divider while keeping the same
-// logical AgentDeck session.
+// logical Chuck session.
 type BackendSwitchData struct {
 	From string `json:"from"`
 	To   string `json:"to"`
@@ -168,7 +168,7 @@ type AnnotationTarget struct {
 // excerpt and anchor rather than asking an agent to infer a location from prose.
 func FormatAnnotationBlock(data AnnotationData) string {
 	var b strings.Builder
-	b.WriteString("[AgentDeck annotations]\n")
+	b.WriteString("[Chuck annotations]\n")
 	for i, a := range data.Annotations {
 		if a.AnchorKind == "file" {
 			fmt.Fprintf(&b, "\n%d. File %s", i+1, a.Path)

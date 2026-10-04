@@ -5,9 +5,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerauth"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // nativeOutcome is the bounded result of a provider-native readiness probe.

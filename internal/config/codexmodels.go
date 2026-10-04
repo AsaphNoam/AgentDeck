@@ -12,7 +12,7 @@ import (
 )
 
 // codexModelsCache is the subset of models_cache.json we consume; the file has
-// many more fields per model that are irrelevant to the AgentDeck catalog.
+// many more fields per model that are irrelevant to the Chuck catalog.
 type codexModelsCache struct {
 	ClientVersion string            `json:"client_version"`
 	Models        []codexModelEntry `json:"models"`
@@ -57,8 +57,8 @@ func CodexModelCatalogPath() string {
 }
 
 // ReadCodexModelCatalog reads the Codex model cache at path and returns the
-// user-selectable models (visibility "list") as AgentDeck Model entries keyed by
-// the Codex slug — the slug is both the AgentDeck model id and the provider
+// user-selectable models (visibility "list") as Chuck Model entries keyed by
+// the Codex slug — the slug is both the Chuck model id and the provider
 // string. A missing or unparseable file returns an error; callers treat that as
 // a non-fatal skip.
 func ReadCodexModelCatalog(path string) (map[string]Model, error) {

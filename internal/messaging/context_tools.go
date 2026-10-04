@@ -6,7 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/contextref"
+	"github.com/AsaphNoam/Chuck/internal/contextref"
 )
 
 // SetContextService supplies the in-process context-plane service. Without it

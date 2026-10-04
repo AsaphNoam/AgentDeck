@@ -7,12 +7,12 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { AgentState } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
-import { AgentDeckerBuilder } from "./AgentDeckerBuilder";
+import { FirstMateBuilder } from "./FirstMateBuilder";
 
-const BUILDER_KEY = "agentdeck.pipeline-builder-agent";
+const BUILDER_KEY = "chuck.pipeline-builder-agent";
 
 const server = setupServer(
-  http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker", prompt: "" } })),
+  http.get("/api/roles", () => HttpResponse.json({ firstmate: { title: "FirstMate", prompt: "" } })),
   http.get("/api/config", () => HttpResponse.json({ default_project: "app" })),
   http.get("/api/projects", () => HttpResponse.json({
     app: { title: "App", cwd: "~/Projects/app", color: [0, 0, 0], add_dirs: [], context_prompt: "", resource_dir: "" },
@@ -39,7 +39,7 @@ function collections(pending: unknown[] = [], declined: unknown[] = []) {
 
 function agent(id: string, running: boolean): AgentState {
   return {
-    agent_id: id, name: "Pipeline Builder", role: "agentdecker", project: "app", backend: "codex",
+    agent_id: id, name: "Pipeline Builder", role: "firstmate", project: "app", backend: "codex",
     model: "gpt-5.6-sol", interface: "chat", created_at: "2026-07-26T00:00:00Z", running,
     state: running ? "idle" : "error", detail: "", context_pct: 0, updated_at: 1,
   };
@@ -49,7 +49,7 @@ function renderBuilder() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
+      <MemoryRouter><FirstMateBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -85,13 +85,13 @@ const runProposal = {
 // FS-14.R42/A18: Runs only acts on `start_run` proposals and Templates only on
 // `save_template` proposals, so each surface's `proposalKind` prop must filter
 // the other kind out rather than offering an approval action it cannot own.
-describe("AgentDeckerBuilder proposal filtering", () => {
+describe("FirstMateBuilder proposal filtering", () => {
   it("shows only the start_run proposal and its action for proposalKind=start_run", async () => {
     server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections([templateProposal, runProposal]))));
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter><AgentDeckerBuilder proposalKind="start_run" showLauncher={false} onRunProposal={() => {}} /></MemoryRouter>
+        <MemoryRouter><FirstMateBuilder proposalKind="start_run" showLauncher={false} onRunProposal={() => {}} /></MemoryRouter>
       </QueryClientProvider>,
     );
 
@@ -104,7 +104,7 @@ describe("AgentDeckerBuilder proposal filtering", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter><AgentDeckerBuilder proposalKind="save_template" showLauncher onTemplateProposal={() => {}} /></MemoryRouter>
+        <MemoryRouter><FirstMateBuilder proposalKind="save_template" showLauncher onTemplateProposal={() => {}} /></MemoryRouter>
       </QueryClientProvider>,
     );
 
@@ -117,7 +117,7 @@ describe("AgentDeckerBuilder proposal filtering", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
+        <MemoryRouter><FirstMateBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
       </QueryClientProvider>,
     );
 
@@ -128,7 +128,7 @@ describe("AgentDeckerBuilder proposal filtering", () => {
 
 // INV §1: a stopped builder cannot keep a dead chat link, but a durable
 // transcript proposal must remain reachable for the required human approval.
-describe("AgentDeckerBuilder persisted session", () => {
+describe("FirstMateBuilder persisted session", () => {
   it("expires a persisted builder id once hydration shows it stopped", async () => {
     localStorage.setItem(BUILDER_KEY, "a_builder");
     useAgentStore.setState({
@@ -138,7 +138,7 @@ describe("AgentDeckerBuilder persisted session", () => {
     renderBuilder();
 
     await waitFor(() => expect(localStorage.getItem(BUILDER_KEY)).toBeNull());
-    expect(screen.queryByRole("link", { name: "Open AgentDecker chat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open FirstMate chat" })).not.toBeInTheDocument();
   });
 
   it("keeps the session link while the builder is still running", async () => {
@@ -149,7 +149,7 @@ describe("AgentDeckerBuilder persisted session", () => {
 
     renderBuilder();
 
-    const link = await screen.findByRole("link", { name: "Open AgentDecker chat" });
+    const link = await screen.findByRole("link", { name: "Open FirstMate chat" });
     expect(link.getAttribute("href")).toBe("/agent/a_builder");
     expect(localStorage.getItem(BUILDER_KEY)).toBe("a_builder");
   });
@@ -179,7 +179,7 @@ describe("AgentDeckerBuilder persisted session", () => {
     );
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
-    render(<QueryClientProvider client={client}><MemoryRouter><AgentDeckerBuilder onTemplateProposal={(proposal) => reviewed.push(proposal)} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><MemoryRouter><FirstMateBuilder onTemplateProposal={(proposal) => reviewed.push(proposal)} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
 
     expect(localStorage.getItem(BUILDER_KEY)).toBeNull();
     const review = await screen.findByRole("button", { name: "Review exact Save proposal" });
@@ -199,7 +199,7 @@ describe("AgentDeckerBuilder persisted session", () => {
     server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections(pending))));
 
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
-    render(<QueryClientProvider client={client}><MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><MemoryRouter><FirstMateBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter></QueryClientProvider>);
 
     await screen.findByRole("button", { name: "Review exact Save proposal" });
     expect(screen.getByText("Pending exact proposals")).toBeInTheDocument();
@@ -244,7 +244,7 @@ function renderProposals(pending: unknown[], declined: unknown[] = []) {
   server.use(http.get("/api/pipeline-proposals", () => HttpResponse.json(collections(pending, declined))));
   const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
   render(<QueryClientProvider client={client}><MemoryRouter>
-    <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+    <FirstMateBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
   </MemoryRouter></QueryClientProvider>);
   return client;
 }
@@ -253,7 +253,7 @@ function renderProposals(pending: unknown[], declined: unknown[] = []) {
 // payload and pushed the template library off the screen. Every proposal is now
 // collapsed to a scannable summary and only expands to the exact payload an
 // approval acts on.
-describe("AgentDeckerBuilder proposal collapse", () => {
+describe("FirstMateBuilder proposal collapse", () => {
   it("collapses a 32-stage save proposal to its kind, title, stage count, and age", async () => {
     renderProposals([stagedTemplateProposal(32)]);
 
@@ -320,7 +320,7 @@ describe("AgentDeckerBuilder proposal collapse", () => {
 // FS-14.A27 / R49: Reject withdraws one offer into the declined list, Delete
 // removes the record from there, and a refusal leaves the entry visible with its
 // action retryable rather than failing silently.
-describe("AgentDeckerBuilder reject and delete", () => {
+describe("FirstMateBuilder reject and delete", () => {
   it("rejects a pending offer and then deletes the declined record", async () => {
     let pending: unknown[] = [templateProposal];
     let declined: unknown[] = [];
@@ -342,7 +342,7 @@ describe("AgentDeckerBuilder reject and delete", () => {
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><MemoryRouter>
-      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+      <FirstMateBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
     </MemoryRouter></QueryClientProvider>);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
@@ -376,7 +376,7 @@ describe("AgentDeckerBuilder reject and delete", () => {
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><MemoryRouter>
-      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+      <FirstMateBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
     </MemoryRouter></QueryClientProvider>);
 
     fireEvent.click(await screen.findByRole("button", { name: "Reject" }));
@@ -409,7 +409,7 @@ describe("AgentDeckerBuilder reject and delete", () => {
     );
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><MemoryRouter>
-      <AgentDeckerBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
+      <FirstMateBuilder showLauncher={false} onTemplateProposal={() => {}} onRunProposal={() => {}} />
     </MemoryRouter></QueryClientProvider>);
 
     fireEvent.click(await screen.findByRole("button", { name: action }));
@@ -423,10 +423,10 @@ describe("AgentDeckerBuilder reject and delete", () => {
 // project directory. It previously sent `default_project` with no picker, so a
 // seeded-but-absent default could only be discovered as a rejected launch and
 // could not be changed from this page.
-describe("AgentDeckerBuilder project selection", () => {
+describe("FirstMateBuilder project selection", () => {
   async function openSetup() {
     renderBuilder();
-    fireEvent.click(await screen.findByRole("button", { name: "Create with AgentDecker" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create with FirstMate" }));
   }
 
   it("launches into the chosen project rather than the configured default", async () => {
@@ -443,7 +443,7 @@ describe("AgentDeckerBuilder project selection", () => {
 
     fireEvent.change(select, { target: { value: "other" } });
     fireEvent.change(screen.getByLabelText("Describe the pipeline"), { target: { value: "Build then review." } });
-    fireEvent.click(screen.getByRole("button", { name: "Launch AgentDecker builder" }));
+    fireEvent.click(screen.getByRole("button", { name: "Launch FirstMate builder" }));
 
     await waitFor(() => expect(launches).toHaveLength(1));
     expect(launches[0].project).toBe("other");
@@ -453,16 +453,16 @@ describe("AgentDeckerBuilder project selection", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter><AgentDeckerBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
+        <MemoryRouter><FirstMateBuilder onTemplateProposal={() => {}} onRunProposal={() => {}} /></MemoryRouter>
       </QueryClientProvider>,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Create with AgentDecker" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Create with FirstMate" }));
     const select = await screen.findByLabelText("Project");
     await waitFor(() => expect((select as HTMLSelectElement).value).toBe("app"));
 
     fireEvent.change(select, { target: { value: "other" } });
     fireEvent.change(screen.getByLabelText("Describe the pipeline"), { target: { value: "Build then review." } });
-    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Launch FirstMate builder" })).toBeEnabled();
 
     // Another tab deletes the selected "other" and the seeded default "app"; the
     // refreshed catalog no longer contains the selection, so the stale id must be
@@ -473,7 +473,7 @@ describe("AgentDeckerBuilder project selection", () => {
     await client.invalidateQueries({ queryKey: ["projects"] });
 
     await waitFor(() => expect((select as HTMLSelectElement).value).toBe(""));
-    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Launch FirstMate builder" })).toBeDisabled();
   });
 
   it("holds the launch closed when the default project no longer exists", async () => {
@@ -488,6 +488,6 @@ describe("AgentDeckerBuilder project selection", () => {
     // so nothing is seeded and the launch stays disabled instead of enabling a
     // button whose only outcome is a rejected launch.
     expect((await screen.findByLabelText("Project") as HTMLSelectElement).value).toBe("");
-    expect(screen.getByRole("button", { name: "Launch AgentDecker builder" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Launch FirstMate builder" })).toBeDisabled();
   });
 });

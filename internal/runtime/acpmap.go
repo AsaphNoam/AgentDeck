@@ -3,8 +3,8 @@ package runtime
 import (
 	"encoding/json"
 
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // Bounds on the decoded available-commands snapshot so provider output cannot
@@ -88,7 +88,7 @@ func decodeSessionConfigOptionsWithPresence(result json.RawMessage) (sessionConf
 }
 
 // normalizeConfigValue reduces a reported option value to the string vocabulary
-// AgentDeck sends. AgentDeck advertises no boolean client capability, so both
+// Chuck sends. Chuck advertises no boolean client capability, so both
 // pinned adapters degrade to a two-value select and a string is the expected
 // form (TS-04.R45); a boolean or a wrapped select entry is folded to the same
 // spelling instead of being rejected, and any other shape reports nothing so the

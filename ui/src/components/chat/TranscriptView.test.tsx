@@ -218,6 +218,19 @@ describe("TranscriptView self-annotation prompt", () => {
     expect(foldTranscript([annotationEvent, promptEvent])).toHaveLength(1);
   });
 
+  // FS-13.A15 (R24): transcripts recorded before the rename keep the old first
+  // line and still render as a card beside new-spelling blocks.
+  it("quiets a block written with the pre-rename first line", () => {
+    const legacyPrompt = { ...promptEvent, data: { text: block.replace(annotationBlockSentinel, "[AgentDeck annotations]") } };
+    const later = { ...annotationEvent, seq: 10 };
+    const rendered = foldTranscript([annotationEvent, legacyPrompt, later, { ...promptEvent, seq: 11 }]);
+    renderTranscript(true, rendered);
+
+    expect(rendered).toHaveLength(2);
+    expect(screen.getAllByText("Annotations assigned")).toHaveLength(2);
+    expect(screen.queryByText("[AgentDeck annotations]", { exact: false })).toBeNull();
+  });
+
   // The three conditions are load-bearing. A batch assigned to another agent
   // leaves the source free to keep talking, and that next message is ordinary
   // prose that must still appear.

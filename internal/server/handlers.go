@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/version"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/version"
 )
 
 // HTTP handlers. All are GET-only; the 1.22 mux enforces the method, returning

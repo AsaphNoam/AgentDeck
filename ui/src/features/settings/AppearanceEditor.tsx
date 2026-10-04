@@ -8,7 +8,7 @@ const appearances = [
   {
     id: "core" as const,
     value: "",
-    name: "AgentDeck Core",
+    name: "Chuck Core",
     description: "The product-native neutral canvas with crisp technical structure.",
   },
   {
@@ -60,11 +60,11 @@ export function AppearanceEditor() {
   };
 
   const warning = configQuery.error
-    ? "Appearance could not be loaded. AgentDeck Core is active."
+    ? "Appearance could not be loaded. Chuck Core is active."
     : configQuery.data?.appearance_skin_warning === "config_unreadable"
-      ? "The saved configuration could not be read. AgentDeck Core is active; choose an appearance to repair it."
+      ? "The saved configuration could not be read. Chuck Core is active; choose an appearance to repair it."
       : configQuery.data?.appearance_skin_warning === "unsupported"
-        ? `The saved appearance “${configQuery.data.appearance_skin}” is unavailable. AgentDeck Core is active.`
+        ? `The saved appearance “${configQuery.data.appearance_skin}” is unavailable. Chuck Core is active.`
         : undefined;
 
   return (
@@ -80,7 +80,7 @@ export function AppearanceEditor() {
       {warning && <p className="appearance-warning" role="status">{warning}</p>}
 
       <fieldset className="appearance-options" disabled={putConfig.isPending || configQuery.isLoading} data-slot="list">
-        <legend className="ad-visually-hidden">AgentDeck appearance</legend>
+        <legend className="ad-visually-hidden">Chuck appearance</legend>
         {appearances.map((appearance) => (
           <label className="appearance-option" data-slot="item" key={appearance.id}>
             <input

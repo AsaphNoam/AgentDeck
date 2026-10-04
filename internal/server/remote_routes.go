@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // remoteAllowed is the tailnet listener's allowlist over the loopback route
@@ -76,7 +76,7 @@ var remoteDenied = map[string]bool{
 	"GET /api/backends": true, "POST /api/backends": true, "PUT /api/backends": true,
 	// Provider refresh executes a desktop CLI and reports paths (TS-03.R53).
 	"POST /api/backends/{id}/refresh-provider": true,
-	"PUT /api/config": true, "GET /api/remote": true, "PUT /api/remote": true,
+	"PUT /api/config":                          true, "GET /api/remote": true, "PUT /api/remote": true,
 	"POST /api/remote/pairings": true, "POST /api/remote/pairings/{id}/allow": true,
 	"POST /api/remote/pairings/{id}/decline": true, "GET /api/remote/devices": true,
 	"PATCH /api/remote/devices/{id}": true, "DELETE /api/remote/devices/{id}": true,
@@ -346,12 +346,12 @@ func (s *Server) remoteAuth(next http.Handler) http.Handler {
 		rr := remoteFrom(r.Context())
 		c, err := r.Cookie(remoteDeviceCookie)
 		if err != nil || c.Value == "" {
-			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from AgentDeck on your Mac")
+			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from Chuck on your Mac")
 			return
 		}
 		device, err := s.stateStore.RemoteDeviceByTokenHash(hashRemoteToken(c.Value))
 		if errors.Is(err, state.ErrNotFound) {
-			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from AgentDeck on your Mac")
+			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from Chuck on your Mac")
 			return
 		}
 		if err != nil {
@@ -389,7 +389,7 @@ func (s *Server) remoteAuth(next http.Handler) http.Handler {
 			return nil
 		})
 		if errors.Is(err, state.ErrNotFound) {
-			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from AgentDeck on your Mac")
+			writeRemoteError(w, http.StatusUnauthorized, codeRemoteUnpaired, "pair this phone from Chuck on your Mac")
 			return
 		}
 		if err != nil {

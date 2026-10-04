@@ -136,7 +136,7 @@ export function AddBackendDialog({
               />
             </div>
             <p className="form-hint">
-              AgentDeck creates this backend with {providerLabel}'s standard starter model. You can
+              Chuck creates this backend with {providerLabel}'s standard starter model. You can
               edit its models afterwards.
             </p>
             {federated && (

@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	persistarchive "github.com/agentdeck/agentdeck/internal/archive"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	persistarchive "github.com/AsaphNoam/Chuck/internal/archive"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 type archiveAgentResult struct {

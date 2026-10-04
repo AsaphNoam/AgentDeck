@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // Native child sessions (FS-03.R58, TS-01.R35, TS-04.R63). With negotiated
 // subagents the adapter announces each child under its immediate parent's
 // session id and then sends the child's ordinary updates and permission
 // requests under the child's own session id. Runtime maps that provider id to
-// an AgentDeck activity scope; no provider id crosses this package.
+// a Chuck activity scope; no provider id crosses this package.
 
 const (
 	maxChildren       = 256
@@ -40,7 +40,7 @@ type activityScope struct {
 	ParentActivityID string
 }
 
-// activityIDFor derives a stable, bounded AgentDeck id from the provider's
+// activityIDFor derives a stable, bounded Chuck id from the provider's
 // child session id, so the same child always maps to the same scope.
 func activityIDFor(childSessionID string) string {
 	sum := sha256.Sum256([]byte(childSessionID))
@@ -94,7 +94,7 @@ func (as *agentState) noteUnknownChild(sessionID string) {
 	}
 }
 
-// childStateFor maps ACP subagent states onto AgentDeck's declared enum.
+// childStateFor maps ACP subagent states onto Chuck's declared enum.
 func childStateFor(state string) (string, bool) {
 	switch state {
 	case "completed":

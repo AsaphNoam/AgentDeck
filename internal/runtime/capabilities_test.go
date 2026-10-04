@@ -21,7 +21,7 @@ func TestNegotiateCapabilitiesIsBilateral(t *testing.T) {
 		want  SessionCapabilities
 	}{
 		{"full advertisement and offer", codex112Init, all, full},
-		// Fork needs no client offer; everything else is off until AgentDeck offers it.
+		// Fork needs no client offer; everything else is off until Chuck offers it.
 		{"no client offer", codex112Init, clientOffer{}, SessionCapabilities{Fork: true}},
 		{"absent advertisement", `{"protocolVersion":1,"agentCapabilities":{}}`, all, SessionCapabilities{}},
 		{"malformed response", `not json`, all, SessionCapabilities{}},

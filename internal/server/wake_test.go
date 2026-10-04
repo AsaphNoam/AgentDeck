@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/hooks"
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/hooks"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // wakeTestServer is a fake-ACP chat server with one project and role, ready to
@@ -176,7 +176,7 @@ func TestPromptDoesNotWakeExcludedAgents(t *testing.T) {
 func TestPromptWakeFailureReturnsResumeErrorAndTearsDown(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	id := launchThenStop(t, srv, ts)
-	srv.registry.Chat().SetCommand("/nonexistent/agentdeck-no-such-binary")
+	srv.registry.Chat().SetCommand("/nonexistent/chuck-no-such-binary")
 
 	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "hi"})
 	if resp.StatusCode == http.StatusAccepted {
@@ -354,7 +354,7 @@ func TestMailActivationWakesStoppedRecipient(t *testing.T) {
 func TestFailedMailWakeRetainsMailAndStopsRetrying(t *testing.T) {
 	srv, ts := wakeTestServer(t)
 	stopped := launchThenStop(t, srv, ts)
-	srv.registry.Chat().SetCommand("/nonexistent/agentdeck-no-such-binary")
+	srv.registry.Chat().SetCommand("/nonexistent/chuck-no-such-binary")
 
 	for _, body := range []string{"first", "second in the same second"} {
 		if _, err := srv.stateStore.InsertMessage(state.Message{

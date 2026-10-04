@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/hooks"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/hooks"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // TestComposeLaunchRejectsMissingCwd guards the J3/S3 blocker: launching a
@@ -109,10 +109,10 @@ func TestHookEnvInjected(t *testing.T) {
 	agent := state.Agent{AgentID: "a_h1", Interface: "terminal"}
 	env := srv.hookEnv(agent, "tok-xyz")
 	wantURL := fmt.Sprintf("http://127.0.0.1:%d/api/hook", srv.cfg.Port)
-	if env["AGENTDECK_HOOK_URL"] != wantURL {
-		t.Fatalf("AGENTDECK_HOOK_URL = %q, want %q", env["AGENTDECK_HOOK_URL"], wantURL)
+	if env["CHUCK_HOOK_URL"] != wantURL {
+		t.Fatalf("CHUCK_HOOK_URL = %q, want %q", env["CHUCK_HOOK_URL"], wantURL)
 	}
-	if env["AGENTDECK_HOOK_TOKEN"] != "tok-xyz" || env["AGENTDECK_AGENT_ID"] != "a_h1" || env["AGENTDECK_INTERFACE"] != "terminal" {
+	if env["CHUCK_HOOK_TOKEN"] != "tok-xyz" || env["CHUCK_AGENT_ID"] != "a_h1" || env["CHUCK_INTERFACE"] != "terminal" {
 		t.Fatalf("hook env = %v", env)
 	}
 }
@@ -137,7 +137,7 @@ func TestComposeHookRegistration(t *testing.T) {
 	}
 
 	// The retired opt-in flag cannot re-enable an unsupported adapter argv.
-	t.Setenv("AGENTDECK_HOOK_REGISTRATION", "1")
+	t.Setenv("CHUCK_HOOK_REGISTRATION", "1")
 	args, err = srv.composeHookRegistration(agent, "claude-acp")
 	if err != nil {
 		t.Fatalf("composeHookRegistration (on): %v", err)
@@ -151,7 +151,7 @@ func TestComposeHookRegistrationTerminalDefault(t *testing.T) {
 	srv := testServer(t, true)
 	agent := state.Agent{AgentID: "a_term", Interface: "terminal"}
 
-	// Terminal registers hooks by DEFAULT (no AGENTDECK_HOOK_REGISTRATION): the
+	// Terminal registers hooks by DEFAULT (no CHUCK_HOOK_REGISTRATION): the
 	// terminal runtime runs the real CLI under a PTY where --settings is
 	// known-good and hooks are the only status producer.
 	args, err := srv.composeHookRegistration(agent, "claude-acp")
@@ -204,12 +204,12 @@ func TestComposeEnvLayering(t *testing.T) {
 
 func TestCodexHomeEnvLayer(t *testing.T) {
 	// Non-codex backends get no CODEX_HOME layer.
-	if layer := codexHomeEnv("claude-acp", "/home/x/.agentdeck"); layer != nil {
+	if layer := codexHomeEnv("claude-acp", "/home/x/.chuck"); layer != nil {
 		t.Errorf("claude-acp got a CODEX_HOME layer: %v", layer)
 	}
 	// codex-acp gets the dedicated home, and it overrides any ambient/backend
 	// CODEX_HOME because it is the last composeEnv layer (FS-09.R43, TS-04.R20).
-	home := "/home/x/.agentdeck"
+	home := "/home/x/.chuck"
 	layer := codexHomeEnv("codex-acp", home)
 	if got := layer["CODEX_HOME"]; got != config.CodexProfileDir(home) {
 		t.Fatalf("CODEX_HOME = %q, want %q", got, config.CodexProfileDir(home))
@@ -232,7 +232,7 @@ func TestCodexHomeEnvLayer(t *testing.T) {
 // FS-09.A17, TS-04.R20).
 func TestComposeChildEnvCodexHomeOverride(t *testing.T) {
 	t.Setenv("CODEX_HOME", "/ambient/.codex")
-	home := "/home/x/.agentdeck"
+	home := "/home/x/.chuck"
 	profile := config.CodexProfileDir(home)
 
 	codexValue := func(kv []string) string {

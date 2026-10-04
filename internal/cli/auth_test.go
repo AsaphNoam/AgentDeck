@@ -12,13 +12,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerauth"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // fakeAuthExit makes authCommandFor run a real process that exits with code,
-// with child output discarded (AgentDeck never captures it).
+// with child output discarded (Chuck never captures it).
 func fakeAuthExit(t *testing.T, code int) {
 	t.Helper()
 	prev := authCommandFor
@@ -109,7 +109,7 @@ func TestAuthFailed(t *testing.T) {
 // the installation working (FS-10.R11).
 func TestAuthToolNotFound(t *testing.T) {
 	hermeticProviders(t)
-	t.Setenv("AGENTDECK_CLAUDE_LOGIN_CMD", "definitely-not-a-real-command-xyzzy")
+	t.Setenv("CHUCK_CLAUDE_LOGIN_CMD", "definitely-not-a-real-command-xyzzy")
 	out, err := runAuthCmd(t, "claude")
 	if !errors.Is(err, errAuthFailed) {
 		t.Fatalf("missing tool err = %v, want errAuthFailed", err)
@@ -120,7 +120,7 @@ func TestAuthToolNotFound(t *testing.T) {
 }
 
 // The command must exist in the built binary's tree, and accept exactly the
-// providers the shared table knows. A release whose `agentdeck auth` is missing
+// providers the shared table knows. A release whose `chuck auth` is missing
 // or narrower than the table sends people to a command that cannot help them
 // (TS-06.R22, FS-10.R5).
 func TestAuthCommandIsPresentForEveryProvider(t *testing.T) {
@@ -133,7 +133,7 @@ func TestAuthCommandIsPresentForEveryProvider(t *testing.T) {
 		}
 	}
 	if auth == nil {
-		t.Fatal("`agentdeck auth` is absent from the command tree")
+		t.Fatal("`chuck auth` is absent from the command tree")
 	}
 	fakeAuthExit(t, 0)
 	for _, id := range providerauth.IDs() {

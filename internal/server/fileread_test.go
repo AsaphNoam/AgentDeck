@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/index"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/index"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // readFileResponse issues the file read and returns the recorder, so a test can

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 )
 
-// Project shared resources: an AgentDeck-owned, owner-only directory per project
-// at $AGENTDECK_HOME/project-resources/{project-id}/ (TS-02.R13, TS-05.R13). It is
+// Project shared resources: a Chuck-owned, owner-only directory per project
+// at $CHUCK_HOME/project-resources/{project-id}/ (TS-02.R13, TS-05.R13). It is
 // opaque agent/person material — never JSON config, SQLite state, a cache, or an
 // index — so this package only creates/validates the directory and never lists,
 // reads, writes, deletes, or repairs its contents beyond a single probe file.
@@ -90,7 +90,7 @@ func ensureOwnerDir(dir string) error {
 
 // checkOwnerDir rejects anything at dir that is not a real directory. A symlink
 // is refused rather than followed, so a resource path can never be redirected
-// outside the AgentDeck home.
+// outside the Chuck home.
 func checkOwnerDir(dir string, fi os.FileInfo) error {
 	if fi.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("config: %q is a symlink; refusing to follow", dir)

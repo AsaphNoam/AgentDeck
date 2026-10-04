@@ -136,12 +136,12 @@ func StarterBackend(backendType string) (Backend, bool) {
 }
 
 // The four shipped personas are lean continuing mandates (FS-18.R16). The
-// shared AgentDeck operating context is composed at launch by the server's
+// shared Chuck operating context is composed at launch by the server's
 // knowledge overlay (FS-18.R15), so these prompts never restate it.
 
-const agentDeckerPrompt = `You are AgentDecker, AgentDeck's resident operator: you help the user understand and operate AgentDeck, and you coordinate work when they ask for it.
+const firstMatePrompt = `You are FirstMate, Chuck's resident operator: you help the user understand and operate Chuck, and you coordinate work when they ask for it.
 
-- Ground answers and actions in current product state and AgentDeck operating guidance rather than memory.
+- Ground answers and actions in current product state and Chuck operating guidance rather than memory.
 - A product question is a question: answer it without starting orchestration.
 - When the user asks you to coordinate, give each assignee a bounded assignment with the relevant context and a clear completion criterion, delegate only where it concretely helps, reconcile the evidence that comes back, and stay responsible for the combined outcome.
 - State blockers and uncertainty plainly.`
@@ -168,8 +168,8 @@ const researcherPrompt = `You are a researcher: you answer questions about this 
 - Do not make implementation or external changes unless explicitly assigned; research artifacts you were asked for are in scope.`
 
 // supersededRolePromptDigests maps a seeded role id to the SHA-256 digests of
-// prompts AgentDeck previously shipped for that same id (FS-04.R47, TS-11.R13).
-// A stored prompt matching one of them is bytes AgentDeck wrote, never a user
+// prompts Chuck previously shipped for that same id (FS-04.R47, TS-11.R13).
+// A stored prompt matching one of them is bytes Chuck wrote, never a user
 // edit, so it is the only thing the migration may replace. The replacement text
 // is read from seedRoles() rather than restated here, so the current prompt has
 // exactly one authority (INV §2, INV §10). testdata holds the matching prompt
@@ -177,10 +177,6 @@ const researcherPrompt = `You are a researcher: you answer questions about this 
 // (INV §17). Retired roles (pm, teammate) are no longer seeded, so they have no
 // entry: their files stay exactly as the user has them (FS-04.R51).
 var supersededRolePromptDigests = map[string][]string{
-	"agentdecker": {
-		"0f06919b97246f6f095416c0f288c4764657d19aae1e764e06b09a5b2579013a",
-		"0c07aaf2c4a95072cebf91205c3bda0d176f3a44686b5d917b1d84dd3e4c2daa",
-	},
 	"implementer": {
 		"c9aefb3a4614d3f41e9cbc8073fc924cfa6196cc0d3837acd0609489b5b3cfcc",
 		"be4de40af06c2b4b56b2f899277d1968e0bffb701fbccfe3b5615efb9aa27141",
@@ -199,9 +195,9 @@ var supersededRolePromptDigests = map[string][]string{
 // (null on disk) so each role inherits the global config by default.
 func seedRoles() map[string]Role {
 	return map[string]Role{
-		"agentdecker": {
-			Title:           "AgentDecker",
-			SystemPrompt:    agentDeckerPrompt,
+		"firstmate": {
+			Title:           "FirstMate",
+			SystemPrompt:    firstMatePrompt,
 			SkipPermissions: nil,
 		},
 		"implementer": {

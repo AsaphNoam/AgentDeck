@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/backend/credcheck"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/backend/credcheck"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // validationFailedBody is the §5.6 error envelope for 400 validation failures.
@@ -311,7 +311,7 @@ type projectResponse struct {
 	AddDirs       []string `json:"add_dirs"`
 	ContextPrompt string   `json:"context_prompt"`
 	// ResourceDir is the server-computed, read-only absolute path to the project's
-	// AgentDeck-owned shared-resources directory (TS-03.R12). It is derived from the
+	// Chuck-owned shared-resources directory (TS-03.R12). It is derived from the
 	// immutable id, never stored in projects/{id}.json, and ignores any client value.
 	ResourceDir string              `json:"resource_dir"`
 	Warnings    []config.FieldError `json:"warnings,omitempty"`
@@ -472,7 +472,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	force := r.URL.Query().Get("force") == "true"
-	// delete_checkout is honored only for an AgentDeck-owned checkout and is
+	// delete_checkout is honored only for a Chuck-owned checkout and is
 	// never defaulted on (FS-19.R8, TS-03.R33).
 	deleteCheckout := r.URL.Query().Get("delete_checkout") == "true"
 	var expectedDirty *bool

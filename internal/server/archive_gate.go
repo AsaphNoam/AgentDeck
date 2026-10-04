@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // projectArchiveGate reports whether the named project blocks a lifecycle action.

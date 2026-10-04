@@ -31,7 +31,7 @@ func TestInstallWritesExecutableScripts(t *testing.T) {
 }
 
 func TestClaudeSettingsMapsHookKeysToScripts(t *testing.T) {
-	home := "/home/u/.agentdeck"
+	home := "/home/u/.chuck"
 	hookMap := map[string]string{
 		"SessionStart": "SessionStart",
 		"PreToolUse":   "PreToolUse",
@@ -100,10 +100,10 @@ func TestInterfaceGate(t *testing.T) {
 		cmd.Env = append(os.Environ(),
 			"PATH="+shim+string(os.PathListSeparator)+os.Getenv("PATH"),
 			"CURL_LOG="+curlLog,
-			"AGENTDECK_AGENT_ID=a_1",
-			"AGENTDECK_HOOK_URL=http://127.0.0.1:9/api/hook",
-			"AGENTDECK_HOOK_TOKEN=tok",
-			"AGENTDECK_INTERFACE="+iface,
+			"CHUCK_AGENT_ID=a_1",
+			"CHUCK_HOOK_URL=http://127.0.0.1:9/api/hook",
+			"CHUCK_HOOK_TOKEN=tok",
+			"CHUCK_INTERFACE="+iface,
 		)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("_post.sh %s/%s: %v\n%s", iface, event, err, out)

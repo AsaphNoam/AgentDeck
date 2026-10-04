@@ -24,7 +24,7 @@ const server = setupServer(
     return HttpResponse.json({
       id: "p1",
       code: "ABCD2345",
-      qr_url: "https://agentdeck.tail.ts.net/pair#ABCD2345",
+      qr_url: "https://chuck.tail.ts.net/pair#ABCD2345",
       qr_svg: "<svg></svg>",
       expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
     });
@@ -84,9 +84,9 @@ describe("RemoteEditor", () => {
   });
 
   it("pairs a phone with a code and answers the request", async () => {
-    status = { ...base, state: "on", address: "https://agentdeck.tail.ts.net" };
+    status = { ...base, state: "on", address: "https://chuck.tail.ts.net" };
     renderEditor();
-    expect(await screen.findByText("https://agentdeck.tail.ts.net")).toBeInTheDocument();
+    expect(await screen.findByText("https://chuck.tail.ts.net")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Pair a phone" }));
     expect(await screen.findByLabelText("Pairing code")).toHaveTextContent("ABCD2345");
     expect(screen.getByAltText("Pairing QR code")).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("RemoteEditor", () => {
     status = {
       ...base,
       state: "on",
-      address: "https://agentdeck.tail.ts.net",
+      address: "https://chuck.tail.ts.net",
       pending_pairing: { id: "req1", name: "Pixel 9", requested_at: new Date().toISOString() },
       devices: [
         { id: "d1", name: "iPhone", paired_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), notifications: "off" },

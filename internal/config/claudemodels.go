@@ -46,7 +46,7 @@ func ClaudeSettingsPath() string {
 }
 
 // ReadClaudeConfiguredModels reads the user-level Claude settings at path and
-// returns its configured model selectors as AgentDeck Model entries, each keyed
+// returns its configured model selectors as Chuck Model entries, each keyed
 // by and carrying the exact selector. It collects `model`, every `availableModels`
 // entry, and every `fallbackModel` entry (tolerating the older singular string
 // shape). Only distinct, non-empty selectors that pass the shared model-string

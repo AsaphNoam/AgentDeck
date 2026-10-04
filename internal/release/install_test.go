@@ -38,7 +38,7 @@ func TestInstallProducesRunnableShim(t *testing.T) {
 	}
 }
 
-// Install into an application root leaves a separate AGENTDECK_HOME untouched
+// Install into an application root leaves a separate CHUCK_HOME untouched
 // (FS-10.R4, TS-06.R16/R21).
 func TestInstallDoesNotTouchUserHome(t *testing.T) {
 	l := newLayout(t)
@@ -68,7 +68,7 @@ func TestInstallDoesNotTouchUserHome(t *testing.T) {
 		t.Fatalf("user home config disturbed: %v", err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("install modified a file under AGENTDECK_HOME")
+		t.Fatal("install modified a file under CHUCK_HOME")
 	}
 }
 

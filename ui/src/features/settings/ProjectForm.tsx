@@ -182,7 +182,7 @@ export function ProjectForm({
         <label>Setup command</label>
         <input {...register("setup_command")} placeholder="e.g. npm ci" />
         <span className="form-hint">
-          AgentDeck runs this inside a new worktree checkout before the project is ready. It never
+          Chuck runs this inside a new worktree checkout before the project is ready. It never
           runs at agent launch.
         </span>
       </div>
@@ -196,7 +196,7 @@ export function ProjectForm({
             onFocus={(e) => e.currentTarget.select()}
           />
           <span className="form-hint">
-            AgentDeck-owned, outside the repository, and shared by this project&apos;s agents.
+            Chuck-owned, outside the repository, and shared by this project&apos;s agents.
             Kept even if you delete the project.
           </span>
         </div>

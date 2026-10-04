@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // attentionItem is one row of the phone's Home (FS-20.R33). Reason is a short,

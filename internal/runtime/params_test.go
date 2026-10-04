@@ -47,7 +47,7 @@ func TestSessionLoadParamsCarriesModelAndSystemPrompt(t *testing.T) {
 	}
 }
 
-// FS-09.A9: the official Claude adapter receives AgentDeck's composed launch
+// FS-09.A9: the official Claude adapter receives Chuck's composed launch
 // values through its documented ACP session metadata shape.
 func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 	spec := LaunchSpec{
@@ -148,7 +148,7 @@ func TestCodexSessionParamsOmitUnsupportedSystemPrompt(t *testing.T) {
 
 // Regression (review fix, federation §2.4): an empty ModelID means "inherit native
 // resolution" — the model flag must be OMITTED so a bound source's native model
-// takes effect instead of AgentDeck forcing a default over ACP. Both backend
+// takes effect instead of Chuck forcing a default over ACP. Both backend
 // shapes (claude _meta options and the generic top-level) must drop the key.
 func TestSessionParamsOmitModelWhenInherited(t *testing.T) {
 	t.Run("claude session/new", func(t *testing.T) {
@@ -195,22 +195,22 @@ func TestCodexSessionParamsOmitModelAndEffort(t *testing.T) {
 
 func TestMCPServerParamUsesNamedPairs(t *testing.T) {
 	httpParam := mcpServerParam(MCPServerSpec{
-		Name:    "agentdeck-messaging",
+		Name:    "chuck-messaging",
 		Type:    "http",
 		URL:     "http://127.0.0.1:4318/mcp",
-		Headers: map[string]string{"X-AgentDeck-Token": "tok-123"},
+		Headers: map[string]string{"X-Chuck-Token": "tok-123"},
 	})
 	headers, ok := httpParam["headers"].([]map[string]string)
 	if !ok || len(headers) != 1 {
 		t.Fatalf("http headers = %#v, want one named pair", httpParam["headers"])
 	}
-	if headers[0]["name"] != "X-AgentDeck-Token" || headers[0]["value"] != "tok-123" {
+	if headers[0]["name"] != "X-Chuck-Token" || headers[0]["value"] != "tok-123" {
 		t.Fatalf("http headers = %#v, want token named pair", headers)
 	}
 
 	stdioParam := mcpServerParam(MCPServerSpec{
 		Name:    "stdio-server",
-		Command: "agentdeck",
+		Command: "chuck",
 		Args:    []string{"mcp-stdio"},
 		Env:     []string{"TOKEN=tok-123"},
 	})

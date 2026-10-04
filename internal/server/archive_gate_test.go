@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 func waitForArchiveGate(t *testing.T, srv *Server, predicate func() bool) {

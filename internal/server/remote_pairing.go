@@ -13,9 +13,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 	"rsc.io/qr"
 )
 
@@ -261,7 +261,7 @@ func (s *Server) handlePairClaim(w http.ResponseWriter, r *http.Request) {
 	rr := remoteFrom(r.Context())
 	var body pairClaimBody
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&body); err != nil {
-		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
+		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from Chuck on your Mac")
 		return
 	}
 	name, ok := cleanRemoteName(body.Name)
@@ -289,7 +289,7 @@ func (s *Server) handlePairClaim(w http.ResponseWriter, r *http.Request) {
 		}
 		p.recordFailureLocked(rr.peer.StableID, now)
 		p.mu.Unlock()
-		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
+		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from Chuck on your Mac")
 		return
 	}
 	p.code = nil // single use
@@ -360,7 +360,7 @@ func (s *Server) handlePairWait(w http.ResponseWriter, r *http.Request) {
 	pp := p.pending
 	if pp == nil || subtle.ConstantTimeCompare([]byte(pp.waitToken), []byte(waitToken)) != 1 || pp.peer.StableID != rr.peer.StableID {
 		p.mu.Unlock()
-		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
+		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from Chuck on your Mac")
 		return
 	}
 	done := pp.done
@@ -378,7 +378,7 @@ func (s *Server) handlePairWait(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	if p.pending != pp {
 		p.mu.Unlock()
-		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
+		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from Chuck on your Mac")
 		return
 	}
 	switch {
@@ -394,7 +394,7 @@ func (s *Server) handlePairWait(w http.ResponseWriter, r *http.Request) {
 	default:
 		p.expireLocked()
 		p.mu.Unlock()
-		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from AgentDeck on your Mac")
+		writeRemoteError(w, http.StatusBadRequest, codeRemotePairingInvalid, "start again from Chuck on your Mac")
 	}
 }
 

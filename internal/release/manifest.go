@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
 )
 
 // internalManifestName is the manifest that travels inside the archive/version
@@ -20,8 +20,8 @@ const internalManifestName = "manifest.json"
 // backend launch table and bundled providers from the shared resolver
 // (TS-06.R30), so the layout cannot name a path launch does not use.
 var requiredLayout = []string{
-	"bin/agentdeck",         // wrapper
-	"libexec/agentdeck",     // FTS5 Go binary
+	"bin/chuck",             // wrapper
+	"libexec/chuck",         // FTS5 Go binary
 	"runtime/node/bin/node", // private Node runtime
 	filepath.Join("runtime", backend.ManagedEntrypoint("claude-acp")),                  // official Claude ACP adapter
 	filepath.Join("runtime", backend.ManagedEntrypoint("codex-acp")),                   // official Codex ACP adapter
@@ -46,7 +46,7 @@ type ReleaseManifest struct {
 type InternalManifest struct {
 	Version    string            `json:"version"`
 	Target     string            `json:"target"`
-	Components map[string]string `json:"components"` // node, claude-agent-acp, codex-acp, claude, codex, agentdeck
+	Components map[string]string `json:"components"` // node, claude-agent-acp, codex-acp, claude, codex, chuck
 }
 
 // Validate reports whether a release manifest is internally coherent and targets
@@ -121,7 +121,7 @@ func verifyInternalManifest(dir, wantVersion string) error {
 	if wantVersion != "" && m.Version != wantVersion {
 		return fmt.Errorf("internal manifest version %q does not match release %q", m.Version, wantVersion)
 	}
-	for _, component := range []string{"node", "claude-agent-acp", "codex-acp", "claude", "codex", "agentdeck"} {
+	for _, component := range []string{"node", "claude-agent-acp", "codex-acp", "claude", "codex", "chuck"} {
 		if m.Components[component] == "" {
 			return fmt.Errorf("internal manifest is missing %s component version", component)
 		}

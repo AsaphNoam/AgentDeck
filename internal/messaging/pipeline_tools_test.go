@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func pipelineProposalFixture(t *testing.T) (*Server, *state.Store, *pipeline.TemplateStore) {
@@ -24,7 +24,7 @@ func pipelineProposalFixture(t *testing.T) (*Server, *state.Store, *pipeline.Tem
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = stateStore.Close() })
-	agent := state.Agent{AgentID: "a_builder", Name: "Builder", Role: "agentdecker", Project: "app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
+	agent := state.Agent{AgentID: "a_builder", Name: "Builder", Role: "firstmate", Project: "app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
 	if err := stateStore.WriteAgent(agent); err != nil {
 		t.Fatal(err)
 	}
@@ -34,12 +34,20 @@ func pipelineProposalFixture(t *testing.T) (*Server, *state.Store, *pipeline.Tem
 	if err := stateStore.WriteAgent(ordinary); err != nil {
 		t.Fatal(err)
 	}
+	// The pre-rename resident role id carries no proposal authority (FS-04.A32).
+	legacy := agent
+	legacy.AgentID = "a_legacy"
+	legacy.Role = "agentdecker"
+	if err := stateStore.WriteAgent(legacy); err != nil {
+		t.Fatal(err)
+	}
 	templates := pipeline.NewTemplateStore(configStore)
 	manager := pipeline.NewManager(stateStore, templates, nil, nil)
 	server := New(stateStore, nil)
 	server.SetPipelineManager(manager)
 	server.RegisterSession("builder-token", agent.AgentID, "builder-generation")
 	server.RegisterSession("other-token", ordinary.AgentID, "other-generation")
+	server.RegisterSession("legacy-token", legacy.AgentID, "legacy-generation")
 	return server, stateStore, templates
 }
 
@@ -56,7 +64,7 @@ func proposalTemplateArgs() map[string]any {
 	}
 }
 
-// FS-14.A10 / TS-04.R17: proposal tools are AgentDecker-only, return data and
+// FS-14.A10 / TS-04.R17: proposal tools are FirstMate-only, return data and
 // a digest, cannot mutate the template store themselves, and publish exactly
 // one durable review record before MCP reports success.
 func TestPipelineProposalToolIsScopedAndNonMutating(t *testing.T) {
@@ -65,6 +73,11 @@ func TestPipelineProposalToolIsScopedAndNonMutating(t *testing.T) {
 	result, isErr := call(t, ordinary, "propose_pipeline_template", proposalTemplateArgs())
 	if !isErr || result["error"] != "proposal_forbidden" {
 		t.Fatalf("ordinary proposal = %v isErr=%v", result, isErr)
+	}
+	legacy := connect(t, server, "legacy-token")
+	result, isErr = call(t, legacy, "propose_pipeline_template", proposalTemplateArgs())
+	if !isErr || result["error"] != "proposal_forbidden" {
+		t.Fatalf("legacy agentdecker proposal = %v isErr=%v", result, isErr)
 	}
 	builder := connect(t, server, "builder-token")
 	result, isErr = call(t, builder, "propose_pipeline_template", proposalTemplateArgs())

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func (s *Server) stopForArchive(r *http.Request, id string) *runtime.APIError {
@@ -201,7 +201,7 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 }
 
 // archiveProjectRequest is the optional archive body. delete_checkout is
-// honored only for an AgentDeck-owned checkout and is never defaulted on.
+// honored only for a Chuck-owned checkout and is never defaulted on.
 type archiveProjectRequest struct {
 	DeleteCheckout bool `json:"delete_checkout"`
 	DirtyKnown     bool `json:"dirty_known,omitempty"`

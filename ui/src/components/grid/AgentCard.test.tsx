@@ -32,7 +32,7 @@ describe("AgentCard", () => {
                       running: true,
                       context_pct: 0,
                     }}
-                    projectTitle="AgentDeck demo"
+                    projectTitle="Chuck demo"
                   />
                 )}
               />
@@ -43,7 +43,7 @@ describe("AgentCard", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("implementer · AgentDeck demo")).toBeInTheDocument();
+    expect(screen.getByText("implementer · Chuck demo")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Atlas"));
 
@@ -56,7 +56,7 @@ describe("AgentCard", () => {
         <DndContext>
           <SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
             <AgentCard agent={{
-              agent_id: "a_1", name: "Atlas", role: "implementer", project: "agentdeck-v0-1-2-demo-20260726t230903z",
+              agent_id: "a_1", name: "Atlas", role: "implementer", project: "chuck-v0-1-2-demo-20260726t230903z",
               backend: "claude", model: "sonnet", interface: "chat", state: "idle",
               detail: "ready", running: true, context_pct: 0,
             }} />
@@ -65,7 +65,7 @@ describe("AgentCard", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("implementer · agentdeck-v0-1-2-demo-20260726t230903z")).toBeInTheDocument();
+    expect(screen.getByText("implementer · chuck-v0-1-2-demo-20260726t230903z")).toBeInTheDocument();
   });
 
   it("links an associated stage agent back to its pipeline run", () => {

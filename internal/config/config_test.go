@@ -229,9 +229,46 @@ func TestHomeResolution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(uh, ".agentdeck")
+	want := filepath.Join(uh, ".chuck")
 	if s2.Home() != want {
 		t.Fatalf("default Home() = %q, want %q", s2.Home(), want)
+	}
+}
+
+// FS-10.A13: Chuck neither reads the pre-rename home variable nor touches a
+// populated pre-rename home; an absent Chuck home seeds normally.
+func TestHomeResolutionIgnoresLegacyHome(t *testing.T) {
+	user := t.TempDir()
+	t.Setenv("HOME", user)
+	legacy := filepath.Join(user, ".agent"+"deck")
+	if err := os.MkdirAll(filepath.Join(legacy, "roles"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(legacy, "roles", "custom.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENT"+"DECK_HOME", legacy)
+	t.Setenv(envHome, "")
+
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(user, ".chuck"); s.Home() != want {
+		t.Fatalf("Home() = %q, want %q", s.Home(), want)
+	}
+	if err := s.EnsureLayout(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SeedIfAbsent(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ReadRole("firstmate"); err != nil {
+		t.Fatalf("fresh Chuck home did not seed FirstMate: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(legacy, "roles"))
+	if err != nil || len(entries) != 1 || entries[0].Name() != "custom.json" {
+		t.Fatalf("legacy home changed: %v, %v", entries, err)
 	}
 }
 
@@ -240,19 +277,19 @@ func TestHomeResolutionExpandsTildeOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv(envHome, "~/agentdeck-test-home")
+	t.Setenv(envHome, "~/chuck-test-home")
 	s, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(uh, "agentdeck-test-home")
+	want := filepath.Join(uh, "chuck-test-home")
 	if s.Home() != want {
 		t.Fatalf("tilde Home() = %q, want %q", s.Home(), want)
 	}
 }
 
 func TestHomeResolutionMakesRelativeOverrideAbsolute(t *testing.T) {
-	t.Setenv(envHome, "relative-agentdeck-home")
+	t.Setenv(envHome, "relative-chuck-home")
 	s, err := New()
 	if err != nil {
 		t.Fatal(err)
@@ -260,8 +297,8 @@ func TestHomeResolutionMakesRelativeOverrideAbsolute(t *testing.T) {
 	if !filepath.IsAbs(s.Home()) {
 		t.Fatalf("Home() = %q, want absolute path", s.Home())
 	}
-	if got := filepath.Base(s.Home()); got != "relative-agentdeck-home" {
-		t.Fatalf("Home() base = %q, want relative-agentdeck-home", got)
+	if got := filepath.Base(s.Home()); got != "relative-chuck-home" {
+		t.Fatalf("Home() base = %q, want relative-chuck-home", got)
 	}
 }
 
@@ -349,7 +386,7 @@ func TestEnsureLayoutHomeIsFile(t *testing.T) {
 
 // A fresh home gets the current provider aliases as defaults; an existing
 // catalog is not touched at all, so nobody's pinned model or edited entry is
-// replaced by a newer AgentDeck (FS-09.R33/A12).
+// replaced by a newer Chuck (FS-09.R33/A12).
 func TestSeededBackendDefaultsAreCurrentAndNeverRewritten(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.SeedIfAbsent(); err != nil {
@@ -371,7 +408,7 @@ func TestSeededBackendDefaultsAreCurrentAndNeverRewritten(t *testing.T) {
 		}
 	}
 
-	// A person pins an exact generation, then a later AgentDeck re-seeds.
+	// A person pins an exact generation, then a later Chuck re-seeds.
 	bk := fresh.Backends["claude"]
 	bk.DefaultModel = "sonnet-4-6"
 	bk.Models = map[string]Model{"sonnet-4-6": {Name: "Sonnet 4.6", Model: "claude-sonnet-4-6"}}
@@ -412,7 +449,7 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
-	if want := []string{"agentdecker", "implementer", "researcher", "reviewer"}; !slices.Equal(ids, want) {
+	if want := []string{"firstmate", "implementer", "researcher", "reviewer"}; !slices.Equal(ids, want) {
 		t.Fatalf("seeded roles = %v, want %v", ids, want)
 	}
 	for id, role := range roles {
@@ -423,9 +460,9 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if cfg, err := s.ReadConfig(); err != nil || cfg.DefaultRole != "implementer" {
 		t.Fatalf("default role = %q, %v; want implementer", cfg.DefaultRole, err)
 	}
-	agentdecker, err := s.ReadRole("agentdecker")
-	if err != nil || agentdecker.SystemPrompt != agentDeckerPrompt || strings.Contains(agentdecker.SystemPrompt, "propose_pipeline") {
-		t.Fatalf("seeded AgentDecker prompt is not the thin role: role=%+v err=%v", agentdecker, err)
+	firstmate, err := s.ReadRole("firstmate")
+	if err != nil || firstmate.SystemPrompt != firstMatePrompt || strings.Contains(firstmate.SystemPrompt, "propose_pipeline") {
+		t.Fatalf("seeded FirstMate prompt is not the thin role: role=%+v err=%v", firstmate, err)
 	}
 	if _, err := s.ReadProject("my-app"); err != nil {
 		t.Fatalf("seeded project: %v", err)
@@ -487,7 +524,7 @@ func supersededPromptFixture(t *testing.T, id string) string {
 // supersededFixtureIDs are the retained seeded roles with migration history.
 // The retired teammate fixture is preservation evidence only (FS-04.R51).
 func supersededFixtureIDs() []string {
-	return []string{"agentdecker", "implementer", "reviewer", "researcher"}
+	return []string{"implementer", "reviewer", "researcher"}
 }
 
 // FS-18.A9, FS-04.A27: every shipped digest is re-derived from the fixture
@@ -540,7 +577,7 @@ func TestSeededPromptsDoNotInstructPolling(t *testing.T) {
 	for id, role := range seedRoles() {
 		for _, phrase := range banned {
 			if strings.Contains(role.SystemPrompt, phrase) {
-				t.Errorf("seeded role %q prompt contains %q; AgentDeck's activation names the tool a host-owned turn needs", id, phrase)
+				t.Errorf("seeded role %q prompt contains %q; Chuck's activation names the tool a host-owned turn needs", id, phrase)
 			}
 		}
 	}
@@ -607,10 +644,10 @@ func TestMigrateSupersededRolePromptsExactOnly(t *testing.T) {
 }
 
 func otherFixtureID(id string) string {
-	if id == "agentdecker" {
+	if id == "implementer" {
 		return "reviewer"
 	}
-	return "agentdecker"
+	return "implementer"
 }
 
 func boolToInt(b bool) int {
@@ -714,15 +751,15 @@ func TestMigrateSupersededRolePromptsIsolatesPerRoleFailure(t *testing.T) {
 		if err := s.EnsureLayout(); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.WriteRole("agentdecker", Role{Title: "Custom title", SystemPrompt: supersededPromptFixture(t, "agentdecker"), SkipPermissions: boolPtr(true)}); err != nil {
+		if err := s.WriteRole("implementer", Role{Title: "Custom title", SystemPrompt: supersededPromptFixture(t, "implementer"), SkipPermissions: boolPtr(true)}); err != nil {
 			t.Fatal(err)
 		}
-		dir := filepath.Dir(s.rolePath("agentdecker"))
+		dir := filepath.Dir(s.rolePath("implementer"))
 		if err := os.Chmod(dir, 0o500); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
-		before, err := os.ReadFile(s.rolePath("agentdecker"))
+		before, err := os.ReadFile(s.rolePath("implementer"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -731,7 +768,7 @@ func TestMigrateSupersededRolePromptsIsolatesPerRoleFailure(t *testing.T) {
 		if migrated != 0 || err == nil {
 			t.Fatalf("migration = %d, %v; want 0 and a reported error", migrated, err)
 		}
-		after, err := os.ReadFile(s.rolePath("agentdecker"))
+		after, err := os.ReadFile(s.rolePath("implementer"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -761,7 +798,7 @@ func TestMigrateSupersededRolePromptsMissingRolesAndIdempotence(t *testing.T) {
 	}
 }
 
-// FS-04.A7: the migration never widens absent-only seeding — a role AgentDeck
+// FS-04.A7: the migration never widens absent-only seeding — a role Chuck
 // does not seed is out of scope even if its prompt matches a shipped digest.
 func TestMigrateSupersededRolePromptsSkipsUnseededRole(t *testing.T) {
 	s := newTestStore(t)
@@ -843,7 +880,7 @@ func TestUpgradePreservesRetiredRolesAndReferences(t *testing.T) {
 	}
 }
 
-// TS-11.R13: a digest naming a role AgentDeck does not seed is a table defect,
+// TS-11.R13: a digest naming a role Chuck does not seed is a table defect,
 // reported rather than silently ignored.
 func TestMigrateSupersededRolePromptsReportsUnseededTableEntry(t *testing.T) {
 	s := newTestStore(t)
@@ -868,5 +905,14 @@ func TestListEmpty(t *testing.T) {
 	projects, err := s.ListProjects()
 	if err != nil || len(projects) != 0 {
 		t.Fatalf("ListProjects empty: len %d err %v", len(projects), err)
+	}
+}
+
+// FS-18.A14: seeded prompts are authored text and carry no pre-rename branding.
+func TestSeededPromptsCarryCurrentBranding(t *testing.T) {
+	for id, role := range seedRoles() {
+		if strings.Contains(strings.ToLower(role.Title+role.SystemPrompt), "agent"+"deck") {
+			t.Errorf("seeded role %s still names the old product", id)
+		}
 	}
 }

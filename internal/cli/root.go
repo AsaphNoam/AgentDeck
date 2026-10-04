@@ -1,4 +1,4 @@
-// Package cli wires the cobra command tree for the agentdeck binary.
+// Package cli wires the cobra command tree for the chuck binary.
 package cli
 
 import (
@@ -7,20 +7,20 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/version"
+	"github.com/AsaphNoam/Chuck/internal/version"
 )
 
 // NewRootCmd builds the root cobra command with --version and subcommands.
 func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "agentdeck",
-		Short:         "AgentDeck — local dashboard for orchestrating coding agents",
+		Use:           "chuck",
+		Short:         "Chuck — local dashboard for orchestrating coding agents",
 		Version:       version.String(),
 		SilenceUsage:  true,
 		SilenceErrors: false,
 	}
-	// `agentdeck --version` prints "agentdeck version <version> (commit, date)".
-	root.SetVersionTemplate("agentdeck version {{.Version}}\n")
+	// `chuck --version` prints "chuck version <version> (commit, date)".
+	root.SetVersionTemplate("chuck version {{.Version}}\n")
 	root.AddCommand(newDashboardCmd())
 	root.AddCommand(newReindexCmd())
 	root.AddCommand(newResumeCmd())
@@ -31,7 +31,7 @@ func NewRootCmd() *cobra.Command {
 	return root
 }
 
-// newResumeCmd returns the `agentdeck resume <agent_id>` cobra command.
+// newResumeCmd returns the `chuck resume <agent_id>` cobra command.
 func newResumeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "resume <agent_id>",
@@ -43,7 +43,7 @@ func newResumeCmd() *cobra.Command {
 	}
 }
 
-// Execute is the entrypoint called by cmd/agentdeck/main.go. It intercepts the
+// Execute is the entrypoint called by cmd/chuck/main.go. It intercepts the
 // reserved `<role>@<project>` launch syntax before cobra dispatch, then runs the
 // command tree. Returns the process exit code.
 func Execute(args []string) int {

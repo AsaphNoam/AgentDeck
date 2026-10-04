@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
 // File-change reports (TS-04.R66, FS-05.R38). Each root prompt asks for at

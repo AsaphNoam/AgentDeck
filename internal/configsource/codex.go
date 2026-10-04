@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -306,11 +306,11 @@ func appendNamedAssets(effective *Effective, layer codexLayer, kind string, valu
 func applyOverrides(effective *Effective, overrides config.SourceOverrides) {
 	if overrides.Model != nil {
 		effective.Model = overrides.Model
-		effective.Provenance["model"] = FieldProvenance{Scope: "agentdeck_override", Key: "model"}
+		effective.Provenance["model"] = FieldProvenance{Scope: "chuck_override", Key: "model"}
 	}
 	if overrides.Effort != nil {
 		effective.Effort = overrides.Effort
-		effective.Provenance["effort"] = FieldProvenance{Scope: "agentdeck_override", Key: "effort"}
+		effective.Provenance["effort"] = FieldProvenance{Scope: "chuck_override", Key: "effort"}
 	}
 }
 

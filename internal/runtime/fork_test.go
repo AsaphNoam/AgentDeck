@@ -29,7 +29,7 @@ func forkSpec(t *testing.T, env ...string) (*ChatRuntime, LaunchSpec, string) {
 }
 
 // A clone forks the source's native session in a fresh process, drops the
-// provider's replayed history, and records AgentDeck's own copy of the source
+// provider's replayed history, and records Chuck's own copy of the source
 // transcript plus a boundary marker under the clone's sequence (FS-01.A20).
 func TestForkLaunchCopiesHistoryThroughTheBoundary(t *testing.T) {
 	c, spec, dir := forkSpec(t, "FAKEACP_CAPS=1")

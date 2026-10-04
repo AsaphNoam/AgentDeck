@@ -3,8 +3,8 @@ package server
 import (
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 type pipelineRunDetailResponse struct {

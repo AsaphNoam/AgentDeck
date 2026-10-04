@@ -40,14 +40,14 @@ type BackendAdapter interface {
 	// primer decision for same-backend model swaps.
 	CanSwitchModelOnResume() bool
 
-	// HookMap maps an AgentDeck lifecycle event (SessionStart, UserPromptSubmit,
+	// HookMap maps a Chuck lifecycle event (SessionStart, UserPromptSubmit,
 	// PreToolUse, PostToolUse, Stop) to the CLI's own hook key for registration
 	// (techspec §2.3, §6.3). Events the backend cannot emit are absent from the
 	// map; UnsupportedHookEvents lists them so the terminal runtime knows which
 	// states to backfill from the ACP/notification channel.
 	HookMap() map[string]string
 
-	// UnsupportedHookEvents lists AgentDeck lifecycle events this backend has no
+	// UnsupportedHookEvents lists Chuck lifecycle events this backend has no
 	// hook for (sorted). Empty when every event maps.
 	UnsupportedHookEvents() []string
 
@@ -58,7 +58,7 @@ type BackendAdapter interface {
 	HookLaunchArgs(settingsPath string) []string
 
 	// EffortDelivery declares how an effort level reaches this adapter for the
-	// given AgentDeck interface. The identifier is a session option id or argv
+	// given Chuck interface. The identifier is a session option id or argv
 	// flag as appropriate; an empty mode means the backend has no mechanism.
 	EffortDelivery(agentInterface string) (mode, identifier string)
 
@@ -66,16 +66,16 @@ type BackendAdapter interface {
 	// mean the adapter does not support that setting through live ACP config.
 	SessionConfigIDs() (model, effort, fast string)
 
-	// Implements declares whether AgentDeck has a verified integration for the
+	// Implements declares whether Chuck has a verified integration for the
 	// given interface ("chat" | "terminal") on this backend. It is the only
 	// evidence of interface support: a hook map or installed executable is not.
 	Implements(agentInterface string) bool
 }
 
-// Interfaces lists the AgentDeck agent interfaces launch support reports on.
+// Interfaces lists the Chuck agent interfaces launch support reports on.
 var Interfaces = []string{"chat", "terminal"}
 
-// LaunchSupport is AgentDeck's static integration support for one backend type
+// LaunchSupport is Chuck's static integration support for one backend type
 // and interface (TS-01.R36). It is not a live session capability, executable
 // probe, or model declaration.
 type LaunchSupport struct {
@@ -121,8 +121,8 @@ type ExtraEnvProvider interface {
 	ExtraEnv(modelID string, skipPerms bool) []string
 }
 
-// agentDeckHookEvents is the canonical AgentDeck lifecycle event set (techspec §4.2).
-var agentDeckHookEvents = []string{
+// chuckHookEvents is the canonical Chuck lifecycle event set (techspec §4.2).
+var chuckHookEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop",
 }
 
@@ -166,7 +166,7 @@ func SupportsFast(backendType, agentInterface string) bool {
 	return Support(backendType, agentInterface).Fast
 }
 
-// SupportsTerminal reports whether AgentDeck can launch, resume or switch this
+// SupportsTerminal reports whether Chuck can launch, resume or switch this
 // backend type under the terminal interface.
 func SupportsTerminal(backendType string) bool {
 	return Support(backendType, "terminal").Available
@@ -180,7 +180,7 @@ func (claudeACP) Binary() string       { return "claude-agent-acp" }
 func (claudeACP) LaunchArgs() []string { return nil }
 func (claudeACP) StripEnvKeys() []string {
 	// The adapter refuses a nested session when CLAUDECODE is set (true when
-	// AgentDeck itself is launched from a Claude Code terminal); AgentDeck spawns
+	// Chuck itself is launched from a Claude Code terminal); Chuck spawns
 	// independent agents, so the nested-session guard must never apply.
 	return []string{"CLAUDECODE"}
 }
@@ -201,7 +201,7 @@ func (claudeACP) Implements(agentInterface string) bool {
 }
 
 func (claudeACP) HookMap() map[string]string {
-	// Claude Code exposes a 1:1 hook for every AgentDeck lifecycle event.
+	// Claude Code exposes a 1:1 hook for every Chuck lifecycle event.
 	return map[string]string{
 		"SessionStart":     "SessionStart",
 		"UserPromptSubmit": "UserPromptSubmit",
@@ -311,7 +311,7 @@ func (opencodeACP) ResolveResumeID(prevSessionID string, sameBackend bool) strin
 func (opencodeACP) CanSwitchModelOnResume() bool          { return true }
 func (opencodeACP) Implements(agentInterface string) bool { return agentInterface == "chat" }
 
-// OpenCode has no AgentDeck hook surface; chat status derives from the ACP
+// OpenCode has no Chuck hook surface; chat status derives from the ACP
 // stream like every chat agent.
 func (opencodeACP) HookMap() map[string]string                 { return nil }
 func (opencodeACP) UnsupportedHookEvents() []string            { return unsupported(nil) }
@@ -382,10 +382,10 @@ func (openhandsACP) ExtraEnv(modelID string, skipPerms bool) []string {
 	return []string{"LLM_MODEL=" + modelID}
 }
 
-// unsupported returns the AgentDeck lifecycle events absent from hookMap, sorted.
+// unsupported returns the Chuck lifecycle events absent from hookMap, sorted.
 func unsupported(hookMap map[string]string) []string {
 	var out []string
-	for _, ev := range agentDeckHookEvents {
+	for _, ev := range chuckHookEvents {
 		if _, ok := hookMap[ev]; !ok {
 			out = append(out, ev)
 		}

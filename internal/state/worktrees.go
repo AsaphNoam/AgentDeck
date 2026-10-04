@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-// AgentDeck-owned worktree ownership (TS-12.R2). A project_worktrees row exists
-// exactly for checkouts AgentDeck created, and its presence is the sole
+// Chuck-owned worktree ownership (TS-12.R2). A project_worktrees row exists
+// exactly for checkouts Chuck created, and its presence is the sole
 // ownership test: a project whose cwd merely lies inside someone else's
 // worktree has no row and therefore no deletion path at all (FS-19.R4).
 //
 // The row is written only after the checkout exists and removed only after the
 // checkout is gone (INV §15), so a crash can leave a checkout that is not
 // recorded as owned — inert, treated as external — but never a record that
-// authorizes deleting something AgentDeck did not create.
+// authorizes deleting something Chuck did not create.
 
 // setupOutputLimit bounds the stored tail of a setup run so one noisy bootstrap
 // cannot grow the state database without limit (TS-12.R5).

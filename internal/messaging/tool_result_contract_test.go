@@ -6,11 +6,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
 )
 
 // FS-17.A2: the classifier is closed over the specified refusal vocabulary and
@@ -110,6 +111,12 @@ func TestRegisteredToolsShareResultContract(t *testing.T) {
 	if len(listed.Tools) == 0 {
 		t.Fatal("tools/list returned no tools")
 	}
+	// FS-18.A14: tool descriptions are authored text with current branding.
+	for _, tool := range listed.Tools {
+		if strings.Contains(strings.ToLower(tool.Description), "agent"+"deck") {
+			t.Errorf("tool %s description still names the old product", tool.Name)
+		}
+	}
 	validArgs := map[string]map[string]any{
 		"list_agents": {}, "send_message": {"to": "nobody", "body": "hello"},
 		"check_messages": {},
@@ -164,7 +171,7 @@ func TestRegisteredToolsShareResultContract(t *testing.T) {
 }
 
 // FS-17 §6: malformed arguments rejected by the pinned SDK never reach an
-// AgentDeck handler and therefore retain the SDK's plain-text error boundary.
+// Chuck handler and therefore retain the SDK's plain-text error boundary.
 func TestSDKArgumentRejectionIsOutsideResultContract(t *testing.T) {
 	srv := New(newStore(t), nil)
 	cs := connect(t, srv, "unknown-token")

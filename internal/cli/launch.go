@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
-// launchArgs is the parsed `agentdeck <role>@<project> [flags]` invocation.
+// launchArgs is the parsed `chuck <role>@<project> [flags]` invocation.
 type launchArgs struct {
 	Role      string
 	Project   string
@@ -148,7 +148,7 @@ func runLaunch(args []string) int {
 
 	resp, body, err := postLaunch(port, la.body())
 	if err != nil {
-		fmt.Printf("could not reach dashboard on 127.0.0.1:%d — run `agentdeck dashboard start` first (%v)\n", port, err)
+		fmt.Printf("could not reach dashboard on 127.0.0.1:%d — run `chuck dashboard start` first (%v)\n", port, err)
 		return 1
 	}
 	if resp.StatusCode != http.StatusCreated {

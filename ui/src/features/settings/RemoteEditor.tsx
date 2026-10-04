@@ -18,8 +18,8 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 const unavailableRepair: Record<string, string> = {
   magicdns_disabled: "Turn on MagicDNS in the DNS page of the Tailscale admin console.",
   https_disabled: "Turn on HTTPS certificates in the DNS page of the Tailscale admin console.",
-  node_error: "AgentDeck could not start its Tailscale device. Turn remote control off and on again.",
-  listener_error: "AgentDeck could not open the phone address. Turn remote control off and on again.",
+  node_error: "Chuck could not start its Tailscale device. Turn remote control off and on again.",
+  listener_error: "Chuck could not open the phone address. Turn remote control off and on again.",
 };
 
 function StatusLine({ status }: { status: RemoteStatus }) {
@@ -113,7 +113,7 @@ function PairingPanel({ status }: { status: RemoteStatus }) {
   return (
     <div className="remote-pairing" data-slot="form">
       <p className="config-notice">
-        Your phone needs the Tailscale app, signed in to the same tailnet. AgentDeck does not install or configure it.
+        Your phone needs the Tailscale app, signed in to the same tailnet. Chuck does not install or configure it.
       </p>
       {code && !expired ? (
         <div className="remote-code">
@@ -225,16 +225,16 @@ export function RemoteEditor() {
       <div className="config-editor-header" data-slot="header">
         <div>
           <h2>Remote</h2>
-          <p>Supervise and direct AgentDeck from your phone while this Mac keeps working.</p>
+          <p>Supervise and direct Chuck from your phone while this Mac keeps working.</p>
         </div>
       </div>
       {remote.isError && <p className="form-error">{errorText(remote.error)}</p>}
       {status && (
         <>
           <p className="config-notice">
-            Remote control joins your Tailscale network as a device named <code>agentdeck</code>, reachable only from
+            Remote control joins your Tailscale network as a device named <code>chuck</code>, reachable only from
             your tailnet. It needs MagicDNS and HTTPS certificates; turning on HTTPS certificates publishes the name{" "}
-            <code>agentdeck.&lt;tailnet&gt;.ts.net</code> in public certificate-transparency logs.
+            <code>chuck.&lt;tailnet&gt;.ts.net</code> in public certificate-transparency logs.
           </p>
           <label className="toggle-row">
             <input

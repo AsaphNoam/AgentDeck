@@ -10,15 +10,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerauth"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // authProvider is the provider sign-in metadata this command delegates to. It
 // is owned by internal/backend/providerauth so the CLI's login argv and the
 // backend readiness probe cannot drift apart (TS-04.R15, INV §2). The command is
-// only ever attached to the user's terminal — AgentDeck accepts no credential
+// only ever attached to the user's terminal — Chuck accepts no credential
 // flags, captures no child stdout/stderr, and writes no credential material of
 // its own (TS-06.R20). The executable is the one the target backend/model would
 // launch, selected by the shared resolver (FS-10.R21, TS-04.R71).
@@ -75,7 +75,7 @@ var authCommandFor = func(t authTarget) (*exec.Cmd, error) {
 
 // authStatusCommandFor is separate from the login factory because a readiness
 // check must not inherit a test or operator login override. It keeps its output
-// out of AgentDeck's logs while the provider examines its own credential store.
+// out of Chuck's logs while the provider examines its own credential store.
 var authStatusCommandFor = func(t authTarget) (*exec.Cmd, error) {
 	if len(t.provider.StatusArgs) == 0 {
 		return nil, fmt.Errorf("%s does not provide a non-interactive readiness check", t.provider.Name)
@@ -203,10 +203,10 @@ func describeAuthTarget(t authTarget) string {
 func unavailableAuthTarget(t authTarget) string {
 	switch t.selection.State {
 	case providerexec.StateBundleUnavailable:
-		return fmt.Sprintf("The AgentDeck bundle for %s is not available in this installation. Choose Installed provider for this backend in Settings, or reinstall AgentDeck.", t.provider.Name)
+		return fmt.Sprintf("The Chuck bundle for %s is not available in this installation. Choose Installed provider for this backend in Settings, or reinstall Chuck.", t.provider.Name)
 	case providerexec.StateMissing:
 		if t.selection.Source == providerexec.SourceDetected {
-			return fmt.Sprintf("%s is not installed. Install it (%s), then retry; or choose AgentDeck bundle for this backend in Settings.", t.provider.Name, providerInstallURL(t.provider.ID))
+			return fmt.Sprintf("%s is not installed. Install it (%s), then retry; or choose Chuck bundle for this backend in Settings.", t.provider.Name, providerInstallURL(t.provider.ID))
 		}
 		return fmt.Sprintf("The %s executable %q from %s was not found. Fix or clear that path in Settings, then retry.", t.provider.Name, t.selection.Override, t.selection.Provider.EnvKey)
 	default:
@@ -221,7 +221,7 @@ func providerInstallURL(id string) string {
 	return "https://code.claude.com/docs/en/setup"
 }
 
-// newAuthCmd builds `agentdeck auth <claude|codex>`.
+// newAuthCmd builds `chuck auth <claude|codex>`.
 func newAuthCmd() *cobra.Command {
 	var check bool
 	var backendID, modelID string
@@ -268,7 +268,7 @@ func runAuthCheck(cmd *cobra.Command, t authTarget) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s is ready.\n", p.Name)
 		return nil
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s needs sign-in. Run 'agentdeck auth %s' to continue.\n", p.Name, p.ID)
+	fmt.Fprintf(cmd.OutOrStdout(), "%s needs sign-in. Run 'chuck auth %s' to continue.\n", p.Name, p.ID)
 	return errAuthFailed
 }
 
@@ -283,7 +283,7 @@ func runAuth(cmd *cobra.Command, t authTarget) error {
 	c, err := authCommandFor(t)
 	if err != nil {
 		fmt.Fprintf(out, "%s sign-in unavailable: %v.\n", p.Name, err)
-		fmt.Fprintf(out, "Your installation still works; retry with 'agentdeck auth %s'.\n", p.ID)
+		fmt.Fprintf(out, "Your installation still works; retry with 'chuck auth %s'.\n", p.ID)
 		return errAuthFailed
 	}
 	switch classifyAuth(c.Run()) {
@@ -291,10 +291,10 @@ func runAuth(cmd *cobra.Command, t authTarget) error {
 		fmt.Fprintf(out, "Signed in to %s.\n", p.Name)
 		return nil
 	case authCancelled:
-		fmt.Fprintf(out, "%s sign-in cancelled. Your installation is ready; retry any time with 'agentdeck auth %s' or from the dashboard.\n", p.Name, p.ID)
+		fmt.Fprintf(out, "%s sign-in cancelled. Your installation is ready; retry any time with 'chuck auth %s' or from the dashboard.\n", p.Name, p.ID)
 		return nil
 	default:
-		fmt.Fprintf(out, "%s sign-in did not complete. Retry with 'agentdeck auth %s' or sign in from the dashboard.\n", p.Name, p.ID)
+		fmt.Fprintf(out, "%s sign-in did not complete. Retry with 'chuck auth %s' or sign in from the dashboard.\n", p.Name, p.ID)
 		return errAuthFailed
 	}
 }

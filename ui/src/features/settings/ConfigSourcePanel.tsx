@@ -31,13 +31,13 @@ function configSourceVisualState(binding?: BindingView): ConfigSourceVisualState
 }
 
 // modelProvenanceLabel turns the redacted per-field provenance into the honest
-// source label the spec (§2.8) requires: an AgentDeck override, an inherited
+// source label the spec (§2.8) requires: a Chuck override, an inherited
 // native value naming its scope/path, or "inherit the CLI default".
 function provenanceLabel(effective: Effective, field: "model" | "effort", value: string | null | undefined): string {
   if (value == null || value === "") return "Inherit CLI default";
   const prov = effective.provenance?.[field];
   if (!prov) return value;
-  if (prov.scope === "agentdeck_override") return `${value} — AgentDeck override`;
+  if (prov.scope === "chuck_override") return `${value} — Chuck override`;
   const where = prov.path ? `${prov.scope} (${prov.path})` : prov.scope;
   return `${value} — inherited from ${where}`;
 }
@@ -156,7 +156,7 @@ export function ConfigSourcePanel({
   const [effective, setEffective] = useState<Effective | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importNote, setImportNote] = useState<string | null>(null);
-  // AgentDeck override inputs for a bound source (empty = inherit the native value).
+  // Chuck override inputs for a bound source (empty = inherit the native value).
   const [overrideModel, setOverrideModel] = useState("");
   const [overrideEffort, setOverrideEffort] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -243,7 +243,7 @@ export function ConfigSourcePanel({
     del.mutate({ backendId, detach: false }, { onError: (e) => setError(configErrorMessage(e)), onSettled: releaseMutation });
   };
 
-  // applyOverrides changes the AgentDeck model/effort overrides on a bound source by
+  // applyOverrides changes the Chuck model/effort overrides on a bound source by
   // re-previewing the SAME source (its root/profile/mode) for a fresh consent token,
   // then re-binding with the new overrides. Passing null for both resets to native
   // inheritance. The server derives the mode from the token, so the token is minted
@@ -286,7 +286,7 @@ export function ConfigSourcePanel({
         {!binding && !compactOnboarding && (
           <div className="source-unbound" data-slot="status">
             <p className="source-hint">
-              AgentDeck reads {providerLabel(provider)}'s existing setup — its model, instructions and
+              Chuck reads {providerLabel(provider)}'s existing setup — its model, instructions and
               tooling — without copying or modifying it.
             </p>
             <div className="source-actions" data-slot="actions">

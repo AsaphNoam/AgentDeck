@@ -11,10 +11,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/configsource"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/configsource"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func canonicalPath(t *testing.T, path string) string {
@@ -264,7 +264,7 @@ func TestComposeLaunchFreezesFederationConfig(t *testing.T) {
 		t.Error("expected native_inherited=true for a default (unspecified) model")
 	}
 	// The composition must OMIT the model over ACP for a native-inherited launch so
-	// the CLI resolves its own configured model instead of AgentDeck forcing the
+	// the CLI resolves its own configured model instead of Chuck forcing the
 	// backend default (federation §2.4 — the core of the "defaults never applied" bug).
 	if spec.ModelID != "" {
 		t.Fatalf("native-inherited launch ModelID = %q, want empty (omitted)", spec.ModelID)

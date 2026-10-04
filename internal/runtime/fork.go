@@ -13,7 +13,7 @@ import (
 // that forks the source's provider session through standard ACP session/fork;
 // the provider conversation already holds the source context, so no system
 // prompt or primer is sent. Replayed history is dropped like session/load's:
-// AgentDeck's own durable copy of the source transcript is the clone's record.
+// Chuck's own durable copy of the source transcript is the clone's record.
 
 // EvForkBoundary marks where a clone's copied history ends and its own begins.
 const EvForkBoundary = "fork_boundary"

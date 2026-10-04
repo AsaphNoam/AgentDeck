@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // providerInstallGuidance is the official installation entry point for each
-// provider; AgentDeck never installs or updates a provider itself (FS-09.R77).
+// provider; Chuck never installs or updates a provider itself (FS-09.R77).
 var providerInstallGuidance = map[string]string{
 	"claude": "https://code.claude.com/docs/en/setup",
 	"codex":  "https://developers.openai.com/codex/cli",
@@ -46,18 +46,18 @@ func providerSelectionError(sel providerexec.Selection) *runtime.APIError {
 	switch sel.State {
 	case providerexec.StateBundleUnavailable:
 		code = runtime.CodeBundledProviderMissing
-		msg = fmt.Sprintf("The AgentDeck bundle for %s is not available in this AgentDeck installation. Choose Installed provider for this backend in Settings, or reinstall AgentDeck.", p.Name)
+		msg = fmt.Sprintf("The Chuck bundle for %s is not available in this Chuck installation. Choose Installed provider for this backend in Settings, or reinstall Chuck.", p.Name)
 	case providerexec.StateMissing:
 		if sel.Source == providerexec.SourceDetected {
 			code = runtime.CodeProviderExecutableMissing
-			msg = fmt.Sprintf("%s is not installed or not on AgentDeck's PATH. Install it (%s), set its executable path in Settings, or choose AgentDeck bundle for this backend.", p.Name, providerInstallGuidance[p.ID])
+			msg = fmt.Sprintf("%s is not installed or not on Chuck's PATH. Install it (%s), set its executable path in Settings, or choose Chuck bundle for this backend.", p.Name, providerInstallGuidance[p.ID])
 		} else {
 			code = runtime.CodeProviderExecutableMissing
-			msg = fmt.Sprintf("The %s executable set by %s (%s) was not found. Fix or clear that path in Settings, or choose AgentDeck bundle for this backend.", p.Name, overrideLabel(sel), sel.Override)
+			msg = fmt.Sprintf("The %s executable set by %s (%s) was not found. Fix or clear that path in Settings, or choose Chuck bundle for this backend.", p.Name, overrideLabel(sel), sel.Override)
 		}
 	default:
 		code = runtime.CodeProviderExecutableInvalid
-		msg = fmt.Sprintf("The %s executable set by %s (%s) is not a usable executable. Use an absolute path or a command name, or choose AgentDeck bundle for this backend.", p.Name, overrideLabel(sel), sel.Override)
+		msg = fmt.Sprintf("The %s executable set by %s (%s) is not a usable executable. Use an absolute path or a command name, or choose Chuck bundle for this backend.", p.Name, overrideLabel(sel), sel.Override)
 	}
 	ae := apiError(code, msg)
 	ae.Details = map[string]any{"provider": p.ID, "source": sel.Source}
@@ -128,23 +128,23 @@ func remoteProviderError(body []byte) []byte {
 	var msg string
 	switch env.Error.Code {
 	case runtime.CodeBundledProviderMissing:
-		msg = fmt.Sprintf("The AgentDeck bundle for %s is unavailable on the Mac. Change this backend's provider in AgentDeck Settings on the Mac, then retry.", name)
+		msg = fmt.Sprintf("The Chuck bundle for %s is unavailable on the Mac. Change this backend's provider in Chuck Settings on the Mac, then retry.", name)
 	case runtime.CodeProviderIncompatible:
-		subject, repair := name+" on the Mac", "Update it or change this backend's provider in AgentDeck Settings on the Mac, then retry."
+		subject, repair := name+" on the Mac", "Update it or change this backend's provider in Chuck Settings on the Mac, then retry."
 		switch src := details["source"]; {
 		case src == providerexec.SourceBundled:
-			subject = "The AgentDeck bundle's " + name + " on the Mac"
-			repair = "Choose Installed provider for this backend in AgentDeck Settings on the Mac, or update AgentDeck, then retry."
+			subject = "The Chuck bundle's " + name + " on the Mac"
+			repair = "Choose Installed provider for this backend in Chuck Settings on the Mac, or update Chuck, then retry."
 		case src != nil:
 			subject = "The installed " + name + " on the Mac"
-			repair = "Update " + name + " on the Mac, or choose AgentDeck bundle for this backend in AgentDeck Settings on the Mac, then retry."
+			repair = "Update " + name + " on the Mac, or choose Chuck bundle for this backend in Chuck Settings on the Mac, then retry."
 		}
 		msg = fmt.Sprintf("%s is too old for this request. %s", subject, repair)
 		if have, need := details["version"], details["required_version"]; have != nil && need != nil {
 			msg = fmt.Sprintf("%s is %v; this request needs %v or newer. %s", subject, have, need, repair)
 		}
 	default:
-		msg = fmt.Sprintf("%s is not available for this backend on the Mac. Repair it in AgentDeck Settings on the Mac, then retry.", name)
+		msg = fmt.Sprintf("%s is not available for this backend on the Mac. Repair it in Chuck Settings on the Mac, then retry.", name)
 	}
 	env.Error.Message, env.Error.Details = msg, details
 	out, err := json.Marshal(env)

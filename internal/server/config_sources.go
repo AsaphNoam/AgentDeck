@@ -8,10 +8,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/bus"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/configsource"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/bus"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/configsource"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // newConfigSourceManager builds the federation SourceManager over the real user
@@ -363,7 +363,7 @@ func (s *Server) handleRefreshConfigSource(w http.ResponseWriter, r *http.Reques
 }
 
 // handleDeleteConfigSource implements DELETE /api/config-sources/{backend_id}.
-// detach=false unbinds the source. detach=true (materialize under AgentDeck
+// detach=false unbinds the source. detach=true (materialize under Chuck
 // ownership) is gated: no Claude/Codex asset has a verified launch-injection copy
 // path yet, so materialization is not implemented and returns 501 rather than
 // silently dropping the copy promise.
@@ -505,7 +505,7 @@ func (s *Server) readProjectOptional(projectID string) (config.Project, bool) {
 }
 
 // launchConfigDoc is the redacted, versioned federation launch object frozen into
-// sessions.launch_config_json (§2.5). It records the binding, the model AgentDeck
+// sessions.launch_config_json (§2.5). It records the binding, the model Chuck
 // requested vs what the source resolved, the source generation + fingerprints, and
 // whether the model was left to native resolution. It carries no secret values:
 // the effective model/effort/provider are display-safe and fingerprints are only
@@ -537,7 +537,7 @@ type launchConfigResolved struct {
 // launch composer (§2.3/§2.4). Exactly one of the intents applies per launch:
 //   - inherit: the user chose no model and the binding has no override, so the
 //     model flag is OMITTED over ACP and the CLI resolves its own native model.
-//   - override != nil: the binding carries an AgentDeck source override, applied
+//   - override != nil: the binding carries a Chuck source override, applied
 //     when the user chose no explicit model.
 //   - neither: an explicit launch model was chosen and wins over the source.
 type federationModel struct {
@@ -555,7 +555,7 @@ type federationModel struct {
 // Model composition (§2.4) layers explicit launch choice / source override above
 // native resolution: when neither an explicit model nor an override applies the
 // model flag is omitted so the CLI applies its own native config via cwd/home
-// pass-through, rather than AgentDeck forcing its backend default over ACP. The
+// pass-through, rather than Chuck forcing its backend default over ACP. The
 // resolved high-level model is still recorded as redacted provenance.
 func (s *Server) composeFederation(ctx context.Context, backendID string, req launchRequest, backend config.Backend, project config.Project, requestedModelID string) (json.RawMessage, *federationModel, *runtime.APIError) {
 	if s.sourceMgr == nil {
@@ -571,7 +571,7 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 	if err != nil {
 		return nil, nil, sourceAPIError(err)
 	}
-	// Reserved messaging-MCP collision preflight (§2.4): AgentDeck injects an MCP
+	// Reserved messaging-MCP collision preflight (§2.4): Chuck injects an MCP
 	// server with the reserved id messagingMCPName. If the native config already
 	// declares that exact id, injecting ours would shadow/duplicate it, so block
 	// the launch with 409 source_conflict rather than silently colliding.
@@ -608,7 +608,7 @@ func (s *Server) composeFederation(ctx context.Context, backendID string, req la
 // frozenModelInherited reports whether a frozen federation launch object marks the
 // model as native-inherited — i.e. launch composition omitted the model over ACP so
 // the CLI resolves its own. Resume and same-identity switch honor this so a launch
-// that deferred to native config does not silently regain an AgentDeck default. A
+// that deferred to native config does not silently regain a Chuck default. A
 // missing/malformed doc means "not inherited" (send the model normally).
 func frozenModelInherited(launchConfig json.RawMessage) bool {
 	if len(launchConfig) == 0 {

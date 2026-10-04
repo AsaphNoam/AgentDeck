@@ -14,10 +14,10 @@ import (
 
 // DefaultRepo is the GitHub owner/repo the updater reads releases from. The Go
 // module path is unrelated; releases are published from this repository.
-const DefaultRepo = "AsaphNoam/AgentDeck"
+const DefaultRepo = "AsaphNoam/Chuck"
 
 // GitHubFetcher resolves and downloads releases from GitHub. It performs network
-// I/O only when explicitly invoked by `agentdeck update`; there is no background
+// I/O only when explicitly invoked by `chuck update`; there is no background
 // polling, telemetry, or auto-update (FS-10.R7, TS-06.R19).
 type GitHubFetcher struct {
 	Repo   string

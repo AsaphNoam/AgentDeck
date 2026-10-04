@@ -1,4 +1,4 @@
-const storageKey = "agentdeck-chat-drafts";
+const storageKey = "chuck-chat-drafts";
 const maxDrafts = 20;
 
 type Draft = { text: string; editedAt: number };

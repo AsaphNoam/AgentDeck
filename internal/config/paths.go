@@ -9,15 +9,15 @@ import (
 // Home-directory resolution and per-object path builders.
 //
 // Resolution rules (resolveHome):
-//  1. If $AGENTDECK_HOME is set and non-empty → use it (expanding a leading ~).
-//  2. Else → filepath.Join(userHomeDir, ".agentdeck").
+//  1. If $CHUCK_HOME is set and non-empty → use it (expanding a leading ~).
+//  2. Else → filepath.Join(userHomeDir, ".chuck").
 //
 // A leading "~" inside stored paths (e.g. project.cwd) is expanded by
 // ExpandTilde() on read by *callers*, never by the store on write — the store
 // persists paths verbatim.
 
 // envHome is the override environment variable name.
-const envHome = "AGENTDECK_HOME"
+const envHome = "CHUCK_HOME"
 
 // resolveHome computes the absolute home directory per the rules above. It does
 // not create anything on disk.
@@ -33,7 +33,7 @@ func resolveHome() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(u, ".agentdeck"), nil
+	return filepath.Join(u, ".chuck"), nil
 }
 
 // ExpandTilde expands a leading "~" or "~/" in p to the user's home directory.

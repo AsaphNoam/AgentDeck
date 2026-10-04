@@ -1,4 +1,4 @@
-// Package worktree is AgentDeck's single Git execution boundary (TS-12.R1).
+// Package worktree is Chuck's single Git execution boundary (TS-12.R1).
 //
 // Every Git invocation in the product goes through this package. Commands are
 // built argv-only (never a shell), rooted with `git -C <path>`, run with stdin

@@ -5,11 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	persistindex "github.com/agentdeck/agentdeck/internal/index"
-	"github.com/agentdeck/agentdeck/internal/state"
+	persistindex "github.com/AsaphNoam/Chuck/internal/index"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
-// serverRunning reports whether an agentdeck server appears to be running by
+// serverRunning reports whether a chuck server appears to be running by
 // checking the pidfile and probing the process with signal 0.
 func serverRunning(home string) bool {
 	info, ok, err := readPidfile(home)
@@ -35,7 +35,7 @@ func newReindexCmd() *cobra.Command {
 			// pidfile is handled by serverRunning's signal-0 liveness probe, so this
 			// only fires when the daemon is actually up.)
 			if serverRunning(cfgStore.Home()) {
-				return fmt.Errorf("agentdeck server is running — stop it before reindex " +
+				return fmt.Errorf("chuck server is running — stop it before reindex " +
 					"(reindex wipes and rebuilds the archive index and must be the sole DB writer)")
 			}
 			st, err := state.Open(cfgStore.Home())

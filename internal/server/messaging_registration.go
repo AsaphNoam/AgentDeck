@@ -8,12 +8,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
-const messagingMCPName = "agentdeck-messaging"
+const messagingMCPName = "chuck-messaging"
 
 // registerMessagingMCP wires one agent to the dashboard-owned MCP server
 // (techspec §3.6). The live CLI verdict is still gated, so both current chat
@@ -29,7 +29,7 @@ func (s *Server) registerMessagingMCP(agent state.Agent, generation string) (run
 	s.messaging.RegisterSession(token, agent.AgentID, generation)
 
 	// Both current backends (claude-acp, codex-acp) take the in-process HTTP
-	// streamable transport. A stdio fallback (an `agentdeck mcp` proxy subcommand)
+	// streamable transport. A stdio fallback (an `chuck mcp` proxy subcommand)
 	// would only be needed if a real CLI rejects HTTP — that's still gated on the
 	// live two-CLI acceptance (see HANDOFF "Blocked on human"); it isn't wired
 	// (no such subcommand exists), so we don't emit an unreachable/broken branch.

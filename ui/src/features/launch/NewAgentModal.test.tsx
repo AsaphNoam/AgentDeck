@@ -117,8 +117,8 @@ describe("NewAgentModal", () => {
     fireEvent.change(screen.getByLabelText("Model"), { target: { value: "haiku" } });
     expect(await screen.findByText(/The Claude Code executable path was not found.*Settings → Backends/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
-    expect(await screen.findByText(/AgentDeck bundle Codex · \/app\/runtime\/codex · version not checked/)).toBeInTheDocument();
-    expect(screen.queryByRole("radio", { name: "AgentDeck bundle" })).toBeNull();
+    expect(await screen.findByText(/Chuck bundle Codex · \/app\/runtime\/codex · version not checked/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Chuck bundle" })).toBeNull();
   });
 
   // FS-09.A40: a cache version difference is not an incompatibility warning.

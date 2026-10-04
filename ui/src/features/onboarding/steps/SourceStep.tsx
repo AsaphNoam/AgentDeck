@@ -30,7 +30,7 @@ export function SourceStep({ backendId, backendType, onDone, claimMutation, rele
     <div className="onboarding-step source-step" data-ui="onboarding" data-slot="step" data-variant="source">
       <h3>Link your CLI configuration (optional)</h3>
       <p className="source-hint">
-        AgentDeck can read your existing {backendType === "claude-acp" ? "Claude Code" : "Codex"} setup —
+        Chuck can read your existing {backendType === "claude-acp" ? "Claude Code" : "Codex"} setup —
         model, instructions and tooling — so agents launch with your real configuration. Nothing is
         copied or modified. You can also link it later in Settings → Backends.
       </p>

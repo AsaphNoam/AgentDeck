@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
+	"github.com/AsaphNoam/Chuck/internal/runtime/terminal"
 )
 
 // GET /api/capabilities reports the terminal driver matrix (§8.5): xterm is

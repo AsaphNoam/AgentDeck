@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/strutil"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 )
 
-// Background terminals are normalized async tasks, never AgentDeck durable
+// Background terminals are normalized async tasks, never Chuck durable
 // tasks (FS-03.R59, TS-04.R64). The adapter announces a command that continues
 // after its tool call and later reports one terminal state; its output stays
 // with the related tool call. Runtime alone keeps the provider's session and
@@ -39,7 +39,7 @@ var (
 )
 
 // BackgroundTaskData is a background task's lifecycle payload. TaskID and
-// ToolCallID are AgentDeck-normalized (activity-scoped for a child).
+// ToolCallID are Chuck-normalized (activity-scoped for a child).
 type BackgroundTaskData struct {
 	TaskID     string `json:"task_id"`
 	ToolCallID string `json:"tool_call_id,omitempty"`

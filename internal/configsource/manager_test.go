@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // recorder captures published updates in a thread-safe way (watch fires them
@@ -33,7 +33,7 @@ func (r *recorder) snapshot() []Update {
 }
 
 // managerFixture builds a Manager over a Claude source tree plus a distinct
-// AgentDeck home holding config-sources.json and the mirror cache.
+// Chuck home holding config-sources.json and the mirror cache.
 func managerFixture(t *testing.T) (*Manager, *config.Store, *recorder, string, config.Project) {
 	t.Helper()
 	userHome, project := claudeFixture(t)

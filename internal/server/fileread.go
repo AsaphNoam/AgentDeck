@@ -12,9 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // fileReadLimit bounds one file read (TS-05.R21). The read is bounded by this
@@ -293,7 +293,7 @@ func languageForPath(rel string) string {
 }
 
 // languageByExtension maps a lowercased extension to the highlighter's language
-// id. Kept to what AgentDeck's own transcripts actually cite.
+// id. Kept to what Chuck's own transcripts actually cite.
 var languageByExtension = map[string]string{
 	".bash": "bash", ".c": "c", ".cc": "cpp", ".cfg": "ini", ".conf": "ini",
 	".cpp": "cpp", ".cs": "csharp", ".css": "css", ".go": "go", ".h": "c",

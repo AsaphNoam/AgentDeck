@@ -86,7 +86,7 @@ func contextCountsColumns(c *ContextCounts) (any, any) {
 	return c.ContextUsed, c.ContextSize
 }
 
-// RuntimeCapabilities is AgentDeck's normalized, provider-independent vocabulary
+// RuntimeCapabilities is Chuck's normalized, provider-independent vocabulary
 // of native session capabilities (TS-01.R35, TS-02.R35). It is populated only
 // from a live ACP initialize response, frozen onto the session snapshot for
 // stopped-session affordances, and never inferred from backend type or adapter
@@ -392,7 +392,7 @@ type PipelineValueRecord struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-// PipelineProposalRecord is the durable, canonical result of an AgentDecker
+// PipelineProposalRecord is the durable, canonical result of a FirstMate
 // proposal tool call. Its payload stays opaque here so state remains independent
 // of the pipeline package's template and run request types.
 // DeclinedAt is nil for a record nobody rejected.

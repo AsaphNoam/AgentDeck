@@ -279,7 +279,7 @@ describe("assistant diagram safety", () => {
   // FS-03.R38, INV §4: a draw-stage failure must not leak Mermaid's scratch node onto
   // document.body. Real Mermaid appends that node itself (outside React's tree) and only tears
   // it down on a thrown draw failure when `suppressErrorRendering` was set at initialize time;
-  // this mock mirrors that documented contract so the assertion exercises AgentDeck's own wiring.
+  // this mock mirrors that documented contract so the assertion exercises Chuck's own wiring.
   it("leaves no stray node on document.body after a draw-stage failure", async () => {
     let initializedWithSuppression = false;
     mermaid.initialize.mockImplementation((opts: { suppressErrorRendering?: boolean }) => {
@@ -369,7 +369,7 @@ describe("file links in assistant Markdown", () => {
   });
 
   it("invents no link for a path written in prose", () => {
-    // AgentDeck adds no path detection over plain text, so a path the agent only
+    // Chuck adds no path detection over plain text, so a path the agent only
     // mentioned stays text and never resolves to nothing (FS-03.R51).
     const onOpenFile = renderText("I edited internal/state/messages.go just now.");
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

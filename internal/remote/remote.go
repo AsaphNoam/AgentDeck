@@ -1,4 +1,4 @@
-// Package remote owns AgentDeck's optional remote-control channel: the embedded
+// Package remote owns Chuck's optional remote-control channel: the embedded
 // tailnet node and the connection state the desktop shows (TS-13.R1–R3). It is
 // never a runtime — a failure here surfaces only as an Unavailable state and
 // never stops the loopback server, agents, tasks, or pipelines.

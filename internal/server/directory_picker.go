@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // Directory browsing for project working directories (FS-04.R42, TS-03.R26,
 // TS-05.R15).
 //
-// The browser cannot supply what AgentDeck persists: the File System Access API
+// The browser cannot supply what Chuck persists: the File System Access API
 // hands back a directory handle, not the absolute host path a project's cwd and
 // add_dirs must store. So the panel is shown by the local server instead, as one
 // synchronous action with no caller-chosen path anywhere in its input.
@@ -32,7 +32,7 @@ const osascriptPath = "/usr/bin/osascript"
 
 // chooseFolderPrompt is the panel's fixed prompt. The whole script is these two
 // constants; no request data reaches it.
-const chooseFolderPrompt = "Choose a directory for AgentDeck"
+const chooseFolderPrompt = "Choose a directory for Chuck"
 
 // Sentinel picker failures. They are intentionally opaque: both the API response
 // and the server log see only these fixed strings, never osascript's stderr

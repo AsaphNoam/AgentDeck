@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 // writeAnnotationPair seeds an inactive chat source and a running, idle chat
@@ -263,6 +263,10 @@ func TestAnnotationBlockStartsWithTheSentinelTheClientMatches(t *testing.T) {
 	})
 	if sentinel := annotationBlockSentinelFromUI(t); !strings.HasPrefix(block, sentinel) {
 		t.Fatalf("annotation block %q does not start with the client's sentinel %q", block, sentinel)
+	}
+	// FS-13.A15: the pre-rename first line is recognized but never written.
+	if strings.Contains(block, "[AgentDeck annotations]") {
+		t.Fatalf("annotation block still writes the legacy first line: %q", block)
 	}
 }
 

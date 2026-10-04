@@ -5,7 +5,7 @@ const agent = {
   agent_id: "a_1",
   name: "Atlas",
   role: "implementer",
-  project: "agentdeck",
+  project: "chuck",
   backend: "claude",
   model: "sonnet",
   interface: "chat",

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/configsource"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/configsource"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // Item-scoped backend creation (TS-03.R23, FS-04.R40). POST /api/backends adds

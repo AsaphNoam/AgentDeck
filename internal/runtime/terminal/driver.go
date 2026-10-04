@@ -14,7 +14,7 @@ import "os"
 type TabSpec struct {
 	Command []string // launch argv: argv[0] is the binary, argv[1:] the args
 	Cwd     string
-	Env     []string // "K=V" entries (already layered, incl. AGENTDECK_* hook env)
+	Env     []string // "K=V" entries (already layered, incl. CHUCK_* hook env)
 	Title   string   // "{name} · {role}@{project}" (§3.2)
 	Color   [3]int   // project accent (0–255 RGB); zero value means "unset"
 }
@@ -34,7 +34,7 @@ type Tab struct {
 	exited chan struct{} // closed once the child process has exited & been reaped
 
 	// tmux driver handles.
-	tmuxName string // named tmux session, e.g. "agentdeck-a_8f3c12"
+	tmuxName string // named tmux session, e.g. "chuck-a_8f3c12"
 
 	// iTerm2 driver handles (AppleScript object ids, §3.6). The window id addresses
 	// the tab for CloseTab; the session id addresses it for write-text.

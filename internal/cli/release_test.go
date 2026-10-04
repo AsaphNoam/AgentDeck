@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/AsaphNoam/Chuck/internal/release"
 )
 
 // buildArchive assembles a minimal but complete release version directory, packs
@@ -18,7 +18,7 @@ func buildArchive(t *testing.T, version string) (string, string) {
 	work := t.TempDir()
 	dir := filepath.Join(work, release.VersionDirName(version))
 	files := map[string]string{
-		"libexec/agentdeck":     "#!/bin/sh\necho ran\n",
+		"libexec/chuck":         "#!/bin/sh\necho ran\n",
 		"runtime/node/bin/node": "#!/bin/sh\n",
 		"runtime/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js":              "#!/bin/sh\n",
 		"runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js":                     "#!/bin/sh\n",
@@ -39,11 +39,11 @@ func buildArchive(t *testing.T, version string) (string, string) {
 	}
 	if err := release.WriteInternalManifest(dir, release.InternalManifest{Version: version, Target: release.Target, Components: map[string]string{
 		"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0",
-		"claude": "2.1.257", "codex": "0.154.0", "agentdeck": version,
+		"claude": "2.1.257", "codex": "0.154.0", "chuck": version,
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	archive := filepath.Join(work, "agentdeck-"+version+"-"+release.Target+".tar.gz")
+	archive := filepath.Join(work, "chuck-"+version+"-"+release.Target+".tar.gz")
 	if err := release.CreateArchive(dir, archive); err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +61,12 @@ func buildArchive(t *testing.T, version string) (string, string) {
 	return archive, manifest
 }
 
-// `agentdeck release install` installs into AGENTDECK_APP_ROOT and yields a
+// `chuck release install` installs into CHUCK_APP_ROOT and yields a
 // runnable shim (FS-10.A1, TS-06.R17).
 func TestReleaseInstallCommand(t *testing.T) {
 	archive, manifest := buildArchive(t, "1.0.0")
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 
 	root := NewRootCmd()
 	root.SetArgs([]string{"release", "install", "--archive", archive, "--manifest", manifest})
@@ -74,7 +74,7 @@ func TestReleaseInstallCommand(t *testing.T) {
 		t.Fatalf("release install: %v", err)
 	}
 
-	shim := filepath.Join(appRoot, "bin", "agentdeck")
+	shim := filepath.Join(appRoot, "bin", "chuck")
 	if _, err := os.Stat(shim); err != nil {
 		t.Fatalf("shim missing after install: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestReleaseInstallRejectsCorrupt(t *testing.T) {
 	_ = os.WriteFile(manifest, data, 0o600)
 
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	root := NewRootCmd()
 	root.SetArgs([]string{"release", "install", "--archive", archive, "--manifest", manifest})
 	if err := root.Execute(); err == nil {

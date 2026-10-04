@@ -106,7 +106,7 @@ describe("OnboardingGate", () => {
         <div data-testid="dashboard">Dashboard</div>
       </OnboardingGate>,
     );
-    expect(await screen.findByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to Chuck")).toBeInTheDocument();
   });
 
   it("renders dashboard children when satisfied is true (no wizard)", async () => {
@@ -117,7 +117,7 @@ describe("OnboardingGate", () => {
       </OnboardingGate>,
     );
     expect(await screen.findByTestId("dashboard")).toBeInTheDocument();
-    expect(screen.queryByText("Welcome to AgentDeck")).toBeNull();
+    expect(screen.queryByText("Welcome to Chuck")).toBeNull();
   });
 
   it("wizard shows Backend step first when backend is not done", async () => {
@@ -168,12 +168,12 @@ describe("OnboardingGate", () => {
         <div>Dashboard</div>
       </OnboardingGate>,
     );
-    expect(await screen.findByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to Chuck")).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
     // Wizard still visible
-    expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Chuck")).toBeInTheDocument();
   });
 
   it("clicking overlay does not dismiss the wizard", async () => {
@@ -188,7 +188,7 @@ describe("OnboardingGate", () => {
     if (overlay) {
       fireEvent.click(overlay);
     }
-    expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Chuck")).toBeInTheDocument();
   });
 
   // FS-04.R32/A13: someone who cannot finish setup now must be able to reach the
@@ -224,7 +224,7 @@ describe("OnboardingGate", () => {
     fireEvent.click(await screen.findByText("Set up later"));
 
     expect(await screen.findByTestId("dashboard")).toBeInTheDocument();
-    expect(screen.queryByText("Welcome to AgentDeck")).toBeNull();
+    expect(screen.queryByText("Welcome to Chuck")).toBeNull();
     expect(configPut).toEqual({ onboarding_complete: true });
     expect(touched).toEqual([]);
   });
@@ -249,7 +249,7 @@ describe("OnboardingGate", () => {
     fireEvent.click(await screen.findByText("Set up later"));
 
     expect(await screen.findByText(/disk is read-only/i)).toBeInTheDocument();
-    expect(screen.getByText("Welcome to AgentDeck")).toBeInTheDocument();
+    expect(screen.getByText("Welcome to Chuck")).toBeInTheDocument();
     expect(screen.queryByTestId("dashboard")).toBeNull();
     // Still retryable.
     expect(screen.getByText("Set up later")).not.toBeDisabled();

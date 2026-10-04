@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/remote"
 )
 
 // pairingServer is a server with remote control On and a tailnet handler whose

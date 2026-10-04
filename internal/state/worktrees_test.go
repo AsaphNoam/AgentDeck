@@ -18,7 +18,7 @@ func TestProjectWorktreeRoundTrip(t *testing.T) {
 	want := ProjectWorktree{
 		Project:      "fork-a",
 		RepoPath:     "/repo",
-		Branch:       "agentdeck/fork-a",
+		Branch:       "chuck/fork-a",
 		CheckoutPath: "/home/worktrees/fork-a",
 	}
 	if err := st.InsertProjectWorktree(want); err != nil {

@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/index"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/index"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // seedSessionForTracking creates an agent + sessions row + running row so file/command
@@ -258,7 +258,7 @@ func postHookJSON(t *testing.T, h http.Handler, body string, token string) *http
 	req := newLocalRequest(http.MethodPost, "/api/hook", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
-		req.Header.Set("X-AgentDeck-Token", token)
+		req.Header.Set("X-Chuck-Token", token)
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

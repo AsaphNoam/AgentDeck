@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
 )
 
 // buildRunnableVersion assembles a version with the full required layout whose
-// libexec/agentdeck is a shell script reporting the environment it runs under,
+// libexec/chuck is a shell script reporting the environment it runs under,
 // so a test can prove what the wrapper does and does not change (TS-06.R15/R30,
 // FS-10.A2).
 func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
@@ -20,7 +20,7 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	name := VersionDirName(version)
 	dir := l.VersionDir(name)
 	for _, rel := range requiredLayout {
-		if rel == internalManifestName || rel == "bin/agentdeck" {
+		if rel == internalManifestName || rel == "bin/chuck" {
 			continue
 		}
 		p := filepath.Join(dir, rel)
@@ -31,8 +31,8 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 			t.Fatal(err)
 		}
 	}
-	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"ROOT=$AGENTDECK_RUNTIME_ROOT\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"CLAUDE_CODE_EXECUTABLE=$CLAUDE_CODE_EXECUTABLE\"\necho \"ARGS=$*\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "libexec", "agentdeck"), []byte(report), 0o755); err != nil {
+	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"ROOT=$CHUCK_RUNTIME_ROOT\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"CLAUDE_CODE_EXECUTABLE=$CLAUDE_CODE_EXECUTABLE\"\necho \"ARGS=$*\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "libexec", "chuck"), []byte(report), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := WriteWrapper(dir); err != nil {
@@ -125,7 +125,7 @@ func TestRequiredLayoutAndManifestComponentsAgree(t *testing.T) {
 		if base == "index.js" {
 			base = filepath.Base(filepath.Dir(filepath.Dir(rel))) // the adapter package
 		}
-		if base == "agentdeck" || base == "manifest.json" {
+		if base == "chuck" || base == "manifest.json" {
 			continue // wrapper/binary/manifest are versioned by the release itself
 		}
 		if _, ok := components[base]; !ok {
@@ -192,7 +192,7 @@ func TestWriteShimReplacesStableCommandAtomically(t *testing.T) {
 	if info.Mode().Perm() != 0o755 {
 		t.Fatalf("shim permissions = %o, want 755", info.Mode().Perm())
 	}
-	leftovers, err := filepath.Glob(filepath.Join(l.BinDir(), ".agentdeck-*"))
+	leftovers, err := filepath.Glob(filepath.Join(l.BinDir(), ".chuck-*"))
 	if err != nil {
 		t.Fatal(err)
 	}

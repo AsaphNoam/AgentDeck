@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/AsaphNoam/Chuck/internal/release"
 )
 
 // fakeFetcher serves a prebuilt archive and manifest without any network.
@@ -94,7 +94,7 @@ func runUpdateCmd(t *testing.T, args ...string) (string, error) {
 // --check reports availability without installing (FS-10.R7).
 func TestUpdateCheckReportsAvailable(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	archive, manifest := buildArchive(t, "2.0.0")
@@ -116,7 +116,7 @@ func TestUpdateCheckReportsAvailable(t *testing.T) {
 // --check reports up-to-date when latest equals current.
 func TestUpdateCheckUpToDate(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	archive, manifest := buildArchive(t, "1.0.0")
@@ -134,7 +134,7 @@ func TestUpdateCheckUpToDate(t *testing.T) {
 // --yes installs the new version and records the old one as previous (FS-10.R7).
 func TestUpdateYesInstalls(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	archive, manifest := buildArchive(t, "2.0.0")
@@ -155,7 +155,7 @@ func TestUpdateYesInstalls(t *testing.T) {
 // --rollback restores the previous release (FS-10.R7, TS-06.R18).
 func TestUpdateRollback(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 	installBase(t, appRoot, "2.0.0")
 
@@ -175,7 +175,7 @@ func TestUpdateRollback(t *testing.T) {
 // rather than blocking on a prompt, and installs nothing (FS-10.R7).
 func TestUpdateNonInteractiveRefusesWithoutYes(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	archive, manifest := buildArchive(t, "2.0.0")
@@ -196,7 +196,7 @@ func TestUpdateNonInteractiveRefusesWithoutYes(t *testing.T) {
 // A corrupt download preserves the current runtime (FS-10.R8, TS-05.R12).
 func TestUpdateCorruptDownloadPreservesCurrent(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	// The manifest advertises 2.0.0 but carries a wrong checksum, so the served
@@ -219,7 +219,7 @@ func TestUpdateCorruptDownloadPreservesCurrent(t *testing.T) {
 // (FS-10.A4, FS-10.R13, TS-06.R19).
 func TestUpdateContenderExitsBeforeReleaseLookup(t *testing.T) {
 	appRoot := t.TempDir()
-	t.Setenv("AGENTDECK_APP_ROOT", appRoot)
+	t.Setenv("CHUCK_APP_ROOT", appRoot)
 	installBase(t, appRoot, "1.0.0")
 
 	archive, manifest := buildArchive(t, "2.0.0")

@@ -212,7 +212,7 @@ export function searchArchiveProject(project: string, q: string, limit = 50, off
 export function archiveAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/archive`, { method: "POST" }); }
 export function restoreAgent(agentId: string) { return json<unknown>(`/api/sessions/${agentId}/restore`, { method: "POST" }); }
 // deleteCheckout is sent only when the person consented in the archive dialog;
-// its absence never deletes an AgentDeck-owned checkout (FS-19.R8).
+// its absence never deletes a Chuck-owned checkout (FS-19.R8).
 export type CheckoutConsent = {
   deleteCheckout: boolean;
   dirtyKnown?: boolean;

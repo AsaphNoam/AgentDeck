@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // Health values reported over SSE / in the discovery response. A binding that

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { PermissionResolution, TranscriptEvent } from "../api/types";
-import { annotationBlockSentinel } from "../lib/annotations";
+import { isAnnotationBlock } from "../lib/annotations";
 
 interface TranscriptStoreState {
   byAgent: Record<string, TranscriptEvent[]>;
@@ -107,7 +107,7 @@ function markResolved(
 // unlikely. Matching the block's first line rather than its whole layout keeps
 // this the only thing the client borrows from the Go writer.
 function suppressedAnnotationPrompt(events: TranscriptEvent[], event: TranscriptEvent) {
-  if (kindOf(event) !== "user_text" || !textOf(event).startsWith(annotationBlockSentinel)) return false;
+  if (kindOf(event) !== "user_text" || !isAnnotationBlock(textOf(event))) return false;
   const last = events[events.length - 1];
   if (!last || kindOf(last) !== "annotation") return false;
   return (last.target as { kind?: string } | undefined)?.kind === "self";

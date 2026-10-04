@@ -7,13 +7,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/release"
+	"github.com/AsaphNoam/Chuck/internal/release"
 )
 
 // newReleaseCmd builds the hidden `release` command group. These are the
 // internal boundary the bootstrap installer hands off to after it downloads and
 // checksum-verifies an archive; end users drive install via the documented
-// bootstrap script and updates via `agentdeck update` (TS-06.R17–R19).
+// bootstrap script and updates via `chuck update` (TS-06.R17–R19).
 func newReleaseCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "release",
@@ -50,7 +50,7 @@ func newReleaseManifestCmd() *cobra.Command {
 				Target:  release.Target,
 				Components: map[string]string{
 					"node": node, "claude-agent-acp": claudeACP, "codex-acp": codexACP,
-					"claude": claudeCLI, "codex": codexCLI, "agentdeck": version,
+					"claude": claudeCLI, "codex": codexCLI, "chuck": version,
 				},
 			})
 		},

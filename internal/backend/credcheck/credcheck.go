@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // DefaultTimeout is the per-probe deadline. Matches techspec §3.5.

@@ -5,7 +5,7 @@ package archive
 import (
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // TestSearchFallbackFiltersMetadata guards usability J8: when FTS5 is not available,

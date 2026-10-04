@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
 )
 
 func newPipelineCmd() *cobra.Command {
@@ -122,7 +122,7 @@ func runPipelineRequest(method, path string, body any) error {
 	}
 	status, data, err := pipelineAPIRequest(dashboardPort(store), method, path, body)
 	if err != nil {
-		return fmt.Errorf("could not reach dashboard; run `agentdeck dashboard start` first: %w", err)
+		return fmt.Errorf("could not reach dashboard; run `chuck dashboard start` first: %w", err)
 	}
 	if status < 200 || status >= 300 {
 		return fmt.Errorf("pipeline request failed (%d): %s", status, strings.TrimSpace(string(data)))

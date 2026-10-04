@@ -13,10 +13,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/worktree"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/worktree"
 )
 
 // Worktree-project orchestration (FS-19, TS-12). Everything here sits above the
@@ -653,7 +653,7 @@ func (s *Server) worktreeStatus(ctx context.Context, projectID string, project c
 
 // ---- Consented deletion (FS-19.R8, TS-12.R7) ----
 
-// deleteOwnedCheckout removes an AgentDeck-created checkout and its ownership
+// deleteOwnedCheckout removes a Chuck-created checkout and its ownership
 // row. It runs only inside an existing project-archive claim with every process
 // stopped. Before removing anything it re-verifies that the recorded path is
 // the canonical owned location, is not a symlink, and is currently registered

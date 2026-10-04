@@ -8,8 +8,8 @@ import (
 	"syscall"
 	"time"
 
-	rt "github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	rt "github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 	"github.com/creack/pty"
 )
 

@@ -1,4 +1,4 @@
-// Package agentknowledge owns AgentDeck's embedded, release-matched operating skill.
+// Package agentknowledge owns Chuck's embedded, release-matched operating skill.
 package agentknowledge
 
 import (
@@ -13,10 +13,10 @@ import (
 
 const (
 	ManagedRootName = "agent-skills"
-	SkillName       = "operating-agentdeck"
+	SkillName       = "operating-chuck"
 )
 
-//go:embed operating-agentdeck
+//go:embed operating-chuck
 var packageFS embed.FS
 
 // Installation is the immutable process-local result of publishing the skill.
@@ -26,7 +26,7 @@ type Installation struct {
 	SkillDir  string
 }
 
-// Install publishes two verified provider views beneath AgentDeck's owner-only cache.
+// Install publishes two verified provider views beneath Chuck's owner-only cache.
 func Install(home string) (Installation, error) {
 	cacheDir := filepath.Join(home, "cache")
 	root := filepath.Join(cacheDir, ManagedRootName)

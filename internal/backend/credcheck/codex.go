@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerauth"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // codexProber validates codex-acp readiness. Native sign-in and a configured

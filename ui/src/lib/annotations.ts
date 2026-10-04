@@ -44,4 +44,11 @@ export function annotationBatch(drafts: AnnotationDraft[], overall: string, agen
 // by this prefix (FS-13.R23) instead of respelling the block's layout, which
 // would drift the moment either side changed. `internal/server` pins the pair by
 // reading this constant and asserting the emitted block still starts with it.
-export const annotationBlockSentinel = "[AgentDeck annotations]";
+export const annotationBlockSentinel = "[Chuck annotations]";
+// Blocks written before the rename carry this line; append-only transcripts keep
+// them, so recognition accepts both spellings permanently (FS-13.R24).
+const legacyAnnotationBlockSentinel = "[AgentDeck annotations]";
+
+export function isAnnotationBlock(text: string) {
+  return text.startsWith(annotationBlockSentinel) || text.startsWith(legacyAnnotationBlockSentinel);
+}

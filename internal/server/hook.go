@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 type hookRequest struct {
@@ -28,7 +29,7 @@ func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := r.Header.Get("X-AgentDeck-Token")
+	token := r.Header.Get(messaging.TokenHeader)
 	if token == "" {
 		token = req.Token
 	}

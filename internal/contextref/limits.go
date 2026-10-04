@@ -32,4 +32,4 @@ const (
 // reader skipped for exceeding its 8 MiB safety limit. Context composition
 // never returns a clean page that silently implies the record was rendered
 // (TS-01.R22, TS-04.R28, INV §7).
-const OversizedRecordMarker = "[AgentDeck omitted an oversized transcript record]"
+const OversizedRecordMarker = "[Chuck omitted an oversized transcript record]"

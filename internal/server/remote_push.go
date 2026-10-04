@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // Push timing and bounds (TS-13.R11, INV §16). Variables so tests can shorten
@@ -166,7 +166,7 @@ func noteFor(it attentionItem) pushNote {
 	case "run":
 		path = "/run/"
 	}
-	return pushNote{Title: "AgentDeck", Body: who + " " + reason, Tag: pushTag(it), URL: path + it.ID, muteTypes: []string{pushMuteType(it)}}
+	return pushNote{Title: "Chuck", Body: who + " " + reason, Tag: pushTag(it), URL: path + it.ID, muteTypes: []string{pushMuteType(it)}}
 }
 
 type pushWindowState struct {
@@ -252,7 +252,7 @@ func (s *Server) runPushSender(ctx context.Context) {
 				for _, it := range w.pending {
 					types = append(types, pushMuteType(it))
 				}
-				enqueue(pushNote{Title: "AgentDeck", Body: fmt.Sprintf("%d items in %s need you", len(w.pending), where), Tag: tag, URL: "/", muteTypes: types})
+				enqueue(pushNote{Title: "Chuck", Body: fmt.Sprintf("%d items in %s need you", len(w.pending), where), Tag: tag, URL: "/", muteTypes: types})
 			}
 		}
 	}

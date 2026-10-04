@@ -1,7 +1,7 @@
 package toolresult
 
 // RetryClass is the stable FS-17 retry vocabulary returned with every refused
-// AgentDeck action.
+// Chuck action.
 type RetryClass string
 
 const (
@@ -48,9 +48,9 @@ func Classes() map[string]RetryClass {
 func StageReportGuidance(code string) string {
 	switch Classify(code) {
 	case RetryAfterChange:
-		return "AgentDeck did not accept this result and recorded nothing. This attempt still owes a result from you; correct the reported fields using the diagnostics, then call report_pipeline_stage_result again."
+		return "Chuck did not accept this result and recorded nothing. This attempt still owes a result from you; correct the reported fields using the diagnostics, then call report_pipeline_stage_result again."
 	case RetryTransient:
-		return "AgentDeck did not accept this result and recorded nothing. This attempt still owes a result from you; retry report_pipeline_stage_result when the temporary problem is resolved."
+		return "Chuck did not accept this result and recorded nothing. This attempt still owes a result from you; retry report_pipeline_stage_result when the temporary problem is resolved."
 	default:
 		return ""
 	}

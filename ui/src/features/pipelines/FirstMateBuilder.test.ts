@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldDropBuilderSession } from "./AgentDeckerBuilder";
+import { shouldDropBuilderSession } from "./FirstMateBuilder";
 
 describe("builder session lifecycle", () => {
   it("drops a stopped builder after hydration regardless of transcript content", () => {

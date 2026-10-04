@@ -52,23 +52,29 @@ jobs:
         run: |
           set -euo pipefail
           test -f dist/release/manifest.json
-          test -f dist/release/agentdeck-${VERSION#v}-darwin-arm64.tar.gz
-          export AGENTDECK_APP_ROOT="$RUNNER_TEMP/agentdeck-app"
-          export AGENTDECK_HOME="$RUNNER_TEMP/agentdeck-home"
-          mkdir -p "$AGENTDECK_HOME"
-          printf 'keep\n' > "$AGENTDECK_HOME/sentinel"
-          archive="dist/release/agentdeck-${VERSION#v}-darwin-arm64.tar.gz"
+          test -f dist/release/chuck-${VERSION#v}-darwin-arm64.tar.gz
+          export CHUCK_APP_ROOT="$RUNNER_TEMP/chuck-app"
+          export CHUCK_HOME="$RUNNER_TEMP/chuck-home"
+          mkdir -p "$CHUCK_HOME"
+          printf 'keep\n' > "$CHUCK_HOME/sentinel"
+          archive="dist/release/chuck-${VERSION#v}-darwin-arm64.tar.gz"
           tar -xzf "$archive" -C "$RUNNER_TEMP"
-          packaged="$RUNNER_TEMP/agentdeck-${VERSION#v}-darwin-arm64/libexec/agentdeck"
+          packaged="$RUNNER_TEMP/chuck-${VERSION#v}-darwin-arm64/libexec/chuck"
           go version -m "$packaged" | grep -Eq $'^\tbuild\t-tags=(.*,)?sqlite_fts5(,.*)?$'
           "$packaged" release install --archive "$archive" --manifest dist/release/manifest.json
-          "$AGENTDECK_APP_ROOT/bin/agentdeck" --version
-          test "$(cat "$AGENTDECK_HOME/sentinel")" = keep
+          "$CHUCK_APP_ROOT/bin/chuck" --version
+          test "$(cat "$CHUCK_HOME/sentinel")" = keep
+          # TS-06.R24: neither the archive, the manifest nor the install tree spells the old name.
+          old='agent''deck'
+          scripts/check-old-name.sh
+          if tar -tzf "$archive" | grep -i "$old"; then exit 1; fi
+          if grep -i "$old" dist/release/manifest.json; then exit 1; fi
+          if find "$CHUCK_APP_ROOT" -iname "*$old*" | grep .; then exit 1; fi
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         if: github.event_name == 'push'
         with:
           files: |
-            dist/release/agentdeck-*-darwin-arm64.tar.gz
+            dist/release/chuck-*-darwin-arm64.tar.gz
             dist/release/manifest.json
             scripts/release/install.sh

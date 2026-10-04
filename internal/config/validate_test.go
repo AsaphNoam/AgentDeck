@@ -16,7 +16,7 @@ func TestGenerateProjectID(t *testing.T) {
 		title string
 		want  string
 	}{
-		{"AgentDeck Demo", "agentdeck-demo-" + suffix},
+		{"Chuck Demo", "chuck-demo-" + suffix},
 		{"demo", "demo-" + suffix},
 		{"My App!!", "my-app-" + suffix},
 		{"  spaces  around  ", "spaces-around-" + suffix},

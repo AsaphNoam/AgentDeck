@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 const maxRecordSize = 8 * 1024 * 1024

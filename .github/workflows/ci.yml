@@ -32,6 +32,9 @@ jobs:
       - name: Specs and Go tests
         run: make test
 
+      - name: No old product name in build and packaging inputs
+        run: scripts/check-old-name.sh
+
       - name: Go vet
         run: go vet ./...
 

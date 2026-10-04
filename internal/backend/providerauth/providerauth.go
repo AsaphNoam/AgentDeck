@@ -1,6 +1,6 @@
-// Package providerauth is the single source of truth for how AgentDeck talks to
+// Package providerauth is the single source of truth for how Chuck talks to
 // a provider's own sign-in tooling: the interactive login argv used by
-// `agentdeck auth`, and the non-interactive readiness argv used by the backend
+// `chuck auth`, and the non-interactive readiness argv used by the backend
 // credential probe (TS-04.R15).
 //
 // Both callers previously carried their own copy of these commands — the CLI in
@@ -8,7 +8,7 @@
 // which is exactly the parallel-construction drift INV §2 names. They now read
 // the same table, so a provider command can only be changed in one place.
 //
-// AgentDeck never starts, proxies, or observes a login *flow* from the server:
+// Chuck never starts, proxies, or observes a login *flow* from the server:
 // the interactive command is only ever attached to a human's terminal by the
 // CLI, and the readiness command is a bounded, stdin-less probe whose raw output
 // never crosses a process, log, or API boundary (TS-04.R15/R16).
@@ -21,7 +21,7 @@ package providerauth
 // resolver selects for the target backend/model (TS-04.R71), so sign-in,
 // readiness and launch always use the same Claude/Codex.
 type Provider struct {
-	// ID is the lowercase provider selector (`agentdeck auth <id>`).
+	// ID is the lowercase provider selector (`chuck auth <id>`).
 	ID string
 	// Name is the human-facing provider label.
 	Name string
@@ -52,7 +52,7 @@ var providers = map[string]Provider{
 		BackendType: "claude-acp",
 		LoginArgs:   []string{"auth", "login"},
 		StatusArgs:  []string{"auth", "status"},
-		LoginEnvVar: "AGENTDECK_CLAUDE_LOGIN_CMD",
+		LoginEnvVar: "CHUCK_CLAUDE_LOGIN_CMD",
 	},
 	"codex": {
 		ID:          "codex",
@@ -60,7 +60,7 @@ var providers = map[string]Provider{
 		BackendType: "codex-acp",
 		LoginArgs:   []string{"login"},
 		StatusArgs:  []string{"login", "status"},
-		LoginEnvVar: "AGENTDECK_CODEX_LOGIN_CMD",
+		LoginEnvVar: "CHUCK_CODEX_LOGIN_CMD",
 	},
 }
 
@@ -83,5 +83,5 @@ func ForBackendType(backendType string) (Provider, bool) {
 	return Provider{}, false
 }
 
-// IDs returns the selectors accepted by `agentdeck auth`, in stable order.
+// IDs returns the selectors accepted by `chuck auth`, in stable order.
 func IDs() []string { return []string{"claude", "codex"} }

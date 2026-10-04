@@ -3,9 +3,9 @@ package server
 import (
 	"net/http"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime/terminal"
 	"github.com/coder/websocket"
 )
 

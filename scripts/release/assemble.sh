@@ -16,12 +16,12 @@ NODE_VERSION="${NODE_VERSION:-22.22.0}"
 NODE_SHA256="5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640"
 CLAUDE_ACP_VERSION="0.75.1"
 CODEX_ACP_VERSION="1.12.0"
-CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+agentdeck.1"
+CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+chuck.1"
 CODEX_ACP_SOURCE_SHA256="f45a64dc3a994556ebdb688dc8d59b86945a9b2f940a3e3e545739dd265a7cc5"
 CODEX_ACP_PATCHED_SHA256="a4d3ee81aacfca79e048341423467738991d9b384cdc75eacac4521aee71ae03"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
 # one: its platform binary is the single managed Codex a backend can explicitly
-# select as the AgentDeck bundle (TS-06.R30). Keep in step with
+# select as the Chuck bundle (TS-06.R30). Keep in step with
 # scripts/release/package.json.
 CODEX_CLI_VERSION="0.154.0"
 # Bundled native providers inside the managed runtime root; the same paths the
@@ -38,16 +38,16 @@ die() { echo "error: $*" >&2; exit 1; }
 command -v go >/dev/null || die "Go is required to assemble a release"
 command -v npm >/dev/null || die "npm is required to build the embedded UI"
 
-work="$(mktemp -d "${TMPDIR:-/tmp}/agentdeck-release.XXXXXX")"
+work="$(mktemp -d "${TMPDIR:-/tmp}/chuck-release.XXXXXX")"
 cleanup() { rm -rf "$work"; }
 trap cleanup EXIT
 
-echo "==> Building embedded AgentDeck ${VERSION}"
+echo "==> Building embedded Chuck ${VERSION}"
 make dist VERSION="$VERSION"
 
-stage="$work/agentdeck-${VERSION}-${TARGET}"
+stage="$work/chuck-${VERSION}-${TARGET}"
 mkdir -p "$stage/libexec" "$stage/runtime"
-cp bin/agentdeck "$stage/libexec/agentdeck"
+cp bin/chuck "$stage/libexec/chuck"
 
 echo "==> Installing private Node ${NODE_VERSION}"
 node_sum="$(shasum -a 256 "$NODE_TARBALL" | awk '{print $1}')"
@@ -66,7 +66,7 @@ cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtim
 [ -x "$stage/runtime/$CODEX_NATIVE" ] || die "bundled Codex CLI was not installed"
 
 # Codex ACP advertises steering but its idle branch starts a detached turn.
-# Keep AgentDeck's no-consumption fallback explicit and version-locked until an
+# Keep Chuck's no-consumption fallback explicit and version-locked until an
 # upstream release provides the same request-level contract (TS-04.R51/R61).
 codex_acp_source="$stage/runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js"
 codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
@@ -103,11 +103,11 @@ case "$CLAUDE_CLI_VERSION" in
   *) die "bundled Claude Code reported an unparseable version: $claude_probe" ;;
 esac
 
-"$stage/libexec/agentdeck" release wrapper --dir "$stage"
-"$stage/libexec/agentdeck" release manifest --dir "$stage" --version "$VERSION" \
+"$stage/libexec/chuck" release wrapper --dir "$stage"
+"$stage/libexec/chuck" release manifest --dir "$stage" --version "$VERSION" \
   --node "$NODE_VERSION" --claude-acp "$CLAUDE_ACP_VERSION" --codex-acp "$CODEX_ACP_COMPONENT_VERSION" \
   --claude "$CLAUDE_CLI_VERSION" --codex "$CODEX_CLI_VERSION"
 
 mkdir -p "$OUT_DIR"
-"$stage/libexec/agentdeck" release package --dir "$stage" --output-dir "$OUT_DIR" --version "$VERSION"
+"$stage/libexec/chuck" release package --dir "$stage" --output-dir "$OUT_DIR" --version "$VERSION"
 echo "==> Release assets written to ${OUT_DIR}"

@@ -307,7 +307,7 @@ ALTER TABLE pipeline_attempts ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 		`,
 	},
 	{
-		// AgentDecker proposal tool calls must survive adapter transcript shapes and
+		// FirstMate proposal tool calls must survive adapter transcript shapes and
 		// be discoverable by a fresh Pipelines page before MCP reports success.
 		version: 14,
 		sql: `
@@ -368,7 +368,7 @@ CREATE INDEX idx_tasks_project_creator_created
 `,
 	},
 	{
-		// AgentDeck-owned Git worktree ownership (TS-02.R27, TS-12.R2). The row's
+		// Chuck-owned Git worktree ownership (TS-02.R27, TS-12.R2). The row's
 		// presence is the sole test of whether a checkout may ever be deleted, so
 		// it lives in state.db rather than a hand-editable config file. `project`
 		// is a logical, non-cascading reference like R25's task references:

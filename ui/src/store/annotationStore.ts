@@ -91,7 +91,7 @@ export const useAnnotationStore = create<AnnotationStoreState>()(
         set((state) => ({ collapsedBySource: { ...state.collapsedBySource, [sourceId]: collapsed } })),
     }),
     {
-      name: "agentdeck-annotation-tray",
+      name: "chuck-annotation-tray",
       partialize: (state) => ({ bySource: state.bySource, overallBySource: state.overallBySource, editedAt: state.editedAt, collapsedBySource: state.collapsedBySource }),
       merge: (persisted, current) => ({ ...current, ...pruneTrays((persisted ?? {}) as Partial<PersistedTrays>) }),
     },

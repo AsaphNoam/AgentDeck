@@ -41,14 +41,14 @@ function NewAgent({ project, onClose }: { project: string; onClose: () => void }
   const [name, setName] = useSuggestedName(role);
   const [runtime, setRuntime] = useState({ backend: "", model: "", effort: "", fast: false });
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const roleID = role || Object.keys(roles.data ?? {}).filter((id) => id !== "agentdecker")[0] || "";
+  const roleID = role || Object.keys(roles.data ?? {}).filter((id) => id !== "firstmate")[0] || "";
   useEffect(() => {
     if (role || !roles.data) return;
-    const available = Object.keys(roles.data).filter((id) => id !== "agentdecker");
+    const available = Object.keys(roles.data).filter((id) => id !== "firstmate");
     setRole(config.data?.default_role && available.includes(config.data.default_role) ? config.data.default_role : available[0] ?? "");
   }, [config.data?.default_role, role, roles.data]);
   const submit = async () => { setBusy(true); setError(""); try { const result = await launchAgent({ project, role: roleID, name: name.trim() || undefined, ...runtime }); navigate(`/agent/${encodeURIComponent(result.agent.agent_id)}`); } catch (err) { setError(errorText(err)); } finally { setBusy(false); } };
-  return <form className="phone-card phone-form" aria-label="New agent" onSubmit={(event) => { event.preventDefault(); void submit(); }}><h2>New agent</h2><label className="phone-field">Role<select value={roleID} onChange={(event) => setRole(event.target.value)}>{Object.keys(roles.data ?? {}).filter((id) => id !== "agentdecker").map((id) => <option key={id} value={id}>{roles.data?.[id]?.title || id}</option>)}</select></label><label className="phone-field">Name <input value={name} onChange={(event) => setName(event.target.value)} /></label><RuntimeFields value={runtime} onChange={setRuntime} />{error && <p className="phone-error">{error}</p>}<div className="phone-actions"><button type="button" onClick={onClose}>Cancel</button><button className="phone-primary" type="submit" disabled={offline || busy || !roleID}>Create agent</button></div></form>;
+  return <form className="phone-card phone-form" aria-label="New agent" onSubmit={(event) => { event.preventDefault(); void submit(); }}><h2>New agent</h2><label className="phone-field">Role<select value={roleID} onChange={(event) => setRole(event.target.value)}>{Object.keys(roles.data ?? {}).filter((id) => id !== "firstmate").map((id) => <option key={id} value={id}>{roles.data?.[id]?.title || id}</option>)}</select></label><label className="phone-field">Name <input value={name} onChange={(event) => setName(event.target.value)} /></label><RuntimeFields value={runtime} onChange={setRuntime} />{error && <p className="phone-error">{error}</p>}<div className="phone-actions"><button type="button" onClick={onClose}>Cancel</button><button className="phone-primary" type="submit" disabled={offline || busy || !roleID}>Create agent</button></div></form>;
 }
 
 function StartPipeline({ project, onClose }: { project: string; onClose: () => void }) {

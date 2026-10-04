@@ -1,7 +1,7 @@
 package release
 
 // Install is the single staged install/update transaction shared by the
-// bootstrap installer and `agentdeck update` (INV §2). Under the install lock it
+// bootstrap installer and `chuck update` (INV §2). Under the install lock it
 // verifies and stages the archive, activates it (recording the outgoing runtime
 // as previous), and rewrites the stable shim. It never writes user configuration
 // or credentials, and never signals a running dashboard (TS-06.R16–R19).

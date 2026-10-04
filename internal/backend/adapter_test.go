@@ -21,7 +21,7 @@ func TestForKnownAndUnknown(t *testing.T) {
 		if len(ad.UnsupportedHookEvents()) != 0 {
 			t.Fatalf("For(%q).UnsupportedHookEvents() = %v, want none", typ, ad.UnsupportedHookEvents())
 		}
-		for _, ev := range agentDeckHookEvents {
+		for _, ev := range chuckHookEvents {
 			if _, ok := ad.HookMap()[ev]; !ok {
 				t.Fatalf("For(%q).HookMap() missing %q", typ, ev)
 			}

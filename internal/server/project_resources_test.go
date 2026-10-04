@@ -26,7 +26,7 @@ func httpGetBody(t *testing.T, url string) (*http.Response, []byte) {
 	return resp, body
 }
 
-// resourcesEnvValue returns the value of AGENTDECK_PROJECT_RESOURCES in a composed
+// resourcesEnvValue returns the value of CHUCK_PROJECT_RESOURCES in a composed
 // env slice, or "" if absent.
 func resourcesEnvValue(env []string) string {
 	const key = envProjectResources + "="
@@ -39,7 +39,7 @@ func resourcesEnvValue(env []string) string {
 }
 
 // FS-11.A2: a launched agent's composed spec carries the canonical resource path
-// in AGENTDECK_PROJECT_RESOURCES, in add_dirs, and in the composed instruction,
+// in CHUCK_PROJECT_RESOURCES, in add_dirs, and in the composed instruction,
 // while its cwd stays the project working directory.
 func TestLaunchComposesProjectResources(t *testing.T) {
 	srv, _ := switchTestServer(t)
@@ -51,7 +51,7 @@ func TestLaunchComposesProjectResources(t *testing.T) {
 
 	want := filepath.Join(srv.configStore.Home(), "project-resources", "tmpproj")
 	if got := resourcesEnvValue(spec.Env); got != want {
-		t.Errorf("AGENTDECK_PROJECT_RESOURCES = %q, want %q", got, want)
+		t.Errorf("CHUCK_PROJECT_RESOURCES = %q, want %q", got, want)
 	}
 	if !containsStr(spec.AddDirs, want) {
 		t.Errorf("AddDirs = %v, missing resource path %q", spec.AddDirs, want)
@@ -108,7 +108,7 @@ func TestResumeAndSwitchCarryProjectResources(t *testing.T) {
 		t.Fatalf("composeResumeSpec: %s", ae.Message)
 	}
 	if got := resourcesEnvValue(rspec.Env); got != want {
-		t.Errorf("resume env AGENTDECK_PROJECT_RESOURCES = %q, want %q", got, want)
+		t.Errorf("resume env CHUCK_PROJECT_RESOURCES = %q, want %q", got, want)
 	}
 	if !containsStr(rspec.AddDirs, want) {
 		t.Errorf("resume AddDirs = %v, missing %q", rspec.AddDirs, want)
@@ -119,7 +119,7 @@ func TestResumeAndSwitchCarryProjectResources(t *testing.T) {
 		t.Fatalf("composeSwitchSpec: %s", ae.Message)
 	}
 	if got := resourcesEnvValue(sspec.Env); got != want {
-		t.Errorf("switch env AGENTDECK_PROJECT_RESOURCES = %q, want %q", got, want)
+		t.Errorf("switch env CHUCK_PROJECT_RESOURCES = %q, want %q", got, want)
 	}
 }
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 const (
@@ -719,7 +719,7 @@ func (s *Server) recoverTasks(ctx context.Context) error {
 // reserved. A runtime this attempt would have created or woken is reaped and the
 // task is started once more within its attempt limit; a runtime it merely
 // borrowed is never touched, because it belongs to someone else and this
-// feature's promise does not lapse because AgentDeck restarted. That task becomes
+// feature's promise does not lapse because Chuck restarted. That task becomes
 // interrupted, since whether the assignment reached that conversation cannot be
 // known and delivering it twice is worse than asking a person (FS-16.R4, R17).
 func (s *Server) recoverStartAttempt(ctx context.Context, task state.Task) {

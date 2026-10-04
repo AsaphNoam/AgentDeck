@@ -35,7 +35,7 @@ export function WorktreeForkDialog({ sourceID, sourceTitle, onClose }: WorktreeF
   });
 
   const [title, setTitle] = useState(sourceTitle);
-  const [branch, setBranch] = useState(`agentdeck/${branchSlug(sourceTitle)}`);
+  const [branch, setBranch] = useState(`chuck/${branchSlug(sourceTitle)}`);
   // The branch tracks the title until the person edits it themselves; after that
   // their value is theirs and retyping the title must not overwrite it.
   const [branchEdited, setBranchEdited] = useState(false);
@@ -97,7 +97,7 @@ export function WorktreeForkDialog({ sourceID, sourceTitle, onClose }: WorktreeF
             <form className="config-form" data-slot="body" onSubmit={submit}>
               <p className="form-hint">
                 Creates a branch off <strong>{base || "the default branch"}</strong>, checks it out into a
-                fresh AgentDeck-owned worktree, and copies {sourceTitle}&apos;s settings into a new project.
+                fresh Chuck-owned worktree, and copies {sourceTitle}&apos;s settings into a new project.
               </p>
               <div className="form-field">
                 <label htmlFor="worktree-title">Title</label>
@@ -106,7 +106,7 @@ export function WorktreeForkDialog({ sourceID, sourceTitle, onClose }: WorktreeF
                   value={title}
                   onChange={(event) => {
                     setTitle(event.target.value);
-                    if (!branchEdited) setBranch(`agentdeck/${branchSlug(event.target.value)}`);
+                    if (!branchEdited) setBranch(`chuck/${branchSlug(event.target.value)}`);
                   }}
                 />
               </div>

@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/hooks"
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/runtime/terminal"
-	"github.com/agentdeck/agentdeck/internal/state"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/hooks"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime/terminal"
+	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 // switchTestServer launches a server wired to the fake ACP CLI (chat) and the
@@ -189,7 +189,7 @@ func TestSwitchRuntimeChatToTerminal(t *testing.T) {
 }
 
 // Backend swap starts a fresh native session, injects a primer, records a
-// backend_switch marker, and keeps the same AgentDeck agent/archive log
+// backend_switch marker, and keeps the same Chuck agent/archive log
 // (techspec §5.3, §8.1).
 func TestSwitchRuntimeBackendSwapUsesPrimer(t *testing.T) {
 	srv, ts := switchTestServer(t)
@@ -294,7 +294,7 @@ func TestSwitchRuntimePrimerKeepsFrozenSystemPrompt(t *testing.T) {
 		t.Fatalf("unexpected original system_prompt: %q", original.SystemPrompt)
 	}
 
-	const primerMark = "AgentDeck backend-switch history primer."
+	const primerMark = "Chuck backend-switch history primer."
 
 	// Switch #1: claude → codex is a cross-backend swap → primer path.
 	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"backend": "codex", "model": "gpt-5.5"})
@@ -479,7 +479,7 @@ func TestStaleCrashKeepsResumedRegistration(t *testing.T) {
 	}
 }
 
-// readMessagingToken extracts the X-AgentDeck-Token from the agent's persisted
+// readMessagingToken extracts the X-Chuck-Token from the agent's persisted
 // MCP config file.
 func readMessagingToken(t *testing.T, srv *Server, id string) string {
 	t.Helper()
@@ -851,7 +851,7 @@ func TestSwitchRuntimeRollbackOnResumeFailure(t *testing.T) {
 	srv, ts := switchTestServer(t)
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	// Make the terminal target fail to launch: a non-existent PTY binary.
-	srv.terminal.SetCommand("/nonexistent/agentdeck-no-such-binary")
+	srv.terminal.SetCommand("/nonexistent/chuck-no-such-binary")
 
 	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/switch-runtime", map[string]string{"interface": "terminal"})
 	if resp.StatusCode != http.StatusInternalServerError {
@@ -961,7 +961,7 @@ func TestResumeFailureRemovesHookSettings(t *testing.T) {
 	}
 
 	// Make the terminal target fail to launch so the resume-failure path runs.
-	srv.terminal.SetCommand("/nonexistent/agentdeck-no-such-binary")
+	srv.terminal.SetCommand("/nonexistent/chuck-no-such-binary")
 
 	resp, body := post(t, ts.URL+"/api/sessions/"+id+"/resume", nil)
 	if resp.StatusCode == http.StatusOK {

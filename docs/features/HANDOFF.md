@@ -47,8 +47,14 @@ Slices:
 3. Docs: README and non-archived docs/specs prose (delegated pass, reviewed here), cutover runbook
    (FS-10.R25), planned→shipped marks; closure matrix + `make dist`.
 
-Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
--run TestTaskWireFixture` (becomes `CHUCK_UPDATE_TASK_FIXTURE` after slice 1).
+Slices 1–2 are committed together (one cut; build/tests green). Slice 3 is next: the delegated
+prose pass sits uncommitted in the tree and needs review before commit. Exceptions kept on purpose:
+legacy annotation line recognition, storage copy-forward keys, rejection tests, historical
+`testdata/superseded_*`. `scripts/check-old-name.sh` is the TS-06.R24 guard (CI + release).
+`TestCodexProberAcceptsNativeLoginWithoutAPIKey` timed out once under full-suite load; passes alone.
+
+Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+-run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
 

@@ -1,4 +1,4 @@
-module github.com/agentdeck/agentdeck
+module github.com/AsaphNoam/Chuck
 
 go 1.26.6
 

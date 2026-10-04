@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
-	"github.com/agentdeck/agentdeck/internal/config"
-	rt "github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerexec"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	rt "github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 func writeProviderExe(t *testing.T, path string) string {
@@ -207,8 +207,8 @@ func TestProviderIncompatibleErrorCarriesSource(t *testing.T) {
 	for _, tc := range []struct {
 		source, phone string
 	}{
-		{"bundled", "The AgentDeck bundle's Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Choose Installed provider"},
-		{"backend", "The installed Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Update Claude Code on the Mac, or choose AgentDeck bundle"},
+		{"bundled", "The Chuck bundle's Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Choose Installed provider"},
+		{"backend", "The installed Claude Code on the Mac is 2.1.100; this request needs 2.1.300 or newer. Update Claude Code on the Mac, or choose Chuck bundle"},
 	} {
 		tooOld := &rt.ProviderTooOldError{Have: "2.1.100", Need: "2.1.300", Source: tc.source}
 		ae := providerIncompatibleError(fmt.Errorf("%w; update the Claude Code at /Users/secret/bin/claude, then retry", tooOld))

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // FS-14.R5 / TS-09.R7: legal named values may be larger than the assignment
@@ -26,7 +26,7 @@ func TestRenderAssignmentPreservesReportingProtocolAtMaximumInput(t *testing.T) 
 	}
 	for _, required := range []string{
 		"call report_task_result",
-		"Your part ends only when AgentDeck accepts the result",
+		"Your part ends only when Chuck accepts the result",
 		"sole authority for the stage result",
 		"outcome success, failure, or blocked",
 		"Declared outputs (use these local names):\n- implementation",

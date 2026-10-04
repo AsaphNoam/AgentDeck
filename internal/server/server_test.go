@@ -15,18 +15,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
-// testServer builds a Server backed by a seeded temp-home store. AGENTDECK_HOME
-// is set to the temp dir so nothing touches the real ~/.agentdeck.
+// testServer builds a Server backed by a seeded temp-home store. CHUCK_HOME
+// is set to the temp dir so nothing touches the real ~/.chuck.
 func testServer(t *testing.T, seed bool) *Server {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("AGENTDECK_HOME", dir)
+	t.Setenv("CHUCK_HOME", dir)
 	cfgStore, err := config.New()
 	if err != nil {
 		t.Fatalf("config.New: %v", err)
@@ -151,7 +151,7 @@ func TestRolesSeeded(t *testing.T) {
 	if len(roles) != 4 {
 		t.Fatalf("seeded roles = %d, want 4: %v", len(roles), roles)
 	}
-	for _, k := range []string{"agentdecker", "implementer", "reviewer", "researcher"} {
+	for _, k := range []string{"firstmate", "implementer", "reviewer", "researcher"} {
 		if _, ok := roles[k]; !ok {
 			t.Errorf("missing seeded role %q", k)
 		}

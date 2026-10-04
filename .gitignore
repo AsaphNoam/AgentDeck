@@ -1,6 +1,6 @@
 # Go build output
 /bin/
-/agentdeck
+/chuck
 *.test
 *.out
 
@@ -23,7 +23,7 @@ mcp/node_modules/
 *.log
 .gocache
 
-.agentdeck-dev/
+.chuck-dev/
 # usability-review harness (binaries, fixtures, node_modules, screenshots) — never commit
 /.review/
 /scratch-fakeacp

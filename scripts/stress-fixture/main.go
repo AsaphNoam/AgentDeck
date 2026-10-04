@@ -1,6 +1,6 @@
-// Command stress-fixture runs the production AgentDeck server and embedded UI
+// Command stress-fixture runs the production Chuck server and embedded UI
 // against a deterministic, high-volume fake ACP workload. It never reads or
-// writes the user's AgentDeck home and never invokes a real provider.
+// writes the user's Chuck home and never invokes a real provider.
 package main
 
 import (
@@ -22,10 +22,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/server"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/server"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 type options struct {
@@ -51,7 +51,7 @@ func main() {
 	flag.IntVar(&opts.chunks, "chunks", 3000, "streamed assistant deltas per agent")
 	flag.IntVar(&opts.chunkBytes, "chunk-bytes", 128, "bytes per assistant delta")
 	flag.IntVar(&opts.delayMS, "delay-ms", 5, "delay between assistant deltas")
-	flag.StringVar(&opts.repo, "repo", ".", "AgentDeck repository root")
+	flag.StringVar(&opts.repo, "repo", ".", "Chuck repository root")
 	flag.Parse()
 
 	if err := run(opts); err != nil {
@@ -74,7 +74,7 @@ func run(opts options) error {
 		return fmt.Errorf("repo %s: %w", repo, err)
 	}
 
-	home, err := os.MkdirTemp("", "agentdeck-stress-")
+	home, err := os.MkdirTemp("", "chuck-stress-")
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func run(opts options) error {
 	}
 	if err := store.WriteProject("stress", config.Project{
 		Title: "Stress fixture", Color: [3]int{230, 126, 34}, Cwd: repo, AddDirs: []string{},
-		ContextPrompt: "Deterministic AgentDeck stress fixture.",
+		ContextPrompt: "Deterministic Chuck stress fixture.",
 	}); err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func run(opts options) error {
 		return err
 	}
 
-	fmt.Printf("AgentDeck stress fixture ready\nURL: %s\nHome: %s\nAgents: %d (Claude Haiku; deterministic fake ACP)\nDeltas: %d x %d bytes per agent, %dms apart\n",
+	fmt.Printf("Chuck stress fixture ready\nURL: %s\nHome: %s\nAgents: %d (Claude Haiku; deterministic fake ACP)\nDeltas: %d x %d bytes per agent, %dms apart\n",
 		baseURL, home, len(launched), opts.chunks, opts.chunkBytes, opts.delayMS)
 	for _, session := range launched {
 		fmt.Printf("- %s (%s)\n", session.Agent.Name, session.Agent.AgentID)
@@ -212,7 +212,7 @@ func launchWorkload(ctx context.Context, baseURL string, workers int) ([]launche
 	for i, name := range names {
 		role := "implementer"
 		if i == 0 {
-			role = "agentdecker"
+			role = "firstmate"
 		}
 		var session launchedSession
 		if err := postJSON(ctx, baseURL+"/api/sessions", map[string]string{

@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // LaunchSpec is the fully-composed input to Start. The launch flow (techspec §6)
@@ -55,10 +55,10 @@ type LaunchSpec struct {
 	// Empty for other backend types.
 	ProviderExecutable string
 	// ProviderSource is the winning selection source ("bundled" for an
-	// explicit AgentDeck bundle), so failures name the right repair.
+	// explicit Chuck bundle), so failures name the right repair.
 	ProviderSource string
 	SkipPerms      bool // effective skip_permissions after role/global resolution
-	// AutoApproveTools is the current code-derived set of AgentDeck MCP tool
+	// AutoApproveTools is the current code-derived set of Chuck MCP tool
 	// identities allowed once without entering the human permission gate.
 	AutoApproveTools map[string]struct{}
 	HookToken        string               // per-launch one-time token passed to the agent's hooks
@@ -142,10 +142,10 @@ func (s LaunchSpec) StartEnv() []string {
 // MCPServerSpec is one MCP server the agent should connect to. Phase 5 prefers
 // the dashboard's in-process HTTP transport, with stdio retained as fallback.
 type MCPServerSpec struct {
-	Name    string            // "agentdeck-messaging"
+	Name    string            // "chuck-messaging"
 	Type    string            // "http" for streamable HTTP; empty/"stdio" for command fallback
 	URL     string            // HTTP transport URL when Type == "http"
-	Headers map[string]string // HTTP headers, including X-AgentDeck-Token
+	Headers map[string]string // HTTP headers, including X-Chuck-Token
 	Command string            // stdio fallback command
 	Args    []string          // stdio fallback args
 	Env     []string          // "K=V"

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/hooks"
-	"github.com/agentdeck/agentdeck/internal/messaging"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/hooks"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // activationTestServer is wakeTestServer plus a provider prompt log, so a test
@@ -554,7 +554,7 @@ func TestStoppedMailActivationResumesOnceAndIsNeverReplayed(t *testing.T) {
 func TestFailedStoppedActivationIsNotRetriedAfterRestart(t *testing.T) {
 	srv, ts, promptLog := activationTestServer(t)
 	id := launchThenStop(t, srv, ts)
-	srv.registry.Chat().SetCommand("/nonexistent/agentdeck-no-such-binary")
+	srv.registry.Chat().SetCommand("/nonexistent/chuck-no-such-binary")
 
 	insertMail(t, srv, id, "please pick this up")
 	srv.executePendingMailActivations(context.Background(), id)

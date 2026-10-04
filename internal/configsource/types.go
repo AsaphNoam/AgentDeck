@@ -6,7 +6,7 @@ package configsource
 import (
 	"context"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 const (
@@ -47,7 +47,7 @@ type Effective struct {
 	EnvKeys       []EnvironmentKey `json:"environment_keys"`
 	// MCPServers is the set of MCP server ids declared natively (names only, never
 	// their config/secret values). Used for the reserved-id collision preflight so
-	// AgentDeck's injected messaging MCP never clashes with a user's own (§2.4).
+	// Chuck's injected messaging MCP never clashes with a user's own (§2.4).
 	MCPServers []string                   `json:"mcp_servers"`
 	Provenance map[string]FieldProvenance `json:"provenance"`
 }

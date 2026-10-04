@@ -110,7 +110,7 @@ describe("PhoneApp", () => {
     expect(await screen.findByText("implementer@my-app")).toBeInTheDocument();
     expect(claims).toBe(1);
     expect(waits).toBe(2);
-    expect(localStorage.getItem("agentdeck.paired")).toBe("1");
+    expect(localStorage.getItem("chuck.paired")).toBe("1");
   });
 
   it("tells the phone to start again when the code is refused", async () => {
@@ -118,12 +118,12 @@ describe("PhoneApp", () => {
     renderApp();
     fireEvent.change(await screen.findByLabelText("Pairing code"), { target: { value: "WRONG234" } });
     fireEvent.click(screen.getByRole("button", { name: "Pair" }));
-    expect(await screen.findByText(/Show a new code in AgentDeck on your Mac/)).toBeInTheDocument();
+    expect(await screen.findByText(/Show a new code in Chuck on your Mac/)).toBeInTheDocument();
   });
 
   it("says a previously paired phone was unpaired", async () => {
     paired = false;
-    localStorage.setItem("agentdeck.paired", "1");
+    localStorage.setItem("chuck.paired", "1");
     renderApp();
     expect(await screen.findByText("This phone was unpaired")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Pair again" }));
@@ -146,11 +146,11 @@ describe("PhoneApp", () => {
     const stream = FakeEventSource.last!;
     act(() => {
       useConnection.setState({
-        agents: { stale: { agent_id: "stale", role: "agentdecker", project: "old", state: "busy" } as never },
+        agents: { stale: { agent_id: "stale", role: "firstmate", project: "old", state: "busy" } as never },
         transcriptRev: { stale: 3 },
       });
       stream.onopen?.();
-      stream.emit("state_update", { data: { agent_id: "fresh", role: "agentdecker", project: "new", state: "idle" } });
+      stream.emit("state_update", { data: { agent_id: "fresh", role: "firstmate", project: "new", state: "idle" } });
     });
     expect(useConnection.getState().link).toBe("reconnecting");
     expect(useConnection.getState().agents.stale).toBeDefined();

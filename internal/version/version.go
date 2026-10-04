@@ -2,9 +2,9 @@
 //
 // install.sh and the Makefile set these with:
 //
-//	-ldflags "-X github.com/agentdeck/agentdeck/internal/version.Version=0.1.0 \
-//	          -X github.com/agentdeck/agentdeck/internal/version.Commit=$(git rev-parse --short HEAD) \
-//	          -X github.com/agentdeck/agentdeck/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+//	-ldflags "-X github.com/AsaphNoam/Chuck/internal/version.Version=0.1.0 \
+//	          -X github.com/AsaphNoam/Chuck/internal/version.Commit=$(git rev-parse --short HEAD) \
+//	          -X github.com/AsaphNoam/Chuck/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 //
 // When built without ldflags (e.g. `go build` or `go test`), the defaults below
 // apply so the binary still reports a sensible, non-empty version.
@@ -21,7 +21,7 @@ var (
 	Date = "unknown"
 )
 
-// String renders the human-readable version line used by `agentdeck --version`.
+// String renders the human-readable version line used by `chuck --version`.
 func String() string {
 	return Version + " (commit " + Commit + ", built " + Date + ")"
 }

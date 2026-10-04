@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // Finding 5 regression (chat runtime): Stop on an agent this runtime does not own

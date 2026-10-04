@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 var (

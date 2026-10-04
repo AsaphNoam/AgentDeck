@@ -12,7 +12,7 @@ import (
 // suite neither depends on nor finds a developer's installed CLIs. Tests of
 // selection itself override these with t.Setenv.
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "agentdeck-providers-")
+	dir, err := os.MkdirTemp("", "chuck-providers-")
 	if err != nil {
 		panic(err)
 	}

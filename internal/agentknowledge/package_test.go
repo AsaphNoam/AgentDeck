@@ -107,7 +107,7 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 			t.Errorf("SKILL.md does not route %s", link)
 		}
 	}
-	for _, forbidden := range []string{"per-turn mail budget of 15", "human Continue", "propose_pipeline_template", "agentdeck release"} {
+	for _, forbidden := range []string{"per-turn mail budget of 15", "human Continue", "propose_pipeline_template", "chuck release"} {
 		if strings.Contains(core, forbidden) {
 			t.Errorf("SKILL.md contains reference-owned detail %q", forbidden)
 		}
@@ -129,9 +129,26 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 		}
 	}
 	pipeline := string(files["references/build-and-run-pipelines.md"])
-	for _, phrase := range []string{"`blocked`", "Continue", "AgentDecker"} {
+	for _, phrase := range []string{"`blocked`", "Continue", "FirstMate"} {
 		if !strings.Contains(pipeline, phrase) {
 			t.Errorf("pipeline reference is missing %q", phrase)
+		}
+	}
+}
+
+// FS-18.A14: the published package is operating-chuck and its authored text
+// carries no pre-rename branding.
+func TestEmbeddedSkillCarriesCurrentBranding(t *testing.T) {
+	if SkillName != "operating-chuck" {
+		t.Fatalf("SkillName = %q", SkillName)
+	}
+	files, err := embeddedFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, data := range files {
+		if strings.Contains(strings.ToLower(string(data)), "agent"+"deck") {
+			t.Errorf("%s still names the old product", path)
 		}
 	}
 }

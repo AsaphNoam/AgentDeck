@@ -282,7 +282,7 @@ func TestSteerInjectsIntoTheRunningTurn(t *testing.T) {
 }
 
 // TestSteerReportsTheAdapterStartedANewTurn keeps the incompatible legacy
-// contract distinct: AgentDeck reports it but never retries text the adapter may
+// contract distinct: Chuck reports it but never retries text the adapter may
 // already have consumed (FS-03.R56).
 func TestSteerReportsTheAdapterStartedANewTurn(t *testing.T) {
 	c, h, _, _, _ := busyAgent(t, "FAKEACP_STEERING=1", "FAKEACP_STEER_OUTCOME=startedNewTurn")
@@ -297,7 +297,7 @@ func TestSteerReportsTheAdapterStartedANewTurn(t *testing.T) {
 
 // TestSteerPromptRequiredRunsAHostOwnedTurn reproduces FS-03.A38's completion
 // race. The fake releases the original prompt and puts its response on the wire
-// before returning promptRequired without consuming the steer. AgentDeck then
+// before returning promptRequired without consuming the steer. Chuck then
 // owns the replacement through the ordinary gate, so Send holds behind it,
 // Cancel settles it, and every accepted prompt has one transcript terminal.
 func TestSteerPromptRequiredRunsAHostOwnedTurn(t *testing.T) {

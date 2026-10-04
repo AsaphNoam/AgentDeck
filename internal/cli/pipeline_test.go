@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
 )
 
 func TestParsePipelineCLIValues(t *testing.T) {

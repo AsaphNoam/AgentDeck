@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // The worktree-project HTTP surface (TS-03.R33, TS-12 §3). Both routes inherit

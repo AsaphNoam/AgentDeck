@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 )
 
-// AgentDeck-owned Git worktrees: one checkout per worktree project at
-// $AGENTDECK_HOME/worktrees/{project-id}/ (FS-19.R4, TS-12.R8). This file owns
+// Chuck-owned Git worktrees: one checkout per worktree project at
+// $CHUCK_HOME/worktrees/{project-id}/ (FS-19.R4, TS-12.R8). This file owns
 // only the path rules — validation, the owner-only root, and symlink rejection.
 // Git itself creates and removes the leaf; this package never writes inside one.
 
@@ -16,7 +16,7 @@ const dirWorktrees = "worktrees"
 
 // WorktreePath returns the canonical absolute checkout path for a project id
 // without touching disk. The id is slug-validated before it is joined into a
-// path, so the result can never escape the AgentDeck home (FS-11.R8).
+// path, so the result can never escape the Chuck home (FS-11.R8).
 func (s *Store) WorktreePath(projectID string) (string, error) {
 	if !ValidSlug(projectID) {
 		return "", fmt.Errorf("config: invalid project id %q", projectID)
@@ -24,7 +24,7 @@ func (s *Store) WorktreePath(projectID string) (string, error) {
 	return filepath.Join(s.home, dirWorktrees, projectID), nil
 }
 
-// WorktreesRoot returns the owned worktree root. No AgentDeck code path removes
+// WorktreesRoot returns the owned worktree root. No Chuck code path removes
 // a directory outside it (TS-12.R8).
 func (s *Store) WorktreesRoot() string {
 	return filepath.Join(s.home, dirWorktrees)

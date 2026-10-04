@@ -1,11 +1,11 @@
-# AgentDeck — convenience build targets.
+# Chuck — convenience build targets.
 #
 # The Go server embeds the built UI via //go:embed at internal/server/ui/dist.
 # Because go:embed paths are relative to the source file, the UI build output
 # (repo-root ui/dist) is copied into internal/server/ui/dist before `go build`.
 
-BINARY      := agentdeck
-PKG         := github.com/agentdeck/agentdeck
+BINARY      := chuck
+PKG         := github.com/AsaphNoam/Chuck
 VERSION_PKG := $(PKG)/internal/version
 
 VERSION ?= 0.1.0
@@ -38,9 +38,9 @@ embed: ui
 	mkdir -p $(EMBED_DIR)
 	cp -R ui/dist/. $(EMBED_DIR)/
 
-## build: build the agentdeck binary (assumes embed dir is populated)
+## build: build the chuck binary (assumes embed dir is populated)
 build:
-	go build -tags "$(TAGS)" -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/agentdeck
+	go build -tags "$(TAGS)" -ldflags "$(LDFLAGS)" -o bin/$(BINARY) ./cmd/chuck
 
 ## dist: full release build — UI + embed + binary
 dist: embed build

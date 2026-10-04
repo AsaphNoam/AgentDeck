@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/backend"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/backend"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 var (
@@ -304,7 +304,7 @@ func TestSkipPermissionsEnvOpenCode(t *testing.T) {
 
 // FS-09.A11 / TS-04.R14: codex-acp does not accept ACP systemPrompt. Its
 // documented per-process CODEX_CONFIG overlay must preserve user config while
-// carrying the frozen AgentDeck role/project prompt for both Start and Resume.
+// carrying the frozen Chuck role/project prompt for both Start and Resume.
 func TestCodexDeveloperInstructionsEnv(t *testing.T) {
 	st, err := state.Open(t.TempDir())
 	if err != nil {
@@ -740,8 +740,8 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	spec.Env = append(spec.Env, "FAKEACP_LOAD_DUMP="+dump)
 	spec.HookToken = "tok-123"
 	spec.MCPServers = []MCPServerSpec{{
-		Name:    "agentdeck-messaging",
-		Command: "/usr/bin/agentdeck",
+		Name:    "chuck-messaging",
+		Command: "/usr/bin/chuck",
 		Args:    []string{"mcp-stdio", "--agent", spec.Agent.AgentID, "--token", "tok-123"},
 		Env:     []string{"X=1"},
 	}}
@@ -782,13 +782,13 @@ func TestResumeSessionLoadAppliesMCP(t *testing.T) {
 	if params.SessionID != "prior-session-id" {
 		t.Fatalf("load sessionId = %q, want prior-session-id", params.SessionID)
 	}
-	if len(params.MCPServers) != 1 || params.MCPServers[0].Name != "agentdeck-messaging" {
+	if len(params.MCPServers) != 1 || params.MCPServers[0].Name != "chuck-messaging" {
 		t.Fatalf("load mcpServers = %+v, want the fresh messaging server", params.MCPServers)
 	}
 }
 
 // Reproduction for the 2026-09-30 Claude model-switch finding: the pinned
-// adapter restores the transcript's previous model on session/load. AgentDeck
+// adapter restores the transcript's previous model on session/load. Chuck
 // must explicitly apply the newly selected model after that load succeeds; the
 // _meta option used to construct the resumed SDK query is not sufficient.
 func TestResumeClaudeAppliesRequestedModelAfterSessionLoad(t *testing.T) {
@@ -847,7 +847,7 @@ func TestResumeSuccessfulLoadWithoutSessionIDKeepsPriorSession(t *testing.T) {
 
 // Regression for BR-3: an adapter may restore provider-native context by
 // replaying prior session/update frames during session/load. Those frames are
-// conversation AgentDeck already holds, so waking a stopped agent must publish
+// conversation Chuck already holds, so waking a stopped agent must publish
 // only the new prompt and its turn — never republish history as live activity
 // that drags an open transcript through old work (FS-03.R3/R35, TS-04.R50,
 // INV §1, INV §11).
@@ -897,7 +897,7 @@ func TestResumeSuppressesProviderHistoryReplay(t *testing.T) {
 		t.Fatalf("wake turn first event = %q, want the new user message", evs[0].Type)
 	}
 	// The provider still answers with its restored context: the turn runs
-	// normally even though AgentDeck recorded none of the replay.
+	// normally even though Chuck recorded none of the replay.
 	var texts int
 	for _, ev := range evs {
 		if ev.Type == EvAssistantText {
@@ -1098,7 +1098,7 @@ func TestModelRejectionReportsAnOutdatedSelectedClaude(t *testing.T) {
 		source, exe string
 		want        []string
 	}{
-		{source: "bundled", want: []string{"AgentDeck bundle", "choose Installed provider", "update AgentDeck"}},
+		{source: "bundled", want: []string{"Chuck bundle", "choose Installed provider", "update Chuck"}},
 		{source: "detected", exe: "/Users/me/.local/bin/claude", want: []string{"update the Claude Code at /Users/me/.local/bin/claude"}},
 	} {
 		c, spec := newChatTest(t, "stream_text")
@@ -1139,7 +1139,7 @@ func TestResumeProviderIncompatibilityDoesNotReplaceTheSession(t *testing.T) {
 	}
 	// The selected source travels with the typed error (TS-04.R76).
 	var tooOld *ProviderTooOldError
-	if !errors.As(err, &tooOld) || tooOld.Source != "bundled" || !strings.Contains(err.Error(), "AgentDeck bundle") {
+	if !errors.As(err, &tooOld) || tooOld.Source != "bundled" || !strings.Contains(err.Error(), "Chuck bundle") {
 		t.Fatalf("Resume error = %v, want the bundled source and its repair", err)
 	}
 	if _, statErr := os.Stat(newDump); !errors.Is(statErr, os.ErrNotExist) {

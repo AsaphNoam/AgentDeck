@@ -31,7 +31,7 @@ const server = setupServer(
     other: { title: "Other", cwd: "/tmp/other" },
     quiet: { title: "Quiet", cwd: "/tmp/quiet" },
   })),
-  http.get("/api/roles", () => HttpResponse.json({ agentdecker: { title: "AgentDecker" }, impl: { title: "Impl" } })),
+  http.get("/api/roles", () => HttpResponse.json({ firstmate: { title: "FirstMate" }, impl: { title: "Impl" } })),
   http.get("/api/config", () => HttpResponse.json({ default_role: "impl" })),
   http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: {
     codex: { name: "Codex", type: "codex-acp", default: true, default_model: "gpt-5", models: { "gpt-5": { name: "GPT-5", model: "gpt-5", fast: true } } },

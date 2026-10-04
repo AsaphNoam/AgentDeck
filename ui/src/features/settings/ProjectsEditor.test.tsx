@@ -8,7 +8,7 @@ import { ProjectsEditor } from "./ProjectsEditor";
 
 // The server always sends the read-only resource_dir on every project payload
 // (TS-03.R12); the mock mirrors that so tests exercise the real shape (INV §11).
-const RESOURCE_DIR = "/home/u/.agentdeck/project-resources/my-app";
+const RESOURCE_DIR = "/home/u/.chuck/project-resources/my-app";
 
 const server = setupServer(
   http.get("/api/projects", () =>
@@ -145,11 +145,11 @@ describe("ProjectsEditor", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 180, 255], cwd: "/tmp/fork", add_dirs: [], context_prompt: "",
-          worktree: { owned: true, branch: "agentdeck/fork" },
+          worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => HttpResponse.json({
-        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: true, dirty_known: true,
+        owned: true, repo_backed: true, branch: "chuck/fork", base: "main", dirty: true, dirty_known: true,
       })),
       http.post("/api/projects/fork/archive", async ({ request }) => {
         body = await request.json() as Record<string, unknown>;
@@ -173,11 +173,11 @@ describe("ProjectsEditor", () => {
       http.get("/api/projects", () => HttpResponse.json({
         fork: {
           title: "Fork", color: [100, 180, 255], cwd: "/tmp/fork", add_dirs: [], context_prompt: "",
-          worktree: { owned: true, branch: "agentdeck/fork" },
+          worktree: { owned: true, branch: "chuck/fork" },
         },
       })),
       http.get("/api/projects/fork/worktree", () => HttpResponse.json({
-        owned: true, repo_backed: true, branch: "agentdeck/fork", base: "main", dirty: false, dirty_known: false,
+        owned: true, repo_backed: true, branch: "chuck/fork", base: "main", dirty: false, dirty_known: false,
       })),
       http.delete("/api/projects/fork", ({ request }) => {
         deletedURL = new URL(request.url);

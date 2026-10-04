@@ -30,7 +30,7 @@ func PackageRelease(versionDir, outputDir, version string) (ReleaseManifest, err
 	m := ReleaseManifest{
 		Version: version,
 		Target:  Target,
-		Archive: fmt.Sprintf("agentdeck-%s-%s.tar.gz", version, Target),
+		Archive: fmt.Sprintf("chuck-%s-%s.tar.gz", version, Target),
 	}
 	archivePath := filepath.Join(outputDir, m.Archive)
 	if err := CreateArchive(versionDir, archivePath); err != nil {

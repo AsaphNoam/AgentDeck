@@ -49,7 +49,7 @@ export function PhoneSettings() {
 
   const enable = () =>
     run(async () => {
-      if ((await Notification.requestPermission()) !== "granted") throw new Error("Notifications are blocked for AgentDeck in this phone's settings.");
+      if ((await Notification.requestPermission()) !== "granted") throw new Error("Notifications are blocked for Chuck in this phone's settings.");
       const registration = await navigator.serviceWorker.ready;
       const existing = await registration.pushManager.getSubscription();
       await existing?.unsubscribe();
@@ -107,7 +107,7 @@ export function PhoneSettings() {
         <p className="phone-card-kicker">Notifications</p>
         <p>Get notified when an agent needs permission or a reply, hits an error, or a task or run needs you. Finished work never notifies.</p>
         {!pushSupported() || iosBrowserTab() ? (
-          <p className="phone-meta">Add AgentDeck to the Home Screen and open it from there to turn on notifications.</p>
+          <p className="phone-meta">Add Chuck to the Home Screen and open it from there to turn on notifications.</p>
         ) : lapsed ? (
           <>
             <p className="phone-error">Notifications are off: this phone stopped accepting them.</p>

@@ -10,7 +10,7 @@ import (
 // TS-04.R63 / FS-03.R58 regression: a native child's permission_resolved must
 // carry the same activity scope (ActivityID/ParentActivityID) as its
 // permission_request, for every resolution path — auto-approve is covered by
-// TestAgentDeckToolPermissionAutoApprovesExactIdentity at root scope; these
+// TestChuckToolPermissionAutoApprovesExactIdentity at root scope; these
 // cover a scoped child's approve, deny, timeout and cancel paths, which
 // previously emitted permission_resolved at root scope regardless of where
 // the request was scoped.

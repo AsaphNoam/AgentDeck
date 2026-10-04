@@ -37,7 +37,7 @@ export const useConnection = create<ConnectionState>((set) => ({
   bump: () => set((state) => ({ revision: state.revision + 1 })),
 }));
 
-const PAIRED_KEY = "agentdeck.paired";
+const PAIRED_KEY = "chuck.paired";
 export const rememberPaired = (paired: boolean) =>
   paired ? localStorage.setItem(PAIRED_KEY, "1") : localStorage.removeItem(PAIRED_KEY);
 export const wasPaired = () => localStorage.getItem(PAIRED_KEY) === "1";

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 type serverCapturePublisher struct {
@@ -24,7 +24,7 @@ func postHook(t *testing.T, h http.Handler, body string, token string) *httptest
 	req := newLocalRequest(http.MethodPost, "/api/hook", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
-		req.Header.Set("X-AgentDeck-Token", token)
+		req.Header.Set("X-Chuck-Token", token)
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -168,6 +168,20 @@ func TestHookValidationErrors(t *testing.T) {
 				t.Fatalf("error body = %+v, want error %q with message", body, tc.wantError)
 			}
 		})
+	}
+}
+
+// TS-04.R78: the pre-rename header is not an alias for X-Chuck-Token.
+func TestHookRejectsLegacyTokenHeader(t *testing.T) {
+	srv := testServer(t, true)
+	seedHookAgent(t, srv)
+	req := newLocalRequest(http.MethodPost, "/api/hook", bytes.NewBufferString(`{"agent_id":"a_8f3c12","event":"status","state":"busy"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-AgentDeck-Token", "tok_live")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("legacy header status = %d body=%s, want 401", rec.Code, rec.Body.String())
 	}
 }
 

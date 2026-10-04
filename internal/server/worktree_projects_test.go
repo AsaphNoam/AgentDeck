@@ -13,7 +13,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // FS-04.A25 / FS-04.R45: base_branch and setup_command round-trip through the
@@ -166,7 +166,7 @@ func TestWorktreeForkCreatesBranchCheckoutAndProject(t *testing.T) {
 		AddDirs: []string{"/tmp/extra"},
 	})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "App fork one", "branch": "agentdeck/fork-one"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "App fork one", "branch": "chuck/fork-one"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s, want 201", rec.Code, rec.Body)
 	}
@@ -174,8 +174,8 @@ func TestWorktreeForkCreatesBranchCheckoutAndProject(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &first); err != nil {
 		t.Fatalf("decode fork: %v", err)
 	}
-	if first.Branch != "agentdeck/fork-one" || first.Base != "main" {
-		t.Fatalf("fork = %+v, want branch agentdeck/fork-one off main", first)
+	if first.Branch != "chuck/fork-one" || first.Base != "main" {
+		t.Fatalf("fork = %+v, want branch chuck/fork-one off main", first)
 	}
 	// The copied fields come from the source; only the cwd differs.
 	fork, err := srv.configStore.ReadProject(first.Project.ProjectID)
@@ -199,15 +199,15 @@ func TestWorktreeForkCreatesBranchCheckoutAndProject(t *testing.T) {
 	// Ownership is recorded, and the response already carries the branch so the
 	// new card can render it without a second round trip (FS-02.R60).
 	row, owned := srv.ownedWorktree(first.Project.ProjectID)
-	if !owned || row.Branch != "agentdeck/fork-one" || row.RepoPath == "" {
+	if !owned || row.Branch != "chuck/fork-one" || row.RepoPath == "" {
 		t.Fatalf("ownership row = %+v owned=%v", row, owned)
 	}
-	if first.Project.Worktree == nil || first.Project.Worktree.Branch != "agentdeck/fork-one" {
+	if first.Project.Worktree == nil || first.Project.Worktree.Branch != "chuck/fork-one" {
 		t.Fatalf("fork response worktree = %+v", first.Project.Worktree)
 	}
 
 	// A sibling fork branches off the same base, not off the first fork.
-	rec = forkProject(t, srv, "app", map[string]any{"title": "App fork two", "branch": "agentdeck/fork-two"})
+	rec = forkProject(t, srv, "app", map[string]any{"title": "App fork two", "branch": "chuck/fork-two"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("second fork status = %d body=%s, want 201", rec.Code, rec.Body)
 	}
@@ -230,14 +230,14 @@ func TestWorktreeForkOfAForkUsesTheEffectiveBase(t *testing.T) {
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "First", "branch": "agentdeck/first"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "First", "branch": "chuck/first"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
 	var first forkResult
 	_ = json.Unmarshal(rec.Body.Bytes(), &first)
 
-	rec = forkProject(t, srv, first.Project.ProjectID, map[string]any{"title": "Second", "branch": "agentdeck/second"})
+	rec = forkProject(t, srv, first.Project.ProjectID, map[string]any{"title": "Second", "branch": "chuck/second"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("nested fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -256,7 +256,7 @@ func TestWorktreeNestedForkSurvivesParentCheckoutDeletion(t *testing.T) {
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "First", "branch": "agentdeck/first"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "First", "branch": "chuck/first"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("first fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -265,7 +265,7 @@ func TestWorktreeNestedForkSurvivesParentCheckoutDeletion(t *testing.T) {
 		t.Fatalf("decode first fork: %v", err)
 	}
 
-	rec = forkProject(t, srv, first.Project.ProjectID, map[string]any{"title": "Second", "branch": "agentdeck/second"})
+	rec = forkProject(t, srv, first.Project.ProjectID, map[string]any{"title": "Second", "branch": "chuck/second"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("nested fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -314,7 +314,7 @@ func TestWorktreeForkFailingSetupStillCreatesTheProject(t *testing.T) {
 		Title: "App", SetupCommand: "echo bootstrapping; exit 3",
 	})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/setup-fails"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/setup-fails"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s, want 201", rec.Code, rec.Body)
 	}
@@ -347,7 +347,7 @@ func TestWorktreeSetupOutputKeepsBoundedUTF8Tail(t *testing.T) {
 		Title: "App", SetupCommand: "printf '%070000d' 0; printf ' €tail'; exit 3",
 	})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/large-setup-output"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/large-setup-output"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -378,7 +378,7 @@ func TestWorktreeForkRejectionsLeaveNothingBehind(t *testing.T) {
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
 	seedWorktreeSource(t, srv, "plain", t.TempDir(), config.Project{Title: "Plain"})
 
-	rec := forkProject(t, srv, "plain", map[string]any{"title": "Nope", "branch": "agentdeck/nope"})
+	rec := forkProject(t, srv, "plain", map[string]any{"title": "Nope", "branch": "chuck/nope"})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("non-repo fork status = %d body=%s, want 422", rec.Code, rec.Body)
 	}
@@ -386,7 +386,7 @@ func TestWorktreeForkRejectionsLeaveNothingBehind(t *testing.T) {
 		t.Fatalf("non-repo body = %s", rec.Body)
 	}
 
-	rec = forkProject(t, srv, "app", map[string]any{"title": "Taken", "branch": "agentdeck/taken"})
+	rec = forkProject(t, srv, "app", map[string]any{"title": "Taken", "branch": "chuck/taken"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("first fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -395,7 +395,7 @@ func TestWorktreeForkRejectionsLeaveNothingBehind(t *testing.T) {
 		t.Fatalf("ListProjects: %v", err)
 	}
 
-	rec = forkProject(t, srv, "app", map[string]any{"title": "Taken again", "branch": "agentdeck/taken"})
+	rec = forkProject(t, srv, "app", map[string]any{"title": "Taken again", "branch": "chuck/taken"})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("colliding fork status = %d body=%s, want 422", rec.Code, rec.Body)
 	}
@@ -421,7 +421,7 @@ func TestWorktreeForkRejectsArchivedSource(t *testing.T) {
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App", Archived: true})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/x"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/x"})
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d body=%s, want 422", rec.Code, rec.Body)
 	}
@@ -441,7 +441,7 @@ func TestWorktreeCheckoutRecreationAndMissingBranch(t *testing.T) {
 		Title: "App", SetupCommand: "echo setup-ran > setup-marker.txt",
 	})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/recreate"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/recreate"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -483,14 +483,14 @@ func TestWorktreeCheckoutRecreationAndMissingBranch(t *testing.T) {
 	if err := git.PruneWorktrees(t.Context(), repo); err != nil {
 		t.Fatalf("PruneWorktrees: %v", err)
 	}
-	if err := git.DeleteBranch(t.Context(), repo, "agentdeck/recreate"); err != nil {
+	if err := git.DeleteBranch(t.Context(), repo, "chuck/recreate"); err != nil {
 		t.Fatalf("DeleteBranch: %v", err)
 	}
 	_, _, ae = srv.ensureWorktreeCheckout(t.Context(), forkID, checkout)
 	if ae == nil {
 		t.Fatal("start succeeded with the recorded branch deleted")
 	}
-	if !strings.Contains(ae.Message, "agentdeck/recreate") {
+	if !strings.Contains(ae.Message, "chuck/recreate") {
 		t.Fatalf("error = %q, want it to name the missing branch", ae.Message)
 	}
 	if isExistingDir(checkout) {
@@ -516,7 +516,7 @@ func TestArchiveDeletesCheckoutOnlyWithConsent(t *testing.T) {
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/archive-me"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/archive-me"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -559,7 +559,7 @@ func TestArchiveDeletesCheckoutOnlyWithConsent(t *testing.T) {
 		t.Fatal("ownership row survived the deletion")
 	}
 	// The branch and its commits survive in the source repository.
-	exists, err := srv.worktreeGit().BranchExists(t.Context(), repo, "agentdeck/archive-me")
+	exists, err := srv.worktreeGit().BranchExists(t.Context(), repo, "chuck/archive-me")
 	if err != nil {
 		t.Fatalf("BranchExists: %v", err)
 	}
@@ -568,7 +568,7 @@ func TestArchiveDeletesCheckoutOnlyWithConsent(t *testing.T) {
 	}
 }
 
-// FS-19.A5 / R4: a project whose cwd is a worktree AgentDeck did not create is
+// FS-19.A5 / R4: a project whose cwd is a worktree Chuck did not create is
 // external — no ownership row, no deletion, and consent is a no-op.
 func TestExternalCheckoutIsNeverDeleted(t *testing.T) {
 	repo := newWorktreeTestRepo(t)
@@ -609,7 +609,7 @@ func TestForceDeleteRefusesOwnedCheckoutWhileAgentRuns(t *testing.T) {
 	repo := newWorktreeTestRepo(t)
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Busy fork", "branch": "agentdeck/busy"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Busy fork", "branch": "chuck/busy"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -629,7 +629,7 @@ func TestArchiveRechecksCleanCheckoutBeforeDeletion(t *testing.T) {
 	repo := newWorktreeTestRepo(t)
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Race fork", "branch": "agentdeck/race"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Race fork", "branch": "chuck/race"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -687,7 +687,7 @@ func TestWorktreeStatusAndListEnrichment(t *testing.T) {
 		t.Fatalf("source status = %+v, want repo-backed, unowned, base main", source)
 	}
 
-	rec = forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/status"})
+	rec = forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/status"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}
@@ -700,7 +700,7 @@ func TestWorktreeStatusAndListEnrichment(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &forked); err != nil {
 		t.Fatalf("decode fork status: %v", err)
 	}
-	if !forked.Owned || forked.Branch != "agentdeck/status" {
+	if !forked.Owned || forked.Branch != "chuck/status" {
 		t.Fatalf("fork status = %+v", forked)
 	}
 	if !forked.DirtyKnown || forked.Dirty {
@@ -723,7 +723,7 @@ func TestWorktreeStatusAndListEnrichment(t *testing.T) {
 	if entry := list["app"]; !entry.RepoBacked || entry.Worktree != nil {
 		t.Fatalf("source list entry = %+v, want repo-backed and unowned", entry)
 	}
-	if entry := list[forkID]; entry.Worktree == nil || entry.Worktree.Branch != "agentdeck/status" {
+	if entry := list[forkID]; entry.Worktree == nil || entry.Worktree.Branch != "chuck/status" {
 		t.Fatalf("fork list entry = %+v", entry)
 	}
 }
@@ -736,7 +736,7 @@ func TestConcurrentCheckoutRecreationClaimsOnce(t *testing.T) {
 	srv := testServer(t, false)
 	seedWorktreeSource(t, srv, "app", repo, config.Project{Title: "App"})
 
-	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "agentdeck/race"})
+	rec := forkProject(t, srv, "app", map[string]any{"title": "Fork", "branch": "chuck/race"})
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("fork status = %d body=%s", rec.Code, rec.Body)
 	}

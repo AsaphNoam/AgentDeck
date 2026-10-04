@@ -16,7 +16,7 @@ import (
 //go:embed scripts/_post.sh scripts/session-start.sh scripts/user-prompt-submit.sh scripts/pre-tool-use.sh scripts/post-tool-use.sh scripts/stop.sh
 var scriptFS embed.FS
 
-// scriptByEvent maps an AgentDeck lifecycle event to its wrapper script's file
+// scriptByEvent maps a Chuck lifecycle event to its wrapper script's file
 // name. _post.sh is the shared helper every wrapper execs.
 var scriptByEvent = map[string]string{
 	"SessionStart":     "session-start.sh",
@@ -33,10 +33,10 @@ var allScripts = []string{
 	"pre-tool-use.sh", "post-tool-use.sh", "stop.sh",
 }
 
-// Dir returns the hooks directory under the AgentDeck home ({home}/hooks).
+// Dir returns the hooks directory under the Chuck home ({home}/hooks).
 func Dir(home string) string { return filepath.Join(home, "hooks") }
 
-// ScriptPath returns the absolute path of the wrapper script for an AgentDeck
+// ScriptPath returns the absolute path of the wrapper script for a Chuck
 // lifecycle event, or "" if the event has no script.
 func ScriptPath(home, event string) string {
 	name, ok := scriptByEvent[event]
@@ -81,7 +81,7 @@ func Install(home string) error {
 }
 
 // ClaudeSettings composes a Claude Code settings object whose "hooks" block maps
-// each CLI hook key (from the backend adapter's hookMap: AgentDeck event → CLI
+// each CLI hook key (from the backend adapter's hookMap: Chuck event → CLI
 // key) to a command that runs the matching wrapper script. The shape matches
 // Claude Code's settings.json hooks format:
 //

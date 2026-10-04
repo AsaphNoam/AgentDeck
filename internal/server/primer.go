@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/transcript"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
 const (
@@ -71,8 +71,8 @@ func synthesizeHistoryPrimer(ctx context.Context, events []runtime.Event, target
 	}
 
 	parts := []string{
-		"AgentDeck backend-switch history primer.",
-		"The native CLI session could not be resumed across backends. Continue from this AgentDeck transcript summary.",
+		"Chuck backend-switch history primer.",
+		"The native CLI session could not be resumed across backends. Continue from this Chuck transcript summary.",
 	}
 	if summary != "" {
 		parts = append(parts, "Older context summary:\n"+summary)

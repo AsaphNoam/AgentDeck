@@ -6,7 +6,7 @@ import (
 )
 
 // TestHomeTreeIsOwnerOnly guards the security fix for world-readable
-// ~/.agentdeck: the home tree holds secrets (backend env/API keys, tokens,
+// ~/.chuck: the home tree holds secrets (backend env/API keys, tokens,
 // transcripts), so EnsureLayout must create it owner-only AND tighten a home
 // left behind by an older build (MkdirAll never re-modes an existing dir).
 func TestHomeTreeIsOwnerOnly(t *testing.T) {

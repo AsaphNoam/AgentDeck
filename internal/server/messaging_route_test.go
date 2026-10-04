@@ -9,7 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/messaging"
+	"github.com/AsaphNoam/Chuck/internal/messaging"
 )
 
 // tokenRoundTripper injects the per-agent session token header on every request.

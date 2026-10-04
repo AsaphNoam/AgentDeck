@@ -20,7 +20,7 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 // setupCodexHomes points CODEX_HOME at a fresh personal home and returns the
-// personal dir plus the AgentDeck profile dir under a separate home.
+// personal dir plus the Chuck profile dir under a separate home.
 func setupCodexHomes(t *testing.T) (personal, profile string) {
 	t.Helper()
 	personal = filepath.Join(t.TempDir(), "codex")
@@ -401,7 +401,7 @@ func TestRefreshCodexProfileRejectsOverlappingPersonalHomeBeforeMutation(t *test
 		t.Fatal(err)
 	}
 	t.Setenv("CODEX_HOME", personal)
-	profile := filepath.Join(personal, "agentdeck-child")
+	profile := filepath.Join(personal, "chuck-child")
 
 	if err := RefreshCodexProfile(profile); err == nil {
 		t.Fatal("expected overlapping source/profile to be rejected")

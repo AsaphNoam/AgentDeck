@@ -1,6 +1,6 @@
 import type { BackendType, ProviderRuntime } from "../schemas/backends";
 
-// Claude/Codex are the only backends whose provider executable AgentDeck
+// Claude/Codex are the only backends whose provider executable Chuck
 // selects (FS-09.R68/R75). Other backends have no provider source.
 export function hasProviderSource(type: BackendType): type is "claude-acp" | "codex-acp" {
   return type === "claude-acp" || type === "codex-acp";
@@ -15,7 +15,7 @@ export function providerExecutableKey(type: BackendType): string {
   return type === "codex-acp" ? "CODEX_PATH" : "CLAUDE_CODE_EXECUTABLE";
 }
 
-// Official installation entry points; AgentDeck never installs a provider.
+// Official installation entry points; Chuck never installs a provider.
 export function providerInstallURL(type: BackendType): string {
   return type === "codex-acp" ? "https://developers.openai.com/codex/cli" : "https://code.claude.com/docs/en/setup";
 }
@@ -25,7 +25,7 @@ const SOURCE_LABELS: Record<ProviderRuntime["source"], string> = {
   ambient: "Installed (dashboard environment path)",
   backend: "Installed (backend path)",
   model: "Installed (model path)",
-  bundled: "AgentDeck bundle",
+  bundled: "Chuck bundle",
 };
 
 // describeProviderRuntime is the one wording for a saved backend/model's
@@ -43,12 +43,12 @@ export function describeProviderRuntime(type: BackendType, rt: ProviderRuntime):
     case "available":
       return { summary };
     case "bundle_unavailable":
-      return { summary, problem: `The AgentDeck bundle for ${name} is not available in this installation. Choose Installed provider, or reinstall AgentDeck.` };
+      return { summary, problem: `The Chuck bundle for ${name} is not available in this installation. Choose Installed provider, or reinstall Chuck.` };
     case "missing":
       return rt.source === "detected"
-        ? { summary, problem: `${name} was not found. Install it, set its executable path, or choose AgentDeck bundle.` }
-        : { summary, problem: `The ${name} executable path was not found. Fix or clear it, or choose AgentDeck bundle.` };
+        ? { summary, problem: `${name} was not found. Install it, set its executable path, or choose Chuck bundle.` }
+        : { summary, problem: `The ${name} executable path was not found. Fix or clear it, or choose Chuck bundle.` };
     default:
-      return { summary, problem: `The ${name} executable path is not usable. Use an absolute path or a command name, or choose AgentDeck bundle.` };
+      return { summary, problem: `The ${name} executable path is not usable. Use an absolute path or a command name, or choose Chuck bundle.` };
   }
 }

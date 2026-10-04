@@ -86,7 +86,7 @@ func TestManagerMapsNodeStates(t *testing.T) {
 		mu.Lock()
 		served++
 		mu.Unlock()
-		if l.Domain != "agentdeck.tail.ts.net" {
+		if l.Domain != "chuck.tail.ts.net" {
 			t.Errorf("domain = %q", l.Domain)
 		}
 		return func() {
@@ -111,22 +111,22 @@ func TestManagerMapsNodeStates(t *testing.T) {
 	waitState(t, m, Status{State: StateUnavailable, Reason: ReasonHTTPSDisabled})
 
 	node.set(func(n *fakeNode) {
-		n.status = NodeStatus{BackendState: BackendRunning, CertDomains: []string{"agentdeck.tail.ts.net"}}
+		n.status = NodeStatus{BackendState: BackendRunning, CertDomains: []string{"chuck.tail.ts.net"}}
 		n.listenErr = ErrMagicDNSDisabled
 	})
 	waitState(t, m, Status{State: StateUnavailable, Reason: ReasonMagicDNSDisabled})
 
 	// A repaired prerequisite recovers without toggling (re-polled).
 	node.set(func(n *fakeNode) { n.listenErr = nil })
-	waitState(t, m, Status{State: StateOn, Address: "https://agentdeck.tail.ts.net"})
+	waitState(t, m, Status{State: StateOn, Address: "https://chuck.tail.ts.net"})
 
 	// Sign-in loss returns to Needs sign-in (FS-20.R26) without re-listening.
 	node.set(func(n *fakeNode) { n.status = NodeStatus{BackendState: BackendNeedsLogin} })
 	waitState(t, m, Status{State: StateNeedsLogin})
 	node.set(func(n *fakeNode) {
-		n.status = NodeStatus{BackendState: BackendRunning, CertDomains: []string{"agentdeck.tail.ts.net"}}
+		n.status = NodeStatus{BackendState: BackendRunning, CertDomains: []string{"chuck.tail.ts.net"}}
 	})
-	waitState(t, m, Status{State: StateOn, Address: "https://agentdeck.tail.ts.net"})
+	waitState(t, m, Status{State: StateOn, Address: "https://chuck.tail.ts.net"})
 
 	m.Disable()
 	if got := m.Status(); got.State != StateOff {

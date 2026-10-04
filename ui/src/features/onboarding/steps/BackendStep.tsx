@@ -21,8 +21,8 @@ const seededIdForType: Record<BackendType, string> = {
   "openhands-acp": "openhands",
 };
 
-// signInProvider maps a backend type to the `agentdeck auth` selector for
-// providers that own an interactive sign-in. AgentDeck never runs, proxies, or
+// signInProvider maps a backend type to the `chuck auth` selector for
+// providers that own an interactive sign-in. Chuck never runs, proxies, or
 // observes that flow — onboarding only tells the person which command to run in
 // their own terminal, then re-checks readiness (FS-04.R34, TS-04.R15).
 const signInProvider: Partial<Record<BackendType, string>> = {
@@ -33,17 +33,17 @@ const signInProvider: Partial<Record<BackendType, string>> = {
 function credentialGuidance(status: string, detail: string | null, type: BackendType): string {
   if (detail === "cli_not_installed") {
     return hasProviderSource(type)
-      ? `${providerName(type)} was not found. Install it (${providerInstallURL(type)}), or choose AgentDeck bundle for this backend in Settings → Backends, then check again.`
+      ? `${providerName(type)} was not found. Install it (${providerInstallURL(type)}), or choose Chuck bundle for this backend in Settings → Backends, then check again.`
       : `The ${BACKEND_TYPE_LABELS[type]} adapter is not installed. Install it, then check again.`;
   }
   if (detail === "bundle_unavailable") {
-    return `The AgentDeck bundle for ${providerName(type)} is not available in this installation. Choose Installed provider in Settings → Backends, or reinstall AgentDeck, then check again.`;
+    return `The Chuck bundle for ${providerName(type)} is not available in this installation. Choose Installed provider in Settings → Backends, or reinstall Chuck, then check again.`;
   }
   if (detail === "cli_invalid") {
     return `The ${providerName(type)} executable path set for this backend is not usable. Fix or clear it in Settings → Backends, then check again.`;
   }
   if (detail === "cli_incompatible") {
-    return `The installed ${BACKEND_TYPE_LABELS[type]} adapter is too old for AgentDeck's readiness check, so its sign-in could not be confirmed. Update the adapter, then check again.`;
+    return `The installed ${BACKEND_TYPE_LABELS[type]} adapter is too old for Chuck's readiness check, so its sign-in could not be confirmed. Update the adapter, then check again.`;
   }
   if (detail === "not_logged_in") {
     return `${BACKEND_TYPE_LABELS[type]} is not signed in. Complete its sign-in below, then check again.`;
@@ -168,15 +168,15 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
         <div className="wizard-guidance" data-slot="guidance">
           <p>
             {BACKEND_TYPE_LABELS[type]} sign-in happens in {BACKEND_TYPE_LABELS[type]}'s own tool, not
-            in AgentDeck. In a terminal, run:
+            in Chuck. In a terminal, run:
           </p>
           <p>
-            <code>agentdeck auth {authProvider}{sameTypeCount > 1 ? ` --backend ${backendId}` : ""}</code>
+            <code>chuck auth {authProvider}{sameTypeCount > 1 ? ` --backend ${backendId}` : ""}</code>
           </p>
           <p className="form-hint">
             {type === "codex-acp"
               ? "Already signed in to Codex? Nothing else is needed — an API key below is only an alternative."
-              : "AgentDeck never sees or stores your credentials."}
+              : "Chuck never sees or stores your credentials."}
           </p>
         </div>
       )}

@@ -17,12 +17,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // RuntimeRootEnv names the managed runtime root the release wrapper publishes
 // (TS-06.R30). It is absent for source builds, which have no bundle.
-const RuntimeRootEnv = "AGENTDECK_RUNTIME_ROOT"
+const RuntimeRootEnv = "CHUCK_RUNTIME_ROOT"
 
 // Sources identify which configuration layer won (TS-03.R52).
 const (

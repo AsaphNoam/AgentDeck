@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // startPermAgent launches a fake agent running the permission scenario with a
@@ -190,8 +190,8 @@ func TestPermissionSkip(t *testing.T) {
 	}
 }
 
-func TestAgentDeckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
-	const identity = "mcp__agentdeck-messaging__send_message"
+func TestChuckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
+	const identity = "mcp__chuck-messaging__send_message"
 	t.Setenv("FAKEACP_PERMISSION_TITLE", identity)
 	t.Setenv("TEST_AUTO_APPROVE_TOOL", identity)
 	c, h, sentinel, ch := startPermAgent(t, false, "")
@@ -202,7 +202,7 @@ func TestAgentDeckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
 	var data PermissionRequestData
 	_ = json.Unmarshal(pr.Data, &data)
 	if !data.AutoApproved {
-		t.Fatal("AgentDeck tool request was not recorded as auto-approved")
+		t.Fatal("Chuck tool request was not recorded as auto-approved")
 	}
 	// FS-03.A24 / INV §15: local truth precedes releasing a fast provider.
 	resolved := waitForEvent(t, ch, EvPermissionResolved)
@@ -213,7 +213,7 @@ func TestAgentDeckToolPermissionAutoApprovesExactIdentity(t *testing.T) {
 	}
 	waitForEvent(t, ch, EvTurnEnd)
 	if !fileExists(sentinel) {
-		t.Fatal("AgentDeck tool did not execute")
+		t.Fatal("Chuck tool did not execute")
 	}
 }
 
@@ -245,9 +245,9 @@ func TestStopCancelsPendingPermissionAndTimer(t *testing.T) {
 	}
 }
 
-func TestAgentDeckToolPermissionFailsClosedOnDifferentServer(t *testing.T) {
+func TestChuckToolPermissionFailsClosedOnDifferentServer(t *testing.T) {
 	t.Setenv("FAKEACP_PERMISSION_TITLE", "mcp__other__send_message")
-	t.Setenv("TEST_AUTO_APPROVE_TOOL", "mcp__agentdeck-messaging__send_message")
+	t.Setenv("TEST_AUTO_APPROVE_TOOL", "mcp__chuck-messaging__send_message")
 	c, h, sentinel, ch := startPermAgent(t, false, "")
 	if err := c.SendPrompt(context.Background(), h.AgentID, "send"); err != nil {
 		t.Fatal(err)
@@ -260,8 +260,8 @@ func TestAgentDeckToolPermissionFailsClosedOnDifferentServer(t *testing.T) {
 	}
 }
 
-func TestAgentDeckToolDoesNotChooseAlwaysAllow(t *testing.T) {
-	const identity = "mcp__agentdeck-messaging__send_message"
+func TestChuckToolDoesNotChooseAlwaysAllow(t *testing.T) {
+	const identity = "mcp__chuck-messaging__send_message"
 	t.Setenv("FAKEACP_PERMISSION_TITLE", identity)
 	t.Setenv("FAKEACP_PERMISSION_ALLOW_ALWAYS_ONLY", "1")
 	t.Setenv("TEST_AUTO_APPROVE_TOOL", identity)
@@ -273,7 +273,7 @@ func TestAgentDeckToolDoesNotChooseAlwaysAllow(t *testing.T) {
 	var data PermissionRequestData
 	_ = json.Unmarshal(pr.Data, &data)
 	if data.AutoApproved || fileExists(sentinel) {
-		t.Fatal("AgentDeck selected an always-allow provider option")
+		t.Fatal("Chuck selected an always-allow provider option")
 	}
 }
 

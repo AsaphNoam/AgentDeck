@@ -16,12 +16,12 @@ import (
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 
-	"github.com/agentdeck/agentdeck/internal/agentknowledge"
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/hooks"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/server"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/agentknowledge"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/hooks"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/server"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // stopTimeout bounds how long `stop` waits for graceful SIGTERM exit before
@@ -32,7 +32,7 @@ const stopTimeout = 5 * time.Second
 func newDashboardCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
-		Short: "Manage the AgentDeck dashboard server",
+		Short: "Manage the Chuck dashboard server",
 	}
 	cmd.AddCommand(newDashboardStartCmd(), newDashboardStopCmd(), newDashboardOpenCmd())
 	return cmd
@@ -40,7 +40,7 @@ func newDashboardCmd() *cobra.Command {
 
 func configuredLogLevel() slog.Level {
 	level := slog.LevelInfo
-	switch os.Getenv("AGENTDECK_LOG_LEVEL") {
+	switch os.Getenv("CHUCK_LOG_LEVEL") {
 	case "debug":
 		level = slog.LevelDebug
 	case "warn":
@@ -55,7 +55,7 @@ func newJSONLogger(w io.Writer) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{Level: configuredLogLevel()}))
 }
 
-// newLogger builds the slog JSON logger to stderr, honoring AGENTDECK_LOG_LEVEL.
+// newLogger builds the slog JSON logger to stderr, honoring CHUCK_LOG_LEVEL.
 func newLogger() *slog.Logger {
 	return newJSONLogger(os.Stderr)
 }
@@ -95,7 +95,7 @@ func resolveConfig(log *slog.Logger) (*config.Store, config.Config, error) {
 }
 
 // resolvePreparedConfig completes startup configuration after the caller has
-// created the AgentDeck home and established its dashboard log.
+// created the Chuck home and established its dashboard log.
 func resolvePreparedConfig(cfgStore *config.Store, log *slog.Logger) (config.Config, error) {
 	if err := cfgStore.SeedIfAbsent(); err != nil {
 		return config.Config{}, err
@@ -122,7 +122,7 @@ func resolvePreparedConfig(cfgStore *config.Store, log *slog.Logger) (config.Con
 func prepareAgentKnowledge(cfgStore *config.Store, log *slog.Logger) agentknowledge.Installation {
 	knowledge, err := agentknowledge.Install(cfgStore.Home())
 	if err != nil {
-		log.Warn("install AgentDeck operator skill; continuing without it", "err", err)
+		log.Warn("install Chuck operator skill; continuing without it", "err", err)
 		return knowledge
 	}
 	if _, err := cfgStore.MigrateSupersededRolePrompts(); err != nil {
@@ -258,7 +258,7 @@ func startDetached(home string, port int) error {
 	_ = child.Process.Release()
 
 	// Verify the child is still alive before reporting success: if the port was
-	// already taken (by a non-agentdeck process, say) the child exits almost
+	// already taken (by a non-chuck process, say) the child exits almost
 	// immediately and its `defer removePidfile` clears the pidfile, so a "started"
 	// message would be a lie. Give it a brief grace window, then confirm.
 	time.Sleep(startConfirmGrace)

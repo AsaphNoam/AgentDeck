@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/pipeline"
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
-const testDomain = "agentdeck.tail1.ts.net"
+const testDomain = "chuck.tail1.ts.net"
 
 // Every loopback route is either allowlisted or explicitly denied on the
 // tailnet listener, and the allowlist names no route that does not exist
@@ -215,9 +215,9 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 	}
 
 	for _, c := range []struct{ path, body string }{
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","interface":"terminal"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","group":"g"}`},
-		{"/api/sessions", `{"role":"agentdecker","project":"my-app","resume":true}`},
+		{"/api/sessions", `{"role":"firstmate","project":"my-app","interface":"terminal"}`},
+		{"/api/sessions", `{"role":"firstmate","project":"my-app","group":"g"}`},
+		{"/api/sessions", `{"role":"firstmate","project":"my-app","resume":true}`},
 		{"/api/sessions/a/switch-runtime", `{"backend":"claude","interface":"terminal"}`},
 		{"/api/sessions/a/session-config", `{"effort":"high","backend":"claude"}`},
 		{"/api/sessions/a/rename", `{"name":"Atlas","role":"implementer"}`},
@@ -236,7 +236,7 @@ func TestRemoteAllowlistAndFieldFilter(t *testing.T) {
 
 	// An allowed launch body reaches the shared handler (which then validates it).
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions", `{"role":"agentdecker","project":"nope","name":"Phone","backend":"claude","model":"sonnet","effort":"high","fast":false}`, token))
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions", `{"role":"firstmate","project":"nope","name":"Phone","backend":"claude","model":"sonnet","effort":"high","fast":false}`, token))
 	if code := errorCode(t, rec); code == codeRemoteFieldNotAllowed {
 		t.Fatalf("allowed body blocked: %d %s", rec.Code, rec.Body)
 	}

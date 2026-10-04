@@ -1,8 +1,8 @@
 {
-  "name": "agentdeck-release-runtime",
+  "name": "chuck-release-runtime",
   "private": true,
   "version": "1.0.0",
-  "description": "Pinned private ACP runtime for AgentDeck macOS releases",
+  "description": "Pinned private ACP runtime for Chuck macOS releases",
   "engines": {
     "node": ">=22"
   },

@@ -82,7 +82,7 @@ func (s TabSpec) tmuxSession() string {
 	if base == "" {
 		base = "agent"
 	}
-	return "agentdeck-" + base
+	return "chuck-" + base
 }
 
 func tmuxDisplay(session, fmtStr string) (string, error) {

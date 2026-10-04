@@ -1,13 +1,15 @@
 package server
 
 import (
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/agentknowledge"
-	"github.com/agentdeck/agentdeck/internal/runtime"
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/agentknowledge"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 func envValue(env []string, key string) string {
@@ -25,13 +27,13 @@ func envValue(env []string, key string) string {
 func TestKnowledgeOverlayIsRuntimeOnlyAndConditional(t *testing.T) {
 	srv := testServer(t, true)
 	root := filepath.Join(srv.configStore.Home(), "cache", "agent-skills")
-	skillDir := filepath.Join(root, ".agents", "skills", "operating-agentdeck")
+	skillDir := filepath.Join(root, ".agents", "skills", "operating-chuck")
 	srv.knowledge = agentknowledge.Installation{Available: true, Root: root, SkillDir: skillDir}
 	base := runtime.LaunchSpec{
 		Agent:        state.Agent{AgentID: "a_test", Name: "Test", Role: "implementer", Project: "my-app"},
 		AddDirs:      []string{"/user/dir"},
 		SystemPrompt: "base prompt",
-		Env:          []string{"BASE=value", "AGENTDECK_SKILL_DIR=shadowed"},
+		Env:          []string{"BASE=value", "CHUCK_SKILL_DIR=shadowed"},
 	}
 
 	effective := srv.applyKnowledgeOverlay(srv.applyKnowledgeOverlay(base))
@@ -43,7 +45,7 @@ func TestKnowledgeOverlayIsRuntimeOnlyAndConditional(t *testing.T) {
 		!strings.HasPrefix(effective.StartSystemPrompt(), "base prompt\n\n") {
 		t.Fatalf("effective prompt = %q", effective.StartSystemPrompt())
 	}
-	if got := envValue(effective.StartEnv(), "AGENTDECK_SKILL_DIR"); got != skillDir {
+	if got := envValue(effective.StartEnv(), "CHUCK_SKILL_DIR"); got != skillDir {
 		t.Fatalf("effective skill env = %q", got)
 	}
 	meta := runtime.NewSessionMeta(effective, "sess")
@@ -51,14 +53,14 @@ func TestKnowledgeOverlayIsRuntimeOnlyAndConditional(t *testing.T) {
 		t.Fatalf("overlay leaked into frozen metadata: %+v", meta)
 	}
 	for _, key := range meta.EnvKeys {
-		if key == "AGENTDECK_SKILL_DIR" {
+		if key == "CHUCK_SKILL_DIR" {
 			t.Fatalf("skill env leaked into frozen metadata: %v", meta.EnvKeys)
 		}
 	}
 
 	srv.knowledge = agentknowledge.Installation{}
 	unavailable := srv.applyKnowledgeOverlay(base)
-	if got := unavailable.StartAddDirs(); len(got) != 1 || strings.Contains(unavailable.StartSystemPrompt(), "operating-agentdeck") || envValue(unavailable.StartEnv(), "AGENTDECK_SKILL_DIR") != "" {
+	if got := unavailable.StartAddDirs(); len(got) != 1 || strings.Contains(unavailable.StartSystemPrompt(), "operating-chuck") || envValue(unavailable.StartEnv(), "CHUCK_SKILL_DIR") != "" {
 		t.Fatalf("unavailable overlay changed base spec: %+v", unavailable)
 	}
 	// FS-18.A11: the stable standing context survives an unavailable package,
@@ -98,7 +100,7 @@ func TestOperatingContextPromptStaysStable(t *testing.T) {
 func TestKnowledgeOverlayComposesWithSwitchPrimer(t *testing.T) {
 	srv := testServer(t, true)
 	root := filepath.Join(srv.configStore.Home(), "cache", "agent-skills")
-	skillDir := filepath.Join(root, ".agents", "skills", "operating-agentdeck")
+	skillDir := filepath.Join(root, ".agents", "skills", "operating-chuck")
 	srv.knowledge = agentknowledge.Installation{Available: true, Root: root, SkillDir: skillDir}
 	spec := srv.applyKnowledgeOverlay(runtime.LaunchSpec{
 		SystemPrompt:        "frozen",
@@ -117,7 +119,7 @@ func TestKnowledgeOverlayComposesWithSwitchPrimer(t *testing.T) {
 func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 	srv, ts := switchTestServer(t)
 	root := filepath.Join(srv.configStore.Home(), "cache", "agent-skills")
-	skillDir := filepath.Join(root, ".agents", "skills", "operating-agentdeck")
+	skillDir := filepath.Join(root, ".agents", "skills", "operating-chuck")
 
 	id := launchAndWaitIdle(t, ts, "impl", "tmpproj")
 	agent, err := srv.stateStore.ReadAgent(id)
@@ -189,9 +191,9 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{Available: true, Root: root, SkillDir: skillDir}
 			spec := tc.compose(t)
 			if len(spec.AutoApproveTools) != 19 {
-				t.Fatalf("AgentDeck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
+				t.Fatalf("Chuck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
 			}
-			if _, ok := spec.AutoApproveTools["mcp__agentdeck-messaging__report_task_result"]; !ok {
+			if _, ok := spec.AutoApproveTools["mcp__chuck-messaging__report_task_result"]; !ok {
 				t.Fatal("task result action missing from runtime overlay")
 			}
 			if got := countStr(spec.StartAddDirs(), root); got != 1 {
@@ -203,15 +205,21 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 			if got := strings.Count(spec.StartSystemPrompt(), operatingContextPrompt); got != 1 {
 				t.Errorf("standing context appears %d times in %q", got, spec.StartSystemPrompt())
 			}
-			if got := envValue(spec.StartEnv(), "AGENTDECK_SKILL_DIR"); got != skillDir {
-				t.Errorf("AGENTDECK_SKILL_DIR = %q, want %q", got, skillDir)
+			if got := envValue(spec.StartEnv(), "CHUCK_SKILL_DIR"); got != skillDir {
+				t.Errorf("CHUCK_SKILL_DIR = %q, want %q", got, skillDir)
+			}
+			// FS-10.A7: every product variable a launch injects is CHUCK_*.
+			for _, kv := range spec.StartEnv() {
+				if strings.HasPrefix(kv, "AGENTDECK_") && !slices.Contains(os.Environ(), kv) {
+					t.Errorf("launch injected legacy variable %q", kv)
+				}
 			}
 			meta := runtime.NewSessionMeta(spec, "sess")
 			if countStr(meta.AddDirs, root) != 0 || strings.Contains(meta.SystemPrompt, skillDir) || strings.Contains(meta.SystemPrompt, operatingContextPrompt) {
 				t.Errorf("overlay leaked into frozen metadata: %+v", meta)
 			}
 			for _, key := range meta.EnvKeys {
-				if key == "AGENTDECK_SKILL_DIR" {
+				if key == "CHUCK_SKILL_DIR" {
 					t.Errorf("skill env leaked into frozen metadata: %v", meta.EnvKeys)
 				}
 			}
@@ -221,11 +229,11 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{}
 			spec := tc.compose(t)
 			if len(spec.AutoApproveTools) != 19 {
-				t.Fatalf("AgentDeck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
+				t.Fatalf("Chuck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
 			}
 			if countStr(spec.StartAddDirs(), root) != 0 ||
 				strings.Contains(spec.StartSystemPrompt(), skillDir) ||
-				envValue(spec.StartEnv(), "AGENTDECK_SKILL_DIR") != "" {
+				envValue(spec.StartEnv(), "CHUCK_SKILL_DIR") != "" {
 				t.Errorf("unavailable package still composed an overlay: %+v", spec)
 			}
 			if got := strings.Count(spec.StartSystemPrompt(), operatingContextPrompt); got != 1 {

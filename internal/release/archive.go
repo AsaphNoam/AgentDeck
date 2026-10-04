@@ -56,7 +56,7 @@ func VerifyArchive(path string, m ReleaseManifest) error {
 }
 
 // CreateArchive writes srcDir (a single top-level version directory such as
-// agentdeck-1.2.3-darwin-arm64) into a gzip-compressed tar at archivePath,
+// chuck-1.2.3-darwin-arm64) into a gzip-compressed tar at archivePath,
 // preserving executable bits and a stable top-level prefix. Used by release
 // assembly and tests (INV §2).
 func CreateArchive(srcDir, archivePath string) error {

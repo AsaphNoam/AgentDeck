@@ -122,7 +122,7 @@ describe("AppearanceEditor", () => {
     renderAppearance();
     await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
 
-    fireEvent.click(screen.getByLabelText(/AgentDeck Core/));
+    fireEvent.click(screen.getByLabelText(/Chuck Core/));
     await waitFor(() => expect(document.documentElement).not.toHaveAttribute("data-skin"));
 
     await waitFor(() => expect(document.documentElement.dataset.skin).toBe("sky-grove"));
@@ -140,7 +140,7 @@ describe("AppearanceEditor", () => {
     expect(await screen.findByText(/forest-from-the-future/)).toBeInTheDocument();
     // With an active warning, no radio is pre-checked so that clicking Core is
     // not inert — otherwise the unsupported value could never be repaired to Core.
-    expect(screen.getByLabelText(/AgentDeck Core/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Chuck Core/)).not.toBeChecked();
     expect(document.documentElement).not.toHaveAttribute("data-skin");
   });
 
@@ -154,7 +154,7 @@ describe("AppearanceEditor", () => {
     // Wait for the warning (GET resolved → fieldset enabled) before clicking.
     await screen.findByText(/forest-from-the-future/);
 
-    fireEvent.click(screen.getByLabelText(/AgentDeck Core/));
+    fireEvent.click(screen.getByLabelText(/Chuck Core/));
 
     await waitFor(() => expect(lastPut).toEqual({ appearance_skin: "" }));
     await waitFor(() => expect(screen.queryByText(/forest-from-the-future/)).toBeNull());

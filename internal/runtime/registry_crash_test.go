@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // TestRegistryForgetsAgentAfterCrash asserts the crash-teardown fix: when the

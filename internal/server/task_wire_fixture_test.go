@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // taskWireFixturePath is the GET /api/tasks payload the Tasks view tests read.
@@ -16,14 +16,14 @@ const taskWireFixturePath = "../../ui/src/features/tasks/fixtures/taskLists.json
 
 // TestTaskWireFixtureMatchesServerEncoding keeps the UI fixture byte-identical
 // to what handleTasks would marshal for these tasks. Regenerate with
-// AGENTDECK_UPDATE_TASK_FIXTURE=1 after a deliberate change to state.Task.
+// CHUCK_UPDATE_TASK_FIXTURE=1 after a deliberate change to state.Task.
 func TestTaskWireFixtureMatchesServerEncoding(t *testing.T) {
 	got, err := json.MarshalIndent(taskWireFixture(), "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}
 	got = append(got, '\n')
-	if os.Getenv("AGENTDECK_UPDATE_TASK_FIXTURE") == "1" {
+	if os.Getenv("CHUCK_UPDATE_TASK_FIXTURE") == "1" {
 		if err := os.WriteFile(taskWireFixturePath, got, 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -33,7 +33,7 @@ func TestTaskWireFixtureMatchesServerEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, want) {
-		t.Fatalf("%s is stale; regenerate with AGENTDECK_UPDATE_TASK_FIXTURE=1", taskWireFixturePath)
+		t.Fatalf("%s is stale; regenerate with CHUCK_UPDATE_TASK_FIXTURE=1", taskWireFixturePath)
 	}
 }
 

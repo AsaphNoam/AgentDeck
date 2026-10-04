@@ -3,7 +3,7 @@ package runtime
 import "encoding/json"
 
 // Capability negotiation is bilateral and extension-scoped (TS-04.R62): the
-// client offers only what AgentDeck implements, and a capability is on only
+// client offers only what Chuck implements, and a capability is on only
 // when the peer's initialize response advertises its matching surface. Nothing
 // here reads the backend type or an adapter version (INV §11/§12).
 
@@ -16,9 +16,9 @@ const (
 	maxAirCapabilities   = 32
 )
 
-// clientOffer is the set of optional surfaces AgentDeck advertises. Each flag
+// clientOffer is the set of optional surfaces Chuck advertises. Each flag
 // turns on only together with the runtime handling for the events it unlocks,
-// so an adapter never switches away from a form AgentDeck already renders.
+// so an adapter never switches away from a form Chuck already renders.
 type clientOffer struct {
 	Subagents         bool
 	AsyncTasks        bool

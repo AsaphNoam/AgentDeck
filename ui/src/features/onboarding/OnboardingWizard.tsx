@@ -88,7 +88,7 @@ export function OnboardingWizard({ steps, onComplete }: OnboardingWizardProps) {
           aria-describedby={undefined}
         >
           <div className="onboarding-flow" data-ui="onboarding" data-variant={step === "resume" ? "backend" : step}>
-            <Dialog.Title>Welcome to AgentDeck</Dialog.Title>
+            <Dialog.Title>Welcome to Chuck</Dialog.Title>
             <div className="wizard-progress" data-slot="progress">
               {(["backend", "project", ...(hasSource ? ["source"] : []), "launch"] as const).map((key) => {
                 const label = key === "backend" ? "Backend" : key === "project" ? "Project" : key === "source" ? "Config" : "Launch";

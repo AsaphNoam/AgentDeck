@@ -8,7 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentdeck/agentdeck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // --- get_assigned_task (FS-16.R11, TS-10.R13) ---
@@ -253,7 +253,7 @@ type createTaskArgs struct {
 	DisplayName string `json:"display_name" jsonschema:"short name for the work"`
 	Instruction string `json:"instruction" jsonschema:"what the assigned agent should do"`
 	// To is the same friendly recipient selector a message uses: role@project, an
-	// agent name, or an agent_id. Omit it to have AgentDeck launch a new agent.
+	// agent name, or an agent_id. Omit it to have Chuck launch a new agent.
 	To      string           `json:"to,omitempty" jsonschema:"existing agent to assign: role@project, name, or agent_id; omit to launch a new agent"`
 	Role    string           `json:"role,omitempty" jsonschema:"role for a new agent when no target is named"`
 	Backend string           `json:"backend,omitempty" jsonschema:"optional backend for a new agent"`

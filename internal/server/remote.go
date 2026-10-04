@@ -7,14 +7,14 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/agentdeck/agentdeck/internal/config"
-	"github.com/agentdeck/agentdeck/internal/remote"
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/remote"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 // remoteHostname is the tailnet device name; the product name governs it
 // (FS-20.R1, FS-00.R16).
-const remoteHostname = "agentdeck"
+const remoteHostname = "chuck"
 
 // devRemoteNodeFactory is set only by the dev-tagged remote_dev.go, to drive
 // the phone app locally without a tailnet.

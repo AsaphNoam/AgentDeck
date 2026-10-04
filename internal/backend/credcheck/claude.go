@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
-	"github.com/agentdeck/agentdeck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/backend/providerauth"
+	"github.com/AsaphNoam/Chuck/internal/config"
 )
 
 // claudeProber validates claude-acp credentials with the same Claude
@@ -63,7 +63,7 @@ func rejectsNoColorFlag(out []byte) bool {
 }
 
 // rejectsArgument reports whether output is a CLI parser refusing one of the
-// arguments AgentDeck passed, rather than a status answer. The vocabulary is
+// arguments Chuck passed, rather than a status answer. The vocabulary is
 // substring-based so a wording change degrades to the caller's fallback
 // instead of a false verdict (INV §12).
 func rejectsArgument(out []byte) bool {

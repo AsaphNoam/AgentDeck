@@ -1836,7 +1836,7 @@ ORDER BY COALESCE(cleanup_next_retry_at, finished_at, updated_at), task_id LIMIT
 // InterruptTaskForAgent moves the task this agent generation was executing to
 // interrupted, releasing its runtime claim and its budget slot. An agent that
 // exits, crashes, is stopped, or has its runtime switched without recording an
-// outcome leaves work interrupted, never successful and never failed: AgentDeck
+// outcome leaves work interrupted, never successful and never failed: Chuck
 // does not convert a process event into a result (FS-16.R16).
 //
 // The generation is required, so a resumed agent's exit cannot interrupt work

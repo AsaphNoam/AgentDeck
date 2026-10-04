@@ -35,7 +35,7 @@ func writeCache(t *testing.T, body string) string {
 // eligibility gate. A newer, older or unknown cache version imports the same
 // visible candidates, and a stale packaged-version variable has no effect.
 func TestReadCodexModelCatalogIgnoresClientVersion(t *testing.T) {
-	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	t.Setenv("CHUCK_CODEX_VERSION", "0.144.0")
 	for _, version := range []string{"0.159.2", "0.100.0", ""} {
 		body := strings.Replace(codexCacheFixture, `"0.153.4"`, `"`+version+`"`, 1)
 		cat, err := ReadCodexModelCatalog(writeCache(t, body))
@@ -50,7 +50,7 @@ func TestReadCodexModelCatalogIgnoresClientVersion(t *testing.T) {
 
 func TestCurrentCodexRuntimeIsDeprecatedUnverified(t *testing.T) {
 	t.Setenv("CODEX_PATH", "/private/runtime/codex")
-	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	t.Setenv("CHUCK_CODEX_VERSION", "0.144.0")
 	if got := CurrentCodexRuntime(); got != (CodexRuntime{CatalogStatus: "unverified"}) {
 		t.Fatalf("runtime info = %+v", got)
 	}
@@ -206,7 +206,7 @@ func TestAutoSyncBackendsImportsCacheFromDifferentCodexVersion(t *testing.T) {
 		t.Fatalf("seed backends: %v", err)
 	}
 	t.Setenv("CODEX_HOME", filepath.Dir(writeCache(t, codexCacheFixture)))
-	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
+	t.Setenv("CHUCK_CODEX_VERSION", "0.144.0")
 	if err := store.AutoSyncBackends(); err != nil {
 		t.Fatalf("autosync: %v", err)
 	}

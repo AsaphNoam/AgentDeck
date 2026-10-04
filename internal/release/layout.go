@@ -2,8 +2,8 @@
 // holds immutable version directories, the current/previous pointers that select
 // the active runtime, and the staged install/update/rollback transaction that
 // swaps them atomically. It is the single stage→verify→activate core shared by
-// the bootstrap installer and `agentdeck update` (INV §2), and it never writes
-// user configuration, sessions, or credentials (they live under $AGENTDECK_HOME).
+// the bootstrap installer and `chuck update` (INV §2), and it never writes
+// user configuration, sessions, or credentials (they live under $CHUCK_HOME).
 package release
 
 import (
@@ -16,24 +16,24 @@ import (
 // Target is the only release target this MVP supports (FS-10.R1, TS-06.R13).
 const Target = "darwin-arm64"
 
-// appRootEnv overrides the default application root. It mirrors AGENTDECK_HOME so
+// appRootEnv overrides the default application root. It mirrors CHUCK_HOME so
 // tests and non-darwin dev machines can exercise the transaction; production
 // installs use the default macOS Application Support location.
-const appRootEnv = "AGENTDECK_APP_ROOT"
+const appRootEnv = "CHUCK_APP_ROOT"
 
 // defaultAppRootSuffix is appended to ~/Library/Application Support for the
 // default application root (TS-06.R16).
-var defaultAppRootSuffix = filepath.Join("Library", "Application Support", "AgentDeck")
+var defaultAppRootSuffix = filepath.Join("Library", "Application Support", "Chuck")
 
 // Layout resolves the paths under one application root. The application root is
-// deliberately distinct from $AGENTDECK_HOME: install, update, rollback, and
+// deliberately distinct from $CHUCK_HOME: install, update, rollback, and
 // uninstall operate here and must never touch user state (TS-06.R16, TS-05.R12).
 type Layout struct {
 	root string
 }
 
-// AppRoot resolves the application root: $AGENTDECK_APP_ROOT when set, else
-// ~/Library/Application Support/AgentDeck.
+// AppRoot resolves the application root: $CHUCK_APP_ROOT when set, else
+// ~/Library/Application Support/Chuck.
 func AppRoot() (string, error) {
 	if v := strings.TrimSpace(os.Getenv(appRootEnv)); v != "" {
 		abs, err := filepath.Abs(expandTilde(v))
@@ -80,11 +80,11 @@ func (l *Layout) VersionsDir() string { return filepath.Join(l.root, "versions")
 // VersionDir is the immutable directory for one release version.
 func (l *Layout) VersionDir(name string) string { return filepath.Join(l.VersionsDir(), name) }
 
-// BinDir holds the stable command shim; it is the one PATH entry AgentDeck owns.
+// BinDir holds the stable command shim; it is the one PATH entry Chuck owns.
 func (l *Layout) BinDir() string { return filepath.Join(l.root, "bin") }
 
 // ShimPath is the stable user command that resolves the current version.
-func (l *Layout) ShimPath() string { return filepath.Join(l.BinDir(), "agentdeck") }
+func (l *Layout) ShimPath() string { return filepath.Join(l.BinDir(), "chuck") }
 
 // CurrentLink points at the active version directory (relative to the root).
 func (l *Layout) CurrentLink() string { return filepath.Join(l.root, "current") }
@@ -100,9 +100,9 @@ func (l *Layout) StagingDir() string { return filepath.Join(l.root, "staging") }
 func (l *Layout) LockPath() string { return filepath.Join(l.root, "install.lock") }
 
 // VersionDirName is the immutable directory name for a version, e.g.
-// "agentdeck-1.2.3-darwin-arm64".
+// "chuck-1.2.3-darwin-arm64".
 func VersionDirName(version string) string {
-	return fmt.Sprintf("agentdeck-%s-%s", version, Target)
+	return fmt.Sprintf("chuck-%s-%s", version, Target)
 }
 
 // EnsureLayout creates the application root and its owner-only skeleton. It never

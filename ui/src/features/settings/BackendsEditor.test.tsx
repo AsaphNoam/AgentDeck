@@ -541,8 +541,8 @@ describe("BackendsEditor", () => {
       expect(screen.getByRole("radio", { name: "Installed provider (default)" })).toBeChecked();
       expect(screen.getByLabelText("Executable path (advanced)")).toHaveValue("/Users/me/bin/claude");
 
-      fireEvent.click(screen.getByRole("radio", { name: "AgentDeck bundle" }));
-      expect(screen.getByText(/are inactive while the AgentDeck bundle is selected/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("radio", { name: "Chuck bundle" }));
+      expect(screen.getByText(/are inactive while the Chuck bundle is selected/)).toBeInTheDocument();
       expect(screen.getByText("Save to check provider.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Refresh provider" })).toBeDisabled();
 
@@ -572,7 +572,7 @@ describe("BackendsEditor", () => {
 
       putBody = null;
       fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "opencode-acp" } });
-      expect(screen.queryByRole("radio", { name: "AgentDeck bundle" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Chuck bundle" })).not.toBeInTheDocument();
       fireEvent.click(screen.getByText("Save"));
       await waitFor(() => expect(putBody).not.toBeNull());
       expect(putBody!.backends.claude.provider_mode).toBeUndefined();

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/runtime"
+	"github.com/AsaphNoam/Chuck/internal/runtime"
 )
 
 func TestIndexerFTSMatch(t *testing.T) {
@@ -47,7 +47,7 @@ func TestIndexerFTSLongTranscript(t *testing.T) {
 	// Then push well past 1 MiB of later, distinct content.
 	filler := strings.Repeat("lorem ipsum dolor ", 4000) // ~72 KiB per event
 	var seq int64 = 2
-	for total := 0; total < (1 << 20 + 256<<10); total += len(filler) {
+	for total := 0; total < (1<<20 + 256<<10); total += len(filler) {
 		if err := ix.OnEvent("a_index", ev(t, seq, runtime.EvAssistantText, runtime.AssistantTextData{Delta: filler})); err != nil {
 			t.Fatalf("OnEvent filler seq %d: %v", seq, err)
 		}

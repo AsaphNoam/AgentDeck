@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agentdeck/agentdeck/internal/pipeline"
+	"github.com/AsaphNoam/Chuck/internal/pipeline"
 )
 
 // FS-14.A34 / FS-09.R54 / INV §3 — a pipeline stage assignment carries the fast
