@@ -35,10 +35,11 @@ auth:*|dashboard:*) printf '%s\n' "$*" >> "$AGENTDECK_TEST_CALL_LOG" ;;
 --version:*) echo "agentdeck version test" ;;
 esac
 `,
-		"runtime/node/bin/node":                      "#!/bin/sh\n",
-		"runtime/node_modules/.bin/claude-agent-acp": "#!/bin/sh\n",
-		"runtime/node_modules/.bin/codex-acp":        "#!/bin/sh\n",
-		"runtime/node_modules/.bin/codex":            "#!/bin/sh\n",
+		"runtime/node/bin/node": "#!/bin/sh\n",
+		"runtime/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js":              "#!/bin/sh\n",
+		"runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js":                     "#!/bin/sh\n",
+		"runtime/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude":               "#!/bin/sh\n",
+		"runtime/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex": "#!/bin/sh\n",
 	}
 	for rel, body := range files {
 		path := filepath.Join(versionDir, rel)
@@ -54,7 +55,7 @@ esac
 	}
 	if err := release.WriteInternalManifest(versionDir, release.InternalManifest{
 		Version: version, Target: release.Target,
-		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0", "codex": "0.154.0", "agentdeck": version},
+		Components: map[string]string{"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0", "claude": "2.1.257", "codex": "0.154.0", "agentdeck": version},
 	}); err != nil {
 		t.Fatal(err)
 	}

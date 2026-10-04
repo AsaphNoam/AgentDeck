@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -54,6 +55,9 @@ func Execute(args []string) int {
 	root := NewRootCmd()
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
+		if errors.Is(err, errProviderUnavailable) {
+			return 3
+		}
 		return 1
 	}
 	return 0

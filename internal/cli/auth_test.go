@@ -193,7 +193,7 @@ func TestAuthMissingProviderGivesInstallGuidance(t *testing.T) {
 	authCommandFor = func(authTarget) (*exec.Cmd, error) { started = true; return exec.Command("true"), nil }
 	t.Cleanup(func() { authCommandFor = prev })
 	out, err := runAuthCmd(t, "claude")
-	if !errors.Is(err, errAuthFailed) || started || !strings.Contains(out, "not installed") {
+	if !errors.Is(err, errProviderUnavailable) || started || !strings.Contains(out, "not installed") {
 		t.Fatalf("missing provider: started=%v err=%v out=%q", started, err, out)
 	}
 }

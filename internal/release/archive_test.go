@@ -41,7 +41,7 @@ func buildFakeVersion(t *testing.T, parent, version string) string {
 func testComponents(version string) map[string]string {
 	return map[string]string{
 		"node": "22.0.0", "claude-agent-acp": "0.75.1", "codex-acp": "1.12.0",
-		"codex": "0.154.0", "agentdeck": version,
+		"claude": "2.1.257", "codex": "0.154.0", "agentdeck": version,
 	}
 }
 
@@ -281,9 +281,6 @@ func TestCreateArchiveKeepsSymlinkedCommandTargetContext(t *testing.T) {
 	}
 
 	packageDist := filepath.Join(src, "runtime", "node_modules", "@agentclientprotocol", "claude-agent-acp", "dist")
-	if err := os.MkdirAll(packageDist, 0o755); err != nil {
-		t.Fatal(err)
-	}
 	entrypoint := filepath.Join(packageDist, "index.js")
 	entrypointBody := "#!/bin/sh\ncat \"$(dirname \"$0\")/acp-agent.js\"\n"
 	if err := os.WriteFile(entrypoint, []byte(entrypointBody), 0o755); err != nil {
@@ -294,7 +291,7 @@ func TestCreateArchiveKeepsSymlinkedCommandTargetContext(t *testing.T) {
 	}
 
 	command := filepath.Join(src, "runtime", "node_modules", ".bin", "claude-agent-acp")
-	if err := os.Remove(command); err != nil {
+	if err := os.MkdirAll(filepath.Dir(command), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filepath.Join("..", "@agentclientprotocol", "claude-agent-acp", "dist", "index.js"), command); err != nil {
@@ -329,7 +326,7 @@ func TestCreateArchiveRejectsRequiredNPMBinTargetOutsideNodeModules(t *testing.T
 	}
 
 	command := filepath.Join(src, "runtime", "node_modules", ".bin", "claude-agent-acp")
-	if err := os.Remove(command); err != nil {
+	if err := os.MkdirAll(filepath.Dir(command), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filepath.Join("..", "..", "..", "outside.js"), command); err != nil {

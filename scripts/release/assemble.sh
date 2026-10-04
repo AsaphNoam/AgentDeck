@@ -20,11 +20,14 @@ CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+agentdeck.1"
 CODEX_ACP_SOURCE_SHA256="f45a64dc3a994556ebdb688dc8d59b86945a9b2f940a3e3e545739dd265a7cc5"
 CODEX_ACP_PATCHED_SHA256="a4d3ee81aacfca79e048341423467738991d9b384cdc75eacac4521aee71ae03"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
-# one: it is the executable that performs `codex login` and answers
-# `codex login status`, so onboarding readiness must not depend on where the
-# adapter happens to hoist it (TS-06.R22). Keep in step with
+# one: its platform binary is the single managed Codex a backend can explicitly
+# select as the AgentDeck bundle (TS-06.R30). Keep in step with
 # scripts/release/package.json.
 CODEX_CLI_VERSION="0.154.0"
+# Bundled native providers inside the managed runtime root; the same paths the
+# resolver selects and release layout verification requires.
+CLAUDE_NATIVE="node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude"
+CODEX_NATIVE="node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
 TARGET="darwin-arm64"
 OUT_DIR="${OUT_DIR:-$ROOT/dist/release}"
 
@@ -57,9 +60,10 @@ mv "$node_source" "$stage/runtime/node"
 echo "==> Installing pinned ACP adapters and Codex CLI"
 cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtime/"
 "$stage/runtime/node/bin/npm" ci --omit=dev --prefix "$stage/runtime"
-[ -x "$stage/runtime/node_modules/.bin/claude-agent-acp" ] || die "Claude ACP adapter was not installed"
-[ -x "$stage/runtime/node_modules/.bin/codex-acp" ] || die "Codex ACP adapter was not installed"
-[ -x "$stage/runtime/node_modules/.bin/codex" ] || die "Codex CLI was not installed"
+[ -f "$stage/runtime/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js" ] || die "Claude ACP adapter was not installed"
+[ -f "$stage/runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js" ] || die "Codex ACP adapter was not installed"
+[ -x "$stage/runtime/$CLAUDE_NATIVE" ] || die "bundled Claude Code was not installed"
+[ -x "$stage/runtime/$CODEX_NATIVE" ] || die "bundled Codex CLI was not installed"
 
 # Codex ACP advertises steering but its idle branch starts a detached turn.
 # Keep AgentDeck's no-consumption fallback explicit and version-locked until an
@@ -83,20 +87,26 @@ codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
 codex_package_count="$(find "$stage/runtime/node_modules" -path '*/@openai/codex/package.json' -type f | wc -l | tr -d ' ')"
 [ "$codex_package_count" = "1" ] || die "private runtime resolved ${codex_package_count} Codex packages; expected exactly one"
 
-# Prove the readiness executable actually runs from the private runtime before
-# packaging: a present-but-unrunnable codex would only surface later as a
-# mysterious "not signed in" during a user's onboarding (TS-06.R22).
-codex_probe="$("$stage/runtime/node/bin/node" "$stage/runtime/node_modules/.bin/codex" --version 2>&1)" \
-  || die "private Codex CLI is not runnable: $codex_probe"
+# Prove both bundled providers run directly, without Node, before packaging:
+# an explicit Bundle choice executes exactly these binaries (TS-06.R30).
+codex_probe="$("$stage/runtime/$CODEX_NATIVE" --version 2>&1)" \
+  || die "bundled Codex CLI is not runnable: $codex_probe"
 case "$codex_probe" in
   *"$CODEX_CLI_VERSION"*) ;;
-  *) die "private Codex CLI does not report expected version ${CODEX_CLI_VERSION}: $codex_probe" ;;
+  *) die "bundled Codex CLI does not report expected version ${CODEX_CLI_VERSION}: $codex_probe" ;;
+esac
+claude_probe="$(HOME="$work" "$stage/runtime/$CLAUDE_NATIVE" --version 2>&1)" \
+  || die "bundled Claude Code is not runnable: $claude_probe"
+CLAUDE_CLI_VERSION="$(printf '%s\n' "$claude_probe" | awk 'NR==1 {print $1}')"
+case "$CLAUDE_CLI_VERSION" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) die "bundled Claude Code reported an unparseable version: $claude_probe" ;;
 esac
 
 "$stage/libexec/agentdeck" release wrapper --dir "$stage"
 "$stage/libexec/agentdeck" release manifest --dir "$stage" --version "$VERSION" \
   --node "$NODE_VERSION" --claude-acp "$CLAUDE_ACP_VERSION" --codex-acp "$CODEX_ACP_COMPONENT_VERSION" \
-  --codex "$CODEX_CLI_VERSION"
+  --claude "$CLAUDE_CLI_VERSION" --codex "$CODEX_CLI_VERSION"
 
 mkdir -p "$OUT_DIR"
 "$stage/libexec/agentdeck" release package --dir "$stage" --output-dir "$OUT_DIR" --version "$VERSION"

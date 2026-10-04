@@ -46,10 +46,12 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
    for Claude terminal, credcheck readiness, and `agentdeck auth --backend/--model` (TS-04.R71
    shipped). Typed `provider_executable_missing|invalid`/`bundled_provider_unavailable` (422).
    `internal/server/main_test.go` sets inert ambient executables so the suite is hermetic.
-3. **Next:** release wrapper: drop private provider bins from PATH, `CODEX_PATH` default and
-   `AGENTDECK_CODEX_VERSION` export; publish managed root; bundled executables from layout
-   (TS-06.R30; `internal/release/wrapper.go`, `scripts/release/`).
-4. Typed errors + resume/wake no-fallback (TS-04.R76), `provider_runtimes` metadata, bounded
+3. **Done 2026-10-04:** wrapper only exports `AGENTDECK_RUNTIME_ROOT`; adapters launch as private
+   node + entrypoint (`backend.LaunchCommand`); layout requires bundled natives
+   (`providerexec.BundledRelPath`), manifest gains `claude`; `assemble.sh` probes both natives
+   (not run locally: needs the Node tarball — release CI exercises it). `agentdeck auth` exits 3
+   when no provider is usable; `scripts/release/install.sh` then skips sign-in.
+4. **Next:** resume/wake no-fallback for recognized incompatibility (TS-04.R76), `provider_runtimes` metadata, bounded
    `--version` probe, `POST /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
 5. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
 6. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
@@ -165,6 +167,10 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: release runtime stops shadowing providers.** Slice 3: the wrapper only
+  publishes the managed root, adapters run via private Node by absolute path, bundled Claude/Codex
+  natives are verified layout entries with manifest versions, and the installer skips sign-in when
+  no provider exists. Release/CLI/runtime tests pass; `assemble.sh` is syntax-checked only.
 - **2026-10-04 — Work: shared provider resolver.** Slice 2 adds backend `provider_mode` and one
   resolver used by every process start, Claude terminal, readiness and `agentdeck auth` (new
   `--backend/--model`); missing/invalid/bundle-unavailable providers fail before side effects.

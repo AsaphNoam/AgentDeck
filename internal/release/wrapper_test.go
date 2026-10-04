@@ -6,44 +6,32 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
 )
 
-// buildRunnableVersion assembles a version whose libexec/agentdeck is a shell
-// script that reports the PATH and CODEX_PATH it runs under and which `node` it
-// resolves, so a test can prove the private runtime is selected (TS-06.R15/R22,
+// buildRunnableVersion assembles a version with the full required layout whose
+// libexec/agentdeck is a shell script reporting the environment it runs under,
+// so a test can prove what the wrapper does and does not change (TS-06.R15/R30,
 // FS-10.A2).
 func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	t.Helper()
 	name := VersionDirName(version)
 	dir := l.VersionDir(name)
-
-	nodeBin := filepath.Join(dir, "runtime/node/bin")
-	if err := os.MkdirAll(nodeBin, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// A private `node` that identifies itself.
-	if err := os.WriteFile(filepath.Join(nodeBin, "node"), []byte("#!/bin/sh\necho private-node\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	adapters := filepath.Join(dir, "runtime/node_modules/.bin")
-	if err := os.MkdirAll(adapters, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, a := range []string{"claude-agent-acp", "codex-acp", "codex"} {
-		body := "#!/bin/sh\n"
-		if a == "codex" {
-			body += "echo 'codex-cli 0.154.0'\n"
+	for _, rel := range requiredLayout {
+		if rel == internalManifestName || rel == "bin/agentdeck" {
+			continue
 		}
-		if err := os.WriteFile(filepath.Join(adapters, a), []byte(body), 0o755); err != nil {
+		p := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	libexec := filepath.Join(dir, "libexec")
-	if err := os.MkdirAll(libexec, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"NODE=$(command -v node)\"\necho \"CODEX=$(command -v codex)\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"CODEX_VERSION=$AGENTDECK_CODEX_VERSION\"\necho \"ARGS=$*\"\n"
-	if err := os.WriteFile(filepath.Join(libexec, "agentdeck"), []byte(report), 0o755); err != nil {
+	report := "#!/bin/sh\necho \"PATH=$PATH\"\necho \"ROOT=$AGENTDECK_RUNTIME_ROOT\"\necho \"CODEX_PATH=$CODEX_PATH\"\necho \"CLAUDE_CODE_EXECUTABLE=$CLAUDE_CODE_EXECUTABLE\"\necho \"ARGS=$*\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "libexec", "agentdeck"), []byte(report), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := WriteWrapper(dir); err != nil {
@@ -55,136 +43,72 @@ func buildRunnableVersion(t *testing.T, l *Layout, version string) string {
 	return name
 }
 
-// The shim → wrapper → libexec chain prepends the private runtime to PATH,
-// resolves `node` to the bundled copy, and directs codex-acp to the exact
-// manifest-pinned Codex executable (FS-10.A2, TS-06.R15/R22).
-func TestShimRunsPrivateRuntime(t *testing.T) {
-	l := newLayout(t)
-	name := buildRunnableVersion(t, l, "1.0.0")
-	if err := l.Activate(name); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.WriteShim(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Run the shim with a deliberately minimal PATH so a resolved private `node`
-	// can only come from the bundled runtime.
-	cmd := exec.Command(l.ShimPath(), "extra-arg")
-	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("shim run: %v\n%s", err, out)
-	}
-	text := string(out)
-
-	// The wrapper resolves physical paths (pwd -P), so resolve the expectation
-	// the same way (/var → /private/var on macOS).
-	versionDir, err := filepath.EvalSymlinks(l.VersionDir(name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantNodeDir := filepath.Join(versionDir, "runtime/node/bin")
-	wantAdapterDir := filepath.Join(versionDir, "runtime/node_modules/.bin")
-
-	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(line, "PATH=") {
-			p := strings.TrimPrefix(line, "PATH=")
-			if !strings.HasPrefix(p, wantNodeDir+":"+wantAdapterDir+":") {
-				t.Fatalf("PATH did not lead with the private runtime dirs.\n got: %s\nwant prefix: %s:%s:", p, wantNodeDir, wantAdapterDir)
-			}
-			// The remaining user PATH is preserved for provider tooling.
-			if !strings.Contains(p, "/usr/bin") {
-				t.Fatalf("user PATH not preserved: %s", p)
-			}
-		}
-		if strings.HasPrefix(line, "NODE=") {
-			if got := strings.TrimPrefix(line, "NODE="); got != filepath.Join(wantNodeDir, "node") {
-				t.Fatalf("node resolved to %q, want the private %q", got, filepath.Join(wantNodeDir, "node"))
-			}
-		}
-		if strings.HasPrefix(line, "CODEX_PATH=") {
-			if got := strings.TrimPrefix(line, "CODEX_PATH="); got != filepath.Join(wantAdapterDir, "codex") {
-				t.Fatalf("CODEX_PATH = %q, want the private %q", got, filepath.Join(wantAdapterDir, "codex"))
-			}
-		}
-		if strings.HasPrefix(line, "CODEX_VERSION=") && strings.TrimPrefix(line, "CODEX_VERSION=") != "0.154.0" {
-			t.Fatalf("packaged Codex version not exported: %s", line)
-		}
-		if strings.HasPrefix(line, "ARGS=") {
-			if got := strings.TrimPrefix(line, "ARGS="); got != "extra-arg" {
-				t.Fatalf("args not forwarded: %q", got)
-			}
-		}
-	}
-}
-
-// An explicit Codex executable remains a supported escape hatch for a provider
-// compatibility issue; the release default must not overwrite it (TS-06.R22).
-func TestShimPreservesExplicitCodexPath(t *testing.T) {
-	l := newLayout(t)
-	name := buildRunnableVersion(t, l, "1.0.0")
-	if err := l.Activate(name); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.WriteShim(); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := exec.Command(l.ShimPath())
-	cmd.Env = append(os.Environ(), "CODEX_PATH=/custom/codex", "AGENTDECK_CODEX_VERSION=stale")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("shim run: %v\n%s", err, out)
-	}
-	if !strings.Contains(string(out), "CODEX_PATH=/custom/codex\n") {
-		t.Fatalf("explicit CODEX_PATH was not preserved:\n%s", out)
-	}
-	if !strings.Contains(string(out), "CODEX_VERSION=\n") {
-		t.Fatalf("explicit CODEX_PATH must not claim the packaged version:\n%s", out)
-	}
-}
-
-// Onboarding readiness runs `codex login status`, so the Codex CLI must resolve
-// from the private runtime on a machine with no Codex installed globally
-// (TS-06.R22). Without this the readiness probe would silently depend on the
-// user's own PATH and report a signed-in person as unready.
-func TestPrivateCodexResolvesWithoutGlobalInstall(t *testing.T) {
-	l := newLayout(t)
-	name := buildRunnableVersion(t, l, "1.0.0")
-	if err := l.Activate(name); err != nil {
-		t.Fatal(err)
-	}
-	if err := l.WriteShim(); err != nil {
-		t.Fatal(err)
-	}
-
-	// An empty-ish PATH with no codex anywhere: any resolution must come from
-	// the bundled runtime.
-	cmd := exec.Command(l.ShimPath())
-	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("shim run: %v\n%s", err, out)
-	}
-
-	versionDir, err := filepath.EvalSymlinks(l.VersionDir(name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantCodex := filepath.Join(versionDir, "runtime/node_modules/.bin/codex")
-
-	var got string
+func reportLines(out []byte) map[string]string {
+	got := map[string]string{}
 	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "CODEX=") {
-			got = strings.TrimPrefix(line, "CODEX=")
+		if i := strings.IndexByte(line, '='); i > 0 {
+			got[line[:i]] = line[i+1:]
 		}
 	}
-	if got == "" {
-		t.Fatalf("codex did not resolve at all under the wrapper PATH:\n%s", out)
+	return got
+}
+
+// The shim → wrapper → libexec chain publishes the physical managed runtime
+// root and forwards args, but leaves PATH and every provider executable
+// override exactly as the user had them: no private provider bin can shadow
+// an installed CLI (TS-06.R30, FS-09.A37).
+func TestShimPublishesManagedRootWithoutShadowingProviders(t *testing.T) {
+	l := newLayout(t)
+	name := buildRunnableVersion(t, l, "1.0.0")
+	if err := l.Activate(name); err != nil {
+		t.Fatal(err)
 	}
-	if got != wantCodex {
-		t.Fatalf("codex resolved to %q, want the private %q", got, wantCodex)
+	if err := l.WriteShim(); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(l.ShimPath(), "extra-arg")
+	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin", "CODEX_PATH=", "CLAUDE_CODE_EXECUTABLE=/custom/claude")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("shim run: %v\n%s", err, out)
+	}
+	got := reportLines(out)
+	// pwd -P resolves physical paths (/var → /private/var on macOS).
+	versionDir, err := filepath.EvalSymlinks(l.VersionDir(name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["ROOT"] != filepath.Join(versionDir, "runtime") {
+		t.Errorf("managed root = %q, want %q", got["ROOT"], filepath.Join(versionDir, "runtime"))
+	}
+	if got["PATH"] != "/usr/bin:/bin" {
+		t.Errorf("wrapper changed PATH: %q", got["PATH"])
+	}
+	if got["CODEX_PATH"] != "" || got["CLAUDE_CODE_EXECUTABLE"] != "/custom/claude" {
+		t.Errorf("wrapper changed executable overrides: CODEX_PATH=%q CLAUDE_CODE_EXECUTABLE=%q", got["CODEX_PATH"], got["CLAUDE_CODE_EXECUTABLE"])
+	}
+	if got["ARGS"] != "extra-arg" {
+		t.Errorf("args not forwarded: %q", got["ARGS"])
+	}
+}
+
+// The verified layout names exactly the bundle the resolver selects: an
+// explicit Bundle choice under the published root finds both providers
+// without any global install (TS-06.R30, FS-09.A45).
+func TestPublishedRootSelectsTheBundledProviders(t *testing.T) {
+	l := newLayout(t)
+	name := buildRunnableVersion(t, l, "1.0.0")
+	if err := VerifyLayout(l.VersionDir(name)); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(l.VersionDir(name), "runtime")
+	for _, typ := range []string{"claude-acp", "codex-acp"} {
+		sel, _ := providerexec.Resolve(providerexec.Input{BackendType: typ, Mode: "bundled", ProcessEnv: []string{
+			"PATH=/usr/bin:/bin", providerexec.RuntimeRootEnv + "=" + root, "CLAUDE_CODE_EXECUTABLE=/custom", "CODEX_PATH=/custom",
+		}})
+		if !sel.Available() || !strings.HasPrefix(sel.Path, root+string(filepath.Separator)) {
+			t.Errorf("%s bundle = %+v", typ, sel)
+		}
 	}
 }
 
@@ -194,6 +118,9 @@ func TestRequiredLayoutAndManifestComponentsAgree(t *testing.T) {
 	components := testComponents("1.0.0")
 	for _, rel := range requiredLayout {
 		base := filepath.Base(rel)
+		if base == "index.js" {
+			base = filepath.Base(filepath.Dir(filepath.Dir(rel))) // the adapter package
+		}
 		if base == "agentdeck" || base == "manifest.json" {
 			continue // wrapper/binary/manifest are versioned by the release itself
 		}

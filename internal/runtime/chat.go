@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/agentdeck/agentdeck/internal/backend"
+	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
 	"github.com/agentdeck/agentdeck/internal/config"
 	"github.com/agentdeck/agentdeck/internal/state"
 	"github.com/agentdeck/agentdeck/internal/strutil"
@@ -118,7 +119,7 @@ func (c *ChatRuntime) adapterFor(backendType string) (backend.BackendAdapter, er
 func (c *ChatRuntime) spawnCmd(ad backend.BackendAdapter, spec LaunchSpec) (*exec.Cmd, error) {
 	bin, args := c.command, c.cmdArgs
 	if bin == "" {
-		bin, args = ad.Binary(), ad.LaunchArgs()
+		bin, args = backend.LaunchCommand(ad, os.Getenv(providerexec.RuntimeRootEnv))
 	}
 	// ExtraArgs carries launch-time hook registration flags (e.g. claude's
 	// --settings <per-agent hooks file>), composed by the server (techspec §2.3).

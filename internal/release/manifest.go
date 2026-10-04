@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/agentdeck/agentdeck/internal/backend"
+	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
 )
 
 // internalManifestName is the manifest that travels inside the archive/version
@@ -13,15 +16,18 @@ const internalManifestName = "manifest.json"
 
 // requiredLayout is the exact set of files an extracted version directory must
 // contain before it may be activated (TS-06.R15). Kept in one place so assembly,
-// verification, and tests agree (INV §2).
+// verification, and tests agree (INV §2): adapter entrypoints come from the
+// backend launch table and bundled providers from the shared resolver
+// (TS-06.R30), so the layout cannot name a path launch does not use.
 var requiredLayout = []string{
-	"bin/agentdeck",                              // wrapper
-	"libexec/agentdeck",                          // FTS5 Go binary
-	"runtime/node/bin/node",                      // private Node runtime
-	"runtime/node_modules/.bin/claude-agent-acp", // official Claude ACP adapter
-	"runtime/node_modules/.bin/codex-acp",        // official Codex ACP adapter
-	"runtime/node_modules/.bin/codex",            // Codex CLI: sign-in and `login status` (TS-06.R22)
-	internalManifestName,                         // internal identity manifest
+	"bin/agentdeck",         // wrapper
+	"libexec/agentdeck",     // FTS5 Go binary
+	"runtime/node/bin/node", // private Node runtime
+	filepath.Join("runtime", backend.ManagedEntrypoint("claude-acp")),                  // official Claude ACP adapter
+	filepath.Join("runtime", backend.ManagedEntrypoint("codex-acp")),                   // official Codex ACP adapter
+	filepath.Join("runtime", providerexec.BundledRelPath("claude", "darwin", "arm64")), // bundled Claude provider
+	filepath.Join("runtime", providerexec.BundledRelPath("codex", "darwin", "arm64")),  // bundled Codex provider
+	internalManifestName, // internal identity manifest
 }
 
 // ReleaseManifest is the small, machine-readable file published alongside the
@@ -40,7 +46,7 @@ type ReleaseManifest struct {
 type InternalManifest struct {
 	Version    string            `json:"version"`
 	Target     string            `json:"target"`
-	Components map[string]string `json:"components"` // node, claude-agent-acp, codex-acp, codex, agentdeck
+	Components map[string]string `json:"components"` // node, claude-agent-acp, codex-acp, claude, codex, agentdeck
 }
 
 // Validate reports whether a release manifest is internally coherent and targets
@@ -115,7 +121,7 @@ func verifyInternalManifest(dir, wantVersion string) error {
 	if wantVersion != "" && m.Version != wantVersion {
 		return fmt.Errorf("internal manifest version %q does not match release %q", m.Version, wantVersion)
 	}
-	for _, component := range []string{"node", "claude-agent-acp", "codex-acp", "codex", "agentdeck"} {
+	for _, component := range []string{"node", "claude-agent-acp", "codex-acp", "claude", "codex", "agentdeck"} {
 		if m.Components[component] == "" {
 			return fmt.Errorf("internal manifest is missing %s component version", component)
 		}

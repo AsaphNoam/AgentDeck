@@ -393,3 +393,27 @@ func unsupported(hookMap map[string]string) []string {
 	sort.Strings(out)
 	return out
 }
+
+// managedEntrypoints are the pinned ACP adapter entrypoints below a release's
+// managed runtime root (TS-06.R30). Release layout verification requires the
+// same paths (INV §2).
+var managedEntrypoints = map[string]string{
+	"claude-acp": "node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js",
+	"codex-acp":  "node_modules/@agentclientprotocol/codex-acp/dist/index.js",
+}
+
+// ManagedEntrypoint returns an adapter's entrypoint relative to the managed
+// runtime root, or "" for adapters a release does not ship.
+func ManagedEntrypoint(backendType string) string { return managedEntrypoints[backendType] }
+
+// LaunchCommand is the executable and argv for an adapter process. With a
+// managed runtime root, the release's private Node runs the pinned entrypoint
+// by absolute path, so neither user PATH nor a user Node can substitute the
+// adapter. Source builds (no root) use the documented adapter installation on
+// PATH. Other adapters are unchanged.
+func LaunchCommand(ad BackendAdapter, managedRoot string) (string, []string) {
+	if rel := managedEntrypoints[ad.Type()]; rel != "" && managedRoot != "" {
+		return managedRoot + "/node/bin/node", append([]string{managedRoot + "/" + rel}, ad.LaunchArgs()...)
+	}
+	return ad.Binary(), ad.LaunchArgs()
+}

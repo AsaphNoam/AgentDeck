@@ -75,15 +75,17 @@ agentdeck-<version>-darwin-arm64/
   bin/agentdeck                 # wrapper
   libexec/agentdeck             # FTS5 Go binary
   runtime/node/bin/node
-  runtime/node_modules/.bin/{claude-agent-acp,codex-acp,codex}
+  runtime/node_modules/@agentclientprotocol/{claude-agent-acp,codex-acp}/dist/index.js
+  runtime/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude     # bundled Claude
+  runtime/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex
   runtime/                      # pinned adapter dependency closure
   manifest.json                 # version, target, component versions and archive identity
 ```
 
-The wrapper prepends only its `runtime/node/bin` and `runtime/node_modules/.bin` to the child PATH
-before executing `libexec/agentdeck`, leaving the remaining user PATH available to provider tooling.
-It does not use a globally installed Node or ACP adapter. Source builds retain their existing PATH
-behavior.
+The wrapper exports `AGENTDECK_RUNTIME_ROOT=<version>/runtime` and executes `libexec/agentdeck`.
+It changes neither PATH nor any provider executable override (R30). Managed adapters launch as the
+private `node` running their entrypoint by absolute path, never a globally installed Node or ACP
+adapter. Source builds have no managed root and keep their existing PATH behavior.
 
 **R16** — The installer places immutable version directories below
 `~/Library/Application Support/AgentDeck/versions/`, keeps the selected version through a `current`
@@ -121,22 +123,16 @@ automated portion on a macOS arm64 runner or equivalent arm64 macOS environment.
 and Codex login/chat checks remain manual gates and cannot be represented as release CI success.
 
 **R22** — The release runtime declares and lockfiles the exact direct `@openai/codex`
-dependency required for Codex native `login status`, exposes its executable through the private
-wrapper PATH, exports that same direct executable as the wrapper's default `CODEX_PATH`, and validates
-it alongside both ACP adapters before packaging. The lockfile and assembled runtime resolve exactly
-one `@openai/codex` package at that direct version; assembly rejects a nested second copy. This
-prevents an adapter dependency range from silently selecting a different Codex than the release
-manifest names. An
-explicit ambient, backend, or model `CODEX_PATH` still overrides the default. Source and release
-command-tree tests prove `agentdeck auth claude|codex` is present; release tests also prove the
-private Codex readiness command and adapter override resolve without a globally installed Codex CLI.
-Existing installed release directories remain immutable: a command absent from an older version
-requires an explicit reinstall/update to a newer release.
-
-The private wrapper also exports that validated executable's reported version as
-`AGENTDECK_CODEX_VERSION`. It does so only when selecting the packaged default, not when preserving
-an explicit `CODEX_PATH`. Since 2026-10-04 nothing reads it: model-cache import and the backend
-response no longer treat a packaged version as authority (TS-04.R73); R30 removes the export.
+dependency whose platform binary is the bundled Codex, and validates both bundled native providers
+(running each `--version` without Node) alongside both ACP adapters before packaging. The manifest
+records the bundled `claude` and `codex` versions. The lockfile and assembled runtime resolve exactly
+one `@openai/codex` package at that direct version; assembly rejects a nested second copy. Since
+2026-10-04 the wrapper no longer exports a default `CODEX_PATH` or `AGENTDECK_CODEX_VERSION`: the
+bundle is used only when a backend explicitly selects it (R30, TS-04.R75). Source and release
+command-tree tests prove `agentdeck auth claude|codex` is present; release tests prove an explicit
+Bundle choice resolves both providers under the published root without a global install. Existing
+installed release directories remain immutable: a command absent from an older version requires an
+explicit reinstall/update to a newer release.
 
 **R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
 launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version

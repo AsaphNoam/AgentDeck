@@ -214,3 +214,20 @@ func TestLaunchSupportMatrix(t *testing.T) {
 		}
 	}
 }
+
+// TS-06.R30: with a managed root, the private Node runs the pinned adapter
+// entrypoint by absolute path; source builds and other adapters keep PATH.
+func TestLaunchCommandUsesManagedNodeAndEntrypoint(t *testing.T) {
+	claude, _ := For("claude-acp")
+	bin, args := LaunchCommand(claude, "/app/v1/runtime")
+	if bin != "/app/v1/runtime/node/bin/node" || len(args) != 1 || args[0] != "/app/v1/runtime/node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js" {
+		t.Fatalf("managed claude = %s %v", bin, args)
+	}
+	if bin, _ := LaunchCommand(claude, ""); bin != "claude-agent-acp" {
+		t.Fatalf("source build claude = %s", bin)
+	}
+	opencode, _ := For("opencode-acp")
+	if bin, args := LaunchCommand(opencode, "/app/v1/runtime"); bin != "opencode" || len(args) != 1 || args[0] != "acp" {
+		t.Fatalf("opencode = %s %v", bin, args)
+	}
+}

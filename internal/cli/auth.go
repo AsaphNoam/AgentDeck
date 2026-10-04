@@ -48,6 +48,11 @@ const (
 // without cobra reprinting anything.
 var errAuthFailed = errors.New("sign-in did not complete")
 
+// errProviderUnavailable means the selected provider cannot start at all
+// (not installed, invalid path, no bundle). It exits with code 3 so the
+// installer can skip sign-in with guidance rather than failing (FS-10.R23).
+var errProviderUnavailable = errors.New("provider unavailable")
+
 // authCommandFor builds the login command with stdio attached to the caller's
 // terminal. Overridable in tests so the outcome branches run against a fake
 // provider (FS-10.A3). The explicit login-command variable is an advanced
@@ -238,7 +243,7 @@ func newAuthCmd() *cobra.Command {
 			}
 			if !target.selection.Available() {
 				fmt.Fprintln(cmd.OutOrStdout(), unavailableAuthTarget(target))
-				return errAuthFailed
+				return errProviderUnavailable
 			}
 			if check {
 				return runAuthCheck(cmd, target)

@@ -8,30 +8,22 @@ import (
 )
 
 // wrapperScript is the private-runtime wrapper shipped inside every archive at
-// bin/agentdeck. It prepends only the bundled Node runtime and ACP adapter bin
-// directories to PATH — leaving the rest of the user PATH available to provider
-// tooling — then execs the FTS5 Go binary. It resolves its own location, so it
-// works both directly and through the current pointer (TS-06.R15).
-// pwd -P resolves the physical version directory (not the current symlink), so a
-// running process keeps using its own immutable runtime even if an update
-// repoints current mid-run (FS-10.R7).
+// bin/agentdeck. It publishes the release's managed runtime root and execs the
+// FTS5 Go binary. It deliberately leaves PATH and every provider executable
+// override untouched: managed adapters launch through absolute private
+// Node/entrypoint paths, and the shared resolver chooses the user's installed
+// provider or this release's bundle per backend (TS-06.R30, TS-04.R75). It
+// resolves its own location, so it works both directly and through the current
+// pointer (TS-06.R15). pwd -P resolves the physical version directory (not the
+// current symlink), so a running process keeps using its own immutable runtime
+// even if an update repoints current mid-run (FS-10.R7).
 const wrapperScript = `#!/bin/sh
 # AgentDeck private-runtime wrapper (generated; do not edit).
 set -e
 here="$(cd "$(dirname "$0")" && pwd -P)"
 root="$(cd "$here/.." && pwd -P)"
-PATH="$root/runtime/node/bin:$root/runtime/node_modules/.bin:$PATH"
-# codex-acp otherwise resolves its own semver-pinned Codex dependency, which can
-# lag behind AgentDeck's direct private Codex pin. Keep the direct executable as
-# the release default while allowing an explicit process/backend/model override.
-if [ -z "${CODEX_PATH:-}" ]; then
-  CODEX_PATH="$root/runtime/node_modules/.bin/codex"
-  AGENTDECK_CODEX_VERSION="$("$CODEX_PATH" --version | awk '{print $NF}')"
-  export AGENTDECK_CODEX_VERSION
-else
-  unset AGENTDECK_CODEX_VERSION
-fi
-export PATH CODEX_PATH
+AGENTDECK_RUNTIME_ROOT="$root/runtime"
+export AGENTDECK_RUNTIME_ROOT
 exec "$root/libexec/agentdeck" "$@"
 `
 
