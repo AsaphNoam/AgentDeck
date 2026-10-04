@@ -132,6 +132,12 @@ const (
 	CodeAgentBusy            = "agent_busy"             // 409
 	CodeTransitionInProgress = "transition_in_progress" // 409
 	CodeCloneUnavailable     = "clone_unavailable"      // 422
+
+	// Provider selection codes (TS-04.R76): the selected Claude/Codex
+	// executable cannot start, named by its effective source.
+	CodeProviderExecutableMissing = "provider_executable_missing"  // 422
+	CodeProviderExecutableInvalid = "provider_executable_invalid"  // 422
+	CodeBundledProviderMissing    = "bundled_provider_unavailable" // 422
 )
 
 // APIError is the normalized error payload. It serializes to the §7.7 envelope:
@@ -158,7 +164,8 @@ func statusForCode(code string) int {
 	switch code {
 	case CodeValidation, CodeTerminalUnavailable, CodeSourceInvalid,
 		CodePathRefused, CodeNotAFile, CodeNotText, CodeFileUnreadable, CodeWorkspaceUnavailable,
-		CodeBackgroundTaskControlUnavailable, CodeCloneUnavailable:
+		CodeBackgroundTaskControlUnavailable, CodeCloneUnavailable,
+		CodeProviderExecutableMissing, CodeProviderExecutableInvalid, CodeBundledProviderMissing:
 		return http.StatusUnprocessableEntity // 422
 	case CodeNoChange, CodeInvalidField, CodeEmptyName, CodeInvalidGroupName:
 		return http.StatusBadRequest // 400

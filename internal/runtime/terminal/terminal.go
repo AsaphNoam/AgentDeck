@@ -593,6 +593,10 @@ func (r *Runtime) launchArgv(spec rt.LaunchSpec, resume bool, sessionID string) 
 	}
 	bin := interactiveBinary(spec.BackendType)
 	argv := []string{bin}
+	if spec.ProviderExecutable != "" {
+		// The same selected provider as chat, not whatever PATH finds first.
+		argv[0] = spec.ProviderExecutable
+	}
 	argv = append(argv, spec.ExtraArgs...)
 	// §6 contract: the composed model, add_dirs, and system prompt / switch primer
 	// MUST reach the interactive CLI — silently dropping them launched a

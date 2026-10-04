@@ -250,6 +250,12 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 			return runtime.LaunchSpec{}, state.Agent{}, ae
 		}
 	}
+	// Select the provider executable before any side effect, so a missing or
+	// invalid provider fails cleanly with nothing to unwind (TS-04.R71).
+	providerEnv, providerExe, ae := providerLaunchLayer(backend, model)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
 
 	cwd, err := config.ExpandTilde(project.Cwd)
 	if err != nil {
@@ -354,23 +360,24 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	}
 
 	spec := runtime.LaunchSpec{
-		Agent:        agent,
-		Generation:   generation,
-		Cwd:          cwd,
-		AddDirs:      addDirs,
-		SystemPrompt: joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),
-		BackendType:  backend.Type,
-		ModelID:      acpModelID,
-		Effort:       resolvedEffort,
-		Fast:         req.Fast,
-		Driver:       driver,
-		Env:          composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir)),
-		SkipPerms:    resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
-		HookToken:    token,
-		MCPServers:   []runtime.MCPServerSpec{mcpSpec},
-		ExtraArgs:    extraArgs,
-		LaunchConfig: launchConfig,
-		Fork:         options.Fork,
+		Agent:              agent,
+		Generation:         generation,
+		Cwd:                cwd,
+		AddDirs:            addDirs,
+		SystemPrompt:       joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),
+		BackendType:        backend.Type,
+		ModelID:            acpModelID,
+		Effort:             resolvedEffort,
+		Fast:               req.Fast,
+		Driver:             driver,
+		Env:                composeChildEnv(backend.Type, s.configStore.Home(), backend.Env, model.Env, hookEnv, projectResourcesEnv(resourceDir), providerEnv),
+		ProviderExecutable: providerExe,
+		SkipPerms:          resolveSkip(s.cfg.SkipPermissions, role.SkipPermissions),
+		HookToken:          token,
+		MCPServers:         []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:          extraArgs,
+		LaunchConfig:       launchConfig,
+		Fork:               options.Fork,
 	}
 	return s.applyKnowledgeOverlay(spec), agent, nil
 }
@@ -670,8 +677,11 @@ func codexHomeEnv(backendType, home string) map[string]string {
 // TS-04.R20). backendEnv, modelEnv, hookEnv, and resourceEnv are the ordered
 // per-call layers applied over the process environment before the codex layer;
 // a non-codex backend gets no codex layer, leaving its env untouched.
-func composeChildEnv(backendType, home string, backendEnv, modelEnv, hookEnv, resourceEnv map[string]string) []string {
-	return composeEnv(os.Environ(), backendEnv, modelEnv, hookEnv, resourceEnv, codexHomeEnv(backendType, home))
+// providerEnv, from providerLaunchLayer, is likewise reserved and final: it pins
+// the adapter's executable-override key to the resolver's selection, so no
+// ambient/backend/model value can redirect the child (TS-04.R75).
+func composeChildEnv(backendType, home string, backendEnv, modelEnv, hookEnv, resourceEnv, providerEnv map[string]string) []string {
+	return composeEnv(os.Environ(), backendEnv, modelEnv, hookEnv, resourceEnv, codexHomeEnv(backendType, home), providerEnv)
 }
 
 // composeEnv layers env: process env, then backend env, then per-model env (later

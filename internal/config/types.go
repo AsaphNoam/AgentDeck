@@ -57,6 +57,24 @@ type Backend struct {
 	// imports configured user-level Claude settings (FS-09.R45). Ignored for other
 	// backend types.
 	AutoSyncModels bool `json:"autosync_models,omitempty"`
+	// ProviderMode selects which Claude/Codex executable future processes use:
+	// the user's installed CLI (empty or "installed", the default) or the single
+	// provider bundled with the running release ("bundled") (FS-09.R75,
+	// TS-03.R54). Other backend types may only omit it or say "installed".
+	ProviderMode string `json:"provider_mode,omitempty"`
+}
+
+const (
+	ProviderModeInstalled = "installed"
+	ProviderModeBundled   = "bundled"
+)
+
+// EffectiveProviderMode resolves the omitted default.
+func (b Backend) EffectiveProviderMode() string {
+	if b.ProviderMode == "" {
+		return ProviderModeInstalled
+	}
+	return b.ProviderMode
 }
 
 // Model is one model under a backend. Per-model Env overrides backend-level Env.

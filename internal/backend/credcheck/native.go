@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/agentdeck/agentdeck/internal/backend/providerauth"
+	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
+	"github.com/agentdeck/agentdeck/internal/config"
 )
 
 // nativeOutcome is the bounded result of a provider-native readiness probe.
@@ -26,20 +28,35 @@ const (
 	nativeUnavailable
 )
 
-// probeNativeLogin asks a provider's own CLI whether it is signed in, using the
-// argv owned by providerauth (TS-04.R15). The child gets no stdin, inherits the
-// merged provider environment, and is bounded by the caller's context deadline
-// (TS-04.R16).
+// selectedExecutable is the provider executable the shared resolver selects
+// for this backend/model — the same one launch and terminal use (TS-04.R71).
+// An unusable selection is a bounded skipped result naming installation or
+// configuration, never a credential verdict (FS-09.R74).
+func selectedExecutable(p providerauth.Provider, be config.Backend, model config.Model) (string, *CredResult) {
+	be.Type = p.BackendType
+	sel, _ := providerexec.ForBackend(be, model)
+	switch sel.State {
+	case providerexec.StateAvailable:
+		return sel.Path, nil
+	case providerexec.StateBundleUnavailable:
+		return "", &CredResult{Status: "skipped", Detail: "bundle_unavailable"}
+	case providerexec.StateMissing:
+		return "", &CredResult{Status: "skipped", Detail: "cli_not_installed"}
+	default:
+		return "", &CredResult{Status: "skipped", Detail: "cli_invalid"}
+	}
+}
+
+// probeNativeLogin asks the selected provider executable whether it is signed
+// in, using the argv owned by providerauth (TS-04.R15). The child gets no
+// stdin, inherits the merged provider environment, and is bounded by the
+// caller's context deadline (TS-04.R16).
 //
 // extraArgs is appended to the shared status argv for provider-specific
 // compatibility flags; it never replaces the fixed command or its base args.
-func probeNativeLogin(ctx context.Context, p providerauth.Provider, mergedEnv map[string]string, extraArgs ...string) (nativeOutcome, []byte, error) {
+func probeNativeLogin(ctx context.Context, path string, p providerauth.Provider, mergedEnv map[string]string, extraArgs ...string) (nativeOutcome, []byte, error) {
 	if len(p.StatusArgs) == 0 {
 		return nativeUnavailable, nil, nil
-	}
-	path, err := lookPath(p.StatusCommand)
-	if err != nil {
-		return nativeUnavailable, nil, err
 	}
 	args := append(append([]string{}, p.StatusArgs...), extraArgs...)
 	cmd := exec.CommandContext(ctx, path, args...)

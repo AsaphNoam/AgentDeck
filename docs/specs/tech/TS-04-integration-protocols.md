@@ -883,7 +883,7 @@ configuration discovery are outside this correction.
 
 **R70 — retired 2026-10-03:** Installed-only resolver replaced by backend-mode resolver R75.
 
-**R71 `(planned)` — Every provider consumer shares selection and preserves profile ownership.**
+**R71 — Every provider consumer shares selection and preserves profile ownership.**
 Route all launch composers and process starts, including rollback/wake/task/pipeline/clone and
 Claude terminal drivers, through R75. Resolve before irreversible launch side effects and before
 stopping a live runtime for a switch; a later spawn race still returns a bounded start error.
@@ -1122,6 +1122,11 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   `internal/contextref`, the `internal/transcript` event projection/skipped-record diagnostic, and
   token-bound fake-ACP coverage named by FS-15.A2–A7.
 - Terminal: `internal/runtime/terminal`, `internal/server/terminal.go`.
+- Provider selection (R71/R75): the resolver in `internal/backend/providerexec`, its launch layer
+  and typed errors in `internal/server/provider_runtime.go`, readiness in `internal/backend/credcheck`
+  and sign-in target selection in `internal/cli/auth.go`; pinned by
+  `TestProviderSelectionReachesEveryLifecycleComposer`, `TestMissingProviderFailsBeforeSideEffects`,
+  `TestClaudeProberUsesTheSelectedExecutable` and `TestSelectAuthTarget`.
 - Regression anchors: `TestLaunchPromptPermissionFlow`, `TestTakePendingSingleWinner`,
   `TestCrashTearsDownAgentRegistration`, `TestLaunchArgvHonorsComposedSpec`,
   `TestTerminalDriverUnavailableRejected`.

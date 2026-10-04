@@ -728,9 +728,13 @@ Configuration-source federation for Claude/Codex is FS-08.
 ## 6. Deviations & open decisions
 
 - **Local-default/bundle-choice design is in progress.** R71's version-gate removal shipped
-  2026-10-04. R68/R70/R72/R74–R78 and A37–A38/A40/A42–A43/A45–A47 remain planned; A40's refresh
-  half waits on R72. Until they ship, the private-runtime selection remains current. No
-  cross-version compatibility receipt is implied by the historical audit.
+  2026-10-04. The shared resolver (TS-04.R71/R75) now selects the Claude/Codex executable for
+  every process start, Claude terminal, readiness probe and `agentdeck auth`, failing with typed
+  provider errors before side effects. Until the release wrapper stops pinning its private Codex
+  and publishes the managed root (TS-06.R30), packaged Codex still runs the private copy and Bundle
+  mode reports unavailable. Settings/New Agent surfaces, refresh and metadata remain planned, as do
+  R68/R70/R72/R74–R78 and A37–A38/A40/A42–A43/A45–A47. No cross-version compatibility receipt is
+  implied by the historical audit.
 
 - **Bounded launch-support projection shipped 2026-09-29.** R60–R63 and A30–A32 cover the
   adapter-support projection, New Agent, Settings and the existing Terminal-switch control. A Settings

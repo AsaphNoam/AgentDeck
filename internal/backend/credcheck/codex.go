@@ -21,15 +21,17 @@ import (
 // look broken for a correctly configured Codex.
 type codexProber struct{}
 
-func (codexProber) Check(ctx context.Context, _ config.Backend, _ config.Model, mergedEnv map[string]string) CredResult {
+func (codexProber) Check(ctx context.Context, backend config.Backend, model config.Model, mergedEnv map[string]string) CredResult {
 	native := nativeUnavailable
 	if p, ok := providerauth.ForBackendType("codex-acp"); ok {
-		// Reserve a bounded portion of the overall deadline for the native
-		// probe so a hung CLI cannot exhaust the fallback API-key path
-		// (TS-04.R15, INV §12).
-		nativeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		native, _, _ = probeNativeLogin(nativeCtx, p, mergedEnv)
-		cancel()
+		if path, unusable := selectedExecutable(p, backend, model); unusable == nil {
+			// Reserve a bounded portion of the overall deadline for the native
+			// probe so a hung CLI cannot exhaust the fallback API-key path
+			// (TS-04.R15, INV §12).
+			nativeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			native, _, _ = probeNativeLogin(nativeCtx, path, p, personalCodexEnv(mergedEnv))
+			cancel()
+		}
 	}
 	if native == nativeReady {
 		return CredResult{Status: "ok"}
@@ -78,4 +80,21 @@ func (codexProber) Check(ctx context.Context, _ config.Backend, _ config.Model, 
 	default:
 		return CredResult{Status: "skipped", Detail: fmt.Sprintf("unexpected_status: %d", resp.StatusCode)}
 	}
+}
+
+// personalCodexEnv points the readiness probe at the same personal Codex home
+// launch refreshes its private profile from, overriding a scoped backend/model
+// CODEX_HOME exactly as launch does (TS-04.R71). It never probes the private
+// session store.
+func personalCodexEnv(mergedEnv map[string]string) map[string]string {
+	home, err := config.PersonalCodexHome()
+	if err != nil {
+		return mergedEnv
+	}
+	out := make(map[string]string, len(mergedEnv)+1)
+	for k, v := range mergedEnv {
+		out[k] = v
+	}
+	out["CODEX_HOME"] = home
+	return out
 }

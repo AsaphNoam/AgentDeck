@@ -8,26 +8,26 @@ import (
 	"github.com/agentdeck/agentdeck/internal/config"
 )
 
-// claudeProber validates claude-acp credentials by delegating through the same
-// official adapter executable chat launch requires. The adapter's --cli mode
-// runs its bundled compatible Claude executable.
+// claudeProber validates claude-acp credentials with the same Claude
+// executable chat and terminal launch select for this backend/model.
 type claudeProber struct{}
 
-func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model, mergedEnv map[string]string) CredResult {
+func (claudeProber) Check(ctx context.Context, backend config.Backend, model config.Model, mergedEnv map[string]string) CredResult {
 	p, ok := providerauth.ForBackendType("claude-acp")
 	if !ok {
 		return CredResult{Status: "skipped", Detail: "unknown_backend_type"}
 	}
-	if _, err := lookPath(p.StatusCommand); err != nil {
-		return CredResult{Status: "skipped", Detail: "cli_not_installed"}
+	path, unusable := selectedExecutable(p, backend, model)
+	if unusable != nil {
+		return *unusable
 	}
 
-	// Run the adapter's bundled `claude auth status` non-interactively. Older
-	// bundled Claude builds may not support `--no-color`, so retry once without
-	// it before surfacing a failure (INV §12).
-	outcome, out, err := probeNativeLogin(ctx, p, mergedEnv, "--no-color")
+	// Run `claude auth status` non-interactively. Older Claude builds may not
+	// support `--no-color`, so retry once without it before surfacing a
+	// failure (INV §12).
+	outcome, out, err := probeNativeLogin(ctx, path, p, mergedEnv, "--no-color")
 	if err != nil && rejectsNoColorFlag(out) {
-		outcome, out, err = probeNativeLogin(ctx, p, mergedEnv)
+		outcome, out, err = probeNativeLogin(ctx, path, p, mergedEnv)
 	}
 
 	if ctx.Err() != nil {
@@ -40,8 +40,8 @@ func (claudeProber) Check(ctx context.Context, _ config.Backend, _ config.Model,
 		return CredResult{Status: "failed", Detail: "not_logged_in"}
 	}
 	if err != nil {
-		// An adapter that rejects the status argv itself — an older build with
-		// no `--cli` mode — is incompatible, not un-credentialed. INV §12: a
+		// A CLI that rejects the status argv itself is incompatible, not
+		// un-credentialed. INV §12: a
 		// tool that cannot be interrogated reports skipped, never failed,
 		// because a wrongly failed gate sends the operator to repair
 		// credentials that are fine (FS-04.R34/A14).

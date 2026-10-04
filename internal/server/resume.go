@@ -461,13 +461,19 @@ func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent
 	if agent.Interface == "terminal" && !terminalSupported(be.Type) {
 		return runtime.LaunchSpec{}, apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
 	}
+	// Re-select the provider for this process start before any side effect: a
+	// missing provider fails the resume and keeps the conversation (FS-09.R70).
+	providerEnv, providerExe, ae := providerLaunchLayer(be, model)
+	if ae != nil {
+		return runtime.LaunchSpec{}, ae
+	}
 	// Resolve the working directory through the one shared step before any
 	// registration side effect (TS-01.R26, TS-12.R4). Resume keeps the frozen
 	// snapshot cwd: the helper only re-materializes a missing owned checkout at
 	// that exact recorded path, and never re-derives a different one.
-	recreated, warning, ae := s.ensureWorktreeCheckout(ctx, agent.Project, snap.Cwd)
-	if ae != nil {
-		return runtime.LaunchSpec{}, ae
+	recreated, warning, wae := s.ensureWorktreeCheckout(ctx, agent.Project, snap.Cwd)
+	if wae != nil {
+		return runtime.LaunchSpec{}, wae
 	}
 	if recreated && notice != nil {
 		row, _ := s.ownedWorktree(agent.Project)
@@ -498,23 +504,24 @@ func (s *Server) composeResumeSpecContext(ctx context.Context, agent state.Agent
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInternal, err.Error())
 	}
 	spec := runtime.LaunchSpec{
-		Agent:          agent,
-		Generation:     generation,
-		Cwd:            snap.Cwd,
-		AddDirs:        snap.AddDirs,
-		SystemPrompt:   snap.SystemPrompt,
-		BackendType:    be.Type,
-		ModelID:        model.Model,
-		Effort:         agent.Effort,
-		Fast:           agent.Fast,
-		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir)),
-		SkipPerms:      snap.SkipPermissions,
-		HookToken:      token,
-		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
-		ExtraArgs:      extraArgs,
-		LastSessionID:  snap.LastSessionID,
-		LastContextPct: snap.LastContextPct,
-		LastContext:    snap.LastContext,
+		Agent:              agent,
+		Generation:         generation,
+		Cwd:                snap.Cwd,
+		AddDirs:            snap.AddDirs,
+		SystemPrompt:       snap.SystemPrompt,
+		BackendType:        be.Type,
+		ModelID:            model.Model,
+		Effort:             agent.Effort,
+		Fast:               agent.Fast,
+		Env:                composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(agent, token), projectResourcesEnv(resourceDir), providerEnv),
+		ProviderExecutable: providerExe,
+		SkipPerms:          snap.SkipPermissions,
+		HookToken:          token,
+		MCPServers:         []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:          extraArgs,
+		LastSessionID:      snap.LastSessionID,
+		LastContextPct:     snap.LastContextPct,
+		LastContext:        snap.LastContext,
 		// Resume reproduces the frozen federation launch object by default
 		// (techspec §2.5); "Resume with latest setup" re-resolves it (handleResume).
 		LaunchConfig: snap.LaunchConfig,

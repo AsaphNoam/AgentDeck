@@ -40,17 +40,19 @@ AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
 
 1. **Done 2026-10-04:** Codex cache `client_version` is provenance only (FS-09.R71 shipped,
    R59/A29 retired); deprecated `codex_runtime` is always `{catalog_status:"unverified"}`.
-2. **Next:** `provider_mode` field + validation (TS-03.R54) and the shared resolver (TS-04.R75) in
-   `internal/backend` or `internal/config`, applied after env merging in `composeEnv`
-   (`internal/server/launch.go`) for every start path, Claude terminal and `providerauth`.
-3. Release wrapper: drop private provider bins from PATH, `CODEX_PATH` default and
+2. **Done 2026-10-04:** `provider_mode` field/validation; resolver `internal/backend/providerexec`
+   (`ForBackend`, `SystemDirs` test seam) applied as the final child-env layer in `composeChildEnv`
+   for launch/resume/switch (pre-stop check in `validateSwitchTarget`), `LaunchSpec.ProviderExecutable`
+   for Claude terminal, credcheck readiness, and `agentdeck auth --backend/--model` (TS-04.R71
+   shipped). Typed `provider_executable_missing|invalid`/`bundled_provider_unavailable` (422).
+   `internal/server/main_test.go` sets inert ambient executables so the suite is hermetic.
+3. **Next:** release wrapper: drop private provider bins from PATH, `CODEX_PATH` default and
    `AGENTDECK_CODEX_VERSION` export; publish managed root; bundled executables from layout
    (TS-06.R30; `internal/release/wrapper.go`, `scripts/release/`).
 4. Typed errors + resume/wake no-fallback (TS-04.R76), `provider_runtimes` metadata, bounded
    `--version` probe, `POST /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
-5. CLI `agentdeck auth --backend/--model` (FS-10.R21, TS-04.R71).
-6. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
-7. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
+5. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
+6. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
    owed credentialed gate (TS-06.R31, needs authorization).
 
 Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
@@ -163,6 +165,10 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: shared provider resolver.** Slice 2 adds backend `provider_mode` and one
+  resolver used by every process start, Claude terminal, readiness and `agentdeck auth` (new
+  `--backend/--model`); missing/invalid/bundle-unavailable providers fail before side effects.
+  Full `go test ./...` passes with no installed providers on PATH; spec check ok.
 - **2026-10-04 — Work: started installed-provider default.** Slice 1 removes Codex's exact
   cache-version import gate and New Agent mismatch warning (FS-09.R71 shipped; R59/A29 retired;
   TS-06.R22 notes the now-inert wrapper export). Focused Go config/server and NewAgentModal/schema

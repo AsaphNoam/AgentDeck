@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/agentdeck/agentdeck/internal/backend/providerexec"
 	"github.com/agentdeck/agentdeck/internal/config"
 )
 
@@ -144,13 +145,13 @@ func TestOpenHandsProber(t *testing.T) {
 
 func TestClaudeProberRetriesWithoutNoColor(t *testing.T) {
 	dir := t.TempDir()
-	cliPath := filepath.Join(dir, "claude-agent-acp")
+	cliPath := filepath.Join(dir, "claude")
 	script := `#!/bin/sh
-if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ] && [ "$4" = "--no-color" ]; then
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--no-color" ]; then
   echo "error: unknown option '--no-color'" >&2
   exit 1
 fi
-if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   echo "logged in"
   exit 0
 fi
@@ -160,7 +161,7 @@ exit 2
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake claude: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 
 	result := claudeProber{}.Check(
 		context.Background(),
@@ -177,13 +178,13 @@ exit 2
 // versions (FS-04.A14, FS-09.A5, TS-04.R15, INV §12).
 func TestClaudeProberRetriesWithoutNoColorOnUnknownFlag(t *testing.T) {
 	dir := t.TempDir()
-	cliPath := filepath.Join(dir, "claude-agent-acp")
+	cliPath := filepath.Join(dir, "claude")
 	script := `#!/bin/sh
-if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ] && [ "$4" = "--no-color" ]; then
+if [ "$1" = "auth" ] && [ "$2" = "status" ] && [ "$3" = "--no-color" ]; then
   echo "unknown flag: --no-color" >&2
   exit 1
 fi
-if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   echo "logged in"
   exit 0
 fi
@@ -193,7 +194,7 @@ exit 2
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake claude: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 
 	result := claudeProber{}.Check(
 		context.Background(),
@@ -233,9 +234,9 @@ func TestRejectsNoColorFlagRequiresFlagAndUnsupportedVocabulary(t *testing.T) {
 // account identity never cross the API boundary (TS-04.R15, INV §8/§12).
 func TestClaudeProberReturnsOnlyBoundedErrorOutput(t *testing.T) {
 	dir := t.TempDir()
-	cliPath := filepath.Join(dir, "claude-agent-acp")
+	cliPath := filepath.Join(dir, "claude")
 	script := `#!/bin/sh
-if [ "$1" = "--cli" ] && [ "$2" = "auth" ] && [ "$3" = "status" ]; then
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   echo "status call failed for user user@example.com with long raw diagnostic output that should never be exposed" >&2
   exit 1
 fi
@@ -245,7 +246,7 @@ exit 2
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake claude: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 
 	result := claudeProber{}.Check(
 		context.Background(),
@@ -281,8 +282,21 @@ exit 2
 	if err := os.WriteFile(filepath.Join(dir, "codex"), []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake codex: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 	return log
+}
+
+// isolateProviderPath makes dir the only place the shared resolver can find a
+// provider: no ambient executable override, no developer install fallbacks.
+func isolateProviderPath(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+"/usr/bin"+string(os.PathListSeparator)+"/bin")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CODE_EXECUTABLE", "")
+	t.Setenv("CODEX_PATH", "")
+	prev := providerexec.SystemDirs
+	providerexec.SystemDirs = nil
+	t.Cleanup(func() { providerexec.SystemDirs = prev })
 }
 
 func readCalls(t *testing.T, log string) string {
@@ -329,7 +343,7 @@ func TestCodexProberReportsNativeNotLoggedIn(t *testing.T) {
 
 // An uninterrogable CLI is not a verdict about the user's credentials (INV §12).
 func TestCodexProberSkipsWhenCLIAbsentAndNoKey(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	isolateProviderPath(t, t.TempDir())
 
 	result := codexProber{}.Check(context.Background(), config.Backend{}, config.Model{}, map[string]string{})
 
@@ -380,7 +394,7 @@ exit 1
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake codex: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" {
@@ -429,15 +443,15 @@ func TestClassifyNativeOutputPrefersTheNegative(t *testing.T) {
 // credentials that are fine (FS-04.A14, TS-04.R15).
 func TestClaudeProberReportsIncompatibleCLIAsSkipped(t *testing.T) {
 	dir := t.TempDir()
-	cliPath := filepath.Join(dir, "claude-agent-acp")
+	cliPath := filepath.Join(dir, "claude")
 	script := `#!/bin/sh
-echo "error: unknown option --cli" >&2
+echo "error: unknown option status" >&2
 exit 2
 `
 	if err := os.WriteFile(cliPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake claude: %v", err)
 	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	isolateProviderPath(t, dir)
 
 	result := claudeProber{}.Check(
 		context.Background(),
@@ -450,5 +464,37 @@ exit 2
 	}
 	if result.Detail != "cli_incompatible" {
 		t.Errorf("detail = %q, want cli_incompatible", result.Detail)
+	}
+}
+
+// FS-09.A42, TS-04.R71: readiness asks the executable launch would select for
+// the same backend/model, and a missing one is installation guidance, never a
+// credential verdict.
+func TestClaudeProberUsesTheSelectedExecutable(t *testing.T) {
+	dir := t.TempDir()
+	isolateProviderPath(t, dir)
+	write := func(name, out string) string {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\necho \""+out+"\"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	write("claude", "Not logged in")
+	modelExe := write("claude-model", "Logged in")
+	be := config.Backend{Type: "claude-acp", Env: map[string]string{}}
+	if r := (claudeProber{}).Check(context.Background(), be, config.Model{}, nil); r.Status != "failed" || r.Detail != "not_logged_in" {
+		t.Fatalf("discovered claude = %+v", r)
+	}
+	model := config.Model{Env: map[string]string{"CLAUDE_CODE_EXECUTABLE": modelExe}}
+	if r := (claudeProber{}).Check(context.Background(), be, model, nil); r.Status != "ok" {
+		t.Fatalf("model-selected claude = %+v", r)
+	}
+	be.ProviderMode = "bundled"
+	if r := (claudeProber{}).Check(context.Background(), be, model, nil); r.Status != "skipped" || r.Detail != "bundle_unavailable" {
+		t.Fatalf("source build bundle = %+v", r)
+	}
+	if r := (claudeProber{}).Check(context.Background(), config.Backend{}, config.Model{Env: map[string]string{"CLAUDE_CODE_EXECUTABLE": "/missing/claude"}}, nil); r.Status != "skipped" || r.Detail != "cli_not_installed" {
+		t.Fatalf("missing claude = %+v", r)
 	}
 }

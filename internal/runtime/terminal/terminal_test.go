@@ -115,6 +115,14 @@ func TestLaunchArgvHonorsComposedSpec(t *testing.T) {
 	if argv[0] != "claude" {
 		t.Errorf("argv[0] = %q, want claude", argv[0])
 	}
+
+	// FS-09.A37: Claude terminal runs the same selected provider as chat and
+	// keeps every composed flag.
+	spec.ProviderExecutable = "/Users/me/.local/bin/claude"
+	argv = r.launchArgv(spec, true, "sess-42")
+	if argv[0] != spec.ProviderExecutable || !argvHasFlagValue(argv, "--model", "claude-sonnet-4-6") {
+		t.Errorf("selected provider argv = %v", argv)
+	}
 }
 
 // argvHasFlagValue reports whether argv contains flag immediately followed by val.

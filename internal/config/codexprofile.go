@@ -458,7 +458,11 @@ func isSafeCodexName(name string) bool {
 // AgentDeck process environment: `$CODEX_HOME` if set, else `~/.codex`. AgentDeck
 // never rewrites its own CODEX_HOME, so this always names the real personal home
 // even while children run with the isolated one (FS-09.R44).
-func personalCodexHome() (string, error) {
+func personalCodexHome() (string, error) { return PersonalCodexHome() }
+
+// PersonalCodexHome is personalCodexHome for readiness/sign-in, which must
+// use the same personal source launch refreshes from (TS-04.R71).
+func PersonalCodexHome() (string, error) {
 	if h := os.Getenv("CODEX_HOME"); h != "" {
 		expanded, err := ExpandTilde(h)
 		if err != nil {

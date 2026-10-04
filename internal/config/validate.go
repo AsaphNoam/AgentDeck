@@ -224,6 +224,23 @@ func ValidateBackendsConfig(b *BackendsConfig) *ValidationErrors {
 				Message: fmt.Sprintf("unknown backend type %q; must be one of claude-acp, codex-acp, opencode-acp, openhands-acp", bk.Type),
 			})
 		}
+		switch bk.ProviderMode {
+		case "", ProviderModeInstalled:
+		case ProviderModeBundled:
+			if bk.Type != "claude-acp" && bk.Type != "codex-acp" {
+				errs = append(errs, FieldError{
+					Field:   fmt.Sprintf("backends.%s.provider_mode", id),
+					Code:    "unsupported",
+					Message: "an AgentDeck bundle is available only for Claude and Codex backends",
+				})
+			}
+		default:
+			errs = append(errs, FieldError{
+				Field:   fmt.Sprintf("backends.%s.provider_mode", id),
+				Code:    "invalid",
+				Message: `provider_mode must be "installed" or "bundled"`,
+			})
+		}
 		// Invariant 4: at least one model.
 		if len(bk.Models) == 0 {
 			errs = append(errs, FieldError{

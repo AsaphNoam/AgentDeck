@@ -276,3 +276,37 @@ func backendsHasCode(ve *ValidationErrors, code string) bool {
 	}
 	return false
 }
+
+// TS-03.R54: provider_mode is optional; omission means Installed and bundled
+// is valid only for Claude/Codex.
+func TestValidateBackendsConfig_ProviderMode(t *testing.T) {
+	for _, tc := range []struct {
+		typ, mode, code string
+	}{
+		{"claude-acp", "", ""},
+		{"claude-acp", "installed", ""},
+		{"claude-acp", "bundled", ""},
+		{"codex-acp", "bundled", ""},
+		{"opencode-acp", "installed", ""},
+		{"opencode-acp", "bundled", "unsupported"},
+		{"claude-acp", "local", "invalid"},
+	} {
+		b := baseBackends()
+		bk := b.Backends["claude"]
+		bk.Type, bk.ProviderMode = tc.typ, tc.mode
+		b.Backends["claude"] = bk
+		ve := ValidateBackendsConfig(&b)
+		if tc.code == "" {
+			if ve != nil {
+				t.Errorf("%s/%q rejected: %v", tc.typ, tc.mode, ve.Errors)
+			}
+			continue
+		}
+		if ve == nil || !backendsHasCode(ve, tc.code) {
+			t.Errorf("%s/%q: want %s, got %v", tc.typ, tc.mode, tc.code, ve)
+		}
+	}
+	if (Backend{}).EffectiveProviderMode() != ProviderModeInstalled {
+		t.Fatal("omitted mode must mean installed")
+	}
+}

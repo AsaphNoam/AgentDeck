@@ -259,7 +259,7 @@ func TestComposeChildEnvCodexHomeOverride(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := composeChildEnv(c.backendType, home, c.backendEnv, c.modelEnv, nil, nil)
+			got := composeChildEnv(c.backendType, home, c.backendEnv, c.modelEnv, nil, nil, nil)
 			if v := codexValue(got); v != c.want {
 				t.Errorf("CODEX_HOME = %q, want %q", v, c.want)
 			}
@@ -269,7 +269,7 @@ func TestComposeChildEnvCodexHomeOverride(t *testing.T) {
 	// Non-CODEX_HOME layer keys still contribute and later layers win their own keys.
 	got := composeChildEnv("codex-acp", home,
 		map[string]string{"B_ONLY": "1", "SHARED": "backend"},
-		map[string]string{"M_ONLY": "2", "SHARED": "model"}, nil, nil)
+		map[string]string{"M_ONLY": "2", "SHARED": "model"}, nil, nil, nil)
 	m := map[string]string{}
 	for _, kv := range got {
 		if i := strings.IndexByte(kv, '='); i >= 0 {

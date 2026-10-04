@@ -49,7 +49,12 @@ type LaunchSpec struct {
 	Driver     string
 	Env        []string // composed env layering (backend then per-model override), "K=V"
 	RuntimeEnv []string // process-only final env; empty means use the frozen Env
-	SkipPerms  bool     // effective skip_permissions after role/global resolution
+	// ProviderExecutable is the Claude/Codex executable the shared resolver
+	// selected for this process start (TS-04.R75). The terminal runtime runs it
+	// directly; chat receives it through the adapter's override key in Env.
+	// Empty for other backend types.
+	ProviderExecutable string
+	SkipPerms          bool // effective skip_permissions after role/global resolution
 	// AutoApproveTools is the current code-derived set of AgentDeck MCP tool
 	// identities allowed once without entering the human permission gate.
 	AutoApproveTools map[string]struct{}

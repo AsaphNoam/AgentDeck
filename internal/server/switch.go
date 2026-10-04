@@ -364,6 +364,10 @@ func (s *Server) validateSwitchTarget(target state.Agent) *runtime.APIError {
 	if target.Interface == "terminal" && !terminalSupported(be.Type) {
 		return apiError(runtime.CodeTerminalUnavailable, terminalUnsupportedReason(be.Type))
 	}
+	// A missing target provider must not stop the working runtime (TS-04.R71).
+	if _, _, ae := providerLaunchLayer(be, be.Models[target.Model]); ae != nil {
+		return ae
+	}
 	return nil
 }
 
@@ -402,6 +406,12 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 		return runtime.LaunchSpec{}, apiError(runtime.CodeInvalidField, "unknown model: "+target.Model)
 	}
 
+	// validateSwitchTarget already proved the provider selectable before the
+	// stop; re-resolve here because this is the actual process start.
+	providerEnv, providerExe, pae := providerLaunchLayer(be, model)
+	if pae != nil {
+		return runtime.LaunchSpec{}, pae
+	}
 	// Resolve the working directory through the one shared step before any
 	// registration side effect (TS-01.R26, TS-12.R4). Switch keeps the frozen
 	// snapshot cwd for the same reason resume does.
@@ -436,23 +446,24 @@ func (s *Server) composeSwitchSpecContext(ctx context.Context, target state.Agen
 	}
 
 	spec := runtime.LaunchSpec{
-		Agent:          target,
-		Generation:     token,
-		Cwd:            snap.Cwd,
-		AddDirs:        snap.AddDirs,
-		SystemPrompt:   snap.SystemPrompt,
-		BackendType:    be.Type,
-		ModelID:        model.Model,
-		Effort:         target.Effort,
-		Fast:           target.Fast,
-		Env:            composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir)),
-		SkipPerms:      snap.SkipPermissions,
-		HookToken:      token,
-		MCPServers:     []runtime.MCPServerSpec{mcpSpec},
-		ExtraArgs:      extraArgs,
-		LastSessionID:  resumeID,
-		LastContextPct: snap.LastContextPct,
-		LastContext:    snap.LastContext,
+		Agent:              target,
+		Generation:         token,
+		Cwd:                snap.Cwd,
+		AddDirs:            snap.AddDirs,
+		SystemPrompt:       snap.SystemPrompt,
+		BackendType:        be.Type,
+		ModelID:            model.Model,
+		Effort:             target.Effort,
+		Fast:               target.Fast,
+		Env:                composeChildEnv(be.Type, s.configStore.Home(), be.Env, model.Env, s.hookEnv(target, token), projectResourcesEnv(resourceDir), providerEnv),
+		ProviderExecutable: providerExe,
+		SkipPerms:          snap.SkipPermissions,
+		HookToken:          token,
+		MCPServers:         []runtime.MCPServerSpec{mcpSpec},
+		ExtraArgs:          extraArgs,
+		LastSessionID:      resumeID,
+		LastContextPct:     snap.LastContextPct,
+		LastContext:        snap.LastContext,
 		// Switch continues the same logical session, so the frozen federation launch
 		// object carries over unchanged — switch never re-resolves the source (§2.5).
 		LaunchConfig: snap.LaunchConfig,
