@@ -106,7 +106,7 @@ export function ProviderSection({
           {refreshing ? "Checking…" : "Refresh provider"}
         </button>
         {dirty && <span className="backend-provider-hint">Save your Settings changes to refresh.</span>}
-        {refreshMessage && <span role="status">{refreshMessage}</span>}
+        {refreshMessage && !dirty && <span role="status">{refreshMessage}</span>}
       </div>
     </fieldset>
   );
