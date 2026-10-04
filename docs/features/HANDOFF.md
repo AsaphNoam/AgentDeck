@@ -22,19 +22,20 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
   cutover, new sessions, no general legacy migration (FS-10.R25–R26).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** `use-installed-provider-clis` (2026-10-04, `4d1e9cc`..HEAD: shared provider
+- **Review units:** `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
   resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
   provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,
-  FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) is available. Review note:
-  onboarding rechecks readiness via Validate & Continue, not a separate Refresh provider button.
+  FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) was reviewed 2026-10-04;
+  two Must-fix and four Worth-fixing findings keep this unit open below.
   The test-only `post-release-flaky-test-synchronization` fixes are available.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
   FS-02.R64, TS-03.R51) is available.
 - **Fix units:** `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage
   finding; its Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
-  finding; its Must-fix is closed. The ready `use-installed-provider-clis.md` change specifies the
-  remaining runtime-selection correction and its credentialed gate. The former bundled-default,
-  opt-in recovery draft FS-09.R64–R67/A33–A36 is retired; no product change has shipped from it.
+  finding; its Must-fix is closed. `use-installed-provider-clis` has the grouped review findings
+  below; its implemented runtime-selection correction still owes the credentialed gate.
+  The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
+  no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -80,6 +81,93 @@ None.
 
 ## Review findings
 
+### Installed-provider default and explicit AgentDeck bundle — reviewed 2026-10-04 — **Fix model:** medium — Codex Terra or Claude Opus.
+
+Reviewed `4d1e9cc^`..`6c5c52f`, including cache import, resolver, packaging, auth/readiness,
+lifecycle composition/recovery, refresh API, Settings/New Agent and documentation. Product code
+and specifications were not changed. Onboarding's reuse of **Validate & Continue** is a sound
+local choice at the existing readiness seam; align FS-10.R21's wording as specified below.
+
+- **Must fix** — Refresh provider replaces edits made while its request is running.
+  **Where:** `ui/src/features/settings/BackendsEditor.tsx:299-305` unconditionally calls
+  `seedDraft(fresh.data)` after the success refetch; the surrounding form stays editable.
+  **Normal-use trigger:** start a refresh on a clean draft, then edit a backend name, provider
+  mode/path, model or another card before the check/refetch returns. **Why it matters:** the
+  completed refresh silently erases those unsaved edits; the comment assumes the draft stayed
+  clean after admission. **Requirement:** FS-09.R72/A40, TS-03.R53, INV §3/§8/§17.
+  **Suggested fix/test:** preserve edits made since the request began while merging imported
+  models/ETag, or prevent draft mutations for the full operation. Hold the refresh response,
+  edit another field/card, release it and assert the edit survives alongside added models.
+  **Fix complexity:** medium.
+
+- **Must fix** — recognized Claude incompatibility envelopes lose the selected source.
+  **Where:** `internal/server/provider_runtime.go:83-89` supplies provider/version fields but no
+  `source`; `remoteProviderError` then replaces the desktop's source-aware message with generic
+  update guidance. **Normal-use trigger:** a selected AgentDeck bundle is too old for a requested
+  Claude model and launch/resume fails, particularly from the phone. **Why it matters:** the
+  structured error cannot identify Bundle versus Installed, and the phone loses the information
+  needed to distinguish an AgentDeck update from updating the installed CLI.
+  **Requirement:** TS-04.R76, FS-09.R77/A47, INV §8/§11.
+  **Suggested fix/test:** carry the selected source through the typed incompatibility error;
+  emit safe selection details and source-specific repair, redacting paths remotely. Exercise
+  current Claude too-old errors for Installed and Bundle through desktop/phone serialization.
+  **Fix complexity:** medium.
+
+- **Worth fixing** — overlapping backend refreshes re-enable an in-flight button and lose feedback.
+  **Where:** `ui/src/features/settings/BackendsEditor.tsx:184,295-309,384` uses one backend id and
+  one mutation observer for all refreshes. **Normal-use trigger:** refresh card A, then card B
+  while A is still checking. **Why it matters:** B replaces `refreshing`, immediately re-enabling
+  A for duplicate requests; TanStack's observer detaches from A, so A's per-call success/error
+  callbacks no longer surface its result. **Requirement:** TS-03.R53, FS-09.R72/A43,
+  INV §1/§5/§8/§17. **Suggested fix/test:** serialize refreshes across the editor, or own each
+  backend's in-flight operation and feedback independently. Hold two responses and prove both
+  buttons remain disabled appropriately and both results/errors appear.
+  **Fix complexity:** trivial/easy.
+
+- **Worth fixing** — a version at the beginning of oversized probe output is accepted.
+  **Where:** `internal/backend/providerexec/probe.go:36-46,51-63` caps captured bytes but does
+  not remember truncation; `TestProbeVersionIsBounded` puts its huge-output version after the cap.
+  **Normal-use trigger:** an executable/wrapper prints a version followed by over 8 KiB of
+  diagnostics. **Why it matters:** the check presents a parsed version instead of the promised
+  unknown state for large output. Memory remains bounded. A temporary Go-overlay regression
+  reproduces this: a version prefix plus 100,000 output bytes returns `2.1.300`.
+  **Requirement:** FS-09.A38, TS-04.R72, INV §12/§17. **Suggested fix/test:** track overflow and
+  return unknown for truncated output; cover a valid prefix followed by excess stdout/stderr.
+  **Fix complexity:** trivial/easy.
+
+- **Worth fixing** — installation specifications still describe the superseded bundled default.
+  **Where:** `docs/specs/features/FS-10-macos-installation.md:34-38,98-100,153-156,203-205`.
+  **Normal-use trigger:** implement or verify setup against the feature specification.
+  **Why it matters:** section 6 calls the implemented selection/auth requirements unshipped and
+  says implicit bundled sign-in remains current; R21 also promises Refresh provider in onboarding,
+  which deliberately reuses Validate & Continue. R23 supersedes R5/A3, but the opening copy and
+  evidence still give contradictory direction. **Requirement:** FS-10.R21/R23–R24/A10–A12,
+  INV §10. **Suggested fix/test:** reconcile the setup copy and superseded acceptance wording,
+  describe Settings versus onboarding accurately, and record implemented behavior separately
+  from the still-owed credentialed acceptance evidence; rerun spec/link checks.
+  **Fix complexity:** trivial/easy.
+
+- **Worth fixing** — A37's live provider-update transition has no executable-marker regression.
+  **Where:** `internal/server/provider_runtime_test.go:47` checks composed specs only;
+  `internal/backend/providerexec/providerexec_test.go:110` preserves a launcher symlink without
+  retargeting it. **Normal-use trigger:** update an installed provider while Dashboard and an
+  agent remain running, then launch/resume another process. **Why it matters:** the defining
+  next-start freshness/unchanged-current-process promise is declared proved in FS-09 §6 and the
+  work record, but no test observes that transition. This is a coverage gap, not an observed
+  selection bug. **Requirement:** FS-09.R70/A37, TS-06.R31, INV §17.
+  **Suggested fix/test:** one focused marker-process test keeps the first process alive,
+  replaces/retargets its installed launcher, proves it received no signal, and observes the new
+  marker on the next start/resume. Reuse composer coverage instead of duplicating lifecycle suites.
+  **Fix complexity:** medium.
+
+Invariant sweep: findings cover §§1/3/5/8/10/11/12/17. Matching surfaces in §§2/4/7/9/13/14/15/16
+produced no additional findings; §6 has no new interface/runtime/driver surface because both sources
+use the existing integration stack. Verification: spec/launcher/finding checks, focused provider
+resolver/auth/release/config suites, current runtime recovery/auth/readiness and server provider
+tests, 68 targeted UI tests plus style/presentation checks, shell syntax and whitespace checks pass.
+The temporary oversized-output regression fails as expected. Loopback test listeners required
+sandbox escalation. Credentialed provider smoke and the two rendered journeys remain owed above.
+
 ### Notifications open the agent's conversation — reviewed 2026-10-03 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
 - **Worth fixing** — the stale-agent acceptance path is not proved by the notification tests.
@@ -121,10 +209,9 @@ supplied.
   `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
   translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
   beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:**
-  implement `docs/ready-changes/use-installed-provider-clis.md` (FS-09.R75–R78/A45–A47), selecting
-  the installed provider through the managed adapter, exposing effective runtime details, and
-  reporting provider-owned update guidance. Prove that an old dependency CLI cannot shadow it and
-  complete the bounded fixed-adapter gate in TS-06.R31. This finding remains open until verified;
+  verify the implemented installed-provider/Bundle change (FS-09.R75–R78/A45–A47), close its
+  grouped review findings above, and complete the bounded fixed-adapter gate in TS-06.R31.
+  This finding remains open until the credentialed runtime-selection correction is verified;
   the retired bundled-default/opt-in draft is not the intended fix.
 
 ### Phone desktop flow and agent management — reviewed 2026-10-02 — **Fix model:** medium — Codex Terra or Claude Opus.
@@ -157,6 +244,13 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Review: installed providers and explicit bundle.** Reviewed the complete unit;
+  recorded two Must-fix findings (refresh discards concurrent draft edits; incompatibility
+  envelopes omit source) and four Worth-fixing findings (overlapping refresh feedback, oversized
+  version output, installation-spec drift, live-update marker coverage). Medium fix model.
+  Focused suites and spec/style checks pass; a temporary overlay reproduces oversized-output
+  acceptance. Onboarding Validate & Continue reuse accepted with a spec wording correction.
+  No product/spec edits or live-provider runs; credentialed/rendered gates remain owed.
 - **2026-10-04 — Work: finished installed-provider default with explicit bundle.** TS-04.R77
   audit found no actionable provider dependency (recorded in TS-04 traceability); A37/A38/A43/A45
   verified by tests. Rendered Settings check against the built binary with a fake installed Claude
