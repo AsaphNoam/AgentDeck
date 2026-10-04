@@ -101,14 +101,16 @@ describe("NewAgentModal", () => {
     expect(await screen.findByRole("option", { name: "My App (my-app)" })).toBeInTheDocument();
   });
 
-  it("warns before launch when the Codex cache is newer than the packaged runtime", async () => {
+  // FS-09.A40: a cache version difference is not an incompatibility warning.
+  it("shows no Codex cache-version warning, even from a legacy runtime field", async () => {
     renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
     await screen.findByRole("option", { name: "Implementer (implementer)" });
     await openOptions();
     const backendSelect = screen.getByLabelText("Backend");
     fireEvent.change(backendSelect, { target: { value: "codex" } });
-    expect(await screen.findByText(/Codex runtime 0\.144\.0/)).toHaveTextContent("Model auto-sync skipped cache from 0.153.4");
-    expect(screen.getByText(/Codex runtime 0\.144\.0/)).toBeVisible();
+    expect(await screen.findByText("GPT-4o", { selector: ".new-agent-runtime span" })).toBeInTheDocument();
+    expect(screen.queryByText(/Model auto-sync skipped cache/)).toBeNull();
+    expect(screen.queryByText(/Codex runtime 0\.144\.0/)).toBeNull();
   });
 
   it("shows project titles without internal project ids in the chooser", async () => {

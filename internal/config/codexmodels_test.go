@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -30,26 +31,27 @@ func writeCache(t *testing.T, body string) string {
 	return path
 }
 
-// FS-09.A29: a packaged runtime must not import models advertised by a cache
-// produced by a different Codex version.
-func TestReadCodexModelCatalogRequiresPackagedRuntimeVersion(t *testing.T) {
-	t.Setenv("AGENTDECK_CODEX_VERSION", "0.153.4")
-	if _, err := ReadCodexModelCatalog(writeCache(t, codexCacheFixture)); err != nil {
-		t.Fatalf("matching cache rejected: %v", err)
-	}
+// FS-09.A40 (R71): the cache's client_version is provenance, not an
+// eligibility gate. A newer, older or unknown cache version imports the same
+// visible candidates, and a stale packaged-version variable has no effect.
+func TestReadCodexModelCatalogIgnoresClientVersion(t *testing.T) {
 	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
-	if _, err := ReadCodexModelCatalog(writeCache(t, codexCacheFixture)); err == nil {
-		t.Fatal("newer personal cache must not be imported by the older packaged runtime")
+	for _, version := range []string{"0.159.2", "0.100.0", ""} {
+		body := strings.Replace(codexCacheFixture, `"0.153.4"`, `"`+version+`"`, 1)
+		cat, err := ReadCodexModelCatalog(writeCache(t, body))
+		if err != nil {
+			t.Fatalf("client_version %q rejected: %v", version, err)
+		}
+		if _, ok := cat["gpt-5.6-sol"]; !ok || len(cat) != 2 {
+			t.Fatalf("client_version %q catalog = %v", version, cat)
+		}
 	}
 }
 
-func TestCurrentCodexRuntimeReportsMismatch(t *testing.T) {
-	cache := writeCache(t, codexCacheFixture)
-	t.Setenv("CODEX_HOME", filepath.Dir(cache))
+func TestCurrentCodexRuntimeIsDeprecatedUnverified(t *testing.T) {
 	t.Setenv("CODEX_PATH", "/private/runtime/codex")
 	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
-	got := CurrentCodexRuntime()
-	if got.Path != "/private/runtime/codex" || got.Version != "0.144.0" || got.CacheVersion != "0.153.4" || got.CatalogStatus != "mismatch" {
+	if got := CurrentCodexRuntime(); got != (CodexRuntime{CatalogStatus: "unverified"}) {
 		t.Fatalf("runtime info = %+v", got)
 	}
 }
@@ -195,7 +197,7 @@ func TestAutoSyncBackendsPersistsOnlyWhenChanged(t *testing.T) {
 	}
 }
 
-func TestAutoSyncBackendsSkipsNewerCacheForPackagedRuntime(t *testing.T) {
+func TestAutoSyncBackendsImportsCacheFromDifferentCodexVersion(t *testing.T) {
 	store := newTestStore(t)
 	bc := BackendsConfig{Version: 2, Backends: map[string]Backend{
 		"codex": {Type: "codex-acp", AutoSyncModels: true, DefaultModel: "gpt-4o", Models: map[string]Model{"gpt-4o": {Name: "GPT-4o", Model: "gpt-4o"}}},
@@ -206,13 +208,16 @@ func TestAutoSyncBackendsSkipsNewerCacheForPackagedRuntime(t *testing.T) {
 	t.Setenv("CODEX_HOME", filepath.Dir(writeCache(t, codexCacheFixture)))
 	t.Setenv("AGENTDECK_CODEX_VERSION", "0.144.0")
 	if err := store.AutoSyncBackends(); err != nil {
-		t.Fatalf("mismatch must remain non-blocking: %v", err)
+		t.Fatalf("autosync: %v", err)
 	}
 	after, err := store.ReadBackends()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := after.Backends["codex"].Models["gpt-5.6-sol"]; ok {
-		t.Fatal("newer-cache model was imported for the older packaged runtime")
+	if _, ok := after.Backends["codex"].Models["gpt-5.6-sol"]; !ok {
+		t.Fatal("a cache from a different Codex version must still import its visible models")
+	}
+	if after.Backends["codex"].DefaultModel != "gpt-4o" {
+		t.Fatalf("default model changed to %q", after.Backends["codex"].DefaultModel)
 	}
 }

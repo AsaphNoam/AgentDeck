@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `use-installed-provider-clis.md` (in progress; see Active change).
 - **Release:** `v0.8.0` is tagged at `a9f33c5` and published. The 13-commit range after `v0.7.0`
   ships unrestricted on-demand local text-file viewing and file-selection annotations in chat,
   plus reliable Claude model application after resume. The operator skill explains the file-viewer
@@ -21,9 +21,6 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   asset.
 - **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
   cutover, new sessions, no general legacy migration (FS-10.R25–R26).
-  `use-installed-provider-clis.md` is waiting to start (FS-09.R75–R78, FS-10.R23–R24;
-  Installed default, one explicit Bundle choice per provider/backend, and capped compatibility
-  work under TS-06.R31; the ready file lists retained requirements).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
   `notifications-open-conversation` (agent toasts and desktop notifications open the conversation;
@@ -38,7 +35,25 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+`docs/ready-changes/use-installed-provider-clis.md` — Installed provider by default, explicit
+AgentDeck bundle choice. Slices (one integration slice at a time; commit each):
+
+1. **Done 2026-10-04:** Codex cache `client_version` is provenance only (FS-09.R71 shipped,
+   R59/A29 retired); deprecated `codex_runtime` is always `{catalog_status:"unverified"}`.
+2. **Next:** `provider_mode` field + validation (TS-03.R54) and the shared resolver (TS-04.R75) in
+   `internal/backend` or `internal/config`, applied after env merging in `composeEnv`
+   (`internal/server/launch.go`) for every start path, Claude terminal and `providerauth`.
+3. Release wrapper: drop private provider bins from PATH, `CODEX_PATH` default and
+   `AGENTDECK_CODEX_VERSION` export; publish managed root; bundled executables from layout
+   (TS-06.R30; `internal/release/wrapper.go`, `scripts/release/`).
+4. Typed errors + resume/wake no-fallback (TS-04.R76), `provider_runtimes` metadata, bounded
+   `--version` probe, `POST /api/backends/{id}/refresh-provider` (TS-03.R52–R53, TS-04.R72).
+5. CLI `agentdeck auth --backend/--model` (FS-10.R21, TS-04.R71).
+6. UI: Settings mode choice/executable field/refresh, New Agent source line, recovery guidance.
+7. Steer audit (TS-04.R77), README/install/operator-knowledge docs, closure matrix, then the
+   owed credentialed gate (TS-06.R31, needs authorization).
+
+Tasks wire fixture regeneration: `AGENTDECK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
@@ -148,6 +163,10 @@ supplied.
 
 ## Changelog
 
+- **2026-10-04 — Work: started installed-provider default.** Slice 1 removes Codex's exact
+  cache-version import gate and New Agent mismatch warning (FS-09.R71 shipped; R59/A29 retired;
+  TS-06.R22 notes the now-inert wrapper export). Focused Go config/server and NewAgentModal/schema
+  tests pass; spec check ok.
 - **2026-10-04 — Design revision: simplify the Chuck cutover.** Revised the waiting rename unit
   for the sole operator's approved supervised cutover. FS-00.R19, FS-04.R52/A32,
   FS-10.R25–R26/A13–A14, FS-18.R18/A14, TS-02.R40–R41, TS-04.R78 and TS-11.R18 retire automatic

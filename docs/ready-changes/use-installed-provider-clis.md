@@ -1,6 +1,6 @@
 # Use installed providers by default, with an explicit AgentDeck bundle choice
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Human request following the 2026-10-01 Codex 0.154.0/cache 0.159.2 warning and Claude
 5.5 investigation: users update providers independently of AgentDeck and must not wait for a new
 application bundle just to select a model their installed provider already supports. Follow-up

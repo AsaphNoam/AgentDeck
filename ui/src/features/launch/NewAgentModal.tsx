@@ -233,13 +233,6 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
             {selectedBackend?.type === "codex-acp" && codexPathOverride && (
               <p className="form-warning">Codex runtime override: {codexPathOverride} (version not verified).</p>
             )}
-            {selectedBackend?.type === "codex-acp" && !codexPathOverride && backendsData?.codex_runtime?.version && (
-              <p className={backendsData.codex_runtime.catalog_status === "mismatch" ? "form-warning" : undefined}>
-                Codex runtime {backendsData.codex_runtime.version} ({backendsData.codex_runtime.path}).
-                {backendsData.codex_runtime.catalog_status === "mismatch" &&
-                  ` Model auto-sync skipped cache from ${backendsData.codex_runtime.cache_version || "an unknown version"}; use a matching Codex runtime or cache.`}
-              </p>
-            )}
 
             <details className="new-agent-options" open={optionsOpen} onToggle={(event) => setOptionsOpen(event.currentTarget.open)}>
               <summary>Options</summary>

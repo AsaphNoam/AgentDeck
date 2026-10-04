@@ -111,13 +111,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   existing entry, or changes a default. The ordinary Settings control can later turn continuing sync
   off. TS-07.R17 owns the accepted best-effort residue when catalog persistence precedes binding.
 
-- **R59** — When a packaged release supplies the exact Codex runtime version it will execute,
-  Codex model autosync imports a personal `models_cache.json` only when its `client_version` exactly
-  matches that runtime. A missing or different cache version is a non-blocking skipped import, and
-  New Agent shows the effective packaged Codex path/version plus the cache mismatch before launch.
-  Source launches and explicit `CODEX_PATH` overrides keep the existing best-effort import because
-  AgentDeck has no verified runtime version for them and must not execute user-selected tooling just
-  to render configuration.
+- **R59 — retired 2026-10-04:** The exact Codex cache-version import gate and New Agent mismatch
+  warning were removed by R71.
 
 - **R50** — A model entry may declare optional **fast-mode capability**:
   `fast`, a boolean. Absent or `false` means the model has no fast-mode capability and AgentDeck
@@ -280,7 +275,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   session home and one-way personal-setup refresh remain R43–R44. Missing/invalid executable and
   recognized runtime-incompatibility errors during resume/wake preserve the conversation and fail rather than creating a fresh
   session to hide it; this is not a general rewrite of FS-01's other lifecycle fallback rules.
-- **R71** `(planned)` — Model discovery provides candidates, not version certification.
+- **R71** — Model discovery provides candidates, not version certification.
   Codex keeps schema-validated, visible, add-only imports from the personal cache; `client_version`
   is provenance, not an exact-match eligibility gate. A different or missing cache version alone
   produces neither an import refusal nor an incompatibility warning. This supersedes R59/A29 when
@@ -648,10 +643,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   agent running fast that switches model within its backend is still running fast afterwards, and a
   switch body carrying a fast-mode field does not change it. *Verify by* launch validation tests and
   switch-runtime tests.
-- **A29** (R28, R47, R59) — A personal Codex cache produced by a newer client than the packaged
-  runtime adds no models; a matching cache still imports normally; and New Agent identifies the
-  packaged executable/version and explains the mismatch before launch. *Verified by* Codex catalog,
-  startup autosync, release-wrapper, backend-response, and New Agent UI tests.
+- **A29 — retired 2026-10-04:** Exact-version import refusal replaced by A40.
 
 - **A30** (R60) — GET and successful PUT catalog responses report support for all
   registered types even with an empty catalog: Claude chat supports effort/fast, Claude terminal
@@ -735,10 +727,10 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 ## 6. Deviations & open decisions
 
-- **Local-default/bundle-choice design is ready, not shipped.** R68/R70–R72/R74–R78 and
-  A37–A38/A40/A42–A43/A45–A47 supersede the retired installed-only and temporary-recovery drafts.
-  Until implemented, R59/A29 and the shipped private-runtime selection
-  remain current. No cross-version compatibility receipt is implied by the historical audit.
+- **Local-default/bundle-choice design is in progress.** R71's version-gate removal shipped
+  2026-10-04. R68/R70/R72/R74–R78 and A37–A38/A40/A42–A43/A45–A47 remain planned; A40's refresh
+  half waits on R72. Until they ship, the private-runtime selection remains current. No
+  cross-version compatibility receipt is implied by the historical audit.
 
 - **Bounded launch-support projection shipped 2026-09-29.** R60–R63 and A30–A32 cover the
   adapter-support projection, New Agent, Settings and the existing Terminal-switch control. A Settings
@@ -791,9 +783,8 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Codex role delivery remains credential-gated.** Automated tests pin the documented
   `CODEX_CONFIG` overlay used by the installed adapter, but A7 must still confirm role adherence on
   a real new turn and native resume.
-- **Model/API compatibility remains partial.** Packaged Codex model import is version-matched under
-  R59, but source launches and explicit executable overrides remain best-effort because probing an
-  arbitrary executable during configuration reads would add side effects. The ACP adapter may ignore
+- **Model/API compatibility remains partial.** Codex model import is best-effort candidate discovery
+  (R71); probing an executable during configuration reads would add side effects. The ACP adapter may ignore
   AgentDeck's requested model in favor of its own identifiers, and older endpoints do not yet share
   one error envelope.
 

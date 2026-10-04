@@ -7,7 +7,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -19,34 +18,17 @@ type codexModelsCache struct {
 	Models        []codexModelEntry `json:"models"`
 }
 
-// CodexRuntime describes the release-owned Codex executable used for launch and
-// whether the personal model cache was produced by that exact runtime. Version
-// is intentionally unknown for source launches and explicit overrides: reading
-// configuration must not execute arbitrary user-selected tooling (FS-09.R59).
+// CodexRuntime is the deprecated global `codex_runtime` response field, kept
+// only so old clients parse. It is always unverified and never carries a
+// path or version: model-scoped provider runtime metadata replaces it
+// (TS-03.R52), and the cache's client_version is provenance, not an
+// eligibility gate (TS-04.R73).
 type CodexRuntime struct {
-	Path          string `json:"path,omitempty"`
-	Version       string `json:"version,omitempty"`
-	CacheVersion  string `json:"cache_version,omitempty"`
 	CatalogStatus string `json:"catalog_status"`
 }
 
 func CurrentCodexRuntime() CodexRuntime {
-	info := CodexRuntime{Path: os.Getenv("CODEX_PATH"), Version: os.Getenv("AGENTDECK_CODEX_VERSION"), CatalogStatus: "unverified"}
-	data, err := os.ReadFile(CodexModelCatalogPath())
-	if err == nil {
-		var cache codexModelsCache
-		if json.Unmarshal(data, &cache) == nil {
-			info.CacheVersion = cache.ClientVersion
-		}
-	}
-	if info.Version != "" {
-		if info.CacheVersion == info.Version {
-			info.CatalogStatus = "compatible"
-		} else {
-			info.CatalogStatus = "mismatch"
-		}
-	}
-	return info
+	return CodexRuntime{CatalogStatus: "unverified"}
 }
 
 type codexModelEntry struct {
@@ -87,9 +69,6 @@ func ReadCodexModelCatalog(path string) (map[string]Model, error) {
 	var cache codexModelsCache
 	if err := json.Unmarshal(data, &cache); err != nil {
 		return nil, err
-	}
-	if runtimeVersion := os.Getenv("AGENTDECK_CODEX_VERSION"); runtimeVersion != "" && cache.ClientVersion != runtimeVersion {
-		return nil, fmt.Errorf("Codex model cache version %q does not match packaged runtime %q; models were not imported", cache.ClientVersion, runtimeVersion)
 	}
 	out := make(map[string]Model, len(cache.Models))
 	for _, m := range cache.Models {

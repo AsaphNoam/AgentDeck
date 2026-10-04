@@ -50,12 +50,6 @@ export type CredResult = z.infer<typeof credResultSchema>;
 
 export const backendsResponseSchema = backendsConfigSchema.extend({
   credentials: z.record(credResultSchema).optional(),
-  codex_runtime: z.object({
-    path: z.string().optional(),
-    version: z.string().optional(),
-    cache_version: z.string().optional(),
-    catalog_status: z.enum(["compatible", "mismatch", "unverified"]),
-  }).optional(),
 });
 
 // Read-only adapter launch support (TS-03.R47). It is parsed separately from

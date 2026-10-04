@@ -135,8 +135,8 @@ requires an explicit reinstall/update to a newer release.
 
 The private wrapper also exports that validated executable's reported version as
 `AGENTDECK_CODEX_VERSION`. It does so only when selecting the packaged default, not when preserving
-an explicit `CODEX_PATH`; configuration uses this release-owned version authority to gate FS-09.R59
-model-cache import and describe the effective runtime before launch.
+an explicit `CODEX_PATH`. Since 2026-10-04 nothing reads it: model-cache import and the backend
+response no longer treat a packaged version as authority (TS-04.R73); R30 removes the export.
 
 **R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
 launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version
