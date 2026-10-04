@@ -6,8 +6,8 @@
 
 ## 1. Purpose
 
-A person can keep supervising and directing AgentDeck from a phone while the Mac keeps doing the
-work. The phone is a companion control surface, not a second AgentDeck: repositories, worktrees,
+A person can keep supervising and directing Chuck from a phone while the Mac keeps doing the
+work. The phone is a companion control surface, not a second Chuck: repositories, worktrees,
 terminals, credentials, backends, configuration, and agent execution stay on the Mac, and the Mac
 remains authoritative for every state and decision. The phone is designed for being away, not built
 from shrunken desktop screens: it opens on what needs the person, gives each decision its context,
@@ -15,7 +15,7 @@ and lets them continue conversations and start work against projects already con
 desktop.
 
 The phone reaches the Mac only over the person's own Tailscale network (tailnet), and only after
-being paired from the desktop. Nothing is exposed to the public internet and AgentDeck operates no
+being paired from the desktop. Nothing is exposed to the public internet and Chuck operates no
 cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-00.R18).
 
 ## 2. Behavior
@@ -23,29 +23,29 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 ### 2.1 Turning remote control on
 
 - **R1 — Remote control is off until the person turns it on.** Desktop Settings gains a
-  **Remote** section. Turning remote control on makes AgentDeck join the person's tailnet as its
-  own device named `agentdeck` (the planned Chuck rename governs it, FS-00.R19); no Tailscale application
-  is required on the Mac. The first time, the section shows a Tailscale sign-in link that the person
-  opens to approve the device; afterward AgentDeck rejoins on its own at every start while remote
+  **Remote** section. Turning remote control on makes Chuck join the person's tailnet as its
+  own device named `chuck` (FS-00.R19; the renamed device gives paired phones a new address, so
+  they re-pair); no Tailscale application is required on the Mac. The first time, the section shows a Tailscale sign-in link that the person
+  opens to approve the device; afterward Chuck rejoins on its own at every start while remote
   control stays on.
 - **R2 — The section states the remote connection plainly.** It shows exactly one of:
   **Off**; **Needs Tailscale sign-in** (with the link); **Connecting**; **On** with the phone
-  address `https://agentdeck.<tailnet>.ts.net`; or **Unavailable** with the reason and a repair —
+  address `https://chuck.<tailnet>.ts.net`; or **Unavailable** with the reason and a repair —
   including **Turn on MagicDNS** and **Turn on HTTPS certificates** in the Tailscale admin console,
   which remote control requires.
 - **R29 — The public name disclosure is stated before turning it on.** The Remote section
-  says that turning on HTTPS certificates publishes the device name `agentdeck.<tailnet>.ts.net` in
+  says that turning on HTTPS certificates publishes the device name `chuck.<tailnet>.ts.net` in
   public certificate-transparency logs, while the device itself stays reachable only from the
   tailnet.
 - **R3 — Only tailnet devices can reach it, over HTTPS.** The phone address is reachable
   only from devices on the same tailnet, with a valid certificate. Remote control never publishes
-  AgentDeck to the public internet. The desktop browser interface on the Mac is unchanged, including
+  Chuck to the public internet. The desktop browser interface on the Mac is unchanged, including
   its same-machine trust (FS-00.R2).
 - **R4 — Turning it off cuts remote access at once.** Every open phone connection closes
   and the phone address stops answering. Paired phones stay paired, so turning it back on restores
   them without pairing again.
 - **R5 — The phone needs Tailscale too.** The phone must run the Tailscale app signed in
-  to the same tailnet. AgentDeck does not install or configure the phone's Tailscale and says so
+  to the same tailnet. Chuck does not install or configure the phone's Tailscale and says so
   where pairing starts.
 
 ### 2.2 Pairing and revoking phones
@@ -65,7 +65,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   paired phone with its name, when it was paired, when it was last seen, and whether notifications
   are on. **Rename** and **Revoke** are available. Revoking takes effect immediately: the phone's open
   connection closes and it shows **This phone was unpaired**. A phone can also **Unpair this phone**
-  itself. Pairings persist across AgentDeck restarts until revoked or unpaired.
+  itself. Pairings persist across Chuck restarts until revoked or unpaired.
 - **R9 — A pairing lives with the installed app.** Clearing the phone browser's site data
   or deleting the installed app loses its pairing; that phone must pair again, and the desktop's
   stale entry remains until revoked.
@@ -107,7 +107,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   agent's conversation where one exists.
 - **R15 — New work starts against configured projects.** **New work** asks for an
   existing active project, then offers:
-  - **Ask AgentDecker** — opens that project's running `agentdecker` agent, or launches one with the
+  - **Ask FirstMate** — opens that project's running `firstmate` agent, or launches one with the
     runtime the desktop New Agent form would preselect, and sends the typed instruction;
   - **New task** — a display name, an instruction, and a role, launched with the preselected runtime
     and no prerequisites (FS-16.R1/R2);
@@ -172,7 +172,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   message field; the person writes to the agent in its conversation. The phone launches only the
   chat interface; terminal agents, worktree forks, groups, and per-launch permission overrides stay
   desktop-only. The new agent opens in its phone conversation. A rejected launch shows the desktop's
-  reason and keeps every entered value (R27). The global **New work** screen — Ask AgentDecker, New
+  reason and keeps every entered value (R27). The global **New work** screen — Ask FirstMate, New
   task, and its Start pipeline — leaves the phone; R41 moves Start pipeline to the project page.
   This supersedes R15 and R31's defaults-only rule for new agents.
 - **R36 (shipped 2026-10-02) — Agent management actions on the phone.** An agent's phone screen offers,
@@ -233,7 +233,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
 
 - **R22 — Optional keep-awake while work is active.** The Remote section offers **Keep
   this Mac awake while work is active**, off by default and usable with or without remote control.
-  While on, AgentDeck prevents idle system sleep whenever any agent is busy or waiting on a
+  While on, Chuck prevents idle system sleep whenever any agent is busy or waiting on a
   permission request or any pipeline run is active, and allows sleep again once none is. It states
   that closing the lid or choosing Sleep still sleeps the Mac.
 
@@ -252,7 +252,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 ## 4. Edge cases & errors
 
 - **R23 — An unreachable Mac is stated, not hidden.** When the Mac is asleep, offline, or
-  not running AgentDeck, or remote control is off, the phone shows **Mac unreachable since <time>**,
+  not running Chuck, or remote control is off, the phone shows **Mac unreachable since <time>**,
   keeps the last-known content visibly marked as stale, and disables every action. Nothing typed or
   tapped is queued for later delivery.
 - **R24 — The first decision wins.** When the desktop and a phone, or two phones, act on
@@ -291,7 +291,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   with the desktop result; a conversation sends, holds a follow-up, steers, cancels, and stops. —
   UI tests plus a fakeACP browser pass at phone size.
 - **A4** (R14, R27) — From the phone, continue a paused run; a refused action shows the desktop
-  reason and keeps typed text. Task retry, task creation, Ask AgentDecker, and the New work screen
+  reason and keeps typed text. Task retry, task creation, Ask FirstMate, and the New work screen
   left the phone under R40/R33; starting a pipeline is A10's project-page journey. — server and UI
   tests plus the fakeACP browser pass.
 - **A5 (planned)** (R18–R21, R25, R28) — Each attention event notifies a subscribed phone once,
@@ -302,7 +302,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 - **A6 (planned)** (R22) — With keep-awake on, idle sleep is prevented exactly while work is active
   and released when idle; with it off, nothing is prevented. — server tests on the sleep-assertion
   lifecycle; manual `pmset -g assertions` check.
-- **A7** (R23, R24, R26) — With AgentDeck stopped, the phone shows Mac unreachable, stale
+- **A7** (R23, R24, R26) — With Chuck stopped, the phone shows Mac unreachable, stale
   content, and disabled actions, and delivers nothing on reconnect; concurrent desktop and phone
   permission answers apply once and the loser sees what happened. — server and UI tests.
 - **A8 (planned)** (all) — Real end-to-end journey: pair an Android phone and an iPhone over a real
@@ -350,7 +350,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   reconnect rather than immediately.
 - The phone's pairing credential lives in the installed app's browser storage (R9); a Face ID or
   fingerprint app lock is not part of this version.
-- Tailscale is required on both devices; AgentDeck runs no relay of its own.
+- Tailscale is required on both devices; Chuck runs no relay of its own.
 - The installed app's icon is SVG only. Android uses it; iPhone Home Screen falls back to a page
   snapshot until a PNG touch icon is added.
 - A1, A5, A6, and A8 keep their manual gates owed: no real tailnet, Android phone, iPhone, or

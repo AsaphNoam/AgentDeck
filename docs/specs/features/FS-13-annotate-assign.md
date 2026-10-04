@@ -1,6 +1,6 @@
 # FS-13 — Annotate and assign
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/chat/`, `ui/src/features/archive/`, `internal/server/`, `internal/runtime/`, `internal/state/` · **Journeys:** J13
 **Absorbed:** —
 
@@ -8,7 +8,7 @@
 
 Instead of describing a location in prose, a person points at the thing itself: select lines inside
 a rendered diff or a whole transcript event, attach a short instruction, and send the result to the
-current agent, another running chat agent, or a newly launched agent. AgentDeck preserves each
+current agent, another running chat agent, or a newly launched agent. Chuck preserves each
 annotation as structured, located context — captured excerpt, anchor, instruction, target — never as
 hand-pasted chat text. The chat surface belongs to FS-03, the archived view to FS-05, mail delivery
 to FS-06, and launch to FS-01; this spec owns the annotation interaction, its records, and its
@@ -29,7 +29,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   transcript event `seq`, the diff's file path, side, and 1-based line range when the selection is
   diff lines, the selected excerpt text verbatim (clipped at 2,000 characters with a visible
   truncation marker), and a required instruction of at most 2,000 characters. The user never types a
-  file path, line number, or location description; AgentDeck derives the anchor from the selection.
+  file path, line number, or location description; Chuck derives the anchor from the selection.
 - **R3.** Annotations accumulate in a pending tray scoped to the source session. The tray
   shows each entry's excerpt and instruction and supports editing an instruction, removing an entry,
   and discarding the tray. It holds at most 20 entries. The tray is per-browser draft state: it
@@ -147,7 +147,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R22.** In the docked form each pending draft presents its anchor as its own heading
   element, distinct from the draft's controls; presents its excerpt with room to wrap rather than
   clipped to the overlay's width; and presents an instruction field taller than the overlay's.
-- **R24.** (planned) With the rename (FS-00.R19) the annotation block's first line is written as
+- **R24.** With the rename (FS-00.R19) the annotation block's first line is written as
   `[Chuck annotations]`. Recognition accepts both that line and the `[AgentDeck annotations]`
   line every block written before the rename carries, so annotations already recorded in a
   transcript keep rendering as annotation cards and keep being suppressed under R23 instead of
@@ -222,7 +222,7 @@ Each acceptance item names its delivered verification.
 - **A13** (R22) — A docked draft row renders its anchor as a heading element separate from
   its controls, alongside the excerpt and the instruction field:
   `ui/src/components/chat/AnnotationTray.test.tsx`.
-- **A15** (R24) — (planned) A transcript containing an annotation block written with the old
+- **A15** (R24) — A transcript containing an annotation block written with the old
   `[AgentDeck annotations]` first line renders as an annotation card and stays suppressed under R23,
   while a newly sent annotation writes `[Chuck annotations]` and behaves identically: a fixture
   transcript holding both spellings renders both, and no code path emits the old line.

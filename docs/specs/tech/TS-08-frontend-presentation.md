@@ -1,12 +1,12 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
 ## 1. Scope
 
-This specification defines how AgentDeck's confirmed core interface design is represented in the
+This specification defines how Chuck's confirmed core interface design is represented in the
 React/Vite frontend and how that core remains distinct from future optional skins. It owns visual
 tokens, cascade order, stylesheet/component boundaries, local visual assets, third-party renderer
 styling, stable skin hooks, automated maintenance safeguards, and presentation verification.
@@ -66,7 +66,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   kept beside the assets. If implementation evidence makes either font unsuitable, changing it is a
   TS-08 visual-contract change rather than an inline component choice.
 - **R12** — The core mark is one repository-owned SVG React component: a simple
-  geometric AgentDeck mark plus text wordmark, using `currentColor` and no embedded raster/text
+  geometric Chuck mark plus text wordmark, using `currentColor` and no embedded raster/text
   payload. Other repository-owned icons follow the same seam. Existing visible text and accessible
   names remain feature-owned; an icon never becomes the only programmatic label.
 - **R13** — Syntax highlighting, `react-diff-viewer-continued`, and xterm.js do not keep
@@ -638,7 +638,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   token, public hook, inline-style exception, skin branch, motion, or component framework. Focused
   component tests plus matched Core, Sky & Grove, and Studio matrix/browser views cover zero,
   unknown, long, and live-updating values (FS-02.R63/A44–A45; INV §8/§10/§13/§17).
-- **R58 — Browser-local identifiers rename with a one-time copy-forward.** (planned) With
+- **R58 — Browser-local identifiers rename with a one-time copy-forward.** With
   FS-00.R19 the document title, the header wordmark component, the built-in skin name, and every
   on-screen product string say Chuck. The identifiers the browser itself keys on rename too:
   `chuck-chat-drafts`, `chuck-annotation-tray`, `chuck.pipeline-builder-agent`, and the
@@ -979,7 +979,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
 ```text
 ui/src/
   assets/fonts/                  bundled core fonts + licenses
-  components/shell/AgentDeckMark.tsx
+  components/shell/ChuckMark.tsx
   components/ui/                 small behavior-transparent presentation primitives
   presentation/
     contract.json                versioned public visual tokens/hooks/slots/states

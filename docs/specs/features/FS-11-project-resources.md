@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-Each AgentDeck project needs an AgentDeck-owned place where its agents can leave and reuse working
+Each Chuck project needs a Chuck-owned place where its agents can leave and reuse working
 material: feature specifications, implementation guides, project-specific instructions, research,
 test harnesses, and validation results. That material is project-scoped and local to the user's
 machine, but intentionally lives outside the project working tree so it cannot become an accidental
@@ -15,14 +15,14 @@ repository change or commit.
 ## 2. Behavior
 
 - **R1** — Every project has one stable shared-resources directory at
-  `$AGENTDECK_HOME/project-resources/{project-id}/`. It is keyed by the immutable project id, not
+  `$CHUCK_HOME/project-resources/{project-id}/`. It is keyed by the immutable project id, not
   by the display title or `cwd`, so renaming a project title or moving its repository leaves the
   resource location unchanged.
-- **R2** — AgentDeck creates the directory when a project is created and also creates
+- **R2** — Chuck creates the directory when a project is created and also creates
   it lazily for pre-existing projects before their first launch. The directory is empty by default;
-  AgentDeck does not seed, scan, index, synchronize, or otherwise interpret its contents.
+  Chuck does not seed, scan, index, synchronize, or otherwise interpret its contents.
 - **R3** — Every new agent launch receives the canonical absolute resource-directory
-  path as `AGENTDECK_PROJECT_RESOURCES` and an explicit composed instruction that the directory is
+  path as `CHUCK_PROJECT_RESOURCES` and an explicit composed instruction that the directory is
   the project’s shared place for agent-created material, is outside the repository, and may be read
   or written by project agents. It is also included once in the agent's additional accessible
   directories. The agent’s working directory remains the configured project `cwd`.
@@ -30,7 +30,7 @@ repository change or commit.
   read-only value and explains that it is outside the repository. It does not expose a control for
   choosing a different location in this change.
 - **R5** — Deleting a project definition never deletes its shared-resources directory.
-  AgentDeck reports the retained path in the successful delete response/UI confirmation so the user
+  Chuck reports the retained path in the successful delete response/UI confirmation so the user
   can remove it deliberately if desired. Recreating a project with a different id creates a new,
   empty directory; it never adopts a directory based only on title or `cwd`.
 
@@ -49,7 +49,7 @@ repository change or commit.
 - **R8** — Project ids pass the existing slug validation before a resource path is
   constructed. A resource-path component cannot contain separators, dots, or another project’s id.
 - **R9** — An existing directory is reused. A missing, non-directory, unreadable, or
-  unwritable target produces an actionable error and AgentDeck must not launch an agent that was not
+  unwritable target produces an actionable error and Chuck must not launch an agent that was not
   told a usable shared location.
 - **R10** — Resource contents are opaque user data: they are never returned by the
   dashboard API, emitted over SSE, included in transcripts, or logged merely because the directory
@@ -59,10 +59,10 @@ repository change or commit.
 ## 5. Acceptance criteria
 
 - **A1** — Creating a project produces an owner-only empty directory under a test
-  AgentDeck home, and launching a pre-existing project creates the same stable directory lazily.
+  Chuck home, and launching a pre-existing project creates the same stable directory lazily.
   *Verified by:* config/server integration tests.
 - **A2** — A launched fake agent sees the canonical path in
-  `AGENTDECK_PROJECT_RESOURCES` and in its composed instruction while its `cwd` remains the project
+  `CHUCK_PROJECT_RESOURCES` and in its composed instruction while its `cwd` remains the project
   working directory. *Verified by:* launch-composition tests.
 - **A3** — Project title/`cwd` edits do not change the resource path; deleting the
   project leaves contents intact and a new project id does not reuse them. *Verified by:* project
@@ -76,7 +76,7 @@ repository change or commit.
 ## 6. Deviations & open decisions
 
 - Projects created before this shipped have no frozen resource path in their existing session
-  snapshots, so a resume of such an agent still receives the `AGENTDECK_PROJECT_RESOURCES` env var
+  snapshots, so a resume of such an agent still receives the `CHUCK_PROJECT_RESOURCES` env var
   but not the path in its frozen add_dirs/prompt. New launches compose all three.
 - Retention after project deletion is intentional: project resources can contain useful work and
   are not safe to erase as a side effect of removing configuration. A future explicit cleanup tool

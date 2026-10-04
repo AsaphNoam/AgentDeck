@@ -6,8 +6,8 @@
 
 ## 1. Purpose
 
-AgentDeck understands dependencies between pieces of work natively. A piece of work can exist in a
-durable "ready to run once these prerequisites are satisfied" state, and AgentDeck starts it when
+Chuck understands dependencies between pieces of work natively. A piece of work can exist in a
+durable "ready to run once these prerequisites are satisfied" state, and Chuck starts it when
 those prerequisites are satisfied. No model polls another agent, waits, relays status, or sends a
 conversational "I'm done" purely to advance orchestration. Dependencies attach to durable work and
 its explicit reported outcome, never to an agent's lifecycle status.
@@ -24,7 +24,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   survives restart, and is not deleted when its agent stops, crashes, or is archived. A task holds no
   copied transcript, no provider session, and no context payload.
 - **R2** — **A task names how it will be executed.** A task targets either one existing
-  chat agent or a launch specification (role, project, backend, model, effort) from which AgentDeck
+  chat agent or a launch specification (role, project, backend, model, effort) from which Chuck
   creates a new agent when the task starts. A task has at most one assigned agent at a time, and an agent holds
   at most one active task — one that is `starting` or `running` — at a time. That exclusivity is a
   durable claim taken atomically when the task is admitted, not a consequence of scheduling order, so
@@ -33,7 +33,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R3** — **Outcomes are reported, never inferred.** A finished task carries exactly one
   outcome from the closed vocabulary `success`, `failure`, `blocked`, or `cancelled`. The assigned
   agent or a person may record `success`, `failure`, or `blocked`; `cancelled` is written only by
-  AgentDeck when the task is cancelled or its agent's work is abandoned. An agent becoming `idle`,
+  Chuck when the task is cancelled or its agent's work is abandoned. An agent becoming `idle`,
   `done`, or `error` (FS-01.R17–R20) never sets, implies, or clears a task outcome, and no unread
   count, status transition, sweep, or restart records one. What an agent may report is deliberately the
   same set a pipeline stage report accepts — `success`, `failure`, `blocked` (FS-14.R6, R19) — so one
@@ -44,7 +44,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R4** — **Finishing releases the task's claim on its runtime, and stops only the
   runtime the task itself brought up.** A task records at start time whether it created the runtime by
   launching a new agent, woke it by resuming a stopped one, or merely borrowed a runtime that was
-  already up for its own reasons. When the task finishes it always releases its claim. AgentDeck then
+  already up for its own reasons. When the task finishes it always releases its claim. Chuck then
   stops the agent through the shared stop seam (FS-01.R6, R34) only in the first two cases, returning
   it to the state the task found it in. A borrowed runtime is left alone, so completing a task never
   kills a conversation a person is in the middle of. Every terminal transition — an agent-reported
@@ -67,21 +67,21 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   (b) **pipeline run** — a pipeline run id plus the satisfying set over that run's registered terminal
   outcome (R13); (c) **signal** — a project-scoped signal name, satisfied when that signal is fired
   (R9). A task with zero arms is ready as soon as it is created.
-- **R6** — **Ready work starts without a model in the loop.** AgentDeck observes its own
+- **R6** — **Ready work starts without a model in the loop.** Chuck observes its own
   durable records, and when a task's last arm is satisfied it starts that task itself. A task
   targeting a launch specification is started by launching its agent with the task's instruction as
   the intentional assignment input permitted by FS-00.R14–R15. A task targeting an existing agent
   crosses into that agent's existing conversation through a host-owned activation (FS-00.R15,
   TS-01.R19); a running agent is given one bounded turn and a stopped agent is resumed first on the
   same wake terms as mail (FS-01.R33). A task is `running` only once its assignment has crossed into
-  a confirmed runtime; until then it is `starting` and its start is still owned by AgentDeck, not by
+  a confirmed runtime; until then it is `starting` and its start is still owned by Chuck, not by
   the agent. No agent is asked to poll, wait, check whether a prerequisite finished, or announce its
   own completion to release other work.
 - **R7** — **Readiness is logical; running processes are budgeted.** Every task whose
   arms are satisfied becomes ready, however many that is: a graph that fans out to fifteen tasks has
   fifteen ready tasks, and nothing about the dependency model is narrowed to fit a machine. Physical
   concurrency is separate. A configurable install-wide budget, default ten, limits how many agent
-  runtimes AgentDeck itself brings up for tasks at one time. Ready tasks are admitted in the order
+  runtimes Chuck itself brings up for tasks at one time. Ready tasks are admitted in the order
   they became ready as capacity frees, and a task whose start borrows a runtime that is already up
   (R4) consumes no budget because it creates no process. A ready task waiting for capacity is
   presented as ready and waiting, not as failed or blocked. The existing exclusive per-agent lifecycle
@@ -105,7 +105,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   that moment and is recorded on the arms it satisfied. A signal is not a durable object with its own
   identity, CRUD surface, history, or retention: an arm may name a signal that has never been fired,
   and firing a name no arm is waiting on succeeds and changes nothing. Signals exist so work can be
-  armed on something AgentDeck cannot observe, such as a CI result or an external approval.
+  armed on something Chuck cannot observe, such as a CI result or an external approval.
 
 ### 2.3 Assignment context
 
@@ -130,14 +130,14 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   it created. Caller identity is always server-derived (TS-04.R7); no tool argument names another
   agent as the reporter or as a task's creator. Every task durably records who created it (R24).
   An agent-created task may target a launch specification, itself, or another chat agent named the
-  same way a message names its recipient — a friendly selector that AgentDeck resolves server-side
+  same way a message names its recipient — a friendly selector that Chuck resolves server-side
   against durable identities, returning the same unknown and ambiguous recipient errors coordination
   already returns (FS-06). A raw agent id in a tool argument is not a target and is never authority;
   resolution, not the caller, decides which agent a task points at. This deliberately opens what
   FS-14 keeps closed for pipelines: an agent can cause new work to start without a person in the loop,
   which is the point of expressing orchestration as control state rather than prose.
 - **R13** — **Pipeline results register in the shared result layer.** When a pipeline run
-  reaches a terminal state, AgentDeck registers its outcome in the same result vocabulary as R3:
+  reaches a terminal state, Chuck registers its outcome in the same result vocabulary as R3:
   `success` when the run completes with the final outcome `success`, `failure` when it completes with
   any other template-defined final outcome, and `cancelled` when the run was stopped. The raw
   template-defined label is retained as a display detail. That registration is what makes a pipeline
@@ -182,7 +182,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   allowance intact and its place in the admission order kept, so a busy machine can never exhaust a
   task's attempts. There is no timed backoff; re-admission happens on the next dispatch, and the
   attempt count is the bound. When the three are spent the task parks as `dependency_failed` recording
-  the last failure, and an explicit Retry (R23) restores the full allowance. If AgentDeck cannot stop
+  the last failure, and an explicit Retry (R23) restores the full allowance. If Chuck cannot stop
   or reap a runtime after assignment delivery or restart recovery fails, the task deliberately remains
   `starting`: that reservation is its only durable ownership record, so clearing or settling it could
   admit duplicate work. A later server restart retries the reap before the task can advance.
@@ -199,7 +199,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   `create_task` tool and the task HTTP API accept an optional effort field, and the Tasks view
   offers it beside its backend and model fields. The value is chosen once, when the task is created,
   and is stored on the durable task row; it is not editable afterwards, because a task's execution
-  target is written once for the same reason its assignee is. When AgentDeck later launches that
+  target is written once for the same reason its assignee is. When Chuck later launches that
   task's agent, the stored value is the *explicitly requested effort* at the top of FS-09.R41's
   precedence order, so it beats a bound configuration source's override and the model's
   `default_effort`; a task that names no effort resolves exactly as it does today. Effort is
@@ -211,7 +211,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   launch specification a task targets (R2) also carries an optional fast mode, under the same rules
   R27 gives effort: both authoring surfaces accept it, it is chosen once at creation and stored on
   the durable task row, it is not editable afterwards, and it is rejected under R20 when the task
-  targets an existing agent rather than silently dropped. When AgentDeck later launches that task's
+  targets an existing agent rather than silently dropped. When Chuck later launches that task's
   agent, the stored value is the *explicitly requested fast mode* at the top of FS-09.R54's
   precedence order; a task naming none launches at normal speed. Two consequences differ from
   effort, and both follow from FS-09.R50/R55. A model that declares no fast-mode capability makes
@@ -379,10 +379,10 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   If an assigned agent exits, crashes, is stopped by a person, or has its runtime switched before
   recording an outcome, the task moves to `interrupted`, releases its runtime claim and its budget
   slot, records why its agent went away, and is presented as needing attention. It does not stay
-  `running`, because nothing is running. AgentDeck never converts that exit into `success` or
+  `running`, because nothing is running. Chuck never converts that exit into `success` or
   `failure`, and dependents keep waiting rather than advancing on a guess. A person may record an
   outcome (R22), retry the task (R23), or cancel it.
-- **R17** — **A restart ends every task runtime rather than adopting it.** AgentDeck
+- **R17** — **A restart ends every task runtime rather than adopting it.** Chuck
   deliberately does not re-adopt an agent process that outlived a previous server (FS-01.R20), so
   after a restart no task runtime is owned and none can be trusted to still hold its assignment.
   Recovery therefore never claims one survived. Armed and ready tasks are re-evaluated from their
@@ -391,7 +391,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   is reaped through the ordinary orphan path (FS-01.R21) and the task returns to `ready` to be started
   once more within its attempt limit (R25). If it would have borrowed a runtime that was already up
   for someone else's reasons, that runtime is never touched — R4's promise does not lapse because
-  AgentDeck restarted — and because it cannot be known whether the assignment reached that
+  Chuck restarted — and because it cannot be known whether the assignment reached that
   conversation, the task becomes `interrupted` for a person to resolve rather than being silently
   delivered twice. A task that was `running` becomes `interrupted` under R16, because its agent is now
   an unowned orphan. A task whose result was already recorded stays finished, and any stop and
@@ -450,7 +450,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   a failure, interruption, or cancellation means. Waiting on its own task or work targeting the
   same exclusively assigned agent is refused with an actionable error; waiting is not a task arm.
 - **R34** (shipped 2026-09-13) — A task that waits yields after its current reporting/tool turn ends.
-  AgentDeck stops only a runtime that task created or woke and releases its capacity slot while
+  Chuck stops only a runtime that task created or woke and releases its capacity slot while
   retaining assignment identity and attached-context membership. Wake resumes the same task and
   agent through normal admission; it never creates a second task or fabricates completion. A
   borrowed runtime stays up. Waiting and ready-to-resume are visible states distinct from an

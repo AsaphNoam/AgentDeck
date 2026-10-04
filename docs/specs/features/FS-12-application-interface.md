@@ -6,11 +6,11 @@
 
 ## 1. Purpose
 
-AgentDeck needs a complete visual identity across its existing frontend. The identity must be
+Chuck needs a complete visual identity across its existing frontend. The identity must be
 recognizable and distinctive without borrowing the generic appearance of an integrated development
 environment (IDE), chat product, or software-as-a-service dashboard.
 
-This first design is **AgentDeck's core interface**, not a skin. It represents the product directly:
+This first design is **Chuck's core interface**, not a skin. It represents the product directly:
 the Dashboard remains a dashboard, agent cards remain agent cards, chat remains chat, Archive
 remains Archive, and Settings remains Settings. It does not wrap those concepts in a fictional,
 narrative, gaming, or real-world metaphor. Future skins may deliberately reinterpret the product;
@@ -29,7 +29,7 @@ Requirements are user-observable.
 
 ### 2.1 Core visual direction
 
-- **R1** — Every first-party frontend surface uses one product-native AgentDeck visual
+- **R1** — Every first-party frontend surface uses one product-native Chuck visual
   language. It is distinctive through typography, composition, geometry, color, borders, depth, and
   spacing rather than a theme, story, metaphor, or renamed product concept.
 - **R2** — The core direction uses a light neutral canvas, near-black structural color,
@@ -52,7 +52,7 @@ Requirements are user-observable.
 
 ### 2.2 Application shell
 
-- **R6** — The shell has a strong AgentDeck wordmark/mark treatment, clear current-route
+- **R6** — The shell has a strong Chuck wordmark/mark treatment, clear current-route
   navigation for Dashboard, Pipelines, Archive, and Settings, and an integrated connection indicator. It keeps
   the existing routes and actions; the change is their composition and appearance.
 - **R7** — Main content uses a deliberate page frame, consistent route-heading pattern,
@@ -69,7 +69,7 @@ Requirements are user-observable.
   is: agent name and live state; current detail/preview; role and project; backend/model/interface;
   context usage; mail indicators; and stopped state. Project color is a bounded accent that cannot
   overwhelm the card.
-- **R10** — Card construction uses recognizable AgentDeck geometry, a clear drag grip,
+- **R10** — Card construction uses recognizable Chuck geometry, a clear drag grip,
   a strong state edge/marker, compact technical metadata, and a designed context meter. Waiting-input
   and error states receive higher salience without changing order, grouping, or action behavior.
 - **R37** — R10's "without changing order" clause is narrowed to the five live
@@ -131,11 +131,11 @@ Requirements are user-observable.
 
 ### 2.6 Boundary for future skins
 
-- **R20** — The delivered interface is the unskinned AgentDeck core. No skin is active
+- **R20** — The delivered interface is the unskinned Chuck core. No skin is active
   by default, and this change adds no skin picker, stored skin preference, project-specific skin,
   downloadable asset, marketplace, import, or runtime skin-switching behavior.
 - **R21** — Core product semantics are independent from visual expression. Content,
-  state text, actions, validation, routes, and component structure are defined by AgentDeck; the
+  state text, actions, validation, routes, and component structure are defined by Chuck; the
   core design supplies their default presentation. A future skin may override approved visual
   values and decorative assets, but may not be required for the product to render correctly.
 - **R22** — Future skins may introduce strong concepts or themed interpretations. The
@@ -157,8 +157,8 @@ Requirements are user-observable.
 
 ### 2.8 First optional skin
 
-- **R27** — AgentDeck offers one optional built-in skin named **Sky & Grove**
-  alongside **AgentDeck Core**. Core remains the initial selection for an install with no stored
+- **R27** — Chuck offers one optional built-in skin named **Sky & Grove**
+  alongside **Chuck Core**. Core remains the initial selection for an install with no stored
   preference and remains the safe fallback; adding the skin does not reinterpret Core as a skin or
   make optional skin code necessary for the application to render.
 - **R28** — Sky & Grove is an airy sky-blue and nature-green design, not a
@@ -168,11 +168,11 @@ Requirements are user-observable.
   destructive, connection, permission, agent-state, context-pressure, and project colors enough
   separation that green or blue never changes their product meaning.
 - **R29** — Settings gains an **Appearance** destination with an explicit
-  choice between AgentDeck Core and Sky & Grove, including a compact visual sample of each. Choosing
+  choice between Chuck Core and Sky & Grove, including a compact visual sample of each. Choosing
   an option applies it across the currently open application immediately, without a reload or
   server restart, and the control always identifies the active choice by text rather than color
   alone.
-- **R30** — The appearance choice is one durable, AgentDeck-wide preference,
+- **R30** — The appearance choice is one durable, Chuck-wide preference,
   not a browser-only or project-specific value. It applies to every route, project, and agent and is
   reused by later browser sessions after configuration loads. An absent preference selects Core.
 - **R31** — Sky & Grove covers every first-party surface in R1–R19 and the
@@ -181,7 +181,7 @@ Requirements are user-observable.
   unchanged, and the application dialogs in R26 adopt the selected appearance without changing
   their validation or consequences.
 - **R32** — A missing, unknown, or unreadable stored skin id cannot prevent
-  first paint or replace the application with an error boundary. AgentDeck renders Core, identifies
+  first paint or replace the application with an error boundary. Chuck renders Core, identifies
   the unavailable preference in Settings, and lets the person choose and save a valid appearance.
   If saving a new choice fails, the UI reports the failure and returns to the last durably selected
   appearance rather than presenting an unsaved selection as permanent.
@@ -220,7 +220,7 @@ Requirements are user-observable.
   overflow control that names the hidden count and opens keyboard-accessible navigation to each
   hidden project. Long project titles truncate visually while retaining their full accessible name.
   The project area is absent when no link is eligible, never wraps the header, and fits five links
-  plus overflow without overlapping or hiding the primary tabs, AgentDeck mark, connection state,
+  plus overflow without overlapping or hiding the primary tabs, Chuck mark, connection state,
   or current-project indicator at the supported desktop floor. Link membership and routing remain
   feature-owned; presentation does not measure available width, persist state, fetch independently,
   or reinterpret project activity.
@@ -233,11 +233,11 @@ Requirements are user-observable.
 
 ### 2.10 Third optional skin
 
-- **R42 (shipped 2026-09-23)** — AgentDeck offers a third, optional built-in skin named **Studio** alongside AgentDeck Core
+- **R42 (shipped 2026-09-23)** — Chuck offers a third, optional built-in skin named **Studio** alongside Chuck Core
   and Sky & Grove. Core remains the default for an absent preference and the safe fallback for an
   unavailable one; both existing appearances remain selectable and visually unchanged. This
   supersedes only R27's count of optional skins and R29's two-choice limit. The new skin uses the
-  existing AgentDeck-wide Appearance preference, applies immediately throughout the mounted app,
+  existing Chuck-wide Appearance preference, applies immediately throughout the mounted app,
   and survives reload and later sessions under R30 and FS-04.R38.
 - **R43 (shipped 2026-09-23)** — Studio presents a light, spacious, polished creative workspace: soft
   off-whites and pale blue-green surfaces, forest-green supporting color, and restrained saturated
@@ -247,7 +247,7 @@ Requirements are user-observable.
   work dominant without generic card grids, neon, AI gradients, glass, or an IDE-like shell. It is
   visibly distinct from Sky & Grove's stronger blue canvas and botanical/topographic decoration.
 - **R44 (shipped 2026-09-23)** — The Figma Make exploration guides Studio's visual direction, not its
-  product anatomy. Existing AgentDeck routes, copy, actions, card density and grouping, live
+  product anatomy. Existing Chuck routes, copy, actions, card density and grouping, live
   states, permissions, chat chronology, composer, Files, Commands, conditional Terminal, and
   archive behavior remain authoritative. In particular, an expanded dashboard card retains its
   real interactive chat transcript and controls; the cramped transcript-like area in the Make
@@ -424,7 +424,7 @@ Requirements are user-observable.
 - **A1** (R1–R19, R23–R25) — A real-browser visual review covers onboarding, empty and
   populated Dashboard, Pipelines, all agent states, New Agent, chat event variants, Files, Commands, Terminal,
   active and archived sessions, every Settings section, menus, notifications, permissions, and
-  representative errors. Every first-party surface clearly belongs to one core AgentDeck design and
+  representative errors. Every first-party surface clearly belongs to one core Chuck design and
   none uses a metaphorical skin concept. *Verify:* visual fixture/screenshot matrix plus existing
   journeys J2–J9, J11, and J14 for behavioral regression.
 - **A2** (R2–R5) — The shell, controls, cards, messages, technical content, forms, and

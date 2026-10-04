@@ -10,7 +10,7 @@ the baseline assessment below predates that additional consumer check.
 
 ## Recommendation
 
-Do not undertake a broad capability-architecture refactor. AgentDeck already has adapter-owned
+Do not undertake a broad capability-architecture refactor. Chuck already has adapter-owned
 delivery, a common model catalog, shared launch validation, and negotiated session capabilities.
 The premise that launch, pipelines and mobile independently encode most provider knowledge is
 not supported by the inspected code.
@@ -84,7 +84,7 @@ execution seam. It does not demonstrate a need for a plugin framework or a catal
 
 Keep three distinct facts, each with one owner:
 
-- **Adapter/interface support:** what AgentDeck implements for this backend and interface.
+- **Adapter/interface support:** what Chuck implements for this backend and interface.
   Extend `internal/backend` with a small typed read model, conceptually
   `LaunchSupport{available, effort, fast}` for each existing interface. Declare interface support
   explicitly; derive effort/fast from the existing delivery methods, gated by that interface.
@@ -122,7 +122,7 @@ existing launch affordances from the server. The operator accepted this scope on
 | Provider protocol | Keep option IDs, wire metadata, environment overlays, credential guidance, Codex home isolation, native resume IDs and provider-specific flags specialized. Preserve the generic runtime's ordered application and error handling. |
 | Queued sends | Host-owned turn arbitration, not a provider queue capability. Never delegate this to an advertised provider queue without a separate behavior change. |
 | Steering | Already live-advertised; preserve active-turn checks and host-owned fallback semantics. No static `codex supports steering` rule. |
-| Permissions | Preserve frozen AgentDeck skip policy, pending-request handling and provider outcome mapping. Do not unify provider-native autonomy modes or absorb the separate live-permission idea. |
+| Permissions | Preserve frozen Chuck skip policy, pending-request handling and provider outcome mapping. Do not unify provider-native autonomy modes or absorb the separate live-permission idea. |
 | Resume/replacement/clone | Preserve native resume vs primer rules, transactional replacement, frozen launch settings and state eligibility. A support flag does not grant permission to perform an action or establish cross-provider session compatibility. |
 | Session capability storage | Preserve snapshot vs live lifetimes and revalidation. Do not migrate existing state/API fields simply to make their names uniform. |
 | New upstream features | Adapter-only changes are realistic for another model/value using existing semantics. A new operation, lifecycle or UI meaning still requires consumer work and explicit acceptance criteria. |

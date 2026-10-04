@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-Running chat agents can discover and message one another without the human relaying text. AgentDeck
+Running chat agents can discover and message one another without the human relaying text. Chuck
 hosts a Model Context Protocol (MCP) server in the dashboard process, binds each caller to its
 registered agent identity, stores mail durably, wakes idle recipients, and caps per-turn messaging
 so a tight loop cannot run away. This spec owns unread/sent indicators and production of the
@@ -20,9 +20,9 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 ### 2.1 Messaging session and discovery
 
-- **R1.** Every launched or resumed chat agent receives a reserved `agentdeck-messaging` MCP server
+- **R1.** Every launched or resumed chat agent receives a reserved `chuck-messaging` MCP server
   entry pointing to the dashboard's loopback `/mcp` endpoint with a freshly-minted per-agent token
-  in `X-AgentDeck-Token`. Stop, switch teardown, crash teardown, and server shutdown revoke the
+  in `X-Chuck-Token`. Stop, switch teardown, crash teardown, and server shutdown revoke the
   token and remove its owner-only generated MCP config.
 - **R2.** The MCP server exposes exactly three coordination tools: `list_agents`, `send_message`,
   and `check_messages`. Calls with a missing, unknown, or revoked token fail as
@@ -48,7 +48,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   messages read, do not delete, and limit 15. Callers may include read mail, retain unread state,
   delete returned rows, and request 1–50 messages. Results include sender identity, subject/body,
   timestamp and reply id plus unread `remaining` and turn-budget status.
-- **R7.** When a mailbox query is limited, AgentDeck returns the newest N matching messages in
+- **R7.** When a mailbox query is limited, Chuck returns the newest N matching messages in
   newest-first order, so old mail is discarded from the page before recent mail. The dashboard's
   `GET /api/sessions/{id}/messages` view follows the same order, defaults to 50, caps at 200,
   accepts `unread_only=true`, and returns `unread_count`; unknown agents return `404` and invalid
@@ -162,7 +162,7 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
 
 - **R24 — Mail activation is explicit work, not unread polling.** Agent mail and
   reserved-user mail retain their autonomous delivery outcome: inserting new mail creates one
-  host-owned opportunity to start a mail-handling reasoning turn for the recipient. AgentDeck may
+  host-owned opportunity to start a mail-handling reasoning turn for the recipient. Chuck may
   wake or wait for the recipient and then start that turn only by claiming the opportunity; an
   unread count, idle/status transition, periodic sweep, restart, or other control fact cannot by
   itself start another turn. Mail already pending when the opportunity is claimed is coalesced into
@@ -178,11 +178,11 @@ Requirements are user-, agent-, and API-observable. R-item numbering is continuo
   activation state: mail left unread after the claimed turn does not cause the same opportunity to
   activate again. Mail arriving after the claim creates a new opportunity, even while the earlier
   turn or wake is still in flight. If all mail has already been read, deleted, or expired before a
-  still-pending opportunity is attempted, AgentDeck retires it deterministically without starting
+  still-pending opportunity is attempted, Chuck retires it deterministically without starting
   an empty model turn.
-- **R26 — A mail activation is at-most-once once attempted.** AgentDeck durably claims
+- **R26 — A mail activation is at-most-once once attempted.** Chuck durably claims
   the exact opportunity before wake or prompt side effects. Losing a lifecycle claim is not an
-  attempt and leaves the opportunity pending; once AgentDeck actually attempts the wake/activation,
+  attempt and leaves the opportunity pending; once Chuck actually attempts the wake/activation,
   success, launch failure, provider failure, process death, cancellation, or an agent that never
   calls `check_messages` cannot make reconciliation automatically repeat it. The mail remains
   durable and unread, the ordinary agent error/status surfaces remain honest, and later new mail may

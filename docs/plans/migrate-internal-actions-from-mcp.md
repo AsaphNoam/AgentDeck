@@ -1,4 +1,4 @@
-# Migrate AgentDeck internal actions from MCP
+# Migrate Chuck internal actions from MCP
 
 This is sequencing guidance for the ready change. The linked specifications remain authoritative.
 

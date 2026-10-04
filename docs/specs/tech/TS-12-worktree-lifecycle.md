@@ -33,7 +33,7 @@ branch automation beyond creating the fork branch.
 - **R2 — Ownership is a SQLite record.** Machine-created worktree ownership lives in
   `state.db` (TS-02.R1's writer split; a hand-editable JSON field could forge ownership and widen
   the deletion surface). A `project_worktrees` row — see §3 — exists exactly for checkouts
-  AgentDeck created; its presence is the sole ownership test (FS-19.R4). The `project` column is a
+  Chuck created; its presence is the sole ownership test (FS-19.R4). The `project` column is a
   logical, non-cascading reference like TS-02.R25's task references: deleting a project never
   cascades here, and the deletion flow removes the row explicitly.
 - **R3 — Fork ordering is crash-safe toward under-ownership.** Fork executes: validate
@@ -93,7 +93,7 @@ branch automation beyond creating the fork branch.
 - **R7 — Deletion is gated, verified, and ordered.** Checkout deletion runs only inside
   the existing project-archive claim window (`beginProjectArchive`, TS-01.R13) or the
   project-delete path after the same claim, with all processes stopped. Before removing anything,
-  the flow verifies the recorded path is the canonical `$AGENTDECK_HOME/worktrees/{project-id}`
+  the flow verifies the recorded path is the canonical `$CHUCK_HOME/worktrees/{project-id}`
   location, symlink-free, and currently registered to the recorded repository via
   `git worktree list`; any mismatch aborts with an error instead of deleting. Removal uses
   `git worktree remove --force`. The request carries the dirty-state snapshot the dialog disclosed;
@@ -104,7 +104,7 @@ branch automation beyond creating the fork branch.
 - **R8 — Owned paths follow the established filesystem rules.** The `worktrees/` root
   and `{project-id}` construction follow the project-resources pattern: slug-validated id before
   path construction, owner-only (0700) root, symlink rejection on root and leaf
-  (FS-11.R8/R9, TS-02.R13). No AgentDeck code path ever removes a directory outside the owned
+  (FS-11.R8/R9, TS-02.R13). No Chuck code path ever removes a directory outside the owned
   `worktrees/` root.
 - **R9 — Base detection order is fixed.** Effective base = project `base_branch` when
   set; else `origin/HEAD`'s target (via `symbolic-ref`); else the branch checked out in the
@@ -115,7 +115,7 @@ branch automation beyond creating the fork branch.
   source fork's branch — using it would stack the new branch on the source's work, which FS-19.R11
   forbids.
 - **R10 — Git refs are the atomic claim.** Concurrent forks are not serialized by
-  AgentDeck; branch-ref creation is the atomic claim (INV §5), so the second identical fork fails
+  Chuck; branch-ref creation is the atomic claim (INV §5), so the second identical fork fails
   on the existing branch and rolls back per R3. Server-derived project ids make checkout-path
   collisions unreachable; the path is still pre-checked and fails closed.
 
@@ -128,7 +128,7 @@ CREATE TABLE project_worktrees (
   project        TEXT PRIMARY KEY,   -- immutable project id; logical reference, no cascade
   repo_path      TEXT NOT NULL,      -- expanded absolute Git common directory; stable after a source worktree is removed
   branch         TEXT NOT NULL,
-  checkout_path  TEXT NOT NULL,      -- canonical $AGENTDECK_HOME/worktrees/{project}
+  checkout_path  TEXT NOT NULL,      -- canonical $CHUCK_HOME/worktrees/{project}
   created_at     TEXT NOT NULL,
   setup_ok       INTEGER,            -- NULL until first setup run
   setup_at       TEXT,
@@ -166,7 +166,7 @@ TS-02's config authority; both are optional and absent-tolerant.
 - **INV §12** — plumbing-only Git parsing with timeout and prompt suppression (R1).
 - **INV §14** — owned paths are validated and symlink-rejected before any create or delete (R8).
 - **INV §15** — ownership rows are written after the checkout exists and deleted after it is
-  removed, so no crash window can authorize deleting something AgentDeck did not create (R3/R7).
+  removed, so no crash window can authorize deleting something Chuck did not create (R3/R7).
 
 ## 5. Deviations & open decisions
 

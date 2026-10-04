@@ -6,9 +6,9 @@
 
 ## 1. Scope
 
-The architecture behind FS-20: AgentDeck's embedded Tailscale node, the second (tailnet) HTTP
+The architecture behind FS-20: Chuck's embedded Tailscale node, the second (tailnet) HTTP
 listener and its guard, phone pairing and device credentials, the phone's API allowlist, Web Push
-delivery, keep-awake, and the phone web-app bundle. Out of scope: any AgentDeck-operated relay,
+delivery, keep-awake, and the phone web-app bundle. Out of scope: any Chuck-operated relay,
 cloud service, or account; Tailscale Funnel or any public exposure; native phone apps; changes to
 the loopback desktop interface's trust model (TS-05.R1–R3 keep governing it).
 
@@ -31,13 +31,13 @@ the installed app on iOS.
   loopback server, agents, tasks, or pipelines; it surfaces only as FS-20.R2's **Unavailable** state
   with a stable reason code. Rationale: remote control is an optional channel, not a runtime.
 - **R2 — The tailnet node is an embedded `tsnet.Server`.** Hostname is the product name
-  (FS-00.R19), state lives in `$AGENTDECK_HOME/remote/tailscale/` (`0700`, TS-05.R5), and the node is
+  (FS-00.R19), state lives in `$CHUCK_HOME/remote/tailscale/` (`0700`, TS-05.R5), and the node is
   not ephemeral so pairings and its address survive restarts. It starts when `remote_enabled` is
   true at startup or when the person turns it on, and is closed with `Server.Close` when turned off or
   at shutdown. Enable/disable transitions are generation-scoped so a late start from a superseded
   generation closes itself instead of publishing state (INV §4, INV §5), and a new generation starts
   only after the previous node has closed so two nodes never share the state directory. `tsnet` log
-  output is routed through AgentDeck's logger with R12's redaction, and the node runs in Tailscale's
+  output is routed through Chuck's logger with R12's redaction, and the node runs in Tailscale's
   no-logs mode (`TS_NO_LOGS_NO_SUPPORT`) so it uploads nothing to Tailscale's log service.
 - **R3 — Connection state is derived, not guessed.** The subsystem maps
   `StatusWithoutPeers().BackendState`/`AuthURL` and `ListenTLS` prerequisite errors to exactly
@@ -58,7 +58,7 @@ the installed app on iOS.
   with code `remote_route_not_available`, whether or not the loopback mux serves it. The table
   contains only what FS-20 needs: health, capabilities, and the SSE stream; session list, detail, and
   transcript reads; `prompt` (POST/GET/DELETE), `steer`, `cancel`, `stop`, `resume`, and
-  `permission`; `POST /api/sessions` for Ask AgentDecker; task list/detail/create and
+  `permission`; `POST /api/sessions` for Ask FirstMate; task list/detail/create and
   `cancel`/`result`/`retry`/`rearm`; pipeline run list/detail/start and
   `continue`/`retry`/`replace`/`repair-cleanup`/`stop`; read-only project, role,
   pipeline-template, and configuration (`GET /api/config`, for notification preferences) reads; and
@@ -121,7 +121,7 @@ the installed app on iOS.
   disagree about what needs the person (INV §2).
 - **R11 — Push is standard Web Push sent from the Mac.** Delivery uses RFC 8030 with
   RFC 8291 `aes128gcm` payload encryption and RFC 8292 VAPID. The VAPID key pair is generated on
-  first need into `$AGENTDECK_HOME/remote/vapid.json` (`0600`). A subscription's endpoint must be
+  first need into `$CHUCK_HOME/remote/vapid.json` (`0600`). A subscription's endpoint must be
   `https` on a known browser push-service host (Google FCM, Apple `*.push.apple.com`, Mozilla
   autopush, Microsoft WNS) or it is rejected, so a phone cannot make the Mac post to arbitrary URLs.
   Sends leave over the Mac's ordinary internet connection, not the tailnet. The payload is at most
@@ -284,7 +284,7 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.
 - Face ID or fingerprint app lock and native apps are out of scope (FS-20 §6).
-- Local browser passes use `AGENTDECK_DEV_FAKE_TAILNET=localhost:<port>` with a `dev`-tagged build
+- Local browser passes use `CHUCK_DEV_FAKE_TAILNET=localhost:<port>` with a `dev`-tagged build
   (`internal/server/remote_dev.go`): a self-signed HTTPS listener with one fixed peer standing in
   for the node. Release builds never contain it.
 

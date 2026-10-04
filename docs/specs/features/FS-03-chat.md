@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-AgentDeck gives each chat-interface agent a live conversation surface over the Agent Client
+Chuck gives each chat-interface agent a live conversation surface over the Agent Client
 Protocol (ACP). A user can send a prompt, watch assistant text and tool activity stream, decide
 permission requests, cancel work, and reopen the durable transcript after a reload, restart, stop,
 or resume. This spec governs the user-visible chat panel, normalized transcript events, prompt and
@@ -55,8 +55,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   not presented as server-acknowledged.
 - **R36.** Each chat composer keeps its exact non-empty unsent text as a separate draft for
   that `agent_id` in the current browser profile. Returning to the chat after navigating elsewhere,
-  refreshing, or closing and reopening AgentDeck restores that draft. The draft is removed only
-  when the prompt request is accepted, the person empties the composer, or the browser's AgentDeck
+  refreshing, or closing and reopening Chuck restores that draft. The draft is removed only
+  when the prompt request is accepted, the person empties the composer, or the browser's Chuck
   site data is cleared; deleting the agent also removes its draft through the existing browser-side
   deletion event, while archiving does not. A rejected send keeps or restores the same draft for
   retry. Drafts do not expire, enter the transcript, reach an agent or server API, or sync to another
@@ -87,7 +87,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `waiting_input` (where the pending prompt and Cancel control already convey the wait).
 
 - **R48.** **Queue one follow-up while the agent is working.** A person may
-  submit a chat message to a `busy` or `waiting_input` chat agent instead of being refused. AgentDeck
+  submit a chat message to a `busy` or `waiting_input` chat agent instead of being refused. Chuck
   holds it and sends it as an ordinary prompt when the current turn ends, so it becomes the next
   turn. At most one message is held per agent: submitting another **replaces** it, and the composer
   offers withdrawing it. The held message is visible at the end of the transcript as clearly pending
@@ -98,7 +98,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   progress. Redirecting is the separate, explicit action in R50. A person who wants to stop what is
   happening entirely still uses Cancel.
 
-  Holding is AgentDeck's, not the provider's, so it behaves identically on every backend rather than
+  Holding is Chuck's, not the provider's, so it behaves identically on every backend rather than
   only where an adapter happens to queue. **Only a person's chat message queues.** An agent-initiated
   prompt — a mail wake, a task assignment, a pipeline stage instruction — still fails closed when a
   turn is in flight, because those callers use that refusal to arbitrate (FS-06, FS-14, FS-16); a
@@ -155,7 +155,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.4 Permission decisions
 
-- **R14.** When an ACP tool call requires approval and skip-permissions is false, AgentDeck emits a
+- **R14.** When an ACP tool call requires approval and skip-permissions is false, Chuck emits a
   `permission_request`, sets the agent to `waiting_input`, and withholds the tool until the user
   chooses Approve or Deny, cancellation claims the turn, or the permission timeout expires.
 - **R15.** Approve and Deny call `POST /api/sessions/{id}/permission` with `tool_call_id` and
@@ -172,8 +172,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   as auto-approved, the agent never enters `waiting_input`, and the tool proceeds without a user
   click. Resume and switch retain that frozen policy under FS-01.
 
-- **R40** — AgentDeck's own actions never require a human approval. When a
-  tool call names one of the actions AgentDeck itself exposes to its agents — `list_agents`,
+- **R40** — Chuck's own actions never require a human approval. When a
+  tool call names one of the actions Chuck itself exposes to its agents — `list_agents`,
   `send_message`, `check_messages`, `report_pipeline_stage_result`, `propose_pipeline_template`,
   `propose_pipeline_run`, `get_assigned_task`, `create_task`, `cancel_task`, `report_task_result`,
   `share_context`, `list_context_links`, `read_context_link`, `set_context_link_visibility`, or
@@ -183,9 +183,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the only category of tool that gains the treatment. Every other tool keeps R14's gate exactly as
   it is today — file reads and edits, shell commands, network fetches, and every provider- or
   user-configured MCP server — so the permission policy a person chose for their workspace is
-  unchanged. The reason these actions are different is that they are AgentDeck's own control plane
+  unchanged. The reason these actions are different is that they are Chuck's own control plane
   and carry no decision a person could make differently: each is reachable only across the loopback
-  boundary with a per-agent credential AgentDeck minted for that agent's current generation, each is
+  boundary with a per-agent credential Chuck minted for that agent's current generation, each is
   already authorized server-side against that agent's own identity, and none of them reads or writes
   a file, runs a command, or reaches the network. `create_task` is included even though it can cause
   a new agent to be launched: that agent appears on the dashboard, stays inside the existing
@@ -198,11 +198,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the agent differently: the same tool names, arguments, results, and refusal/retry classification
   apply (FS-17), and no agent-facing surface is added, removed, or renamed.
 
-- **R42** — Identification fails closed. A tool call AgentDeck cannot
+- **R42** — Identification fails closed. A tool call Chuck cannot
   positively identify as one of its own actions is gated under R14, exactly as today. An
   unrecognized name, a backend whose approval request does not name the tool, an identically named
   tool belonging to a different MCP server, and a malformed request all prompt rather than proceed.
-  AgentDeck never infers the exemption from the fact that an agent belongs to a pipeline or a task,
+  Chuck never infers the exemption from the fact that an agent belongs to a pipeline or a task,
   from the tool's declared category, or from the absence of arguments.
 
 - **R44** — A permission outcome that did not execute its tool is written to
@@ -261,7 +261,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   with an actionable error rather than presenting the unapplied change as active. The applied value
   becomes the agent's stored fast mode, so resume, clone, and switch runtime carry it and the
   archive records it. Because fast mode trades increased provider usage for speed, the control names
-  that trade in AgentDeck's own words rather than repeating a provider description — the pinned
+  that trade in Chuck's own words rather than repeating a provider description — the pinned
   adapters disagree, one naming the usage cost and the other not. It does not interrupt with a
   confirmation: the change is one activation, immediately reversible, and affects only the turns
   taken while it is on.
@@ -271,9 +271,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   with the reason that this model does not offer it, so a request that was accepted at launch is
   never silently reported as active. A chat agent that is not running shows its fast mode as static
   text beside backend, model, and effort, matching R24. **Known limitation:** the toggle reports the
-  fast mode AgentDeck applied and the person chose. The pinned Claude adapter can suspend fast mode
+  fast mode Chuck applied and the person chose. The pinned Claude adapter can suspend fast mode
   on its own during a provider rate-limit cooldown and re-enable it when the cooldown clears, and
-  AgentDeck does not yet consume the session update that reports this, so a suspended Claude agent
+  Chuck does not yet consume the session update that reports this, so a suspended Claude agent
   still shows fast mode on. The pinned Codex adapter reports no fast-mode state back at all.
 
 - **R47.** **Supersedes R23's effort clause.** For a running chat agent the
@@ -302,7 +302,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   separate tall block; Back remains first, context remains a quiet right-hand summary, and long
   names, staged changes, errors, and unavailable settings may wrap without hiding or reordering a
   control. Right-clicking the header opens the existing pointer-menu treatment with **Copy thread
-  identity**, which copies the exact stable AgentDeck `agent_id`. A clipboard failure leaves the
+  identity**, which copies the exact stable Chuck `agent_id`. A clipboard failure leaves the
   workspace usable and surfaces an actionable error.
 
 - **R63 (shipped 2026-09-26) — Selected transcript text has an explicit Copy action.** When a person
@@ -325,7 +325,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   it, and Escape dismisses it. Accepting replaces the typed `@query` with `@` followed by the file's
   path relative to the session working directory, then a trailing space. The result is ordinary
   composer text: it is submitted exactly as displayed, is recorded verbatim in the durable
-  `user_text` event, and requires no change to the prompt request contract (R6) — AgentDeck sends no
+  `user_text` event, and requires no change to the prompt request contract (R6) — Chuck sends no
   structured attachment and embeds no file contents. Enter accepts the highlighted entry only while
   the picker is open; with the picker closed Enter submits per R6, and Shift+Enter always inserts a
   newline.
@@ -342,7 +342,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the prior live-session list. Accepting replaces `#query` with `/` followed by the advertised name
   and a trailing space: a Codex skill advertised as `$review` therefore inserts `/$review `. The
   inserted command is ordinary composer text and is submitted and recorded exactly as displayed.
-  AgentDeck neither invents commands nor attempts to classify a provider's entries as skills.
+  Chuck neither invents commands nor attempts to classify a provider's entries as skills.
 
 ### 2.7 Diagram rendering
 
@@ -360,7 +360,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   sequence, no fold boundary (R4), and no archived or searched content, so the same message replays
   identically after a reload and renders identically in an archived transcript (FS-05.R14).
   Rendering applies only to assistant text. Tool calls, tool results, diffs, user prompts, and
-  annotations are unchanged, and AgentDeck neither authors, edits, exports, nor downloads diagrams.
+  annotations are unchanged, and Chuck neither authors, edits, exports, nor downloads diagrams.
 
 ### 2.8 Chat panes on the dashboard
 
@@ -389,11 +389,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R51** — **A file link an agent wrote opens the file.** In assistant
   Markdown, a link whose target is a local filesystem path — relative
   (`internal/state/messages.go`), absolute, or `file://`, optionally suffixed `:line`,
-  `:line:col`, or a `:start-end` range cited by its start line — opens that file in AgentDeck's file viewer (R52) instead of navigating the browser.
+  `:line:col`, or a `:start-end` range cited by its start line — opens that file in Chuck's file
+  viewer (R52) instead of navigating the browser.
   Today such a link is an ordinary relative anchor, so activating it leaves the agent screen, fails
   to resolve as an application route, and lands on the dashboard after a full reload, losing the
   reader's place in the conversation; that is the defect this closes. `http`, `https`, and `mailto`
-  links are untouched. AgentDeck adds no path detection over plain transcript text: a path an agent
+  links are untouched. Chuck adds no path detection over plain transcript text: a path an agent
   mentions without marking it as a link stays text, so the product never invents a link that
   resolves to nothing. Link handling is presentation of an existing event — it changes no durable
   event, no sequence, no fold boundary (R4), and no annotation target (FS-13.R4), so a message
@@ -408,7 +409,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   link inside a rendered file is relative to that file's own directory, as in ordinary Markdown, and
   a link that climbs above the working directory still reaches R55's refusal. Opening
   another file replaces the open one: there is one panel, with no tabs and no history. Content is
-  read when the file is opened and when **Reload** is chosen — AgentDeck does not watch or poll the
+  read when the file is opened and when **Reload** is chosen — Chuck does not watch or poll the
   file — so the panel states when its content was read, and a file the agent rewrites afterwards
   keeps showing the earlier read until it is reloaded. The viewer never writes, creates, renames,
   deletes, downloads, or runs anything, and offers no directory browsing.
@@ -454,7 +455,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R64 (shipped 2026-09-30) — Conversation file reads are unrestricted by project roots.** This supersedes
   R55's working-directory and `.git` containment when it ships. A local filesystem link may name
-  any regular UTF-8 file the AgentDeck process can read, including a file outside every configured
+  any regular UTF-8 file the Chuck process can read, including a file outside every configured
   project or `add_dirs`, a path reached through a symlink, and a file inside `.git`. Relative paths
   still resolve from the session's recorded working directory; absolute and local `file://` paths need no
   session-root authorization. The viewer shows the normalized path spelling used for the read —
@@ -466,7 +467,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   their stated refusals, while an oversized text file keeps its labelled partial result. Composer
   file search remains working-directory-confined under R34, no directory browsing or path
   discovery is added, no remote-control route gains file-reading authority, and no file content or
-  access history becomes durable AgentDeck state.
+  access history becomes durable Chuck state.
 
 - **R65 (shipped 2026-09-30) — Loaded file text joins the existing annotation interaction.** In a live or
   archived chat session, selecting text in the file viewer and right-clicking offers **Copy
@@ -482,10 +483,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 - **R56 — A steer that loses the active turn remains host-owned.** If the
   adapter handles a Steer request after no provider turn is still active, it returns a
-  no-consumption `promptRequired` outcome instead of launching a detached turn. AgentDeck then sends
+  no-consumption `promptRequired` outcome instead of launching a detached turn. Chuck then sends
   the unchanged message through the ordinary prompt path exactly once, so the normal busy,
   waiting, cancellation, and terminal lifecycle applies and the public outcome remains `new_turn`.
-  AgentDeck never retries `startedNewTurn`: that outcome means the adapter may already have consumed
+  Chuck never retries `startedNewTurn`: that outcome means the adapter may already have consumed
   the message. Steer remains available wherever the runtime advertises it; an advertised adapter
   must provide this host-owned fallback before the planned behavior ships.
 
@@ -494,7 +495,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R57** — A runtime-advertised reasoning stream appears live in chronological order
   beside the assistant turn under one compact **Thinking** disclosure, collapsed by default. Opening
   it reveals the text received so far and continues streaming without moving or duplicating the
-  surrounding transcript. Reasoning is ephemeral: AgentDeck does not append it to the transcript,
+  surrounding transcript. Reasoning is ephemeral: Chuck does not append it to the transcript,
   database, archive, search index, annotations, context references or clone history, and it is gone
   after reload or reopening. The same rule applies to reasoning emitted by a native child session.
 - **R58** — When both sides negotiate native subagent sessions, each provider child is
@@ -502,10 +503,10 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   the child when the runtime supplies a name and shows its lifecycle, assistant output, tool calls,
   tool results, diffs, permissions and terminal outcome using the ordinary normalized renderers.
   Durable child events are retained in the parent transcript and replay with the same nesting; they
-  do not create AgentDeck agents, dashboard cards, durable tasks, pipeline stages, independent
+  do not create Chuck agents, dashboard cards, durable tasks, pipeline stages, independent
   archive rows or separate search identities. Child permissions remain actionable from the parent
   conversation and identify the child that requested them. Root Cancel and Stop keep their existing
-  whole-turn/session authority; AgentDeck offers no targeted child stop or close that the negotiated
+  whole-turn/session authority; Chuck offers no targeted child stop or close that the negotiated
   capability does not provide. A loaded child whose provider history cannot prove an outcome is
   shown as `disconnected`, not failed; it remains inspectable but has no live control.
 - **R59** — When a runtime advertises background-task control, a command that continues
@@ -517,12 +518,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   claiming the task stopped; a refusal or transport failure preserves the last state and gives a
   retryable error. Lifecycle events are durable and replay in live and archived transcripts. A
   provider restart may terminally stop or fail old tasks, exactly as reported by the runtime.
-  Background tasks never become AgentDeck durable tasks, pipeline work or terminal-interface tabs.
+  Background tasks never become Chuck durable tasks, pipeline work or terminal-interface tabs.
 - **R60** — Tool calls prefer the runtime's canonical tool name and retain the existing
   bounded title/kind fallback when no name is supplied. The canonical name flows through permission
   identity, transcript rendering, command/file tracking and diagnostic logs without changing the
   provider's arguments or result. A runtime that improves load/fork pagination, MCP elicitation
-  completion or ordinary diff emission requires no provider-specific UI path: AgentDeck consumes
+  completion or ordinary diff emission requires no provider-specific UI path: Chuck consumes
   the same normalized history, permission and diff contracts and must not duplicate replayed events
   or leave a completed elicitation pending.
 - **R61** — Plan updates remain deliberately ignored. Supporting them
@@ -726,7 +727,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `sse.test.ts` multi-open and delayed-response cases, a `transcriptStore.test.ts` case applying an
   out-of-order transcript, and a pane render test beside `ChatPanel.test.tsx`.
 
-- **A24** (R40–R42) — Each of the fifteen AgentDeck actions raised as an
+- **A24** (R40–R42) — Each of the fifteen Chuck actions raised as an
   approval request executes with no `waiting_input` transition and no pending request, under a
   launch policy with `skip_permissions` false. A same-named tool advertised by a different MCP
   server, an unnamed approval request, and an ordinary file-edit, shell, and fetch request each
@@ -835,7 +836,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `internal/server/fileread_unix_test.go`, and
   `ui/src/components/chat/FileViewer.test.tsx`.
 - **A38** (R56) — A fake adapter whose active turn settles before it
-  handles a Steer request returns `promptRequired` without emitting a detached turn; AgentDeck
+  handles a Steer request returns `promptRequired` without emitting a detached turn; Chuck
   submits the unchanged text once through the ordinary prompt path, reports `new_turn`, keeps the
   agent busy until that prompt's terminal event, and lets Send and Cancel arbitrate against that
   host-owned turn. The transcript contains one user message and one terminal outcome. A provider
@@ -911,11 +912,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   permission mutation failures are surfaced as required above; initial history-load diagnostics are
   an open UX gap.
 
-- **Confirmed AgentDeck-action approval boundary.** R40–R44 exempt AgentDeck's own fifteen actions
+- **Confirmed Chuck-action approval boundary.** R40–R44 exempt Chuck's own fifteen actions
   from the approval gate and stop the default auto-deny. They add no per-tool, per-role, per-stage,
   or per-template autonomy setting, do not change what `skip_permissions` means for any other tool,
   do not pre-authorize anything at the provider CLI, and add no agent-facing tool, argument, result,
-  or knowledge change. An approval request AgentDeck cannot identify keeps prompting. R43's
+  or knowledge change. An approval request Chuck cannot identify keeps prompting. R43's
   indefinite hold is safe only because FS-14.R54 makes a run waiting on an undecided request say so;
   the two ship together.
 

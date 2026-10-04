@@ -1,4 +1,4 @@
-# AGENTS.md — AgentDeck
+# AGENTS.md — Chuck
 
 Guidance for coding agents working in this repository.
 
@@ -41,7 +41,7 @@ rationale, history, or sequencing but do not override an FS/TS requirement.
 - **Shape and test UX:** §15. `/ux` is explicit or automatically accompanies feature design and
   implementation only when an established task changes or material consequence, state, recovery,
   long-running, or AI uncertainty needs judgment; it optimizes the experienced operator's task.
-- **Release:** §16. `/release` tags a new version, refreshes the shipped `operating-agentdeck`
+- **Release:** §16. `/release` tags a new version, refreshes the shipped `operating-chuck`
   package for what the release range changed, and publishes only with explicit authorization; it
   adds no feature and fixes no finding.
 

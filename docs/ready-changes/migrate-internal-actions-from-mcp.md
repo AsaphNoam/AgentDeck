@@ -1,15 +1,15 @@
-# Migrate AgentDeck internal actions from MCP
+# Migrate Chuck internal actions from MCP
 
 **State:** Paused
-**Why:** Direct operator request on 2026-08-31 to remove MCP where AgentDeck controls both sides and
+**Why:** Direct operator request on 2026-08-31 to remove MCP where Chuck controls both sides and
 it adds context/protocol cost without an interoperability benefit.
 **Relevant requirements:** FS-06 §6; FS-15 §6; FS-16 §6; FS-17.R13–R20/A7–A11; TS-01.R25; TS-03.R32;
 TS-04.R32–R40; TS-05.R18–R19; TS-06.R23; TS-11.R11–R12; INV §§1–6, 8–15
 
 ## Outcome
 
-Every supported chat agent uses one packaged, generation-authenticated `agentdeck action` command
-for AgentDeck coordination. AgentDeck no longer advertises its internal actions as MCP, while
+Every supported chat agent uses one packaged, generation-authenticated `chuck action` command
+for Chuck coordination. Chuck no longer advertises its internal actions as MCP, while
 provider- and user-configured MCP support continues unchanged.
 
 ## Included work
@@ -33,7 +33,7 @@ distributable checks pass.
 ## Waiting on
 
 Packaged Codex and its ACP adapter must expose a narrowly scoped direct transport that a managed
-Codex process can reach under AgentDeck's default sandbox. AgentDeck must prove that transport with
+Codex process can reach under Chuck's default sandbox. Chuck must prove that transport with
 the packaged release runtime and all four supported chat providers before this design returns to
 review. Broad network access, filesystem mailbox transport, and a Codex-only MCP exception do not
 satisfy the gate.

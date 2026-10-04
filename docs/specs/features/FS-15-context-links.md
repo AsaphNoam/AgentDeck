@@ -7,7 +7,7 @@
 ## 1. Purpose
 
 Agents can expose durable work to one another without copying it into mail or eagerly injecting it
-into another model's conversation. AgentDeck gives an immutable source selection a stable,
+into another model's conversation. Chuck gives an immutable source selection a stable,
 target-neutral context reference, grants agents permission to retrieve that reference, and returns
 its content only through an explicit bounded read. Direct sharing is an ad-hoc convenience; future
 work objects may attach the same reference and expose it through their own assignment API without
@@ -24,7 +24,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   same reference id; sharing it with another agent or attaching it to another piece of work does not
   duplicate the reference. The reference records intrinsic provenance but contains no target,
   presentation title, description, read state, work id, prompt, or copied source content.
-- **R2 — The initial sources are immutable AgentDeck records.** The accepted source kinds
+- **R2 — The initial sources are immutable Chuck records.** The accepted source kinds
   are (a) an exact inclusive sequence range in one agent's append-only normalized transcript and
   (b) the accepted immutable report of one pipeline attempt. A transcript source is resolved to
   concrete `agent_id`, first-sequence, and last-sequence values before its reference is returned; a
@@ -39,7 +39,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 - **R4 — Agents can share only context they currently own.** A token-bound chat agent may
   share the transcript content accumulated in its current turn so far, its latest completed
   transcript turn, or the accepted report of its current pipeline attempt, with one resolvable chat
-  agent. AgentDeck derives the caller and source identity from the live MCP session and resolves the
+  agent. Chuck derives the caller and source identity from the live MCP session and resolves the
   friendly source selector to the exact R2 locator; the caller cannot name another agent's
   transcript or an unrelated pipeline attempt. Sharing returns both the canonical reference id and
   the direct-grant id. `current_turn` is an immutable snapshot through the share call: the intended
@@ -78,7 +78,7 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
 ### 2.3 Retrieval and plane boundaries
 
 - **R9 — Retrieval is explicit, authorized, and bounded.** A token-bound agent reads a
-  reference by id only when an effective authorization path exists. AgentDeck returns a stable
+  reference by id only when an effective authorization path exists. Chuck returns a stable
   source description and one bounded, deterministic text page with an opaque continuation cursor;
   repeated reads can traverse the fixed source without changing it. Missing and unauthorized ids
   share one safe `context_not_found` outcome.
@@ -120,12 +120,12 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   status, and task running/terminal status are never reference identity or authorization.
 - **R13 — Deleted sources become tombstones, not aliases.** If an agent transcript or
   pipeline run/attempt is deleted after a reference was created, the reference remains identifiable
-  but reads return a typed `context_source_unavailable` tombstone. AgentDeck neither remaps it to a
+  but reads return a typed `context_source_unavailable` tombstone. Chuck neither remaps it to a
   newer source nor retains an implicit content snapshot. Archive is not deletion.
 - **R14 — Identity relationships have narrow durable effects.** The schema cascades a
   recipient row deletion to its direct grants and personal preferences as defensive referential
   hygiene, while retaining a grantor id as logical provenance without a foreign-key cascade.
-  AgentDeck adds no agent-deletion product operation in this feature. Deleting or revoking one
+  Chuck adds no agent-deletion product operation in this feature. Deleting or revoking one
   relationship cannot cascade into the underlying transcript, pipeline run, another grant, or
   future work attachment.
 - **R15 — Invalid source selection is atomic.** An empty or reversed transcript range, a

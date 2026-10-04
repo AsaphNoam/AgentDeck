@@ -1,4 +1,4 @@
-# AgentDeck work workflow
+# Chuck work workflow
 
 This is the shared way Claude Code and Codex make changes, review work, and leave the repository
 easy to resume. The feature and technical specifications say what the product must do; this document
@@ -290,7 +290,7 @@ captured logs may be the only evidence there will ever be. The investigation cha
 and no specifications, with one exception: it may commit a reproduction test marked skipped.
 
 1. **Record the report.** Capture the report verbatim before interpreting it: the symptom, what the
-   person was doing, the AgentDeck version or commit when known, the environment, and the logs — or
+   person was doing, the Chuck version or commit when known, the environment, and the logs — or
    the explicit fact that nothing was logged. If the request carries no report, ask for one.
 2. **Establish expected behavior first.** Find the FS/TS/INV items that govern the reported area
    before reading code, and classify the report:
@@ -387,7 +387,7 @@ Commit only the state file and finish with the §6 human update.
 
 ## 14. Design UI
 
-`/design` is the design-quality workflow for AgentDeck's interface. It runs explicitly when named
+`/design` is the design-quality workflow for Chuck's interface. It runs explicitly when named
 and accompanies another role automatically when that role materially depends on visual judgment:
 a new screen, redesign, meaningful composition or styling change, motion, visual polish, or design
 critique. It stays out of data wiring, state fixes, behavior tests, copy-only changes, and other
@@ -411,7 +411,7 @@ Before implementation, capture a compact direction in the working plan or existi
 - **Operator and job:** who uses this surface, the repeated task, its frequency, and the one result
   the first view must make easiest.
 - **Composition:** first-view thesis, reading order, density, focal point, and what stays quiet.
-- **AgentDeck proof:** one choice rooted in agent lifecycle, coordination, technical work, or another
+- **Chuck proof:** one choice rooted in agent lifecycle, coordination, technical work, or another
   real product mechanism; name why it belongs here rather than in any administration dashboard.
 - **States and interaction:** real content ranges plus relevant empty, loading, error, permission,
   paused, active, and completed states; feedback for every action in scope.
@@ -437,7 +437,7 @@ ownership, state, dependency, urgency, or scope. Avoid flattening the interface 
 nested surfaces, decorative labels, or repeated icon tiles. Use real product-shaped content while
 designing so long names, dense runs, blocked work, errors, and empty states influence the result.
 
-Spend visual boldness in one place and keep the operating surface disciplined around it. AgentDeck's
+Spend visual boldness in one place and keep the operating surface disciplined around it. Chuck's
 lifecycle and coordination states are strong material: transitions between working, waiting,
 blocked, delegated, failed, and completed can carry hierarchy and continuity. Expression must never
 obscure the task, state, familiar control, semantic status color, or technical content. Typography,
@@ -473,7 +473,7 @@ browser and inspect the affected route or fixture after fonts, data, and motion 
 matrix is repeatable input, not a substitute for the product surface. When the inspection needs
 representative product states — live, blocked, or delegated sessions, permission prompts,
 failures — reuse the rendered-run setup from [`USABILITY-REVIEW.md`](USABILITY-REVIEW.md) §2 as
-applicable: the real built binary, an isolated review-owned `AGENTDECK_HOME`, and the
+applicable: the real built binary, an isolated review-owned `CHUCK_HOME`, and the
 deterministic `fakeacp` backend. This borrows that environment only; a small visual edit whose
 states the affected route already reaches does not inherit the full usability-review ceremony.
 Choose viewports from the governing requirements and affected layout rather than assuming
@@ -485,7 +485,7 @@ Exercise the important state matrix from the direction, including interaction st
 fixtures cannot prove. For motion, observe the transition at normal speed, repeat or interrupt it,
 and check reduced motion. A valid inspection checks hierarchy, scan path, density, state salience,
 copy, focus and hover feedback, contrast, alignment, clipping, overflow, stacking, and whether the
-result still belongs unmistakably to AgentDeck.
+result still belongs unmistakably to Chuck.
 
 Critique against the direction rather than personal taste. Name rendered evidence and consequence,
 rank implementation findings as **Must fix**, **Worth fixing**, or polish, and remove unsupported
@@ -500,7 +500,7 @@ review alone cannot close a visual claim, and open-ended polishing is not a comp
 
 ## 15. Shape and test the experience
 
-`/ux` improves how a person understands and completes a task across AgentDeck's interface, CLI,
+`/ux` improves how a person understands and completes a task across Chuck's interface, CLI,
 and AI-assisted behavior. It runs explicitly when named. During `/design-feature` or implementation,
 use it automatically only when the work changes an established task flow or introduces an
 unfamiliar or consequential decision, ambiguous state, recovery path, long-running operation, or AI
@@ -512,7 +512,7 @@ turns critique into implementation, invents user evidence, or replaces `/design-
 `/design`, `/review`, or `/usability-review`. It is primarily a design-time companion; rendered
 validation tests the resulting experience after it exists.
 
-AgentDeck currently serves a small set of experienced internal operators. Default to their actual
+Chuck currently serves a small set of experienced internal operators. Default to their actual
 knowledge, learned habits, and repeated-use needs: speed, density, keyboard flow, predictability,
 and control. Do not simplify a workflow for a hypothetical novice. First-use guidance matters when
 onboarding is the task; rediscoverability matters when an operation is rare or consequential enough
@@ -582,7 +582,7 @@ recovery behavior, or the unresolved design-time risk could change the judgment.
 fully established by acceptance tests does not earn a browser pass; an explicit standalone `/ux`
 critique does. When validation is warranted, run the working tree's real product and complete the
 framed task from the operator's normal entry state. Reuse `USABILITY-REVIEW.md` §§2 and 5 for an
-isolated `AGENTDECK_HOME`, the built binary, `fakeacp` when deterministic live behavior is
+isolated `CHUCK_HOME`, the built binary, `fakeacp` when deterministic live behavior is
 needed, and the browser fallback ladder. Exercise the primary task plus only the state,
 consequence, interruption, or recovery branch likely to change the judgment. Source inspection and static rendering may identify risks but cannot prove an
 experienced finding.
@@ -615,13 +615,13 @@ can find an action, read state, predict a consequence, or understand feedback.
 
 When both trigger, share one task frame and one rendered browser pass. Describe the user problem
 once: `/ux` establishes what the experience must communicate or enable, and `/design` makes that
-need perceptible and coherent in AgentDeck's visual system. Do not bounce a finding between the two,
+need perceptible and coherent in Chuck's visual system. Do not bounce a finding between the two,
 duplicate evidence, or let visual polish stand in for a missing step, unsafe action, or absent
 recovery path.
 
 ## 16. Cut a release
 
-`/release` tags a new version and keeps the shipped `operating-agentdeck` skill package matched to
+`/release` tags a new version and keeps the shipped `operating-chuck` skill package matched to
 what that version actually ships. It does not add features, fix findings, or change product
 behavior; when the release range needs one of those, that work happens first under §2 or §8.
 
@@ -632,10 +632,10 @@ behavior; when the release range needs one of those, that work happens first und
    open review unit is a user decision under §3, not something to wave through.
 
 2. **Refresh the shipped operator skill.** Read the range for anything that changes what an agent
-   operating AgentDeck must know: agent-facing tool behavior and results, coordination and task
+   operating Chuck must know: agent-facing tool behavior and results, coordination and task
    semantics, pipeline stage and supervision behavior, agent lifecycle, configuration, interfaces,
    and project resources. For each such change, decide whether the embedded package is now wrong,
-   incomplete, or stale, and correct it in `internal/agentknowledge/operating-agentdeck/**` — the
+   incomplete, or stale, and correct it in `internal/agentknowledge/operating-chuck/**` — the
    single source (TS-11.R1). Never edit an installed cache view, which is a disposable projection,
    and never confuse the shipped package with this repository's own `.claude/skills` and
    `.agents/skills` launchers. TS-11.R8 decides which file owns a correction, and its exclusions

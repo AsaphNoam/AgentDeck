@@ -13,9 +13,9 @@ freshness/watch behavior, cache, launch freezing, and redaction. FS-08 owns user
 ## 2. Design & constraints
 
 **R1 — Federation is one-way.** Native provider files remain authoritative in linked and mirrored
-modes. AgentDeck persists a binding, approved roots, and explicit overrides; provenance,
+modes. Chuck persists a binding, approved roots, and explicit overrides; provenance,
 fingerprints, generation, and health are derived manager/snapshot/cache state. An optional
-owner-only mirror is disposable cache. AgentDeck never writes the native source.
+owner-only mirror is disposable cache. Chuck never writes the native source.
 
 **R2 — Resolution is provider-native and pure.** Claude and Codex resolvers implement their real
 precedence and inventory rules from an explicit source root/project/profile plus an approved-root
@@ -28,11 +28,11 @@ source root, profile, mode, fingerprints, and redacted result. Bind consumes a m
 token; source-root/profile/mode changes require re-preview.
 
 **R4 — Consent is backend/source-root scoped; resolution is project-aware.** A backend binding can
-serve different AgentDeck projects. Every resolution admits the currently selected canonical
+serve different Chuck projects. Every resolution admits the currently selected canonical
 project root for that resolution, without persisting it as new source-root consent or requiring a
-new preview merely because the AgentDeck project changed.
+new preview merely because the Chuck project changed.
 
-**R5 — Effective composition has explicit precedence.** Launch-explicit values beat AgentDeck
+**R5 — Effective composition has explicit precedence.** Launch-explicit values beat Chuck
 binding overrides; overrides beat provider-native resolved values; absent explicit/override values
 are natively inherited by omitting the ACP model where required. Every effective field carries
 provenance (`explicit`, `override`, native source, default/absent).
@@ -60,8 +60,8 @@ Reference-only/unsupported assets are inventory metadata, not copied content.
 values, provenance, field/key names, asset kinds/paths/hashes, health, and changed keys. It does not
 return native file bodies, environment values, credential material, hook bodies, or tokens after use.
 
-**R11 `(planned)` — Detached import materializes only copyable contracts.** Detach will make an
-AgentDeck-owned copy only for fields/assets with a verified injection path. Until then
+**R11 `(planned)` — Detached import materializes only copyable contracts.** Detach will make a
+Chuck-owned copy only for fields/assets with a verified injection path. Until then
 `detach=true` returns `501 not_implemented`; ordinary unbind works.
 
 **R12 `(planned)` — Provider compatibility is acceptance-gated.** Pinned real Claude/Codex versions
@@ -160,7 +160,7 @@ does not require project. It never carries source content.
 - Detach is not implemented (R11); the UI shows it as unavailable and unbind remains supported.
 - Custom root/profile controls are not exposed in the normal UI although the API/resolvers support
   them. Effective-view SSE invalidation and prompt watch registration have known usability gaps.
-- Real-provider acceptance in R12 is credential-gated. Fake/fixture coverage proves AgentDeck's
+- Real-provider acceptance in R12 is credential-gated. Fake/fixture coverage proves Chuck's
   resolver/manager behavior, not undocumented provider compatibility.
 - **Accepted enabled-bind residue (R17).** The backend catalog and source manifest remain separate
   owner-only JSON authorities. A crash between their atomic writes or a failed compensation may

@@ -6,9 +6,9 @@
 
 ## 1. Purpose
 
-Every session AgentDeck has ever run — active or stopped — is durably recorded, browsable, and
+Every session Chuck has ever run — active or stopped — is durably recorded, browsable, and
 searchable, and any inactive session can be resumed with its history and composed config restored.
-Alongside each session, AgentDeck rolls up the files the agent edited and the shell commands it ran.
+Alongside each session, Chuck rolls up the files the agent edited and the shell commands it ran.
 This spec governs the archive list/search surface (`GET /api/archive`), resume-from-archive, the
 read-only transcript view of an archived session, and the per-session file/command tracking tabs. It
 does **not** cover live launch/stop/switch (FS-01), the live chat panel (FS-03), or config federation

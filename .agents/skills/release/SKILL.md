@@ -10,7 +10,7 @@ handoff header when present; otherwise read only **Current position** and **Acti
 change** in [`HANDOFF.md`](../../../docs/features/HANDOFF.md). Open its **Review findings**,
 **Acceptance gates**, and **Blocked on human** sections for readiness, then read FS-10 and
 TS-06.R13–R22 for the release contract,
-FS-18 and TS-11 for the shipped `operating-agentdeck` package, and
+FS-18 and TS-11 for the shipped `operating-chuck` package, and
 [`AGENT-WORKFLOW.md`](../../../docs/features/AGENT-WORKFLOW.md) §§2–6 and §16 completely. Then
 follow the shared workflow; the workflow and specs take precedence over this launcher.
 
@@ -18,8 +18,8 @@ follow the shared workflow; the workflow and specs take precedence over this lau
 and confirm it with the user before tagging.
 
 The release range runs from the previous `vX.Y.Z` tag to `main`. Read it for behavior an agent
-operating AgentDeck must know, and refresh the embedded package under
-`internal/agentknowledge/operating-agentdeck/` — the single source, never an installed cache view
+operating Chuck must know, and refresh the embedded package under
+`internal/agentknowledge/operating-chuck/` — the single source, never an installed cache view
 and never this repository's own skill launchers. State plainly when the range changes nothing
 agent-facing. Do not add features or fix findings here; an open **Must fix** finding returns to
 `/fix` before a release.

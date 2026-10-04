@@ -2,13 +2,13 @@
 
 **Status:** Partial
 **Code:** `internal/agentknowledge`, `internal/config`, `internal/server`, `internal/runtime`, `internal/messaging`, `internal/cli`
-**Absorbed:** the AgentDeck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
+**Absorbed:** the Chuck knowledgebase idea in [`../../ideas.md`](../../ideas.md)
 
 ## 1. Scope
 
-This specification owns the product-managed `operating-agentdeck` skill package, its release-time
-source, secure cache installation, delivery to every AgentDeck-launched process, safe degradation
-when the package is unavailable, and the exact legacy AgentDecker-prompt migration.
+This specification owns the product-managed `operating-chuck` skill package, its release-time
+source, secure cache installation, delivery to every Chuck-launched process, safe degradation
+when the package is unavailable, and the exact legacy FirstMate-prompt migration.
 
 It does not create a documentation API, MCP documentation tool, mutable knowledge store, managed
 role system, provider-home synchronization, or development/release-maintenance workflow. Feature
@@ -18,28 +18,28 @@ operating guidance.
 ## 2. Design & constraints
 
 **R1 — One embedded source owns the complete skill package.** A new
-`internal/agentknowledge` package embeds one canonical `operating-agentdeck` source tree:
+`internal/agentknowledge` package embeds one canonical `operating-chuck` source tree:
 
 ```text
-operating-agentdeck/
+operating-chuck/
   SKILL.md
   references/operate-agents.md
   references/coordinate-work.md
   references/build-and-run-pipelines.md
 ```
 
-`SKILL.md` has provider-neutral frontmatter with `name: operating-agentdeck` and a description that
-triggers when an agent answers AgentDeck product questions or operates, coordinates, or supervises
-AgentDeck work. It links references one level deep. There is no independently maintained
+`SKILL.md` has provider-neutral frontmatter with `name: operating-chuck` and a description that
+triggers when an agent answers Chuck product questions or operates, coordinates, or supervises
+Chuck work. It links references one level deep. There is no independently maintained
 Claude/Codex source twin and no generated copy committed outside this package.
 
 **R2 — Startup atomically publishes two byte-identical managed views when verification
-succeeds.** On every dashboard start, AgentDeck attempts to install the embedded package beneath the
-owner-only root `$AGENTDECK_HOME/cache/agent-skills/` at:
+succeeds.** On every dashboard start, Chuck attempts to install the embedded package beneath the
+owner-only root `$CHUCK_HOME/cache/agent-skills/` at:
 
 ```text
-.agents/skills/operating-agentdeck/**
-.claude/skills/operating-agentdeck/**
+.agents/skills/operating-chuck/**
+.claude/skills/operating-chuck/**
 ```
 
 Both views contain exactly the embedded files with byte-identical contents. Installation stages and
@@ -47,7 +47,7 @@ verifies the complete package before replacing managed files atomically; dashboa
 package-level commit boundary, so no managed launch can observe a partly installed tree. Managed
 directories are `0700`, regular files are `0600`, no installed entry is a symlink, and every
 resolved path stays beneath the managed cache root. The installer owns only this cache root; it
-never writes a repository, personal skill directory, native provider home, or AgentDeck's private
+never writes a repository, personal skill directory, native provider home, or Chuck's private
 Codex profile.
 
 **R3 — retired 2026-08-29:** Startup-fatal package installation was replaced before implementation
@@ -58,11 +58,11 @@ server-owned helper receives the startup process's verified package availability
 already-composed base `LaunchSpec` for fresh launch, ordinary and wake resume, runtime switch,
 pipeline launch/resume, chat, and terminal only when that availability is true. It:
 
-- adds `$AGENTDECK_HOME/cache/agent-skills` once to effective `AddDirs`;
-- adds reserved final-layer `AGENTDECK_SKILL_DIR`, pointing to the absolute managed
-  `.agents/skills/operating-agentdeck` directory; and
-- appends once: `AgentDeck operator knowledge is in the bundled operating-agentdeck skill at
-  <absolute path>/SKILL.md; read it when AgentDeck-specific behavior matters.`
+- adds `$CHUCK_HOME/cache/agent-skills` once to effective `AddDirs`;
+- adds reserved final-layer `CHUCK_SKILL_DIR`, pointing to the absolute managed
+  `.agents/skills/operating-chuck` directory; and
+- appends once: `Chuck operator knowledge is in the bundled operating-chuck skill at
+  <absolute path>/SKILL.md; read it when Chuck-specific behavior matters.`
 
 Provider-native discovery consumes the `.agents` or `.claude` view as supported. The absolute-path
 instruction is the provider-neutral fallback and is authoritative if a same-named user/project
@@ -114,12 +114,12 @@ advertises only three tools and superseded wake behavior is corrected. No skill 
 argument schema or duplicates the full registration inventory.
 
 **R8 — Core and reference content are bounded by ownership.** The main `SKILL.md`
-contains only the AgentDeck-wide choices in FS-18.R3–R4: message versus task versus context link
-versus pipeline, durable dependencies instead of polling, pull-only/non-waking context, AgentDeck-
+contains only the Chuck-wide choices in FS-18.R3–R4: message versus task versus context link
+versus pipeline, durable dependencies instead of polling, pull-only/non-waking context, Chuck-
 derived authority, structured-result behavior, and routing to tool definitions for exact mechanics.
 `coordinate-work.md` owns coordination-only details including messaging budgets.
 `build-and-run-pipelines.md` owns pipeline-only details including accepted/`blocked` attempt
-finality, human Continue, and review-only AgentDecker proposals. `operate-agents.md` owns lifecycle,
+finality, human Continue, and review-only FirstMate proposals. `operate-agents.md` owns lifecycle,
 configuration, interface, and project-resource detail. Examples are limited to commonly misused
 behavior; planned, experimental, secret-bearing, credential-specific, and unverifiable claims are
 excluded. As an alignment cleanup, the fresh PM and teammate seed prompts remove duplicated
@@ -134,22 +134,22 @@ development/release skill that workflow uses.
 signal.** The installer returns one immutable process-local availability result to server
 construction. Secure-path, publication, or verification failure returns `Available=false`, emits a
 bounded warning to the ordinary startup log/stderr sinks, and permits dashboard startup. The shared
-composition helper then adds no managed `AddDirs`, `AGENTDECK_SKILL_DIR`, or package-use prompt for
-any launch path, even if a prior cache remains on disk. AgentDeck neither claims nor natively
+composition helper then adds no managed `AddDirs`, `CHUCK_SKILL_DIR`, or package-use prompt for
+any launch path, even if a prior cache remains on disk. Chuck neither claims nor natively
 advertises the package for that dashboard process, and R13's migration does not run. The next
 dashboard start retries installation and then migration; there is no background repair, network
 fetch, telemetry, or hot-reload loop.
 
 **R11 (planned) — Operating guidance chooses actions without duplicating their protocol.** The
 embedded skill replaces internal-MCP/tool wording with the FS-17.R13 action names and directs agents
-to `agentdeck action describe <action>` for exact fields and results. It retains cross-action
+to `chuck action describe <action>` for exact fields and results. It retains cross-action
 judgment, budgets, authority, recovery, and pipeline/task boundaries, but does not copy schemas,
 credentials, URLs, or the full action catalog into resident guidance.
 This replacement ships atomically with the eventual direct-action cutover; internal-MCP wording
 remains correct and unchanged while FS-17.R20 is unmet.
 
 **R12 (planned) — Basic action discovery does not depend on skill installation.** Every chat runtime
-overlay carries one short stable pointer to `$AGENTDECK_ACTION_CLI action ...`; mail activation names
+overlay carries one short stable pointer to `$CHUCK_ACTION_CLI action ...`; mail activation names
 `check_messages`, task activation names `get_assigned_task`, and pipeline assignment names
 `report_pipeline_stage_result`. If managed-skill installation degrades under R10, these exact next
 steps remain available without claiming the broader knowledge package is installed. Terminal
@@ -157,7 +157,7 @@ launches receive neither signal (FS-17.R15/R18, TS-04.R36–R37).
 No direct-action pointer is injected while the migration is paused.
 
 **R14 — retired 2026-10-03:** Special retirement/prompt migration replaced by ordinary publication R18.
-**R18** `(planned)` — Rename `SkillName`, embedded directory and frontmatter to `operating-chuck`.
+**R18** — Rename `SkillName`, embedded directory and frontmatter to `operating-chuck`.
 Reuse `internal/agentknowledge/package.go`'s existing verified whole-root publication (R9/R10),
 which stages both provider views and replaces the managed root; do not add an old-name detector,
 cleanup retry loop or per-directory migration. Files outside that owned root remain untouched.
@@ -246,10 +246,10 @@ new evaluation service or model-selection policy is part of the change.
 The new agent-facing delivery contracts are:
 
 ```text
-skill name: operating-agentdeck
-managed root: $AGENTDECK_HOME/cache/agent-skills
-direct package: $AGENTDECK_HOME/cache/agent-skills/.agents/skills/operating-agentdeck
-reserved env: AGENTDECK_SKILL_DIR=<direct package>
+skill name: operating-chuck
+managed root: $CHUCK_HOME/cache/agent-skills
+direct package: $CHUCK_HOME/cache/agent-skills/.agents/skills/operating-chuck
+reserved env: CHUCK_SKILL_DIR=<direct package>
 ```
 
 The embedded package inventory in R1 is closed for this version. Unknown installed entries,
@@ -276,14 +276,14 @@ SQLite state, REST/SSE data, or MCP arguments.
 - **INV §10:** embedded source is authoritative, installed trees are disposable projections, and
   byte-for-byte verification prevents source and provider-view drift.
 - **INV §15:** the complete verified package is committed before any launch can consume it; a
-  failed commit suppresses the overlay rather than suppressing AgentDeck startup.
+  failed commit suppresses the overlay rather than suppressing Chuck startup.
 - **INV §17:** R13's digest table is proven against the shipped seed constants rather than against a
   restated copy of them, so a stale or self-matching entry fails a test instead of silently
   migrating nothing.
 
 ## 5. Deviations & open decisions
 
-- No external API or schema changes. `AGENTDECK_SKILL_DIR`, the managed path, and the bounded prompt
+- No external API or schema changes. `CHUCK_SKILL_DIR`, the managed path, and the bounded prompt
   pointer are the only new agent-facing delivery interfaces.
 - R15–R17 extend the existing prompt overlay and seed contents only; Claude's additive wire shape
   is owned by TS-04.R69. The direct-action migration remains paused and is not a prerequisite.

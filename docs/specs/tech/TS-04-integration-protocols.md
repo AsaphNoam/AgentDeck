@@ -6,14 +6,14 @@
 
 ## 1. Scope
 
-This spec owns protocol boundaries between AgentDeck and agent CLIs: Agent Client Protocol (ACP),
+This spec owns protocol boundaries between Chuck and agent CLIs: Agent Client Protocol (ACP),
 lifecycle hooks, Model Context Protocol (MCP) messaging and context tools, terminal PTY/WebSocket
 framing, and external CLI compatibility policy. TS-11 owns the planned provider-native skill views
 and direct-path prompt fallback; those add no MCP tool or protocol schema.
 
 ## 2. Design & constraints
 
-**R1 — Chat uses ACP over child stdio.** The adapter is launched as a process group. AgentDeck
+**R1 — Chat uses ACP over child stdio.** The adapter is launched as a process group. Chuck
 performs ACP initialize, starts or loads a session, sends prompts, maps streamed updates to normalized
 events, and terminates the whole group on stop/failure. JSON-RPC ids are correlated and malformed or
 unknown notifications cannot crash the runtime.
@@ -23,7 +23,7 @@ internal event vocabulary (`assistant_text`, tool call/update, permission reques
 turn/error boundaries). Persistence, SSE, indexing, and UI consume normalized events, not raw ACP.
 
 **R3 — Session start/load omit inherited model fields.** When federation says the provider-native
-model is authoritative, AgentDeck omits the ACP model key. An explicit user/model override is sent.
+model is authoritative, Chuck omits the ACP model key. An explicit user/model override is sent.
 Provider identifiers are adapter-owned; silently substituting a different model is a compatibility
 deviation that must remain visible.
 
@@ -49,11 +49,11 @@ text frame with `cols`/`rows` requests resize. Viewer disconnect never stops the
 
 **R9 — External CLI capabilities fail honestly.** Missing binaries, rejected flags, failed
 initialize, unavailable credentials, and unsupported interface/backend combinations return bounded,
-backend-specific errors. AgentDeck does not claim a capability solely because a binary exists.
+backend-specific errors. Chuck does not claim a capability solely because a binary exists.
 A session setting the provider refuses reports only the JSON-RPC message, except that a recognized
 Claude `claude_code_version_too_old` rejection names the selected Claude Code version, the required
 version, and R76's source-specific repair (update that Claude Code, or for an explicit bundle choose
-Installed/update AgentDeck); no other provider error data is returned.
+Installed/update Chuck); no other provider error data is returned.
 
 **R10 — retired 2026-08-14:** Startup bounds and diagnostics shipped as R22; optional-integration
 flag fallback/probing remains planned as R23.
@@ -64,19 +64,19 @@ credentialed acceptance before a release claims those combinations.
 
 **R13 — Claude chat uses the official adapter boundary.** The `claude-acp` backend
 executes the pinned `claude-agent-acp` package entry point and speaks ACP protocol version 1. The
-adapter owns its compatible native Claude executable; AgentDeck passes provider configuration only
+adapter owns its compatible native Claude executable; Chuck passes provider configuration only
 through documented ACP session metadata and uses the adapter's `--cli` delegation for credential
 checks. Interactive terminal launch and hook settings remain a direct-Claude-CLI path.
 
 **R14 — Prompt delivery is adapter-specific and fail-closed.** Claude receives the composed prompt
 through its documented ACP metadata. `codex-acp` does not consume an ACP `systemPrompt` or prompt
-metadata field; AgentDeck instead merges the composed start prompt into the adapter's documented
+metadata field; Chuck instead merges the composed start prompt into the adapter's documented
 `CODEX_CONFIG` JSON object as `developer_instructions` before spawning it. A malformed overlay or
 conflicting non-string value is a launch error, not a best-effort prompt omission. The generic ACP
 shape omits `systemPrompt` for Codex.
 
 **R15 — Native-auth readiness is a fixed-command probe, not a dashboard login flow.**
-One provider-metadata helper owns the CLI `agentdeck auth` login argv and each non-interactive
+One provider-metadata helper owns the CLI `chuck auth` login argv and each non-interactive
 readiness probe. The onboarding UI supplies only static provider guidance and reuses the ordinary
 backend save/check (TS-03.R15); the server never starts or proxies a login command. Each probe uses
 an explicit allowlisted executable and argv through `exec.CommandContext` (never a shell), a bounded
@@ -92,7 +92,7 @@ account identity, and credential values never cross the process/log/API boundary
 server adds `report_pipeline_stage_result`, `propose_pipeline_template`, and
 `propose_pipeline_run`; there is no `start_pipeline_run` tool. All derive caller identity from the
 per-launch token and return bounded structured results. Reporting delegates to TS-09's atomic
-current-attempt service. Proposal tools are limited to token-bound AgentDecker-role chat sessions,
+current-attempt service. Proposal tools are limited to token-bound FirstMate-role chat sessions,
 call the canonical pipeline validator, and commit their bounded canonical proposal record before
 returning data/digests: they cannot save, start, or approve. Tool registration, token generation,
 teardown, transport, and redaction remain the existing R6–R7 authority rather than a second MCP
@@ -112,7 +112,7 @@ inline (the rule `internal/backend/adapter.go` already states for argv, env, and
   must not become the third occurrence. An omitted effort yields the bare model id unchanged, so a
   catalog that declares no levels produces byte-identical parameters to today.
 - **Post-session config** (`claude-acp` chat) — the adapter accepts effort only as a session
-  configuration option after `session/new`/`session/load` returns, and AgentDeck will not write the
+  configuration option after `session/new`/`session/load` returns, and Chuck will not write the
   user's native Claude settings files to seed it earlier (TS-07.R4). The runtime therefore issues the
   option call as part of its own launch sequence, **before** the runtime is registered or announced,
   and returns an error on failure so the caller's existing generation-scoped
@@ -143,7 +143,7 @@ failure posture:
   request at launch, rather than at the provider.
 
 Three constraints separate this from effort. **The value shape is the adapter's, not
-AgentDeck's:** AgentDeck advertises no `session.configOptions.boolean` client capability, so both
+Chuck's:** Chuck advertises no `session.configOptions.boolean` client capability, so both
 pinned adapters degrade to their two-value select and accept the strings `on`/`off`. The runtime
 sends that spelling and does not send a JSON boolean, which the pinned Claude adapter would accept
 and the pinned Codex adapter would too — but only the string form is guaranteed by the advertised
@@ -170,13 +170,13 @@ and once been at risk on effort.
 
 **R46 — The session configuration option list is decoded in `acpmap.go`
 like every other ACP shape.** `session/new` and `session/load` return a `configOptions` array that
-AgentDeck currently discards. Reading it introduces a new ACP wire shape, and TS-01's isolation rule
+Chuck currently discards. Reading it introduces a new ACP wire shape, and TS-01's isolation rule
 keeps every ACP shape decode in `internal/runtime/acpmap.go` so an adapter version bump has one blast
 radius. The decode yields a normalized "which option identifiers does this session advertise" answer
 for the runtime; it does not leak the ACP option structs, their `type`/`category`/`options`
 vocabulary, or their provider display copy past that boundary. Provider descriptions in particular
 are not surfaced to people: the pinned adapters disagree about whether fast mode's description names
-its usage cost, so FS-03.R45 requires AgentDeck's own wording and INV §8 requires user-facing text be
+its usage cost, so FS-03.R45 requires Chuck's own wording and INV §8 requires user-facing text be
 in-vocabulary rather than passed through from an external tool. An absent, null, or unparseable
 `configOptions` is treated as advertising nothing, which fails open to normal speed under R45 rather
 than failing the session (INV §7).
@@ -190,7 +190,7 @@ the model to one with no reasoning levels removes the `effort` and `fast` option
 subsequent call for either is refused with `Unknown config option`. A runtime that kept the
 pre-model list would send exactly that refused call. And a peer may answer success while its own
 rebuilt list reports a different effective value, which is the silent ignore BR-1 shipped, so
-`currentValue` — not the RPC envelope — decides whether a setting AgentDeck required was honored
+`currentValue` — not the RPC envelope — decides whether a setting Chuck required was honored
 (INV §12, INV §17). A value the peer does not report is treated as unreported rather than as a
 mismatch, so an adapter that legitimately omits it does not fail an otherwise good launch (INV §7).
 The readback is adapter configuration evidence and nothing more: it says the adapter accepted and
@@ -205,7 +205,7 @@ declares only `cwd`, `additionalDirectories`, `mcpServers`, and `_meta` — ther
 and the pinned `codex-acp` reads none, deriving the session's model and reasoning effort from its own
 thread-start response. A live check against the pinned adapter confirmed a session requesting one
 model at one level came up on the local Codex default instead, and that both values applied cleanly
-as configuration options afterwards. So AgentDeck was sending an out-of-schema parameter into a void;
+as configuration options afterwards. So Chuck was sending an out-of-schema parameter into a void;
 `claude-acp` also receives its model through `_meta`, the extensibility channel the protocol defines
 and its adapter documents and reads, but a successful `session/load` restores the transcript's prior
 model after reading that metadata. It therefore needs the same post-session application to make a
@@ -236,11 +236,11 @@ each CLI is installed and checked at the effective provider.
 Because effort now applies to a live session as well as at startup, the same helper serves the
 running-agent change in FS-03.R47 with no second spelling of the call (INV §2).
 
-**R48 — AgentDeck holds a queued prompt itself; no adapter queue is
+**R48 — Chuck holds a queued prompt itself; no adapter queue is
 used.** Both pinned chat adapters process ordinary prompts as strictly sequential turns. Their
 advertised steering extension is a separate operation, not an ordinary-prompt queue, so the
 strongest portable Send promise is "runs as the next turn" (FS-03.R48) and the holding mechanism is
-free to be AgentDeck's. It is, for three reasons that are properties of the adapters rather than
+free to be Chuck's. It is, for three reasons that are properties of the adapters rather than
 preference:
 
 - **The native queues disagree, and one is destructive.** The historical
@@ -256,7 +256,7 @@ preference:
   host-side keeps withdrawal (FS-03.R48) a local state change instead of an accounting problem.
 - **One behavior beats four.** Holding above the adapter gives `opencode-acp` and `openhands-acp` the
   same behavior without checking whether their pinned adapters queue, superseded, or reject — the
-  INV §12 posture that BR-1 exists because AgentDeck did not take.
+  INV §12 posture that BR-1 exists because Chuck did not take.
 
 The historical `codex-acp` 1.1.2 adapter wired neither Codex app-server `turn/steer` nor
 `thread/queue`. The current 1.10.0 adapter exposes steering through R49's capability-gated ACP
@@ -266,13 +266,13 @@ stronger product promise than R48's hold, not a drop-in replacement for it.
 **R49 — Steering is the `_session/steering` extension, gated on its
 advertised capability, never on a version number.** Both current adapters implement the same agreed
 ACP steering extension: request method `_session/steering`, advertised at handshake as
-`initialize` response `_meta.steering.supported`. AgentDeck detects it from that advertisement and
+`initialize` response `_meta.steering.supported`. Chuck detects it from that advertisement and
 from nothing else — not the adapter version, not the backend type — because the advertisement is the
 contract the adapters themselves publish, and inferring provider capability from anything weaker is
 the BR-1 failure mode. An adapter that does not advertise it exposes no Steer control (FS-03.R50);
 queueing (R48) stays available everywhere and is unaffected.
 
-The adapter owns the active-turn injection and AgentDeck must not reimplement it. The
+The adapter owns the active-turn injection and Chuck must not reimplement it. The
 currently pinned adapters also have a legacy idle path: when no turn is steerable — the turn ended
 between the client's decision and the call — they start a detached new turn and return which path
 they took. That path is the known lifecycle deviation; the planned host-owned replacement is
@@ -281,25 +281,25 @@ queue.
 
 **Version evidence, stated rather than assumed:** the retired 0.59.0 Claude and 1.1.2 Codex pins
 predated this extension. The current 0.75.1 and 1.10.0 pins both advertise and implement it, so
-steering is reachable once AgentDeck implements this planned requirement. Capability advertisement,
+steering is reachable once Chuck implements this planned requirement. Capability advertisement,
 not those version numbers, remains the runtime gate; an adapter without the advertisement degrades
 to "no Steer control" rather than breaking Send.
 
 **R19 — A provider-rejected effort fails the launch; it is never retried bare.**
-A pinned CLI may reject a level AgentDeck's catalog declares (hand-declared Claude levels, an older
+A pinned CLI may reject a level Chuck's catalog declares (hand-declared Claude levels, an older
 CLI, a provider that withdrew a level). INV §12's usual detect-and-retry-without-the-optional-flag
 pattern is deliberately **not** applied here: retrying without effort would start an agent at a
 different level than the person chose, which FS-09.R42 forbids. The rejection instead surfaces as a
 bounded, backend-specific launch error naming the effort field, and the process group is terminated.
 Raw provider output stays behind the bounded vocabulary per R12.
 
-**R20 — Codex gets an isolated runtime profile.** AgentDeck launches the `codex-acp`
-child with `CODEX_HOME` set to `<agentdeck-home>/codex`, a `0700` directory under the owner-only
-AgentDeck home, so Codex writes its rollouts and native session index there instead of the user's
+**R20 — Codex gets an isolated runtime profile.** Chuck launches the `codex-acp`
+child with `CODEX_HOME` set to `<chuck-home>/codex`, a `0700` directory under the owner-only
+Chuck home, so Codex writes its rollouts and native session index there instead of the user's
 personal store (FS-09.R43). The value is composed once as a reserved, final child-environment layer:
 it overrides ambient, backend, and model `CODEX_HOME` values in launch, resume, switch, and rollback.
 INV §2 already names these paths as "the same thing built in parallel," and a resume that opened a
-different home would abandon the session. AgentDeck's own process `CODEX_HOME` is left untouched, so
+different home would abandon the session. Chuck's own process `CODEX_HOME` is left untouched, so
 the federation resolver (`config_sources.go`) and model autosync (`codexmodels.go`) keep reading the
 user's real home (FS-09.R44). Model and prompt still flow through ACP and the `CODEX_CONFIG` overlay
 (R14); only the Codex child receives the isolated profile.
@@ -335,31 +335,31 @@ backend plus failed stage. Claude maps recognized captured stderr to a small rec
 stderr is never returned over the API and falls back to adapter/authentication verification
 guidance. Launch and resume share this boundary.
 
-**R50 — Provider history replayed during `session/load` never becomes an AgentDeck event.** ACP
+**R50 — Provider history replayed during `session/load` never becomes a Chuck event.** ACP
 permits an adapter to restore native context by emitting `session/update` notifications while
 `session/load` is in flight; the pinned Codex adapter does this. Those frames describe the
-conversation AgentDeck already recorded, so the resume path holds a replay gate from the moment the
+conversation Chuck already recorded, so the resume path holds a replay gate from the moment the
 notification callback is installed until the `session/load` call returns, and no `session/update`
 mapped to a normalized transcript event crosses the boundary while it is held: no sequence is
 allocated, nothing is appended to the durable transcript, nothing is published to subscribers or the
 global sink, and no replayed turn boundary drives agent status. Without the gate an open chat
 re-renders and auto-follows its whole history as fresh live activity on wake, breaking FS-03.R3 and
-FS-03.R35 (INV §1, INV §11). The gate covers only AgentDeck's view — the provider keeps its restored
+FS-03.R35 (INV §1, INV §11). The gate covers only Chuck's view — the provider keeps its restored
 context and answers the wake prompt with it. Replace-only live session state decoded from the same
 notification (R24 available commands, R25 context usage) is not a transcript event and is accepted
 during load as normal. `session/new` replays nothing, so the launch path holds no gate. The number of
 suppressed frames is logged once per resume, because a provider that replays is otherwise invisible
-in AgentDeck's own records.
+in Chuck's own records.
 
 **R51 — Idle steering returns control to the host.** The active-turn
 `_session/steering` path returns `injected`, and its completion stays attached to the outstanding
 `session/prompt`. If the adapter receives steering when no turn is active, it returns
 `promptRequired` and guarantees that it did not enqueue, inject, or otherwise consume the supplied
-content; AgentDeck resubmits that exact content through `session/prompt`. `startedNewTurn` is a
-legacy detached-turn outcome and is not a safe retry signal or a completion owner for AgentDeck.
+content; Chuck resubmits that exact content through `session/prompt`. `startedNewTurn` is a
+legacy detached-turn outcome and is not a safe retry signal or a completion owner for Chuck.
 Claude 0.75.1 provides the request opt-in directly. The private release applies the version-locked
 `codex-acp-1.12.0-steering-prompt-required.patch` after its clean install and records that patched
-component as `1.12.0+agentdeck.1`; patch drift fails release assembly, and assembly also refuses an
+component as `1.12.0+chuck.1`; patch drift fails release assembly, and assembly also refuses an
 upstream source that already reads `idleBehavior`, so a no-longer-required patch is re-reviewed
 rather than stacked (R61). The steering advertisement
 still controls whether Steer is shown.
@@ -388,7 +388,7 @@ snapshot after new/load/resume and on `commands_changed`; Codex adapter 1.1.2 se
 cwd/additional-directory-discovered `$` skills. Those versions are historical evidence; static
 inspection confirms that the current Claude 0.75.1 and Codex 1.10.0 pins retain the same
 `available_commands_update` behavior. The ACP v1 command contract and current pinned adapter
-implementations are the compatibility authority, not provider-specific parsing in AgentDeck.
+implementations are the compatibility authority, not provider-specific parsing in Chuck.
 
 **R25 — ACP context usage follows the adapter's context channel.** The pinned Claude adapter's
 `session/prompt` result `usage` object is token accounting
@@ -433,7 +433,7 @@ wakes an idle model or initiates tool use. Historical `claude-agent-acp` 0.59.0 
 inspection confirms the current 0.75.1 and 1.10.0 pins retain that entrypoint and no semantic wake
 capability. Steering is not a wake primitive. ACP `mcp/message` is an unstable transport wrapper,
 not a semantic wake; the current pinned Codex adapter advertises ACP-MCP transport unsupported, and
-ordinary MCP resource/list/progress notifications do not start a model turn. AgentDeck therefore
+ordinary MCP resource/list/progress notifications do not start a model turn. Chuck therefore
 implements a claimed activation by one ordinary `session/prompt` carrying a short, code-owned,
 kind-specific instruction. For `mail`, it says only that mail work is available and directs the
 agent to the existing `check_messages` tool; no message body, subject, sender, transcript, artifact,
@@ -488,7 +488,7 @@ caller and launch generation come from the existing token session:
   outputs. A field returned by the transcript/report authority is chunked through the same cursor
   rather than copied whole or silently omitted. If the tolerant transcript reader skips a physical
   record above its 8 MiB safety limit, its new diagnostic becomes a bounded
-  `[AgentDeck omitted an oversized transcript record]` marker at that stream position, including
+  `[Chuck omitted an oversized transcript record]` marker at that stream position, including
   when the skipped record is the selected turn's first or last record; a record skipped outside the
   selected turn is not marked. A supplied cursor must name a rune boundary inside the fixed source:
   an offset that splits a rune or reaches past the end returns `invalid_cursor` rather than
@@ -544,9 +544,9 @@ global resource list.
   pinned Claude and Codex adapters' handling of them is verified (FS-17.A6). Values that cannot
   marshal to a JSON object omit the field rather than fail the call (FS-17.R12).
 
-### Approval exemption for AgentDeck's own actions
+### Approval exemption for Chuck's own actions
 
-- **R41 — One composed AgentDeck-tool identity, derived not duplicated.** The set
+- **R41 — One composed Chuck-tool identity, derived not duplicated.** The set
   of tool identities exempt from the approval gate (FS-03.R40) is composed once, at the same place
   that registers the in-process MCP server, from that server's registered name and its registered
   tool names — not from a second hand-maintained list that could drift as tools are added or renamed
@@ -574,11 +574,11 @@ global resource list.
 
 - **R43 — The exemption answers with a single-use allow and creates no
   provider-side rule.** The exemption responds by selecting the adapter's single-use allow option,
-  not its always-allow option, so the decision is AgentDeck's on every call and no persistent
+  not its always-allow option, so the decision is Chuck's on every call and no persistent
   permission rule is written into a provider's configuration. The always-allow route was examined
   and rejected on evidence: `codex-acp` offers both "Allow for This Session" and "Allow and Don't Ask
   Again" under the identical ACP option kind `allow_always`, so a client choosing by kind cannot tell
-  a session-scoped rule from a persisted one, and AgentDeck will not write a durable provider
+  a session-scoped rule from a persisted one, and Chuck will not write a durable provider
   permission a person never chose. Single-winner resolution (R4) is unchanged: the exemption is one
   more path that atomically claims a request, and it emits exactly one ACP response and one
   normalized resolution like every other.
@@ -590,7 +590,7 @@ global resource list.
   crash teardown already resolve pending requests and are unchanged. A pending request is process-
   lifetime state, as it is today; nothing about holding it longer makes it durable across a restart.
 
-### Direct AgentDeck action transport
+### Direct Chuck action transport
 
 - **R32 (planned) — One typed action registry replaces the internal MCP authority.**
   `internal/messaging` retains one registration for each FS-17.R13 action identifier, its bounded
@@ -608,14 +608,14 @@ global resource list.
   access, filesystem IPC, an unauthenticated route, and a provider-specific fallback are excluded.
   The transport contract returns to design review before implementation.
 
-- **R34 (planned) — `agentdeck action` is the only agent client.** The packaged command
-  `agentdeck action <action> --input -` reads exactly one JSON object from standard input and invokes
+- **R34 (planned) — `chuck action` is the only agent client.** The packaged command
+  `chuck action <action> --input -` reads exactly one JSON object from standard input and invokes
   the reviewed R33 transport with its credential supplied only through process environment. An action whose
   input type is empty may omit `--input -`; every other action rejects missing input. The command
   unwraps the private transport envelope, writes only its `result` object plus one newline to standard
   output, and exits zero exactly when `is_error` is false. A transport failure that has no server
   result is converted to one bounded FS-17-shaped refusal on standard output and a non-zero exit.
-  Diagnostics go only to standard error. `agentdeck action describe <action>` projects R32's
+  Diagnostics go only to standard error. `chuck action describe <action>` projects R32's
   compiled description/schema locally as JSON without transport or authentication; neither command
   reads SQLite, calls a domain service directly, retries
   an action automatically, accepts a token argument, or falls back to an unauthenticated route.
@@ -642,7 +642,7 @@ global resource list.
   mail, task, and pipeline work (INV §3/§6/§11).
 
 - **R37 (planned) — Activation and assignment prompts name the direct action.** The mail activation
-  bridge directs the agent to `$AGENTDECK_ACTION_CLI action check_messages`; the dependency bridge
+  bridge directs the agent to `$CHUCK_ACTION_CLI action check_messages`; the dependency bridge
   directs it to `get_assigned_task`; pipeline assignment/result-boundary text names
   `report_pipeline_stage_result`. They carry no action payload or credential. All source-fact,
   claim, attempt, quiescence, response-before-release, and commit-before-effect ordering remains
@@ -650,10 +650,10 @@ global resource list.
   action committed or a turn ended.
 
 - **R38 (planned) — Provider MCP remains provider-owned.** Removing `/mcp`, the
-  `agentdeck-messaging` registration, generated AgentDeck MCP configuration, and `LaunchSpec`'s
+  `chuck-messaging` registration, generated Chuck MCP configuration, and `LaunchSpec`'s
   internal MCP field does not filter, rename, copy, or reinterpret MCP servers discovered through
   Claude/Codex native configuration or another provider's own setup. The former reserved-name
-  collision check is removed because AgentDeck no longer injects that name. Configuration federation
+  collision check is removed because Chuck no longer injects that name. Configuration federation
   continues to inventory provider MCP metadata under TS-07, and provider launch behavior remains
   native/provider-owned rather than flowing through R32.
 
@@ -670,7 +670,7 @@ global resource list.
   can reach the reviewed narrow transport under its default sandbox.
 
 **R52 — retired 2026-10-03:** Legacy tmux adoption removed by R78's stopped-process cutover.
-**R78** `(planned)` — Chuck's MCP implementation name is `chuck-messaging`, and `/mcp` and
+**R78** — Chuck's MCP implementation name is `chuck-messaging`, and `/mcp` and
 `/api/hook` use `X-Chuck-Token`; hook scripts read `CHUCK_HOOK_TOKEN` from the `CHUCK_*` launch
 environment (FS-10.R26). Keep one definition per header/env spelling and update every producer and
 consumer together. Tool names remain unchanged; descriptions follow FS-18.R18. Reject the old
@@ -704,7 +704,7 @@ is short and supplies this allowance. Overflow alone never schedules a follow-up
 
 Each entry supplies message id, bounded sender identity/display attribution, timestamp, subject,
 complete body, optional reply id and wake intent. Escape the structured envelope so peer text cannot
-masquerade as AgentDeck metadata; label it peer input, not system authority. Bound display metadata
+masquerade as Chuck metadata; label it peer input, not system authority. Bound display metadata
 without clipping the message body/subject. Include remaining pending counts and say that
 `check_messages` is available for deliberate overflow/history retrieval, without instructing a
 mandatory fetch. Do not add message content to activation rows, status details or SSE notifications.
@@ -721,11 +721,11 @@ deferred-only prompt. The existing packaged Claude/Codex continuation probes in 
 verify one inline mail body without an acknowledgement tool; they remain implementation acceptance,
 not a design blocker. Update operating-agent knowledge and tool descriptions with these semantics.
 
-**R54 — A provider-contract claim needs an oracle AgentDeck does not author.**
+**R54 — A provider-contract claim needs an oracle Chuck does not author.**
 (shipped 2026-09-13) BR-1 shipped a `model` member that the design asserted, the implementation
 emitted, the fake accepted, and no provider ever read: every layer agreed because every layer was
 derived from the same asserted shape. Three rules separate a contract statement from a restatement
-of AgentDeck's own intent.
+of Chuck's own intent.
 
 - **The pinned request schema is the oracle, enumerated separately from the builder.** The session
   request member set — `cwd`, `additionalDirectories`, `mcpServers`, `_meta`, plus `sessionId` on
@@ -754,7 +754,7 @@ IDs are not reused.
 **R61 — The packaged Codex baseline is ACP 1.12.0 with its compatible Codex 0.154.0.**
 The bump consumes 1.11's paginated load/fork history and finalized standalone MCP-elicitation
 permission completion plus 1.12's canonical tool names, elicitation-form fix and turn-diff-derived
-file reports. AgentDeck neither consumes the adapter's recommended model/reasoning values nor
+file reports. Chuck neither consumes the adapter's recommended model/reasoning values nor
 session-goal extension. Static inspection of 1.12.0 confirms that idle steering still starts a
 detached turn and its request parser still drops `_meta.steering.idleBehavior`; the
 `promptRequired` patch required by R51 is therefore rebased, source-hash locked and retained. It may
@@ -764,7 +764,7 @@ outcome and R51's compatibility receipt passes.
 **R62 — Capability negotiation is bilateral and extension-scoped.** Initialize sends
 the canonical ACP `clientCapabilities.subagents:{}` plus AIR v1 capability keys only for
 `asyncTasks` and `agentFileChangeReport`; it does not advertise plan updates, goals, recommended
-configuration, provider management or an elicitation UI AgentDeck does not implement. The decoder
+configuration, provider management or an elicitation UI Chuck does not implement. The decoder
 accepts only known boolean/object shapes from `agentCapabilities.sessionCapabilities` and bounded
 AIR metadata and maps them into TS-01.R35's value. Native subagents, fork, background updates,
 targeted stop and file reports remain disabled independently when their matching advertisement is
@@ -782,9 +782,9 @@ runtime generation. Child permission and elicitation requests still resolve thro
 transport and single-winner permission gate using that normalized id. Without bilateral
 negotiation, the adapter's legacy ordinary tool call passes through unchanged. History orphans map
 to the explicit durable `disconnected` state; unknown live child ids produce a bounded protocol
-diagnostic and no invented AgentDeck identity.
+diagnostic and no invented Chuck identity.
 
-**R64 — Background terminals are normalized async tasks, not AgentDeck tasks.** After
+**R64 — Background terminals are normalized async tasks, not Chuck tasks.** After
 AIR async negotiation the runtime maps `async_task_spawned` and `async_task_state_update` into one
 stable background-task lifecycle keyed by the root agent, optional child activity and adapter task
 id; related tool-call id is retained and output is never copied. `_session/async_task/stop` receives
@@ -808,13 +808,13 @@ teardown; no native app-server method is called directly (INV §2/§12/§15).
 **R66 — New metadata strengthens existing events without replacing them.** ACP 1.12's
 top-level tool-call/update `name` is decoded into the existing normalized name and wins over the
 title/kind fallback; conflicting later names cannot change the permission identity of an already
-pending call. For each root prompt, AgentDeck requests at most one AIR v1 file-change report using a
+pending call. For each root prompt, Chuck requests at most one AIR v1 file-change report using a
 generation/turn-derived request id, accepts one matching bounded `session_info_update`, validates
 every absolute path against cwd/additional directories, and records its declared-incomplete and
 uncertainty fields. The report supplements Files tracking only: it never fabricates file contents,
 patches, line counts or completeness and never replaces ordinary ACP diffs. Duplicate, stale,
 malformed, unavailable or unmatched reports are ignored with bounded diagnostics. The 1.11
-standalone MCP elicitation fix is consumed through the existing permission lifecycle; AgentDeck adds
+standalone MCP elicitation fix is consumed through the existing permission lifecycle; Chuck adds
 no provider-specific elicitation form.
 
 **R67 — Recipient refusals derive from the addressable-set resolver alone.** When
@@ -842,7 +842,7 @@ no inferred counts. The fake ACP adapter and mapping tests exercise the real `us
 shape, invalid pairs, zero, over-window usage, and mid-turn republish independently of the runtime
 helper (FS-02.R62, TS-04.R25, INV §17).
 
-**R69 — Claude chat adds AgentDeck instructions to the native coding preset.**
+**R69 — Claude chat adds Chuck instructions to the native coding preset.**
 For FS-18.R17/A13, both `sessionNewParams` and `sessionLoadParams` build the Claude metadata
 prompt through one small shared builder with this shape:
 
@@ -899,7 +899,7 @@ report ambiguity with `--backend` guidance. A selected backend uses its default 
 `--model` names another existing model; invalid selections fail before spawn. A missing catalog
 uses ambient selection only; a corrupt/unreadable existing catalog is an error, not a default.
 Login and probes use the personal auth/config profile which feeds the existing Codex refresh,
-not `<agentdeck-home>/codex`; R20–R21's session isolation, refresh source and no-write-through
+not `<chuck-home>/codex`; R20–R21's session isolation, refresh source and no-write-through
 guarantees do not change. Do not redefine personal-home ownership from backend `CODEX_HOME` in
 this change: login/readiness must use the same process-owned personal source as refresh, overriding
 scoped home values consistently with launch, rather than authenticating a profile launch will not use.
@@ -1010,8 +1010,8 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   no agent-callable start operation. **Paused replacement:** R32–R40 may supersede this internal-only
   interface only after FS-17.R20 passes; provider-owned MCP remains unchanged.
 - Direct actions (planned; blocked): a reviewed narrowly scoped transport behind the packaged
-  `agentdeck action <action> --input -` client; exact schemas are projected locally from the action
-  registry by `agentdeck action describe <action>`.
+  `chuck action <action> --input -` client; exact schemas are projected locally from the action
+  registry by `chuck action describe <action>`.
 - Terminal WebSocket: binary/text terminal bytes plus JSON resize control frames.
 - Effort delivery: no new ACP method. The model-suffix mechanism reuses the existing `model` key in
   `session/new`/`session/load`; the post-session mechanism uses the adapter's documented session
@@ -1085,7 +1085,7 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   launch; missing/old CLI diagnostics are also incomplete. These are tracked product gaps.
 - Codex session isolation (R20/R21) does not migrate `codex-acp` sessions already written into the
   user's personal home before the change ships; they stay there, may no longer native-resume through
-  AgentDeck, and the user may archive them with the native `codex archive` command. Whether the
+  Chuck, and the user may archive them with the native `codex archive` command. Whether the
   packaged CLI honors the isolated profile is confirmed only by the credentialed A7 gate.
 
 ## 6. Traceability
@@ -1111,7 +1111,7 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   rejection of detached `startedNewTurn` as a host completion contract.
 - Codex isolated profile (R20/R21): final `CODEX_HOME` composition in
   `internal/server/{launch,resume,switch}.go` via `composeEnv`, one-way profile refresh under
-  `internal/config`, applied in `internal/runtime/chat.go` spawn; AgentDeck's own home read stays in
+  `internal/config`, applied in `internal/runtime/chat.go` spawn; Chuck's own home read stays in
   `internal/server/config_sources.go` and `internal/config/codexmodels.go`.
 - Hooks: `internal/hooks`, `internal/server/hook.go`, registration in `launch.go`.
 - MCP: `internal/messaging/messaging.go`, `tools.go`, `internal/server/messaging_registration.go`.

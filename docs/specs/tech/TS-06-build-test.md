@@ -43,11 +43,11 @@ lint, both Go variants, `go vet`, UI install/tests/build. CI uses read-only repo
 and cancels superseded runs; it does not rewrite embedded tracked output.
 
 **R9 — Tests isolate user state and external providers.** Tests use temporary
-`AGENTDECK_HOME`, deterministic fake ACP peers, in-process HTTP handlers, and fixtures. Credentialed
+`CHUCK_HOME`, deterministic fake ACP peers, in-process HTTP handlers, and fixtures. Credentialed
 real-CLI acceptance is an explicit manual gate and never silently substitutes for automated tests.
 
 **R10 — retired 2026-07-15:** This single-binary delivery assumption is superseded for the planned
-macOS release by R13–R21. Source-built AgentDeck remains a single Go binary.
+macOS release by R13–R21. Source-built Chuck remains a single Go binary.
 
 **R12 — Source installs pin the official Claude adapter.** When `INSTALL_ACP=1`,
 `install.sh` installs the exact reviewed `@agentclientprotocol/claude-agent-acp` version and checks
@@ -66,14 +66,14 @@ job verifies those pinned inputs before it creates an archive; an installer neve
 package range, builds the UI, or compiles Go on a recipient's Mac. A version-locked patch may amend
 one pinned adapter only when its filename identifies that exact package version, clean-install
 application is fail-closed, the required output is checked before packaging, and the manifest's
-component version carries an AgentDeck patch suffix rather than presenting upstream bytes.
+component version carries a Chuck patch suffix rather than presenting upstream bytes.
 
 **R15** — A release archive contains only this versioned layout:
 
 ```text
-agentdeck-<version>-darwin-arm64/
-  bin/agentdeck                 # wrapper
-  libexec/agentdeck             # FTS5 Go binary
+chuck-<version>-darwin-arm64/
+  bin/chuck                     # wrapper
+  libexec/chuck                 # FTS5 Go binary
   runtime/node/bin/node
   runtime/node_modules/@agentclientprotocol/{claude-agent-acp,codex-acp}/dist/index.js
   runtime/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude     # bundled Claude
@@ -82,15 +82,15 @@ agentdeck-<version>-darwin-arm64/
   manifest.json                 # version, target, component versions and archive identity
 ```
 
-The wrapper exports `AGENTDECK_RUNTIME_ROOT=<version>/runtime` and executes `libexec/agentdeck`.
+The wrapper exports `CHUCK_RUNTIME_ROOT=<version>/runtime` and executes `libexec/chuck`.
 It changes neither PATH nor any provider executable override (R30). Managed adapters launch as the
 private `node` running their entrypoint by absolute path, never a globally installed Node or ACP
 adapter. Source builds have no managed root and keep their existing PATH behavior.
 
 **R16** — The installer places immutable version directories below
-`~/Library/Application Support/AgentDeck/versions/`, keeps the selected version through a `current`
+`~/Library/Application Support/Chuck/versions/`, keeps the selected version through a `current`
 pointer, and exposes one stable user command shim. That application root is distinct from
-`AGENTDECK_HOME`; release assembly, install, update, rollback, and uninstall must never write user
+`CHUCK_HOME`; release assembly, install, update, rollback, and uninstall must never write user
 configuration, state, transcripts, or credentials there.
 
 **R17** — A GitHub Release publishes the archive, a SHA-256 checksum, and a small
@@ -100,17 +100,17 @@ checksum and internal manifest/layout before activation, then atomically install
 switch `current`. No partial directory is reachable through the stable command.
 
 **R18** — Release activation retains the immediately preceding verified version as
-`previous`. `agentdeck update --rollback` atomically restores that version. A failed update, failed
+`previous`. `chuck update --rollback` atomically restores that version. A failed update, failed
 rollback, or an installer interrupted before activation leaves the old `current` pointer intact;
 activation never signals or replaces a running dashboard process.
 
-**R19** — `agentdeck update` is the only update mechanism. It obtains release metadata
+**R19** — `chuck update` is the only update mechanism. It obtains release metadata
 only when explicitly invoked, supports check-only/non-interactive confirmation behavior from
 FS-10.R7, and performs no background check, download, telemetry, or update. Concurrent installer or
 update invocations serialize around one install root; a contender exits without changing it.
 
 **R20** — Guided authentication is implemented as a CLI delegation boundary, not an
-installer credential protocol. `agentdeck auth claude|codex` resolves the selected private adapter
+installer credential protocol. `chuck auth claude|codex` resolves the selected private adapter
 and its compatible provider login path, attaches it to the caller's terminal, and returns a bounded
 success/cancel/failure result. It accepts no credential value flags, writes no credential material to
 the application runtime, and does not log child stdout/stderr except sanitized actionable failure
@@ -118,7 +118,7 @@ detail. Interactive install may invoke this command; non-interactive install nev
 
 **R21** — Release CI verifies archive contents, FTS5 tagging, pinned component versions,
 private-wrapper resolution, checksum rejection, fresh-home installation, explicit update/rollback,
-no-start/non-interactive behavior, and preservation of a pre-existing `AGENTDECK_HOME`. It runs the
+no-start/non-interactive behavior, and preservation of a pre-existing `CHUCK_HOME`. It runs the
 automated portion on a macOS arm64 runner or equivalent arm64 macOS environment. Credentialed Claude
 and Codex login/chat checks remain manual gates and cannot be represented as release CI success.
 
@@ -129,12 +129,12 @@ records the bundled `claude` and `codex` versions. The lockfile and assembled ru
 one `@openai/codex` package at that direct version; assembly rejects a nested second copy. Since
 2026-10-04 the wrapper no longer exports a default `CODEX_PATH` or `AGENTDECK_CODEX_VERSION`: the
 bundle is used only when a backend explicitly selects it (R30, TS-04.R75). Source and release
-command-tree tests prove `agentdeck auth claude|codex` is present; release tests prove an explicit
+command-tree tests prove `chuck auth claude|codex` is present; release tests prove an explicit
 Bundle choice resolves both providers under the published root without a global install. Existing
 installed release directories remain immutable: a command absent from an older version requires an
 explicit reinstall/update to a newer release.
 
-**R23 (planned) — The action client is the exact running AgentDeck binary.** Source and release
+**R23 (planned) — The action client is the exact running Chuck binary.** Source and release
 launches resolve `os.Executable()` to an absolute path and inject that immutable/current-version
 path for chat actions; they do not depend on `PATH`, a global install, or a second artifact. Source,
 archive, installed-version, retained-rollback, and update tests invoke representative action help and
@@ -144,7 +144,7 @@ Implementation is also blocked until the exact packaged Codex and ACP adapter pr
 the default sandbox. Enabling broad network access or substituting a filesystem transport does not
 pass this build gate.
 
-**R24 (planned) — The rename is one cut through build, release, and distribution identity.** The Go
+**R24 — The rename is one cut through build, release, and distribution identity.** The Go
 module follows the renamed Chuck repository under the existing GitHub owner, with every internal
 import path and version `-ldflags -X` target tracking it; the command directory becomes `cmd/chuck`;
 the built binary, the wrapper shim at `bin/chuck`, the FTS5 binary at `libexec/chuck`, the
@@ -167,14 +167,14 @@ inputs pin `@agentclientprotocol/codex-acp` exactly at `1.12.0` and direct `@ope
 `0.154.0`; lockfile, assembly constants, manifest expectations, wrapper/archive fixtures and release
 documentation move together. Assembly still proves one installed Codex package, hashes the reviewed
 unpatched adapter bundle, applies the version-named no-consumption steering patch with zero fuzz,
-hashes the complete patched output, and reports the component as `1.12.0+agentdeck.1`. A source
+hashes the complete patched output, and reports the component as `1.12.0+chuck.1`. A source
 comparison test proves the patch is still semantically required instead of assuming its old offset.
 
 Automated contract fixtures exercise canonical and absent capability advertisements; root/nested
 reasoning; native child lifecycle and legacy fallback; background task reconstruction, targeted stop
 and provider restart; fork success, pagination, cyclic/oversized cursor refusal and compensating
 delete; canonical tool names; matching/stale/truncated file reports; and MCP elicitation completion.
-The fake derives closed request/update shapes from the reviewed 1.12.0 protocol, not AgentDeck's
+The fake derives closed request/update shapes from the reviewed 1.12.0 protocol, not Chuck's
 mapper. Before release, one credentialed Codex receipt covers chat, model/effort/fast application,
 MCP, steer idle fallback, thought delivery, one native subagent, one background command and targeted
 stop, clone/fork with multi-page history, canonical tool name, file report, stop/resume and load. It

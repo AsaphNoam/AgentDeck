@@ -6,7 +6,7 @@
 
 ## 1. Purpose
 
-AgentDeck's agent-facing MCP tools already answer in machine-readable JSON with stable outcome
+Chuck's agent-facing MCP tools already answer in machine-readable JSON with stable outcome
 codes, and already express waiting as durable prerequisite arms rather than polling
 (FS-16.R5, FS-16.R12). Two gaps remain in how that surface presents itself to an agent.
 
@@ -20,9 +20,9 @@ This spec owns the cross-cutting shape shared by every agent-facing tool result.
 tools remain owned by FS-06 (messaging), FS-14 (pipeline reporting), FS-15 (context links), and
 FS-16 (tasks); this spec adds no tool and changes no tool's arguments, authority, or effect.
 
-The planned replacement in R13–R20 removes MCP only as AgentDeck's internal action-delivery
+The planned replacement in R13–R20 removes MCP only as Chuck's internal action-delivery
 mechanism. It preserves the action vocabulary and domain behavior while moving exact invocation
-detail to an on-demand AgentDeck command. It is paused until R20's safe-transport gate passes; the
+detail to an on-demand Chuck command. It is paused until R20's safe-transport gate passes; the
 released internal MCP remains authoritative meanwhile. User- and provider-configured MCP servers
 remain supported.
 
@@ -62,7 +62,7 @@ remain supported.
   `retry` value names a task, pipeline run, agent, message, or context reference that the caller is
   not already a participant in, and no class directs an agent to re-call a tool on a schedule.
   Waiting on other work remains expressible only as a prerequisite arm at task creation
-  (FS-16.R5), which AgentDeck resolves without a model in the loop (FS-16.R6). This spec adds no
+  (FS-16.R5), which Chuck resolves without a model in the loop (FS-16.R6). This spec adds no
   condition language, no wait tool, and no task-graph query.
 
 - **R5 — A successful result carries no retry field.** `retry` appears only on a refusal.
@@ -80,42 +80,42 @@ remain supported.
   No tool declares an output schema in this change.
 
 - **R8 — The contract covers the whole agent-facing surface.** R1–R7 apply to every tool
-  registered on AgentDeck's single MCP authority — the messaging, pipeline, context, and task tools
+  registered on Chuck's single MCP authority — the messaging, pipeline, context, and task tools
   named by TS-04.R6, R17, R28, and R29 — and to any tool added to it later.
 
-### 2.3 Direct AgentDeck actions
+### 2.3 Direct Chuck actions
 
-- **R13 (planned) — AgentDeck actions use one packaged command instead of an internal MCP
+- **R13 (planned) — Chuck actions use one packaged command instead of an internal MCP
   server.** Every fresh, resumed, or switched chat agent can invoke the existing action identifiers
-  through one `agentdeck action` command family: `list_agents`, `send_message`, `check_messages`,
+  through one `chuck action` command family: `list_agents`, `send_message`, `check_messages`,
   `report_pipeline_stage_result`, `propose_pipeline_template`, `propose_pipeline_run`,
   `get_assigned_task`, `create_task`, `cancel_task`, `report_task_result`, `share_context`,
   `list_context_links`, `read_context_link`, `set_context_link_visibility`, and
-  `revoke_context_grant`. AgentDeck no longer registers or advertises its own
-  `agentdeck-messaging` MCP server to those agents. This changes delivery only: each action keeps the
+  `revoke_context_grant`. Chuck no longer registers or advertises its own
+  `chuck-messaging` MCP server to those agents. This changes delivery only: each action keeps the
   arguments, authority, effects, limits, and domain outcomes its owning FS defines.
 
 - **R14 (planned) — Invocation and results are machine-composable.**
-  `agentdeck action <action-name> --input -` accepts exactly one JSON object from standard input and
+  `chuck action <action-name> --input -` accepts exactly one JSON object from standard input and
   writes exactly one JSON object to standard output; no-input actions may omit `--input -`, and
-  `agentdeck action describe <action-name>` reads the compiled registry locally and returns the
+  `chuck action describe <action-name>` reads the compiled registry locally and returns the
   action's name, description, and resolved input schema without a running dashboard, transport, or
   credential. A
   successful action exits successfully; a refused, invalid, unauthenticated, or unavailable action
-  exits non-zero while still returning its structured result when AgentDeck can form one. Progress,
+  exits non-zero while still returning its structured result when Chuck can form one. Progress,
   diagnostics, provider output, and logs never mix into standard output. Empty collections remain
   arrays, and shell quoting is not part of any action's data model.
 
 - **R15 (planned) — Exact mechanics are disclosed only when needed.** The shared
-  `operating-agentdeck` skill explains when to choose messaging, tasks, context links, or pipelines
+  `operating-chuck` skill explains when to choose messaging, tasks, context links, or pipelines
   and directs an agent to action-specific command help for exact input fields, limits, effects, and
-  result fields. AgentDeck does not inject the complete action catalog and all fifteen input schemas
+  result fields. Chuck does not inject the complete action catalog and all fifteen input schemas
   into every conversation. A mail activation names the action that reads mail; a task activation
   names the action that reads the assignment; a pipeline assignment names the result action. An
   autonomously activated agent therefore has an exact next step without loading unrelated action
   definitions.
 
-- **R16 (planned) — Caller authority remains runtime-derived.** AgentDeck derives the stable agent
+- **R16 (planned) — Caller authority remains runtime-derived.** Chuck derives the stable agent
   id and current launch generation from a fresh action credential that is independent of both the
   hook credential and the non-secret generation identifier, never from an action name,
   input field, environment claim, working directory, role text, or provider session id. Stop,
@@ -127,14 +127,14 @@ remain supported.
 - **R17 (planned) — The result contract becomes transport-neutral.** R1–R5 and R9–R11 apply to
   direct action results unchanged. The JSON object on standard output replaces R6–R8's MCP text and
   `structuredContent` duplication and is the one authoritative representation. Invalid JSON,
-  unknown fields, missing required fields, and wrong field types are rejected by AgentDeck with a
+  unknown fields, missing required fields, and wrong field types are rejected by Chuck with a
   stable error code, message, and retry classification rather than a provider- or protocol-owned
   plain-text schema error. A result that cannot be encoded is an internal refusal; it is never
   replaced by prose or reported as success.
 
 - **R18 (planned) — The replacement is one portable chat capability.** Claude, Codex, OpenCode,
   and OpenHands chat agents use the same command, action identifiers, input objects, output objects,
-  and authority rules. AgentDeck does not add provider-specific custom functions or retain MCP for
+  and authority rules. Chuck does not add provider-specific custom functions or retain MCP for
   one provider in released behavior. The internal MCP removal cannot ship until every supported
   chat adapter can invoke the packaged command and consume its structured success and refusal
   results across fresh launch, resume, and switch. Terminal agents remain outside the action surface,
@@ -142,14 +142,14 @@ remain supported.
 
 - **R19 (planned) — Cutover is complete before release.** MCP and the direct command may coexist
   only inside the unreleased implementation while their behavior is compared. The completed change
-  exposes only the direct action command to AgentDeck agents and retains no released compatibility
-  mode, preference, feature flag, or per-provider fallback for the internal MCP. Existing AgentDeck
+  exposes only the direct action command to Chuck agents and retains no released compatibility
+  mode, preference, feature flag, or per-provider fallback for the internal MCP. Existing Chuck
   mail, tasks, context references, grants, pipeline runs, proposals, transcripts, and sessions need
   no migration and keep their current retention. User- and provider-configured MCP servers,
-  provider MCP configuration federation and inventory, and MCPs unrelated to AgentDeck's internal
+  provider MCP configuration federation and inventory, and MCPs unrelated to Chuck's internal
   actions are explicitly unchanged.
 
-- **R20 (planned) — Migration waits for a safe direct transport.** AgentDeck keeps its released
+- **R20 (planned) — Migration waits for a safe direct transport.** Chuck keeps its released
   internal MCP path until the exact packaged Codex/ACP runtime can reach a narrowly scoped direct
   transport from a managed command under the default sandbox, and the same transport is proven for
   Claude, OpenCode, and OpenHands. Enabling broad shell networking, using a filesystem mailbox,
@@ -175,7 +175,7 @@ counted. No row, migration, notification, activation, transcript event, or SSE p
   session, so it does not invite one.
 
 - **R11 — Classification carries no retry budget.** `retry` never includes a count, a
-  delay, a backoff, a deadline, or a timestamp. AgentDeck does not track how many times a caller
+  delay, a backoff, a deadline, or a timestamp. Chuck does not track how many times a caller
   retried and does not refuse a call for having retried.
 
 - **R12 — A result that cannot be structured still answers.** If a result value cannot be
@@ -206,14 +206,14 @@ Each names the verification that demonstrates it.
   injected unencodable result returns its text block and code with `structuredContent` absent:
   registration-derived tests under `internal/messaging`.
 - **A6** (R6–R7) — A pinned Claude and a pinned Codex adapter each complete a normal tool call and a
-  refused tool call against a live AgentDeck with structured content enabled, and neither rejects
+  refused tool call against a live Chuck with structured content enabled, and neither rejects
   the result nor loses the text block: manual gate, run with the other pinned live-provider checks.
 
 - **A7 (planned)** (R13–R17) — Every one of R13's fifteen identifiers is invoked through the
   packaged command with a representative success and refusal. A transport-neutral golden matrix
   proves the command reaches the same domain operation and produces the same durable rows, state
   transitions, events, bounded result fields, stable error codes, and retry classes as the frozen
-  pre-migration MCP baseline. Invalid JSON and schema-invalid input return AgentDeck-owned structured
+  pre-migration MCP baseline. Invalid JSON and schema-invalid input return Chuck-owned structured
   refusals and mutate nothing. *Verify:* command, protocol, and domain integration tests.
 
 - **A8 (planned)** (R15–R16) — Fresh launch, ordinary resume, stopped-agent mail wake, task
@@ -230,13 +230,13 @@ Each names the verification that demonstrates it.
   sessions each discover and invoke one success and one refusal through the packaged command after a
   fresh launch and resume; Claude↔Codex switching retains the same stable agent identity with a fresh
   generation. Mail and task activations follow their named action without human repair, and a
-  pipeline agent reports its result once. No provider receives an internal AgentDeck MCP
+  pipeline agent reports its result once. No provider receives an internal Chuck MCP
   registration. Codex runs under the default packaged sandbox and reaches only the reviewed narrow
   transport; broad network access is off. *Verify:* release-blocking live-provider gate plus the
   fake-ACP lifecycle matrix.
 
 - **A10 (planned)** (R18–R19) — The completed build has no internal `/mcp` route, generated
-  AgentDeck MCP registration/config artifact, `agentdeck-messaging` reserved-name collision, or MCP
+  Chuck MCP registration/config artifact, `chuck-messaging` reserved-name collision, or MCP
   SDK dependency, while configured external MCP definitions still appear in federation/inventory
   and still reach their provider-owned launch configuration unchanged. Terminal behavior is
   byte-for-byte unchanged. *Verify:* route, dependency, configuration-source, launch-parameter, and
@@ -266,15 +266,15 @@ are planned and the migration is paused behind R20.
   task-graph query (FS-16 §6, TS-04.R29) is deliberately upheld by R4.
 - Output schemas are not declared. The pinned Claude and Codex adapters' handling of a tool
   `outputSchema` is unverified, and declaring one later is additive.
-- Argument shapes rejected by the pinned MCP SDK before an AgentDeck handler runs are outside
+- Argument shapes rejected by the pinned MCP SDK before a Chuck handler runs are outside
   R1–R8. The SDK returns its own plain-text `isError` result for schema-validation and decoding
-  failures, so those results have neither AgentDeck's stable error code and retry class nor
+  failures, so those results have neither Chuck's stable error code and retry class nor
   `structuredContent`. Handler-produced validation refusals remain fully covered by this contract.
 - No HTTP surface changes. The REST error envelope and its mixed legacy forms (TS-03.R3) are
   untouched; this contract is the MCP tool surface only.
-- **Confirmed direct-cutover boundary (planned).** R13–R20 replace only AgentDeck's internal action
+- **Confirmed direct-cutover boundary (planned).** R13–R20 replace only Chuck's internal action
   MCP with the packaged command and a future reviewed private transport. There is no released dual-transport
-  window because AgentDeck currently has one active operator who can validate the cutover directly;
+  window because Chuck currently has one active operator who can validate the cutover directly;
   parity and rollback exist during implementation instead. General MCP support, provider-native MCP
   configuration, terminal capability, domain data, and the public local API remain unchanged.
 - **Confirmed pause (2026-09-01).** The loopback HTTP proposal is not safe for managed Codex under

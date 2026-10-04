@@ -14,16 +14,16 @@ planned disposable agent-knowledge cache and explicitly adds no JSON or SQLite a
 ## 2. Design & constraints
 
 **R1 — Persistence is split by writer.** Human-editable configuration is JSON under
-`$AGENTDECK_HOME` (default `~/.agentdeck`); machine state is SQLite; AgentDeck's chat runtime appends
+`$CHUCK_HOME` (default `~/.chuck`); machine state is SQLite; Chuck's chat runtime appends
 normalized events to `sessions/{agent_id}/transcript.ndjson`. External CLI transcripts may also be
-read and indexed, but are never treated as AgentDeck's only transcript authority.
+read and indexed, but are never treated as Chuck's only transcript authority.
 
 **R2 — The server is the sole SQLite writer.** All writes flow through `internal/state`; other
 packages call its methods and do not open `state.db` independently. Readers tolerate missing rows
 and return typed errors rather than fabricating state.
 
 **R3 — New and rewritten data is atomic and owner-only.** JSON updates use write-temp,
-fsync/close, rename semantics in the config store. AgentDeck creates its home and data directories
+fsync/close, rename semantics in the config store. Chuck creates its home and data directories
 as `0700` and creates/rewrites config, transcript, token, cache, and database files as `0600`.
 Startup explicitly tightens the home directory and database; it does not recursively repair every
 pre-existing descendant.
@@ -69,7 +69,7 @@ state live in SQLite. A send either stores the message and updates its budget at
 nothing; readers return newest-first bounded results as specified by FS-06.
 
 **R13** — Project resources are opaque filesystem data at
-`$AGENTDECK_HOME/project-resources/{project-id}/`, not JSON configuration, SQLite state, a cache,
+`$CHUCK_HOME/project-resources/{project-id}/`, not JSON configuration, SQLite state, a cache,
 or an index. `internal/config` owns one shared helper that validates the project id, returns the
 absolute path, and ensures the parent and leaf directories exist as owner-only directories. It
 rejects a parent or leaf that is a non-directory or symlink. To prove an existing leaf is writable,
@@ -130,7 +130,7 @@ attempt lineage/reports, current named values/provenance, and start idempotency 
 forward-only SQLite tables written only through `internal/state`. Pipeline-table foreign keys may
 cascade within a deleted run but must not cascade into `agents`, `sessions`, transcripts, or archive
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
-and agent-attempt lookup, and a schema-version guard test. Durable AgentDecker proposal records are
+and agent-attempt lookup, and a schema-version guard test. Durable FirstMate proposal records are
 part of the same SQLite-owned set and are specified by R22. TS-09 owns the logical shapes.
 
 **R18 — Effort is an additive catalog field and frozen execution data.**
@@ -208,7 +208,7 @@ rule in the same structural form R30 applies to requested-versus-applied fast mo
 **R32 — retired 2026-10-03:** Home migration helper replaced by ordinary resolution in R40.
 **R33 — retired 2026-10-03:** Startup identity rewrites replaced by offline cutover R41.
 
-**R40** `(planned)` — Extend the existing `internal/config/paths.go` resolver for `$CHUCK_HOME`
+**R40** — Extend the existing `internal/config/paths.go` resolver for `$CHUCK_HOME`
 and default `~/.chuck` (FS-10.R26); keep tilde/absolute-path handling and all callers on that single
 resolver. Do not add a legacy-home probe, mover, merger, marker, retry state or schema migration for
 the rename. Ordinary startup initializes/opens only the selected home (INV §2, §10).
@@ -227,9 +227,9 @@ their existing owner under TS-11.R18. Failure stops the supervised cutover for r
 deleting its source; no automatic rollback/merge engine is shipped (INV §7, §15).
 
 **R19 — Codex's isolated runtime profile is private, managed filesystem state.**
-`$AGENTDECK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).
+`$CHUCK_HOME/codex/` is an owner-only Codex profile for `codex-acp` children (TS-04.R20/R21).
 It contains the child's own session/history store plus a one-way managed mirror of personal Codex
-setup. A private owner-only manifest records only the destination paths AgentDeck refreshed, so a
+setup. A private owner-only manifest records only the destination paths Chuck refreshed, so a
 later source removal removes that private copy without deleting session/history data or any
 unmanaged Codex state. An explicit setup allowlist, rather than a runtime-state denylist, excludes
 personal session indexes, databases and WAL sidecars, logs, snapshots, temp files, and future
@@ -281,12 +281,12 @@ A forward-only migration adds `remote_devices`: text `id` primary key, `name`, u
 (`active`/`expired`). Revoke and unpair hard-delete the row; nothing else about a device is
 retained. `config.json` version 1 gains optional booleans `remote_enabled` and `keep_awake`
 (absent = false) under R3's owner-only atomic rewrite with no config-version bump. The embedded
-Tailscale node state lives in `$AGENTDECK_HOME/remote/tailscale/` (`0700`) and the VAPID key pair in
-`$AGENTDECK_HOME/remote/vapid.json` (`0600`). Pairing codes and pending requests are memory-only and
+Tailscale node state lives in `$CHUCK_HOME/remote/tailscale/` (`0700`) and the VAPID key pair in
+`$CHUCK_HOME/remote/vapid.json` (`0600`). Pairing codes and pending requests are memory-only and
 lost on restart. The phone's "since you last looked" time lives only in the phone's own storage
 (TS-13.R10, R7, R8, R11).
 
-**R22 — AgentDecker proposal records are authoritative, consumable, and
+**R22 — FirstMate proposal records are authoritative, consumable, and
 bounded.** A forward-only `pipeline_proposals` table is the durable authority for the Pipelines
 approval surface: content-addressed `proposal_id`, kind, digest, non-null canonical `payload_json`,
 `created_at`, and `consumed_at`. A record is committed before its MCP tool reports success. Because
@@ -522,7 +522,7 @@ after a new turn, concurrent manual reads, no double charge, and a clock advance
 schema migration adds nullable `sessions.forked_from_agent_id`, `forked_from_seq`, and a bounded
 `runtime_capabilities_json` snapshot. The source foreign identity is informational rather than a
 cascading foreign key: deleting or archiving either agent never deletes the other agent's session,
-transcript, index or provider history. Capability JSON accepts only AgentDeck's boolean vocabulary,
+transcript, index or provider history. Capability JSON accepts only Chuck's boolean vocabulary,
 defaults to all false for old rows, is replaced after each successful handshake, and is never an
 oracle for a new peer that fails to advertise the capability.
 
@@ -555,7 +555,7 @@ no half-copied clone survives (INV §3/§9/§15).
 The durable layout is:
 
 ```text
-$AGENTDECK_HOME/
+$CHUCK_HOME/
   config.json
   backends.json
   config-sources.json

@@ -28,26 +28,26 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/state` | `state.db` — sole SQLite writer: identity, running registry, live status, messages, activations, session/transcript metadata, pipeline run state |
 | `internal/index` | FTS5 full-text index over transcript content; in-memory accumulators feeding replace-style writes |
 | `internal/bus` | In-process pub/sub bus backing SSE; snapshot+subscribe atomicity |
-| `internal/config` | Plain-JSON config store under `~/.agentdeck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
+| `internal/config` | Plain-JSON config store under `~/.chuck`, atomic writes, slug validation, layout/dir modes, pipeline templates |
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
 | `internal/messaging` | In-process agent-facing MCP gateway and token→agent registry; handlers delegate messaging and TS-09 pipeline result/proposal semantics to their owning services |
 | `internal/contextref` | Canonical context-reference identity, typed source resolution/rendering, direct-grant authorization, and bounded reads; no artifact payload store or scheduler |
-| `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and AgentDecker proposal services |
+| `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and FirstMate proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
-| `internal/transcript` | Append-only normalized AgentDeck transcript reader/writer; tolerant reads of session artifacts |
+| `internal/transcript` | Append-only normalized Chuck transcript reader/writer; tolerant reads of session artifacts |
 | `internal/cli` | Cobra CLI: `dashboard start/open`, pidfile, reindex |
 | `ui/src` | React 18 + Vite SPA (Zustand, React Query, Radix, xterm); consumes REST + SSE only |
 
 **R4 — The `Runtime` abstraction is interface-keyed dispatch.** The server programs against a single `Runtime` interface (`internal/runtime/runtime.go`) with methods `Start`, `SendPrompt`, `Cancel`, `Stop`, `Resume`, `StartActivation`, `Permission`, `Subscribe`, `Transcript`. Two implementations exist: **chat** (ACP JSON-RPC/NDJSON over stdio) and **terminal** (PTY-backed). The `Registry` dispatches every agent by `agent.interface` (`byIface["chat"]` / `byIface["terminal"]`, `internal/runtime/registry.go`). Both implementations wrap the **same** CLI under the **same** stable identity — that is what makes interface/backend/model switching non-destructive (D4).
 
 **R5 — Source-of-truth rules, split by writer (D1).**
-- **Config = plain JSON files** under `~/.agentdeck` (`roles/`, `projects/`, `pipelines/`, `backends.json`, `config.json`, `layout.json`, `config-sources.json`). Hand-editable, git-friendly, single-writer, low-volume.
+- **Config = plain JSON files** under `~/.chuck` (`roles/`, `projects/`, `pipelines/`, `backends.json`, `config.json`, `layout.json`, `config-sources.json`). Hand-editable, git-friendly, single-writer, low-volume.
 - **State = SQLite `state.db`, server-sole-writer.** Nothing else opens the DB for writing. This is what makes SQLite safe here (no multi-process write contention) and authoritative (no derived-index drift). Enabled by the hook-over-HTTP channel (R8) so only the server touches the DB.
-- **Transcripts = AgentDeck normalized log plus provider artifacts.** The chat runtime appends
+- **Transcripts = Chuck normalized log plus provider artifacts.** The chat runtime appends
   normalized events to `sessions/{id}/transcript.ndjson`; provider-owned session/history artifacts
-  may coexist. AgentDeck indexes the normalized log into FTS5 (`internal/index`, `internal/transcript`).
-- **Federation authority is one-way (D1 Phase-7 refinement).** For a bound Claude/Codex backend, the native user/project files remain authoritative; AgentDeck stores only a `config-sources.json` binding plus explicit overrides and derives a redacted effective view. A mirror is disposable cache, never a second authority; only a future explicit detached import makes AgentDeck authoritative.
+  may coexist. Chuck indexes the normalized log into FTS5 (`internal/index`, `internal/transcript`).
+- **Federation authority is one-way (D1 Phase-7 refinement).** For a bound Claude/Codex backend, the native user/project files remain authoritative; Chuck stores only a `config-sources.json` binding plus explicit overrides and derives a redacted effective view. A mirror is disposable cache, never a second authority; only a future explicit detached import makes Chuck authoritative.
 
 **R6 — Config composition happens at launch, through one shared helper.** `project.cwd` + `project.context_prompt` + `role.system_prompt` + backend/model + resolved `skip_permissions`/`add_dirs`/env compose into a `LaunchSpec`. Launch, resume, and switch each build a `LaunchSpec` and MUST route through the shared composition helpers rather than hand-rolling a subset: `composeLaunch` (launch), `composeResumeSpec` (resume), `composeSwitchSpec` (switch), plus the field resolvers `resolveSkip`, `expandAddDirs`, `composeEnv`, and the single `teardownAgentRegistration` cleanup (all `internal/server/launch.go`, with resume/switch in their own files). Edits to config affect **future** launches only; a launched agent's composed spec is frozen into its `sessions` snapshot.
 
@@ -56,7 +56,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 identity. `session_id` is the CLI-assigned ephemeral runtime id and changes on (re)launch. Every
 switch re-launches on the same `agent_id`; `running` maps it to current pid/session/tty.
 
-**R8 — Event flow: producer → server → `state.db` → SSE; reconciliation is fallback only.** Status producers are (a) lifecycle hooks that `POST /api/hook` with a per-launch token, and (b) the chat runtime deriving status from the ACP stream. The server applies every change to `state.db` and emits an SSE event over the `internal/bus`. SSE event types include `state_update`, `new_message`, `pipeline_update`, `notification`, and `ping`. The reconciliation watcher over `sessions/` (`internal/server/reconcile.go`) repairs missed projections from AgentDeck's own normalized `runtime.Event` NDJSON log; provider-native transcript formats are not compatible reconciliation inputs. It is not the primary status channel and must not stomp in-vocabulary status fields (INV §1, §8).
+**R8 — Event flow: producer → server → `state.db` → SSE; reconciliation is fallback only.** Status producers are (a) lifecycle hooks that `POST /api/hook` with a per-launch token, and (b) the chat runtime deriving status from the ACP stream. The server applies every change to `state.db` and emits an SSE event over the `internal/bus`. SSE event types include `state_update`, `new_message`, `pipeline_update`, `notification`, and `ping`. The reconciliation watcher over `sessions/` (`internal/server/reconcile.go`) repairs missed projections from Chuck's own normalized `runtime.Event` NDJSON log; provider-native transcript formats are not compatible reconciliation inputs. It is not the primary status channel and must not stomp in-vocabulary status fields (INV §1, §8).
 
 **R9 — The composition seam is shared-helper-only (binding rule).** Launch, resume, and switch are the seam where config, runtime, state, hooks, and MCP registration compose. Any field or cleanup step added to one path must be added to all three, via the shared helpers of R6 — never as an inline subset. This rule is the mechanical form of INV §2 and is enforced by review, not by the compiler.
 
@@ -133,7 +133,7 @@ already-held successor before publishing completion, so a newer submission canno
 queued message. A read-only runtime snapshot exposes the hold and its acceptance sequence for
 browser rehydration without persisting it; a dashboard restart still clears the live field.
 
-**R30 — Every turn reached through Steer has one AgentDeck owner.** An
+**R30 — Every turn reached through Steer has one Chuck owner.** An
 injected message remains under the current ordinary `session/prompt` turn gate. When steering finds
 no active provider turn, the adapter's no-consumption `promptRequired` outcome enters the same
 ordinary prompt path with the unchanged message; the runtime claims the gate before resubmitting and
@@ -154,7 +154,7 @@ The service invokes ordinary runtime/pipeline stop paths; delegates durable agen
 resulting full agent state through the existing bus. This is the atomic-claim boundary required by
 INV §5, not a check of `project.archived` followed later by process registration.
 
-**R14 — Native model autosync is one bounded startup import into the AgentDeck
+**R14 — Native model autosync is one bounded startup import into the Chuck
 catalog.** After seeding and before the server starts, `internal/config` reads the validated
 `backends.json` snapshot once, detects which provider types opted in, invokes only those providers'
 pure local catalog readers, merges every successful candidate set in memory through one shared
@@ -166,13 +166,13 @@ reader decodes only `model`, `availableModels`, and the array-or-legacy-string `
 the fixed user-level settings path, rejects a wrong shape before returning any candidate, and never
 logs or returns unrelated source content. Candidate validation reuses the same provider-model-string
 rule as backend PUT validation. Existing model entries and defaults win; imported entries become
-ordinary user-owned AgentDeck configuration and are not retracted when the native source changes.
+ordinary user-owned Chuck configuration and are not retracted when the native source changes.
 This path does not use federation bindings, project precedence, previews, watches, provenance, or
 effective generations. It adds no API, config version, cache, sidecar, SQLite state, or migration.
 
-**R15 — Dashboard process logging has one durable sink.** After the AgentDeck home exists and before
+**R15 — Dashboard process logging has one durable sink.** After the Chuck home exists and before
 startup work that can emit diagnostics, `internal/cli` configures the dashboard's structured logger
-and the process-wide `slog` default to append to `$AGENTDECK_HOME/dashboard.log`. A foreground process
+and the process-wide `slog` default to append to `$CHUCK_HOME/dashboard.log`. A foreground process
 uses a multi-writer to retain interactive stderr output; a detached child writes only to stderr
 because its parent redirects that stream to the same file. This preserves one copy of each record
 and brings package-level `slog` calls under the configured level and format. The file obeys TS-05.R7
@@ -304,7 +304,7 @@ attempted, failure, cancellation, crash, or restart can omit that mail turn but 
 This is FS-06's policy, not a default for future tasks: a future dependency-backed activation may
 remain actionable until its owning durable task/attempt records a successful start. A fixed
 kind-specific instruction is the only activation data sent to the provider, and it is not appended
-as a user-authored AgentDeck transcript event.
+as a user-authored Chuck transcript event.
 
 **R22 — Context references are one in-process context-plane
 service.** `internal/contextref` owns canonicalization of typed immutable source locators, source
@@ -370,11 +370,11 @@ domain's authorization transition.
   client only after FS-17.R20 passes.** The server remains the sole domain writer and owns one
   provider-neutral action registry; a reviewed narrowly scoped adapter exposes it only to
   generation-authenticated chat launches, and the
-  running `agentdeck` executable is the client. Runtime composition adds the client path, reviewed
+  running `chuck` executable is the client. Runtime composition adds the client path, reviewed
   transport parameters, credential, and short discovery prompt once for every chat lifecycle, alongside the optional
   knowledge overlay but outside frozen session configuration. No daemon, provider-specific action
   implementation, second domain service, or data migration is introduced. When this ships,
-  `LaunchSpec` and runtime adapters stop carrying AgentDeck's internal MCP registration while
+  `LaunchSpec` and runtime adapters stop carrying Chuck's internal MCP registration while
   provider-owned MCP configuration remains outside this boundary (FS-17.R13–R20, TS-04.R32–R40).
   Until the gate passes, the shipped internal MCP composition remains unchanged.
 
@@ -389,12 +389,12 @@ domain's authorization transition.
   (R9, INV §2).
 
 - **R27 — The approval-exemption set is a runtime parameter, not frozen launch
-  config.** The composed set of AgentDeck-owned tool identities (TS-04.R41) travels on the same
+  config.** The composed set of Chuck-owned tool identities (TS-04.R41) travels on the same
   process-parameter overlay the embedded-knowledge parameters use (TS-11.R4–R5): it is applied by
   the one shared overlay helper that launch, resume, switch, wake, terminal, and pipeline stage
   start all pass through, and it is deliberately invisible to `runtimeMeta`'s frozen `sessions`
   snapshot. R6's frozen-composition rule is unaffected and is the reason for this placement — the
-  set is derived from AgentDeck's own code rather than from a person's configuration, so freezing it
+  set is derived from Chuck's own code rather than from a person's configuration, so freezing it
   would make an agent launched before an upgrade keep prompting for actions the current build
   exempts, with no way to correct it short of a new agent. No path composes its own variant of the
   set (R9, INV §2).
@@ -448,7 +448,7 @@ so launch, resume, switch, clone, wake and rollback never reach a Codex app-serv
 Normalized durable events gain optional `activity_id` and `parent_activity_id` scope plus bounded
 activity/background-task lifecycle payloads. Root events omit both fields. Child assistant, tool,
 diff and permission events reuse their existing payloads with scope attached rather than creating a
-parallel transcript vocabulary. Every child tool call receives an AgentDeck-normalized composite
+parallel transcript vocabulary. Every child tool call receives a Chuck-normalized composite
 `tool_call_id` scoped by activity; only Runtime retains the provider's raw id and maps the normalized
 id back when answering permission or task control. Root ids remain unchanged for API compatibility,
 so the one pending-permission map cannot cross-resolve equal raw ids from sibling sessions
@@ -521,7 +521,7 @@ lost.
 
 **On-disk layout (source of truth by writer):**
 ```
-~/.agentdeck/            (0700; $AGENTDECK_HOME overrides)
+~/.chuck/                (0700; $CHUCK_HOME overrides)
   roles/{role}.json      persona: system_prompt + skip_permissions (null=inherit)
   projects/{p}.json      cwd + context_prompt + add_dirs
   pipelines/{id}.json    reusable model-neutral pipeline templates
@@ -531,7 +531,7 @@ lost.
   config-sources.json    Claude/Codex bindings + overrides (Phase 7)
   state.db               SQLite — server sole writer (identity, registry, status, messages,
                          activations, pipelines, FTS5)
-  sessions/{id}/         AgentDeck normalized transcript + provider session artifacts
+  sessions/{id}/         Chuck normalized transcript + provider session artifacts
 ```
 
 **Identity vs session (logical):** `agent_id` stable in `agents`/identity rows; `session_id`, `pid`, `tty` live in the `running` registry row keyed by `agent_id` and are rewritten on each (re)launch.

@@ -1,9 +1,9 @@
 ---
 name: design
-description: "Use automatically for AgentDeck UI work where visual design judgment is material: new screens, redesigns, meaningful layout or styling changes, motion, visual polish, or critique. Also run when the user sends `/design`. Do not trigger for routine frontend engineering where presentation is incidental, such as data wiring, type fixes, behavior tests, copy-only edits, or style-preserving bug fixes."
+description: "Use automatically for Chuck UI work where visual design judgment is material: new screens, redesigns, meaningful layout or styling changes, motion, visual polish, or critique. Also run when the user sends `/design`. Do not trigger for routine frontend engineering where presentation is incidental, such as data wiring, type fixes, behavior tests, copy-only edits, or style-preserving bug fixes."
 ---
 
-# Design AgentDeck UI
+# Design Chuck UI
 
 This is a design-quality companion to the active role, not authority to choose or enlarge the work.
 An automatic trigger does not select a future change, replace `/design-feature`, turn a critique

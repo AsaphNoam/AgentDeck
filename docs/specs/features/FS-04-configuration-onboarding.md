@@ -1,13 +1,13 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
 ## 1. Purpose
 
-AgentDeck is configured by small, hand-editable JSON files under `~/.agentdeck/` (or
-`$AGENTDECK_HOME`): `roles/{role}.json`, `projects/{project}.json`, `backends.json`, `config.json`,
+Chuck is configured by small, hand-editable JSON files under `~/.chuck/` (or
+`$CHUCK_HOME`): `roles/{role}.json`, `projects/{project}.json`, `backends.json`, `config.json`,
 `layout.json`. This spec governs the Settings UI and REST surface that edit those files as a
 convenience over the same on-disk shapes, plus the first-run onboarding wizard that gates the
 dashboard until a minimum viable configuration exists. Direct JSON editing stays valid at all times;
@@ -44,7 +44,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   as `slug(title)-<timestamp>`: `slug(title)` lowercases the title and collapses every run of
   non-`[a-z0-9]` characters to a single hyphen (leading/trailing hyphens trimmed, base truncated so
   the whole id satisfies R3), and `<timestamp>` is the local creation time formatted
-  `YYYYMMDDThhmmssZ` lowercased — e.g. title `AgentDeck Demo` → `agentdeck-demo-20260714t202825z`.
+  `YYYYMMDDThhmmssZ` lowercased — e.g. title `Chuck Demo` → `chuck-demo-20260714t202825z`.
   An explicitly supplied, valid `project` id is still honored and validated (R6), so API/CLI callers
   keep full control. The Settings and onboarding project forms no longer expose an id field; they
   always rely on server derivation. A derived id is immutable exactly like a supplied one (R3).
@@ -63,7 +63,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   without re-creating the project.
 - **R36.** An archived project is ineligible wherever a project is selected for a new
   process. A stored `default_project` may continue to name an archived project as a dormant
-  preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and AgentDecker
+  preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and FirstMate
   builder list only configured active projects and preselect the default only when it is active.
   Direct JSON edits that archive the default therefore do not create a launch trap; restoring that
   project makes the preference eligible again without rewriting `config.json`. `project.done` in
@@ -95,7 +95,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   as empty. Both round-trip through the project CRUD surface (R6) and the Settings → Projects form
   like every other field. `base_branch` names the branch new independent work derives from in
   FS-19.R2; empty means the repository's default branch is auto-detected at use time.
-  `setup_command` is the non-interactive bootstrap AgentDeck itself runs inside a freshly created
+  `setup_command` is the non-interactive bootstrap Chuck itself runs inside a freshly created
   or recreated checkout (FS-19.R3/R7); it never runs at agent launch, so R13's composition timing
   is unchanged.
 
@@ -111,7 +111,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   semantics, and per-backend capabilities are specified in **FS-09**; this spec only asserts that the
   Settings UI is the editing front-end to that surface.
 - **R40** — **Add backend** opens an application dialog rather than inserting an
-  incomplete card into the Settings document. The person chooses the provider type first; AgentDeck
+  incomplete card into the Settings document. The person chooses the provider type first; Chuck
   supplies a matching editable display-name suggestion and a usable provider starter model, so a
   selected **Codex** type never begins with a confusing **Claude** identity or an invalid empty
   model. Submit uses TS-03.R23's item-scoped create operation: the server builds the starter from the
@@ -178,7 +178,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   steps are already satisfied on a fresh install; the backend credential check is the operative gate
   (§3).
 - **R41.** Every `dashboard start` writes the structured application log by appending to
-  `$AGENTDECK_HOME/dashboard.log` (normally `~/.agentdeck/dashboard.log`), whether it runs in the
+  `$CHUCK_HOME/dashboard.log` (normally `~/.chuck/dashboard.log`), whether it runs in the
   foreground or with `--detach`. Foreground starts also mirror the same records to stderr. The log
   file is owner-only (`0600`), an existing broader mode is tightened before startup continues, and
   failure to establish the persistent log prevents the dashboard from starting.
@@ -189,16 +189,16 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 - **R47 — The exact-prompt exception to R14 covers every seeded role.** After
   ordinary absent-only seeding and successful shared-skill package verification, startup may replace
   only the `system_prompt` field of any seeded role whose prompt bytes match one of the code-owned
-  digests of prompts AgentDeck previously shipped for that same role id. The replacement is that
+  digests of prompts Chuck previously shipped for that same role id. The replacement is that
   role's current shipped seed prompt, taken from the same seed authority a fresh home writes, so no
   second copy of the text can drift from it. Every other field, every non-exact prompt, every role
-  AgentDeck does not seed, and every unreadable or install-failed role remains untouched; one role's
+  Chuck does not seed, and every unreadable or install-failed role remains untouched; one role's
   failure does not stop the others or startup, and a later verified startup retries normally. This
   remains a bounded catch-up rather than managed roles or recurring seed synchronization.
   FS-18.R12–R13 own the corrected prompt content and its user-visible limits; TS-11.R13 owns the
   comparison, the digest table, and the atomic write.
 - **R48 — retired 2026-10-03:** Startup role conversion replaced by R52 and supervised cutover.
-- **R52** `(planned)` — Chuck seeds `firstmate`, displayed as **FirstMate**, and pipeline-proposal
+- **R52** — Chuck seeds `firstmate`, displayed as **FirstMate**, and pipeline-proposal
   authorization accepts that id, not `agentdecker`. There is no automatic legacy-role conversion,
   alias or existing-process identity repair. The supervised cutover (FS-10.R25) preserves edited
   role content and adjusts the concrete installation's references offline; it does not overwrite
@@ -209,7 +209,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 
 
 - **R50 — Four lean shipped personas.** Superseding R14–R15 only for the
-  shipped role set, a fresh home seeds the resident operator (currently `agentdecker`),
+  shipped role set, a fresh home seeds the resident operator (`firstmate`, FS-04.R52),
   `implementer`, `reviewer`, and `researcher`. Coordination is part of the resident operator's
   mandate; no separate coordinator, `pm`, or `teammate` is seeded. The default remains
   `implementer`, all four inherit the existing permission policy, and role editing retains its
@@ -244,7 +244,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   success, sets `onboarding_complete: true` via `PUT /api/config`, then closes the wizard.
 
 - **R43** — Settings expose the install-wide task concurrency budget: how many agent
-  runtimes AgentDeck may bring up for dependent work at one time, defaulting to ten (FS-16.R7, R21).
+  runtimes Chuck may bring up for dependent work at one time, defaulting to ten (FS-16.R7, R21).
   It is a single positive integer, validated and persisted like every other setting on this screen,
   and it never counts or affects agents a person launches or resumes themselves.
 
@@ -308,10 +308,10 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   cannot be dismissed by outside click or Escape; its ordinary completion path remains **Backend →
   Project → Config → Launch**. If writing completion fails, it stays open and reports the failure.
 - **R33** — The Backend step presents backend type and credential choices, but no
-  editable AgentDeck model id or provider model string. It uses the chosen backend's existing
+  editable Chuck model id or provider model string. It uses the chosen backend's existing
   default model; people edit model catalogs and defaults later in Settings → Backends.
 - **R34** — Claude and Codex onboarding gives provider-specific guidance to sign in
-  outside AgentDeck, then offers **Check again** to refresh readiness. AgentDeck does not launch,
+  outside Chuck, then offers **Check again** to refresh readiness. Chuck does not launch,
   proxy, display, receive, or store a native sign-in flow or credential. Unready, unavailable, and
   failed readiness results leave the wizard open with retryable guidance and the Set up later action.
   An installed adapter that cannot answer the readiness check is an unavailable result with
@@ -428,7 +428,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `TestMigrateSupersededRolePromptsExactOnly`, `TestMigrateSupersededRolePromptsSkipsUnseededRole`;
   FS-18.A9 covers the per-role failure isolation and package gating.
 - **A28 — retired 2026-10-03:** Automatic role migration replaced by A32 and FS-10.A14.
-- **A32** `(planned)` (R52) — A fresh home seeds FirstMate and pipeline-proposal authorization
+- **A32** (R52) — A fresh home seeds FirstMate and pipeline-proposal authorization
   accepts `firstmate` and rejects `agentdecker`; a prepared customized FirstMate role survives
   startup unchanged under R47. *Verify by* seed/pipeline authorization fixtures. Preservation of
   the operator's old customized role and references is checked in the FS-10.A14 cutover rehearsal.
@@ -485,7 +485,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `RunStartForm.tsx`.
 - **Set up later & provider guidance:** `OnboardingWizard` owns the completion escape hatch (R32);
   `steps/BackendStep.tsx` holds the provider sign-in guidance and Check again (R33, R34), naming the
-  `agentdeck auth` selectors that `internal/backend/providerauth` owns.
+  `chuck auth` selectors that `internal/backend/providerauth` owns.
 - **Dashboard logging (R41/A21):** `internal/cli/dashboard.go` establishes the shared persistent
   logger; `internal/cli/cli_test.go` covers foreground mirroring, append/permission behavior,
   unavailable paths, and the detached child's single redirected sink.

@@ -1,6 +1,6 @@
-# AgentDeck — Claude Code context
+# Chuck — Claude Code context
 
-AgentDeck is a local Go server with an embedded React/Vite UI that supervises agent CLIs. This file
+Chuck is a local Go server with an embedded React/Vite UI that supervises agent CLIs. This file
 contains Claude Code adapter guidance only; product and architecture rules live in `docs/specs/`.
 
 ## Start every role

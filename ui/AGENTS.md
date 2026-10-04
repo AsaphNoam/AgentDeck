@@ -1,4 +1,4 @@
-# AgentDeck UI presentation rules
+# Chuck UI presentation rules
 
 Read `docs/specs/features/FS-12-application-interface.md` and
 `docs/specs/tech/TS-08-frontend-presentation.md` before changing presentation code.

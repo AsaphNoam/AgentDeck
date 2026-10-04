@@ -29,7 +29,7 @@ then read or reply with minimal chrome. Quiet groups, friendly readable typograp
 and opaque surfaces keep content dominant; status badges are deliberately the stronger scan cue.
 Motion indicates current state only: no card movement or celebratory animation.
 
-Reference: [AgentDeck Figma Make exploration](https://www.figma.com/make/OykxmXqZnnyA67QA1lv3AU/AgentDeck-%25E2%2580%2594-Theme-Exploration).
+Reference: [Chuck Figma Make exploration](https://www.figma.com/make/OykxmXqZnnyA67QA1lv3AU/AgentDeck-%25E2%2580%2594-Theme-Exploration).
 Compare composition, not prototype anatomy. The pre-design live comparison showed 640px expanded
 cards with ~253px headers, ~78px Send buttons, zero Tasks authoring inset padding and boxed runtime
 groups with an empty live-settings band. These are baseline observations, not acceptance evidence.

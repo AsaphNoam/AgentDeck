@@ -6,9 +6,9 @@
 
 ## 1. Scope
 
-This spec defines AgentDeck's local threat model, network and browser boundary, producer identity,
+This spec defines Chuck's local threat model, network and browser boundary, producer identity,
 context authorization, filesystem protections, path validation, process environment policy, and
-secret/redaction rules. AgentDeck is a personal local tool, not a multi-user or remotely exposed
+secret/redaction rules. Chuck is a personal local tool, not a multi-user or remotely exposed
 service.
 
 ## 2. Design & constraints
@@ -29,14 +29,14 @@ boundary must be disclosed; adding API authentication is a future product/securi
 tokens bound server-side to an agent and launch generation. Tokens are not accepted from query
 parameters, not logged, and are invalidated on stop/crash/switch.
 
-**R5 — AgentDeck creates owner-only files.** `$AGENTDECK_HOME` and newly created subdirectories are
+**R5 — Chuck creates owner-only files.** `$CHUCK_HOME` and newly created subdirectories are
 `0700`; newly created/rewritten configs, database, transcripts, registrations, tokens, and caches
 are `0600`. Startup tightens the home directory and database, but does not recursively repair an
 existing tree.
 
 **R6 — Path policies are boundary-specific.** URL-decoded role/project ids pass strict slug
 validation before path construction. Project `cwd` and `add_dirs` deliberately name user-selected
-external roots and are expanded/existence-checked, not contained beneath AgentDeck home. Federation
+external roots and are expanded/existence-checked, not contained beneath Chuck home. Federation
 roots/imports/cache targets use their approved-root and symlink policy from TS-07. Existing
 valid-name role/project symlink files are a documented same-user hardening gap.
 
@@ -58,17 +58,17 @@ lines, CLI stderr, and MCP input are parsed as data and use boundary-specific va
 They cannot choose sender identity, HTML execution, or log format unchecked. Existing record/tool
 limits remain binding; TS-03 records the missing uniform HTTP-body bound.
 
-**R13** — A project-resources leaf is an AgentDeck-owned owner-only directory selected
-solely by a validated project id under AgentDeck home; it is never resolved from `cwd`, `add_dirs`,
-title, or client input. AgentDeck rejects an existing resource parent or leaf symlink/non-directory
+**R13** — A project-resources leaf is a Chuck-owned owner-only directory selected
+solely by a validated project id under Chuck home; it is never resolved from `cwd`, `add_dirs`,
+title, or client input. Chuck rejects an existing resource parent or leaf symlink/non-directory
 instead of following it. Its path may appear as non-secret launch/UI metadata, but its contents are
 never read into API, SSE, transcript, analytics, or log data merely by this feature.
 
 **R14 — Pipeline controls preserve the local trust boundary.** Pipeline REST routes stay
 under the whole-mux Host/Origin guard and have the same unauthenticated same-user authority as the
-rest of `/api`. Stage-result and AgentDecker-proposal MCP calls additionally require the existing
+rest of `/api`. Stage-result and FirstMate-proposal MCP calls additionally require the existing
 random launch token and server-derived caller identity; a role/id supplied in tool arguments is never
-authority. AgentDecker's exact-payload Save/Start confirmation is a UI interaction guard, not a claim
+authority. FirstMate's exact-payload Save/Start confirmation is a UI interaction guard, not a claim
 that a shell-capable same-user process cannot invoke the ordinary CLI/API. Pipeline text is treated
 like prompt/transcript content: owner-only and bounded, but not a credential vault or automatically
 redacted secret field.
@@ -104,7 +104,7 @@ content-free logs/events (R11, INV §8/§11/§12/§13).
 FS-15 §6 deliberately accepts durable direct grants without an owner-management surface or automatic
 expiry in the current local, single-user product. Grantor revocation and recipient deletion remain
 the only revocation transitions. This avoids additional management and timer wiring; the policy must
-be reconsidered if AgentDeck gains a multi-user trust boundary or evidence shows accidental
+be reconsidered if Chuck gains a multi-user trust boundary or evidence shows accidental
 sensitive-context sharing is a practical problem.
 
 - **R17** — Every task MCP operation first resolves the existing per-launch token to
@@ -139,7 +139,7 @@ sensitive-context sharing is a practical problem.
   narrow direct transport is reviewed and proven.
 
 - **R20 — The approval exemption widens no boundary it did not already sit
-  inside.** Exempting AgentDeck's own actions from the human approval gate (FS-03.R40) changes who
+  inside.** Exempting Chuck's own actions from the human approval gate (FS-03.R40) changes who
   is asked, never what is permitted. Every exempt call still crosses the same loopback-only `/mcp`
   route behind the existing `localOnly` wrapper, still carries the per-agent token minted for that
   agent's current generation, and is still authorized server-side against that agent's own identity
@@ -181,7 +181,7 @@ sensitive-context sharing is a practical problem.
   person is never misdirected to a containment problem that does not exist (`INV §8`). The
   route is registered inside `routes()` so it sits behind `localOnly` like every other route
   (R2, `INV §14`); loopback is not authentication (R3), which is precisely why the root comes from
-  session state instead of the request. AgentDeck's own home tree stays out of reach unless a
+  session state instead of the request. Chuck's own home tree stays out of reach unless a
   session working directory is itself inside it, and R13's project-resources rule is untouched
   because this feature never makes that directory a readable root. Files Git ignores **are**
   readable inside the root: a deliberate product decision (FS-03.R55) that accepts a linked `.env`
@@ -200,8 +200,8 @@ sensitive-context sharing is a practical problem.
   including a path outside every project, inside `.git`, or reached through a symlink. Absolute
   paths need no available working directory, and the route does not prove that a path came from a
   transcript or require a per-read confirmation. This is an explicit same-machine trust decision:
-  another local process able to call AgentDeck can use the route as a direct reader for the
-  AgentDeck user's text files, including secrets. OS permissions are the only filesystem
+  another local process able to call Chuck can use the route as a direct reader for the
+  Chuck user's text files, including secrets. OS permissions are the only filesystem
   authorization for an absolute target.
 
   The widened authority changes none of the content-safety or network boundaries. The response is
@@ -271,7 +271,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
   independently authenticate a compromised release account or manifest. Documentation must state that
   limit and the possible Gatekeeper approval; the installer must not bypass Gatekeeper, disable system
   protections, or request elevated privileges. The application-runtime root is separate from
-  `AGENTDECK_HOME`, owner-writable only, and never used as authority for user config, sessions, or
+  `CHUCK_HOME`, owner-writable only, and never used as authority for user config, sessions, or
   credentials (FS-10.R3–R9; TS-06.R13–R21).
 - **INV §11:** an unusable project-resources path fails project creation or lifecycle composition;
   it never degrades into an agent launch without the promised accessible directory.
@@ -280,7 +280,7 @@ Their concrete payloads are owned by TS-03, TS-04, and TS-07.
 
 - Same-machine API callers are trusted as described by R3; real API authentication is not shipped.
 - Full environment inheritance is accepted behavior under R8. The UI masks likely secret fields but
-  plaintext values remain in owner-only config and child environments; AgentDeck is not a vault.
+  plaintext values remain in owner-only config and child environments; Chuck is not a vault.
 - Provider credential checks remain heuristic for some CLI versions/storage layouts. A passed check
   is readiness evidence, not a security guarantee or entitlement check.
 - Existing descendant modes are not recursively repaired and valid-name role/project symlinks are

@@ -1,6 +1,6 @@
 ---
 name: design-feature
-description: Explicit invocation only. Run only when the user sends `/design-feature`; turn an AgentDeck idea into ready-to-implement specifications without writing product code.
+description: Explicit invocation only. Run only when the user sends `/design-feature`; turn a Chuck idea into ready-to-implement specifications without writing product code.
 ---
 
 # Design an implementation-ready feature
@@ -37,7 +37,7 @@ excluded behavior, states, errors, compatibility, and observable acceptance. Pre
 of related questions at a time.
 
 Do not invent a product, security, privacy, compatibility, or data-retention decision. Explain any
-important existing AgentDeck boundary that constrains the idea.
+important existing Chuck boundary that constrains the idea.
 
 Draft the feature side first. Extend the best existing FS when the idea belongs to an existing
 capability; create the next FS only for a genuinely separate capability. Follow the templates and ID

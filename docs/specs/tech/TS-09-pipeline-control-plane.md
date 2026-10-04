@@ -8,7 +8,7 @@
 
 This spec owns the native pipeline engine: template representation, durable run/attempt/value state,
 exactly-once transition claims, stage assignment/result tools, restart reconciliation, and the
-AgentDecker proposal seam. FS-14 owns visible behavior. TS-01 owns the process and launch boundaries,
+FirstMate proposal seam. FS-14 owns visible behavior. TS-01 owns the process and launch boundaries,
 TS-02 owns the persistence classes and migration rules, TS-03 owns HTTP/SSE conventions, TS-04 owns
 the shared MCP transport, and TS-05 owns the existing same-user local trust model.
 
@@ -27,13 +27,13 @@ self-HTTP call. Reconciliation is event-driven with a bounded startup sweep as r
 unbounded polling loop.
 
 **R2 — Templates are versioned configuration.** Pipeline templates are filename-addressed
-version-1 JSON under `$AGENTDECK_HOME/pipelines/{id}.json`, written through the config store's
+version-1 JSON under `$CHUCK_HOME/pipelines/{id}.json`, written through the config store's
 owner-only atomic-write path. The filename supplies the immutable validated slug id. Reads reject an
 unknown version and return per-template diagnostics without making other valid templates disappear.
 Create refuses an existing id; update never changes the id; delete removes only the template file.
 
 **R3 — One canonical validator.** Config reads, template CRUD/validation, run start, and
-AgentDecker proposals call the same pure validator. It checks structural limits; unique stage/run-input
+FirstMate proposals call the same pure validator. It checks structural limits; unique stage/run-input
 and stage-local declaration names; existing roles on template save and run start; input/output
 bindings; complete success/failure routes; reachable destinations; final outcomes; and a positive
 `max_visits` bound for every stage participating in a cycle. Read/list returns an invalid
@@ -122,9 +122,9 @@ session snapshots, transcripts, or archive/index records. Attempt-to-agent refer
 not cascade into the existing agent tables. Template CRUD is serialized per store, and existing run
 snapshots remain readable after template deletion.
 
-**R15 — AgentDecker proposals are validated, soft-gated data.** The shared MCP server adds
+**R15 — FirstMate proposals are validated, soft-gated data.** The shared MCP server adds
 proposal tools for a model-neutral template draft and a saved-template run configuration. They are
-available to a token-bound AgentDecker-role chat session, call the canonical validator, and return a
+available to a token-bound FirstMate-role chat session, call the canonical validator, and return a
 canonical payload plus digest and proposal id without saving or starting anything. Before reporting
 MCP success, the server commits one content-addressed canonical proposal record to SQLite; a retry of
 the same proposal retains one record. The Pipelines UI reads those records as its approval authority,
@@ -157,15 +157,15 @@ used by JSON config, HTTP, MCP, assignment rendering, and tests. Collection fiel
 arrays/maps at every JSON boundary. Opaque text is stored and rendered as data; it is not treated as a
 secret field, filesystem authority, markup, command, or condition expression.
 
-**R21 — Builder sessions remain ordinary AgentDecker agents.** Create with AgentDecker
-launches the configured `agentdecker` role through the shared chat launch service with the user's
+**R21 — Builder sessions remain ordinary FirstMate agents.** Create with FirstMate
+launches the configured `firstmate` role through the shared chat launch service with the user's
 chosen backend/model and the configured default project. The agent remains visible, transcript-backed,
 archivable, and stoppable through ordinary surfaces; its backend/model never enters the template. A
 missing role, unusable default project, non-chat-capable backend, or failed readiness check prevents
-the builder launch with the ordinary bounded error. The seeded AgentDecker prompt gains the pipeline
+the builder launch with the ordinary bounded error. The seeded FirstMate prompt gains the pipeline
 proposal and CLI behavior only when those capabilities ship.
 
-**R22 — The CLI is a thin API client.** `agentdeck pipeline` subcommands cover template
+**R22 — The CLI is a thin API client.** `chuck pipeline` subcommands cover template
 list/validate and run start/show/continue/retry/stop using the same local REST requests and structured
 errors as the Pipelines UI. They do not open SQLite or template files directly while the server is
 running, do not contain a second transition engine, and require the dashboard server like other live
@@ -591,7 +591,7 @@ pipeline_runs       run identity, frozen template/run config, state, revision, p
 pipeline_attempts   immutable visit/attempt lineage, agent link, assignment hash, report/quiescence
 pipeline_values     current run-wide text values plus source provenance
 pipeline_requests   unique start request ids and their resulting run ids
-pipeline_proposals  canonical AgentDecker proposals, their digest, and consumption state
+pipeline_proposals  canonical FirstMate proposals, their digest, and consumption state
 ```
 
 Exact columns and indexes live in a forward-only TS-02 migration (TS-02.R17, TS-02.R22). Foreign

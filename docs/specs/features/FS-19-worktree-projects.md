@@ -6,9 +6,9 @@
 
 ## 1. Purpose
 
-AgentDeck makes isolated parallel coding work effortless by leaning into its existing model: the
+Chuck makes isolated parallel coding work effortless by leaning into its existing model: the
 project is the workspace. A **worktree project** is an ordinary project whose working directory is a
-Git worktree that AgentDeck created, bootstrapped, and tracks. Spinning up a parallel stream of work
+Git worktree that Chuck created, bootstrapped, and tracks. Spinning up a parallel stream of work
 is creating one more project; everything inside a project — agents, tasks, pipeline stages — shares
 its checkout, and isolation exists between projects. The checkout is disposable infrastructure: the
 branch, commits, project, agent identities, and conversations are the durable things.
@@ -19,11 +19,11 @@ branch, commits, project, agent identities, and conversations are the durable th
 
 - **R1.** Any active project whose expanded `cwd` resolves inside a Git working tree
   offers a **New worktree project** action. It creates, as one visible operation: a new branch off
-  the base branch (R2), a fresh Git worktree for that branch under AgentDeck's owned worktree area
+  the base branch (R2), a fresh Git worktree for that branch under Chuck's owned worktree area
   (R4), and a new active project whose `cwd` is that worktree and whose `color`, `context_prompt`,
   `add_dirs`, `base_branch`, and `setup_command` are copied from the source project. The creation
   form asks only for what varies: a **Title** (pre-filled from the source title), an editable
-  **Branch** pre-filled as `agentdeck/<slug(title)>`, and an editable **Base** pre-filled from the
+  **Branch** pre-filled as `chuck/<slug(title)>`, and an editable **Base** pre-filled from the
   source project's effective base branch. Editing the base to another branch is the explicit way to
   stack on feature work; nothing ever stacks implicitly. The action creates a project only; it does
   not launch an agent.
@@ -31,18 +31,18 @@ branch, commits, project, agent identities, and conversations are the durable th
   effective base is the repository's default branch, auto-detected at use time. Independent new
   work always branches from the effective base, keeping logical task relationships separate from
   Git ancestry.
-- **R3.** When the new project has a non-empty `setup_command`, AgentDeck runs it
+- **R3.** When the new project has a non-empty `setup_command`, Chuck runs it
   non-interactively inside the fresh worktree immediately after creation, before reporting the
   project ready. A failing or timed-out setup command does **not** undo or block creation: the
   project exists and is launchable, and the failure surfaces as a visible warning carrying the
   **tail** of the captured output — the last 2,000 runes, not the whole build log, so a verbose
   failure cannot flood the surface it appears on. The full stored tail stays on the ownership
-  record for anyone who needs it (TS-12.R5). Setup is AgentDeck's job at checkout creation; it is
+  record for anyone who needs it (TS-12.R5). Setup is Chuck's job at checkout creation; it is
   never delegated to the first coding agent.
-- **R4.** AgentDeck-owned worktrees live under `$AGENTDECK_HOME/worktrees/{project-id}/`,
-  keyed by the new project's immutable id. For each worktree it creates, AgentDeck durably records
+- **R4.** Chuck-owned worktrees live under `$CHUCK_HOME/worktrees/{project-id}/`,
+  keyed by the new project's immutable id. For each worktree it creates, Chuck durably records
   ownership: the checkout path, the branch, and the source repository. A project whose `cwd` merely
-  lies inside a worktree AgentDeck did not create is **external**; AgentDeck never deletes an
+  lies inside a worktree Chuck did not create is **external**; Chuck never deletes an
   external checkout and never offers to.
 
 ### 2.2 Living in a worktree project
@@ -59,7 +59,7 @@ branch, commits, project, agent identities, and conversations are the durable th
 ### 2.3 Disposable checkout, durable branch
 
 - **R7.** When a launch in a worktree project finds the owned checkout directory missing,
-  AgentDeck recreates the worktree from the recorded branch, re-runs the project's `setup_command`
+  Chuck recreates the worktree from the recorded branch, re-runs the project's `setup_command`
   under R3's warning semantics, and proceeds with the launch, reporting that recreation happened.
   It never silently substitutes the base branch: if the recorded branch no longer exists, the
   launch fails with an actionable error naming the branch and the recovery options.
@@ -80,7 +80,7 @@ and deletes under FS-04.R35/R36. Its extra state is the owned checkout, which is
 project is archived or deleted; the branch remains in the repository). Ownership never changes:
 a checkout is owned from creation, and external checkouts never become owned.
 
-**Consented deletion ends ownership.** Accepting R8's offer removes the checkout *and* AgentDeck's
+**Consented deletion ends ownership.** Accepting R8's offer removes the checkout *and* Chuck's
 ownership of it, so a project restored afterwards is an ordinary project pointing at a directory
 that no longer exists: launching it fails with the same missing-directory error any misconfigured
 project gets, and R7's recreation does not apply. This is deliberate — recreating a checkout the
@@ -117,7 +117,7 @@ deletion, which leaves ownership intact.
   registration while the branch and commits survive in the source repository. Verified by test
   plus manual gate.
 - **A5.** A project whose `cwd` is a user-created worktree is treated as external: no
-  deletion offer at archive or delete, and no AgentDeck code path removes it. Verified by test.
+  deletion offer at archive or delete, and no Chuck code path removes it. Verified by test.
 - **A6.** A non-repo project shows no fork action; a fork attempt with a colliding branch
   name fails actionably and leaves no partial project, branch, or directory. Verified by test.
 - **A7.** Two agents in one worktree project share one checkout; two sibling forks get

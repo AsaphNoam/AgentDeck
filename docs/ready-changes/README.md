@@ -1,4 +1,4 @@
-# AgentDeck ready changes
+# Chuck ready changes
 
 This directory holds changes that are fully described, approved to start, and waiting for an agent
 to begin. The linked feature and technical specifications remain the source of truth for what to
@@ -57,9 +57,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`simplify-agent-and-automation-setup.md`](simplify-agent-and-automation-setup.md) — reduce setup
   overhead for experienced operators across New Agent, native linking, Tasks and pipeline start.
-- [`rename-product-to-chuck.md`](rename-product-to-chuck.md) — rename AgentDeck to Chuck
-  across identity, install, agent-facing surfaces and UI, with one supervised data-preserving
-  cutover and restarted sessions instead of a general migration mechanism.
 - [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
   give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,
   project-page pipeline start, agent management, and tracked-file views; remove phone task UI.
@@ -67,5 +64,5 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 ## Paused changes
 
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only
-  AgentDeck's internal MCP action delivery with the packaged direct-action command, preserving
+  Chuck's internal MCP action delivery with the packaged direct-action command, preserving
   provider/user MCP support; waiting for a safe direct transport supported by packaged Codex/ACP.

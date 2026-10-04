@@ -1,6 +1,6 @@
 # FS-00 — Product Overview
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/server`, `internal/runtime`, `internal/state`, `internal/config`, `ui/src` · **Journeys:** J1, J3
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) §§1–3, §7
 
@@ -10,7 +10,7 @@ the per-feature specs, and architecture lives in the TS-series.
 
 ## 1. Purpose
 
-AgentDeck is a **local-first desktop tool for running and supervising many AI coding-agent sessions
+Chuck is a **local-first desktop tool for running and supervising many AI coding-agent sessions
 in parallel**. It wraps existing agent CLIs (Claude Code, Codex, and additional backends) and gives
 every session a persistent identity, live status, a durable normalized agent-event history,
 file/command tracking, and a
@@ -18,22 +18,22 @@ messaging channel so agents coordinate with each other. The user is a developer 
 concurrent tasks to AI agents and needs one place to see what each is doing, intervene, and resume
 past work — without juggling a dozen terminal tabs.
 
-- **R1** — All product data is local. AgentDeck-owned config and Phase 7 native-CLI source bindings
+- **R1** — All product data is local. Chuck-owned config and Phase 7 native-CLI source bindings
   are plain files; machine state is a single local SQLite database. There is no cloud component and
   no account.
 - **R2** — The server binds `127.0.0.1` only and is never exposed publicly. The API is unauthenticated
   on loopback; `/api/hook` and `/mcp` additionally require a per-launch token (see TS-05).
 - **R18 — Paired phones over the person's tailnet are the one remote exception.** When
-  the person turns on remote control (FS-20), AgentDeck also answers on its own device in the
+  the person turns on remote control (FS-20), Chuck also answers on its own device in the
   person's Tailscale network, to paired phones only. It is never published to the public internet,
-  AgentDeck still operates no cloud component and requires no AgentDeck account, and the loopback
+  Chuck still operates no cloud component and requires no Chuck account, and the loopback
   desktop interface keeps R2's same-machine trust unchanged.
 - **R3** — The product goals are: run N sessions concurrently, each addressable as `role@project`;
   show live status at a glance; provide a full streaming chat view per agent; persist and
   search/resume every session; let agents message each other; and support multiple
   backends/models switchable on a live agent without losing history.
 - **R16 — retired 2026-10-03:** Automatic migration promise replaced by R19's supervised cutover.
-- **R19** `(planned)` — The product is named Chuck across the application, documentation,
+- **R19** — The product is named Chuck across the application, documentation,
   `chuck` command, `$CHUCK_HOME`, release/install identity, MCP identity/header, agent knowledge
   and desktop/phone UI. The resident operator is **FirstMate**. FS-10.R15/R25–R26 define a normal
   Chuck install and one supervised data-preserving cutover for the sole operator, with stopped old
@@ -45,7 +45,7 @@ past work — without juggling a dozen terminal tabs.
   permissions or product capability beyond the named identity and cutover boundaries.
 
 **Non-goals (v1):** no cloud sync, no remote/multi-user access, no auth layer; no built-in code
-editor (AgentDeck observes and orchestrates, it does not replace the IDE); no support for agent
+editor (Chuck observes and orchestrates, it does not replace the IDE); no support for agent
 runtimes that are not CLI/ACP-compatible; no billing, telemetry, or analytics.
 
 ## 2. Core concepts
@@ -80,7 +80,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **R5** — A **role** is a reusable persona defining *how* an agent behaves, independent of where it
   works: a `system_prompt`, display `title`, and a `skip_permissions` policy (`null` inherits the
   global config value; `true`/`false` override it). Roles are stored as config files and seeded if
-  absent, never overwriting user edits (see FS-04). Seed roles: `agentdecker`, `implementer`,
+  absent, never overwriting user edits (see FS-04). Seed roles: `firstmate`, `implementer`,
   `reviewer`, `researcher` (FS-04.R50).
 
 ### 2.3 Project — the workspace
@@ -121,11 +121,11 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **R11** — Persistence is split by *who writes the data*. Human-edited **config is plain JSON
   files** (hand-editable, `git`-friendly). Machine-generated **state lives in one SQLite file**, and
   the Go server is its **sole writer** — so there is no multi-process contention and the DB is
-  authoritative (no derived-index drift). Everything lives under `~/.agentdeck/` (overridable by
-  `AGENTDECK_HOME`).
+  authoritative (no derived-index drift). Everything lives under `~/.chuck/` (overridable by
+  `CHUCK_HOME`).
 
 ```
-~/.agentdeck/
+~/.chuck/
   # config — plain JSON files (server + hand-editable)
   roles/{role}.json          persona: system_prompt + permission policy
   projects/{project}.json    workspace: cwd + context_prompt + add_dirs
@@ -138,20 +138,20 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   state.db                   agent identity, running registry, live status, messages,
                              session/transcript metadata + FTS5 search index
 
-  # AgentDeck normalized transcripts + any external CLI history used for resume/indexing
+  # Chuck normalized transcripts + any external CLI history used for resume/indexing
   sessions/{agent_id}/       append-only normalized transcript and session artifacts
 ```
 
-- **R12** — AgentDeck's chat runtime appends normalized events to
+- **R12** — Chuck's chat runtime appends normalized events to
   `sessions/{agent_id}/transcript.ndjson`; external CLI session/history artifacts may coexist and
-  remain provider-owned. AgentDeck indexes the durable normalized transcript into FTS5 and can
+  remain provider-owned. Chuck indexes the durable normalized transcript into FTS5 and can
   rebuild that projection (see FS-03, FS-05, TS-02).
 
 ## 3.1 Orchestration planes
 
 - **R13 — Control facts remain application state.** Agent lifecycle, availability,
   readiness, dependencies, queues, unread mail, wake reasons, permissions, attention requirements,
-  and waiting/blocking relationships are control-plane facts. AgentDeck records and reacts to those
+  and waiting/blocking relationships are control-plane facts. Chuck records and reacts to those
   facts deterministically where it can; a control fact does not become an LLM conversation turn,
   transcript event, or mailbox message merely because an agent may eventually need to act.
 - **R14 — Durable context remains independently retrievable.** Transcripts, task
@@ -160,7 +160,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
   imply eager prompt injection. Existing launch snapshots, pipeline assignments, annotations, and
   user prompts remain intentional conversation inputs where their content itself defines the work;
   this requirement does not introduce the future context-link model.
-- **R15 — Every model turn is an explicit plane crossing.** AgentDeck starts a model
+- **R15 — Every model turn is an explicit plane crossing.** Chuck starts a model
   turn for exactly three reasons: a user instruction, an intentional assignment or continuation
   whose own bounded content defines the work, or a host-owned activation that requires model
   judgment (TS-01.R18). They are distinct crossings, and none inherits another's persistence or
@@ -189,19 +189,19 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **MCP (Model Context Protocol)** — the protocol for the in-process agent-to-agent messaging server,
   hosted inside the Go binary and mounted over loopback HTTP at `/mcp` (no runtime Node). See FS-06,
   TS-04.
-- **`agent_id` vs. `session_id`** — `agent_id` is AgentDeck's stable identity (R4); `session_id` is
+- **`agent_id` vs. `session_id`** — `agent_id` is Chuck's stable identity (R4); `session_id` is
   the CLI's ephemeral per-start id. Resume/clone/switch preserve the former and mint a new latter.
 - **Hook** — a thin shell script registered with the agent CLI that fires on lifecycle events
   (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`) and POSTs to
   `/api/hook` with its per-launch token. The primary status channel for terminal agents. See TS-04.
 - **Activation** — a durable, payload-free control opportunity to initiate work after
-  AgentDeck claims it. It makes the control-to-conversation crossing explicit without prescribing a
+  Chuck claims it. It makes the control-to-conversation crossing explicit without prescribing a
   universal retry/completion policy or containing the work payload. See FS-06 and TS-01.
 - **Mail activation executor `(current)`** — the server loop that claims a durable pending
   mail activation — a host-owned opportunity, at-most-once once attempted — and starts or wakes the
   recipient to process it. It replaced the earlier unread-polling nudger. See FS-06, TS-04.
-- **Federation** — binding AgentDeck to a backend's native Claude/Codex config files so those files
-  stay authoritative and AgentDeck stores only bindings, overrides, and a derived redacted view.
+- **Federation** — binding Chuck to a backend's native Claude/Codex config files so those files
+  stay authoritative and Chuck stores only bindings, overrides, and a derived redacted view.
   See FS-08.
 - **Required checks** — the build and test work a change must pass before it is considered done. The
   definition lives in `docs/features/AGENT-WORKFLOW.md` §2, not here.

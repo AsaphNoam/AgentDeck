@@ -1,4 +1,4 @@
-# AgentDeck invariants — normative technical-spec appendix
+# Chuck invariants — normative technical-spec appendix
 
 Every class below cost at least one review cycle; most recurred in two or more subsystems before
 being named. The evidence base is multiple full top-to-bottom reviews plus the repo's `review fix:`
@@ -219,7 +219,7 @@ must explicitly walk this checklist — silence on any line is a bug, not a defa
       (`ResetTurnBudget` via `terminalTurnID`) — not lumped into a generic status hook.
 - [ ] **Reconcile:** the sweep knows its shape (no chat-shaped preview stomping, §1).
 - [ ] **Hooks/status:** feature flags scoped to the actual risk surface, not blanket-applied
-      (`AGENTDECK_HOOK_REGISTRATION` once muted terminal agents entirely).
+      (`CHUCK_HOOK_REGISTRATION` once muted terminal agents entirely).
 - [ ] **Capabilities honesty:** never advertise what no API/UI surface can select (`tmux:true`
       with no selector shipped).
 - [ ] **Teardown:** joins §4's single teardown on every exit path.
@@ -238,7 +238,7 @@ Paid for by (this one recurred **four times** as the same literal mistake):
 - `bufio.Scanner` in the transcript reader aborted the *entire* transcript on one oversized
   (>8 MiB) line (`ErrTooLong`) — could 500 `/transcript` and block resume permanently. Skip the
   record, keep the stream.
-- `agentdeck reindex` wiped ALL agents' index up front, then aborted wholesale on the first
+- `chuck reindex` wiped ALL agents' index up front, then aborted wholesale on the first
   unreadable transcript — the repair tool left the archive worse than before. Per-entity isolation.
 - reindex flush logic lost the final partial turn when a transcript had one finished turn plus a
   crash mid-later-turn.
@@ -360,7 +360,7 @@ Paid for by:
 - The ACP handshake once logged an incompatible protocol version and proceeded. Version gates fail
   and run the normal shutdown path; they never warn and continue with an unsupported peer.
 - BR-1: a `model` member was asserted from a reading of the adapter's internal parser, emitted by
-  AgentDeck, accepted by the fake, and read by no provider — the pinned request schema has no such
+  Chuck, accepted by the fake, and read by no provider — the pinned request schema has no such
   field. A claim that a provider *honors* a value needs a complete trace from the wire call to the
   provider-side read, or a credentialed run that observed the effect. An adapter-local readback is
   neither: an ACP `configOptions.model.currentValue` is adapter configuration evidence, not provider
@@ -412,7 +412,7 @@ response headers). And any other account on the machine can read world-readable 
   (TS-05.R23) The tailnet remote listener is the one other chain: its routes sit behind
   the remote guard, device authentication, and allowlist of TS-13.R4/R5 instead — never behind
   neither guard, and never mixed with `localOnly`.
-- Everything under `~/.agentdeck` (config with backend env/API keys, `state.db`, transcripts,
+- Everything under `~/.chuck` (config with backend env/API keys, `state.db`, transcripts,
   hook/MCP token files, logs) is owner-only: `0o700` dirs, `0o600` files (hook scripts `0o700`).
   `MkdirAll` never re-modes an existing dir and SQLite creates files umask-relative, so creation
   paths must pass tight modes AND `EnsureLayout`/`state.Open` explicitly `Chmod` what may already
@@ -505,7 +505,7 @@ Paid for by:
   pipeline codes (`internal/messaging/tool_result_contract_test.go`).
 - A mail-activation test asserted a condition that could not fail, leaving its stated guarantee
   unproven until the assertion was made against the actual durable rows and provider prompts.
-- The AgentDecker migration's unreadable-file case exercised decode corruption instead, then
+- The role-prompt migration's unreadable-file case exercised decode corruption instead, then
   skipped the whole case as root. Corrupt content, a real read-I/O failure, and write failure now
   have separate fixtures (`internal/config/config_test.go`).
 - Release CI passed `-tags sqlite_fts5` only to packages with no tagged implementation and never
@@ -513,7 +513,7 @@ Paid for by:
   executable's build metadata (`.github/workflows/release.yml`).
 - The server once marshaled an empty collection as `null` while its MSW double returned `[]`, so
   every UI test passed against a payload the server did not produce (§11).
-- `fakeacp` accepted every `session/new` member AgentDeck sent, while the pinned ACP decoder strips
+- `fakeacp` accepted every `session/new` member Chuck sent, while the pinned ACP decoder strips
   anything outside its closed schema. The fixture therefore confirmed emission and was read as
   confirming delivery. The fake now decodes through the same member set, and the params check
   enumerates that set from the protocol schema and its backends from the adapter registry rather

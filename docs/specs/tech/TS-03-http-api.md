@@ -218,7 +218,7 @@ availability travels on the agent.** Send and Steer are two deliberate actions w
 route, not a mode flag on it: overloading one route would make a client's intent — "after this turn"
 versus "into this turn" — a parameter the server could silently reinterpret. It returns `202 {accepted,
 agent_id, outcome}` where `outcome` is `steered` when the adapter injected into the running turn and
-`new_turn` when the turn had already ended and AgentDeck accepted the text for a fresh host-owned
+`new_turn` when the turn had already ended and Chuck accepted the text for a fresh host-owned
 turn, so the client reports which happened instead of inferring it from transcript timing
 (TS-04.R49/R51). An empty `text` steers the
 message currently held for that agent and is the only way to send one, so promoting a held message is
@@ -501,7 +501,7 @@ stop-and-registration-cleanup operation.
   `POST /api/projects/{project}/worktree-fork` (201 on success; Git and validation failures are 422
   with the specific reason; archived sources rejected), on-demand
   `GET /api/projects/{project}/worktree` status, an optional `delete_checkout` boolean on the
-  existing project archive and delete requests (honored only for AgentDeck-owned checkouts, never
+  existing project archive and delete requests (honored only for Chuck-owned checkouts, never
   defaulted on — as a body field on `POST .../archive`, whose body remains optional, and as a
   `?delete_checkout=true` query parameter on `DELETE /api/projects/{project}`, which carries no
   body). A consented deletion also echoes the status snapshot as `dirty_known` and `dirty` body
@@ -633,7 +633,7 @@ No route or event type is added, and older percentage-only producers and clients
 adapter returns `promptRequired`, `POST /api/sessions/{id}/steer` submits the unchanged text through
 the ordinary prompt path exactly once and returns the existing `202 {accepted, agent_id,
 outcome:new_turn}` shape. The route does not retry `startedNewTurn`, because that adapter outcome may
-already have consumed the text and started work outside AgentDeck's turn gate. A runtime that cannot
+already have consumed the text and started work outside Chuck's turn gate. A runtime that cannot
 provide the no-consumption idle fallback is not compatible with the steering lifecycle;
 Steer availability remains capability-advertised rather than inferred from the adapter version.
 

@@ -8,7 +8,7 @@ TS-05.R24, TS-08.R80, TS-13.R5/R16, INV §1/§2/§8/§10/§11/§14–§17
 
 ## Outcome
 
-A person can open any regular UTF-8 file the AgentDeck process can read from a conversation file
+A person can open any regular UTF-8 file the Chuck process can read from a conversation file
 link or local file address, then select its displayed text and assign a point-in-time annotation
 through the same tray and target flow used by conversation annotations.
 

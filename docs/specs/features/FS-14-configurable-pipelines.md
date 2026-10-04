@@ -6,11 +6,11 @@
 
 ## 1. Purpose
 
-AgentDeck already launches independently configured agents, groups them visually, and lets chat
+Chuck already launches independently configured agents, groups them visually, and lets chat
 agents coordinate through messages. It does not know that one agent's work is input to another
 agent's review, whether a stage succeeded, or which stage may run next. Configurable pipeline runs
 add that missing product-level coordination: a person defines reusable stages and their agent
-configuration, starts a run with a concrete goal, and can leave AgentDeck to advance the run through
+configuration, starts a run with a concrete goal, and can leave Chuck to advance the run through
 explicit, durable stage results while retaining supervision and recovery controls.
 
 This feature owns pipeline templates, run and stage behavior, agent-visible stage assignments and
@@ -63,12 +63,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   run snapshots the template, display name, goal, project, inputs, roles, and runtime assignments;
   later template edits affect future runs only.
 - **R4.** A run can be started from the dashboard and through a local CLI/API surface.
-  AgentDecker may start the same native run by invoking that CLI/API after the user asks it to; the
-  pipeline engine, not AgentDecker's conversational context, then owns progression.
+  FirstMate may start the same native run by invoking that CLI/API after the user asks it to; the
+  pipeline engine, not FirstMate's conversational context, then owns progression.
 
 ### 2.2 Assignment and explicit completion
 
-- **R5.** AgentDeck launches only the current stage's agent. Its initial assignment names
+- **R5.** Chuck launches only the current stage's agent. Its initial assignment names
   the run goal, stage responsibility, declared named inputs, relevant prior-stage results, scope
   boundaries, and the explicit result and named outputs it must report. Future-stage agents are not
   launched early.
@@ -80,13 +80,13 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   are system-owned attempt failures, not agent-reported outcomes. The caller identity and assigned
   run/stage are server-derived, so an agent cannot report for another agent or stage.
 - **R7.** Runtime status alone never completes a stage: `idle`, `done`, or process exit
-  does not mean the work passed. AgentDeck may advance only after accepting the explicit result and
+  does not mean the work passed. Chuck may advance only after accepting the explicit result and
   observing the reporting turn reach an idle/quiescent boundary. Duplicate or stale reports do not
   trigger a second transition.
 - **R8.** An accepted result is durable and visible before the next stage starts. The
   next assignment receives its declared named text inputs and structured prior results rather than
-  a copied transcript; all stage-agent transcripts remain available through the ordinary AgentDeck
-  archive. After a `success` or `failure` result reaches the idle boundary, AgentDeck stops the stage
+  a copied transcript; all stage-agent transcripts remain available through the ordinary Chuck
+  archive. After a `success` or `failure` result reaches the idle boundary, Chuck stops the stage
   agent before
   advancing or waiting at an approval gate.
 
@@ -116,7 +116,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   earlier attempt.
 - **R13.** Stopping a run cancels/stops its current agent through the ordinary lifecycle
   path and prevents future stages from launching. Agents and transcripts from completed attempts
-  remain ordinary archived AgentDeck sessions. Completed and stopped run summaries and stage
+  remain ordinary archived Chuck sessions. Completed and stopped run summaries and stage
   results have no automatic expiry and remain until the user explicitly deletes the run record;
   deleting a run or template never silently deletes its agents or transcripts.
 - **R14.** Dashboard restart restores every non-finished run to its last durable stage,
@@ -134,7 +134,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   edits, shell commands, network fetches, and every provider- or user-configured MCP server keep the
   selected role's ordinary permission policy, and a pipeline still never changes credentials,
   substitutes a model, or treats a permission prompt as a failed or completed stage. What R15 no
-  longer implies is that a stage agent must ask a person for permission to use AgentDeck's own
+  longer implies is that a stage agent must ask a person for permission to use Chuck's own
   actions — reporting its stage result, reading its assignment, messaging, delegating, or sharing
   context. Those are exempt for every agent under FS-03.R40–R42, pipeline or not, so a stage that
   reports its result advances without a human click and can no longer be failed by an unanswered
@@ -142,7 +142,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   no autonomy field, and nothing about a run changes which tools a person is asked about. *Verified
   through* FS-03.A24 and FS-03.A26.
 
-- **R16.** Agents from a run remain normal AgentDeck agents: they have stable agent ids,
+- **R16.** Agents from a run remain normal Chuck agents: they have stable agent ids,
   cards, transcripts, archive entries, notifications, and messaging. The run adds an immutable run
   and stage association but does not replace those existing surfaces or use display names/group
   labels as identity.
@@ -202,7 +202,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   user input for a blocked stage and opens a new attempt on that stage's resumable agent. Retry
   reruns the current stage with a fresh agent, and Stop is the escape hatch when neither is
   appropriate.
-- **R21.** Concurrent runs retain AgentDeck's existing shared-project-directory
+- **R21.** Concurrent runs retain Chuck's existing shared-project-directory
   behavior and are allowed. A run serializes its own stages but does not claim filesystem isolation
   from direct agents or other runs; the start surface visibly warns when another active run or agent
   shares the project, without presenting that warning as an isolation guarantee.
@@ -214,35 +214,35 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   declarations include bounded human-readable descriptions so the run form and stage assignment can
   explain what each value represents. Every value is bounded opaque text: it may contain a
   specification, a repository-relative filename, or another reference meaningful to the agent, but
-  AgentDeck has no separate path type and does not inspect, copy, or verify referenced file contents.
+  Chuck has no separate path type and does not inspect, copy, or verify referenced file contents.
 - **R23.** The Start Run form and API collect all required run inputs before launch.
   Stage output values join the run's durable named-value set and may satisfy later stage inputs; the
   run detail shows each value's name, producing run input or stage attempt, and current text value.
 - **R24.** Before accepting a stage result whose selected transition starts another
-  stage, AgentDeck verifies that every required input binding of that destination resolves to a
+  stage, Chuck verifies that every required input binding of that destination resolves to a
   non-empty named text value. Missing values are returned to the reporting agent/user by name and
   do not complete the attempt or launch the destination. `failure` and `blocked` results may still
   carry useful partial outputs.
 
-### 4.2 Pipelines page and AgentDecker-assisted creation
+### 4.2 Pipelines page and FirstMate-assisted creation
 
 - **R25 — superseded 2026-08-27 by R35–R45:** A single dedicated **Pipelines** page carried the
   template list, template editor, Start Run form, and run detail/history together on one scrolling
   screen. Combining authoring with supervision made both jobs hard to read and left a live run's
   position visible only as a stage id. R35–R45 split the surface and replace it; the no-graph-canvas
   boundary is carried forward by R35 and hand-editable versioned template JSON by R41.
-- **R26.** Create with AgentDecker first lets the user choose one configured active project,
-  backend, and model for the template-building AgentDecker session. The project picker lists every
+- **R26.** Create with FirstMate first lets the user choose one configured active project,
+  backend, and model for the template-building FirstMate session. The project picker lists every
   configured active project and defaults to the configured default project only when that project
   still exists and is active; the builder cannot be launched until a listed project is selected, so
   a stale, removed, or archived default is visible before launch rather than only as a rejected
   launch. The picker shows configured readiness honestly; effort remains a per-run stage assignment
   rather than a template or builder setting. This creator choice is not written into the
   resulting model-neutral template.
-- **R27.** The AgentDecker builder accepts a natural-language pipeline description, asks
+- **R27.** The FirstMate builder accepts a natural-language pipeline description, asks
   clarifying questions in chat, and submits a structured draft containing stages, roles,
-  instructions, named inputs/outputs, outcome routes, approval gates, and loop bounds. AgentDeck
-  validates and previews the draft in the ordinary editor. AgentDecker may request **Save** for the
+  instructions, named inputs/outputs, outcome routes, approval gates, and loop bounds. Chuck
+  validates and previews the draft in the ordinary editor. FirstMate may request **Save** for the
   exact validated draft or **Start** for an exact saved-template run configuration, but neither
   action occurs until the person approves its one-time confirmation in the Pipelines UI. Editing the
   proposed payload invalidates that approval, Save and Start require separate approvals, and chat
@@ -250,18 +250,18 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   approval surface rather than navigating into the builder chat, because the Save/Start controls live
   there. The builder session panel reflects the session's live state: while agent state is still
   hydrating it shows a loading line; while the builder runs it shows the session id and an **Open
-  AgentDecker chat** link; and once the builder has stopped it withholds that link and states that the
+  FirstMate chat** link; and once the builder has stopped it withholds that link and states that the
   session stopped while its pending proposals remain available for approval below.
 - **R28.** Runs can be started and controlled from the Pipelines page and local CLI/API.
-  AgentDecker may invoke that local surface after a user's request, but v1 exposes no agent-facing
+  FirstMate may invoke that local surface after a user's request, but v1 exposes no agent-facing
   start-run MCP tool and pipelines cannot start child pipelines.
 - **R29.** Pipeline-level notifications use the existing toast/desktop/mute pipeline for
   exactly two categories: **needs attention** (blocked, approval gate, launch failure, or crash) and
   **completed** (terminal success or terminal failure). Ordinary successful stage transitions do not
   notify.
-- **R30.** The AgentDecker Save/Start confirmation is an interaction guard, not a new
+- **R30.** The FirstMate Save/Start confirmation is an interaction guard, not a new
   security boundary. The builder integration exposes no unapproved write/start operation and never
-  auto-approves its own request, while AgentDeck retains TS-05's existing same-user local-API trust
+  auto-approves its own request, while Chuck retains TS-05's existing same-user local-API trust
   model: a shell-capable agent is not cryptographically prevented from invoking the ordinary local
   CLI/API outside this guided flow.
 
@@ -269,7 +269,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   the exact Save or Start it asked for has succeeded, including after a reload, so the same approval
   cannot be performed twice or replay an older run. A failed or refused approval leaves the proposal
   pending. There is no Dismiss control: a proposal the person never approves simply ages out, because
-  AgentDeck retains only the newest proposals and prunes older ones — that clause alone is
+  Chuck retains only the newest proposals and prunes older ones — that clause alone is
   superseded by R49, which adds an explicit decline; every other obligation in R33 is
   unchanged. Approving an edited payload creates no consumption, since the edit already invalidated
   that approval (R27).
@@ -320,11 +320,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   reason, or stop any agent.
 - **R41** — The Templates sub-destination lists saved templates with each
   template's title, id, stage count, and validation state, and offers **Create manually** and
-  **Create with AgentDecker** under the rules R26, R27, R30, and R33 already define. A template
+  **Create with FirstMate** under the rules R26, R27, R30, and R33 already define. A template
   opens in its own full-width editor page carrying the stage-list editing surface R1 and R17
-  define. Templates remain hand-editable as versioned AgentDeck JSON through the same validation
+  define. Templates remain hand-editable as versioned Chuck JSON through the same validation
   contract (carried forward from R25).
-- **R42** — A pending AgentDecker proposal appears on the sub-destination that
+- **R42** — A pending FirstMate proposal appears on the sub-destination that
   can act on it: a `save_template` proposal on Templates and a `start_run` proposal on Runs. The
   other sub-destination shows a count of the proposals waiting on it so neither is hidden. Proposal
   approval, one-time consumption, and edit invalidation are unchanged from R27 and R33.
@@ -367,7 +367,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **R47** — A stage agent is told where its participation ends. The assignment
   states that the one `report_pipeline_stage_result` call ends the agent's part in that assignment —
   that clause alone is superseded by R53, which restates the boundary in terms of the
-  result AgentDeck accepted rather than the call the agent made, leaving every other obligation in
+  result Chuck accepted rather than the call the agent made, leaving every other obligation in
   R47 unchanged — that a `blocked` result pauses the run for a person, that anything said in the
   agent's chat during that pause is out of band and cannot be recorded against the run, and that the
   person's answer
@@ -414,7 +414,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   proposal id is derived from its content, an agent proposing content byte-identical to a declined
   or deleted record returns exactly one pending offer to the approval surface, timed by that newest
   proposal, in the same way R33's re-arm already returns one after an approved Save. Declining
-  refuses one offer; it is not a standing block on that content, and AgentDeck therefore holds no
+  refuses one offer; it is not a standing block on that content, and Chuck therefore holds no
   per-content refusal list. Suppressing the re-proposal instead would let an agent receive tool
   success with nothing on any human surface, which is the discoverability defect the durable
   proposal record exists to remove.
@@ -462,10 +462,10 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 4.5 Running a stage without a person in the loop
 
-- **R53** — The boundary is the result AgentDeck accepted, not the call the
-  agent made. The assignment states that the agent's part in an assignment ends when AgentDeck
+- **R53** — The boundary is the result Chuck accepted, not the call the
+  agent made. The assignment states that the agent's part in an assignment ends when Chuck
   **accepts** a result; that a refused call records nothing, leaves the attempt still owing a
-  result, and leaves that agent as the only one who can supply it; and that a refusal AgentDeck
+  result, and leaves that agent as the only one who can supply it; and that a refusal Chuck
   classes as retryable is an instruction to correct the call and send it again rather than a signal
   to stop. Every refusal of `report_pipeline_stage_result` states which of the two it is: either the
   attempt still owes a result and this agent must send one, naming what to change, or its
@@ -480,7 +480,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   attention reason naming that wait, and it joins R29's needs-attention notification category
   alongside blocked, approval gate, launch failure, and crash. The reason clears when the request is
   approved, denied, or otherwise resolved, and the run returns to its ordinary presentation. This
-  covers only the state AgentDeck can prove, because it is holding the request itself; it is not a
+  covers only the state Chuck can prove, because it is holding the request itself; it is not a
   general detector of a stage agent that has gone quiet for some other reason, which remains an
   unresolved product decision recorded in the handoff. Without this, removing the approval deadline
   would trade a stage that fails in three minutes for a run that waits in silence indefinitely.
@@ -543,7 +543,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   does not promise that a provider process survives restart.
   If normal provider resume starts a fresh native session, the agent receives its durable assignment
   and work results again and supervision explicitly says native conversation context was not restored.
-- **R67** (shipped 2026-09-13) — Stage outputs live in AgentDeck's durable run/task records and remain
+- **R67** (shipped 2026-09-13) — Stage outputs live in Chuck's durable run/task records and remain
   inspectable after completion with no automatic expiry. Deleting a new-model run requires terminal
   state and completed cleanup; it removes the run's template snapshot and named-value projection,
   not tasks, their results, agents, or transcripts. Stage task deletion is refused while retained
@@ -553,7 +553,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   the resulting repository, implementor, decision, and concern context to review. Review can assign
   the appropriate reviewers, return fixes to original implementors, add replacement or additional
   work, and decide completion. All such repositories must be accessible under the run's existing
-  AgentDeck project configuration. Task targets, dependency arms, and context reads keep existing
+  Chuck project configuration. Task targets, dependency arms, and context reads keep existing
   project boundaries; the pipeline grants no cross-project access or additional filesystem roots.
 - **R69** (shipped 2026-09-13) — This is a clean replacement: old pipeline templates, runs, attempts, values,
   and pipeline proposals are discarded when the replacement is installed, without conversion or
@@ -596,7 +596,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   group initially; a user's group edits have no control-plane effect.
 - **R75** (shipped 2026-09-13) — Every stage is a bounded durable assignment to the standing run
   orchestrator, which retains run-wide responsibility and alone reports the stage outcome. For a
-  stage configured with dedicated coordination, AgentDeck creates one managed child task beneath
+  stage configured with dedicated coordination, Chuck creates one managed child task beneath
   that assignment and launches its stage sub-orchestrator through ordinary task admission. The
   standing owner receives that child's identity and objective, delegates the stage work through it,
   and remains responsible for evaluating its report. The sub-orchestrator coordinates its own
@@ -759,15 +759,15 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   stage's declared inputs; an unresolved required input prevents accepting the transition; text that
   names a nonexistent path remains opaque rather than receiving a false existence guarantee.
   *Verify:* template validation and run-transition tests.
-- **A10** — Create with AgentDecker offers configured project/backend/model choices for
+- **A10** — Create with FirstMate offers configured project/backend/model choices for
   the creator, launches the session into the selected project rather than an assumed default, holds
   the launch closed while no listed project is selected, supports a clarifying conversation, and
   places a valid model-neutral draft into the editor. Launching keeps the person on the Pipelines
   approval surface, and the builder session panel shows the loading, running (with an **Open
-  AgentDecker chat** link), and stopped (link withheld, pending proposals still listed) states. Its
+  FirstMate chat** link), and stopped (link withheld, pending proposals still listed) states. Its
   Save and Start requests show the exact payload for separate one-time approval; denial
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
-  fake-runtime server test, `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`, and J14.
+  fake-runtime server test, `ui/src/features/pipelines/FirstMateBuilder.test.tsx`, and J14.
 
 - **A11** (R31) — Run setup offers effort only for a stage whose assigned model declares
   levels, a run started with per-stage efforts launches each stage agent at its assigned level, an
@@ -785,7 +785,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   caller request id resolve to one record whose exact payload is what the approval surface holds in
   either order, and one unreadable proposal record does not hide the others. *Verify:*
   `internal/pipeline/proposals_test.go`, `internal/state/pipeline_proposals_test.go`, and
-  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
+  `ui/src/features/pipelines/FirstMateBuilder.test.tsx`.
 
 - **A14** (R35/R36/R41) — Opening Pipelines lands on Runs; switching to Templates shows
   the template library with no run history and no start form on screen, and switching back shows no
@@ -810,7 +810,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **A18** (R42) — A pending `save_template` proposal is actionable on Templates and
   counted on Runs, a pending `start_run` proposal is actionable on Runs and counted on Templates,
   and approving either still consumes it exactly once. *Verify:*
-  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx` and J14.
+  `ui/src/features/pipelines/FirstMateBuilder.test.tsx` and J14.
 - **A19** (R43) — A link to the combined page carrying a selected run opens that run's
   page, and a link naming a deleted run or template explains the absence and returns to the matching
   list. *Verify:* Pipelines routing tests.
@@ -874,7 +874,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   with the durable state rather than applied. — `internal/state/pipeline_proposals_test.go`,
   `internal/pipeline/proposals_test.go` (both orderings for both kinds, and the leftover-offer
   failure mode), `internal/server/pipeline_handlers_test.go`, and
-  `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`.
+  `ui/src/features/pipelines/FirstMateBuilder.test.tsx`.
 
 - **A28** (R51) — A pending 32-stage `save_template` proposal renders collapsed:
   its kind, template title, stage count, and pending age are present and its exact payload is not
@@ -887,7 +887,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   and run ledger as the surface's first content. A `start_run` summary names its template's current
   title, follows a rename, and names the template id and says the template is gone once that template
   is deleted. A proposal whose payload cannot be summarized still lists with its
-  kind and proposal id. — `ui/src/features/pipelines/AgentDeckerBuilder.test.tsx`; J14.
+  kind and proposal id. — `ui/src/features/pipelines/FirstMateBuilder.test.tsx`; J14.
 
 - **A29** (R53) — A rendered assignment states that the boundary is the
   accepted result, that a refused call records nothing and leaves the attempt still owing one, and
@@ -972,7 +972,7 @@ remains open for this change. Requirements remain planned until implementation a
 
 The shipped first version deliberately keeps these product boundaries:
 
-- Stages are generic named/instructed units configured with AgentDeck roles; Work,
+- Stages are generic named/instructed units configured with Chuck roles; Work,
   Review, Validate, and Fix are template examples rather than hard-coded stage types. Templates are
   model-neutral; every run supplies and snapshots its per-stage backend/model assignments.
 - A run may change values and runtime assignments, not pipeline structure or stage semantics. Before
@@ -991,10 +991,10 @@ The shipped first version deliberately keeps these product boundaries:
   not claim filesystem isolation.
 - Arguments and stage artifacts are named opaque text only. Templates declare input/output bindings;
   there is no typed path, file copying, or content verification.
-- The Pipelines destination supports manual editing and a provider/model-selected AgentDecker
-  builder. AgentDecker submits a validated model-neutral draft and may request Save or Start, but
+- The Pipelines destination supports manual editing and a provider/model-selected FirstMate
+  builder. FirstMate submits a validated model-neutral draft and may request Save or Start, but
   each exact action requires a separate one-time human confirmation. This is a guided-flow guard,
-  not a change to AgentDeck's same-user local-API trust boundary.
+  not a change to Chuck's same-user local-API trust boundary.
 - The §4.3 split reorganizes the pipeline surface only. It changes no template, routing,
   approval, loop-bound, recovery, or run-state behavior, adds no agent-facing tool or payload, and
   adds no attention reason. Delegated agents are followed one hop from a stage agent and are shown
@@ -1005,7 +1005,7 @@ The shipped first version deliberately keeps these product boundaries:
   shared page-frame, route-heading, dialog, and repeated-surface rules govern the new pages as they
   govern the existing ones; R44–R45 define the Pipelines-specific hierarchy, disclosure, continuity,
   and reduced-motion behavior those shared rules do not.
-- Runs start through the Pipelines page or local CLI/API, including AgentDecker invoking that surface
+- Runs start through the Pipelines page or local CLI/API, including FirstMate invoking that surface
   after a user request; there is no start-run MCP tool or child pipeline in v1.
 - Only needs-attention and completed pipeline notifications join the existing notification/mute
   surface.
@@ -1014,7 +1014,7 @@ The shipped first version deliberately keeps these product boundaries:
   silence, a pause that does not say what its two actions do, and a declared output that reaches no
   screen. They add no work-unit, checkpoint, or resumable-task concept, no partial-success carry
   across a Retry, no workspace isolation for a stage or its delegates, and no change to how a run's
-  outcome is decided — those remain as §6 already records them. R54 covers only a wait AgentDeck is
+  outcome is decided — those remain as §6 already records them. R54 covers only a wait Chuck is
   itself holding; detecting a stage agent that has gone quiet for any other reason stays an open
   product decision. How long a stopped stage agent stays unaddressable was settled by R74: its
   pipeline history never excludes it.

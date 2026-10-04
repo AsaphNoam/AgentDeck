@@ -149,12 +149,12 @@ from the Notifications settings editor.
 agent notification toast of any type (`permission_required`, `waiting_input`, `done`,
 `budget_exceeded`) opens the full conversation (`/agent/<agent_id>`) and dismisses the toast; a
 separate close control dismisses it without navigating. Clicking a desktop Web Notification brings
-the AgentDeck tab forward, opens the same conversation, and closes the notification. Nothing is
+the Chuck tab forward, opens the same conversation, and closes the notification. Nothing is
 approved, denied, or replied to from a notification. A stale target opens current truth: an
 already-answered permission shows its conversation as it now stands, and a vanished agent shows the
 existing **Agent not found** view. Error toasts that name no agent stay non-navigating. Mutes,
 per-agent desktop dedupe, the four-toast cap, and per-toast auto-dismiss (R23/R24) are unchanged,
-and phone push taps keep FS-20.R21. A desktop notification whose AgentDeck tab was closed has no
+and phone push taps keep FS-20.R21. A desktop notification whose Chuck tab was closed has no
 page to open and does nothing.
 
 **R27.** A stopped agent's card context menu additionally offers **Resume**. It is absent from a

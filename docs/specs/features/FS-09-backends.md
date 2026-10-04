@@ -6,9 +6,9 @@
 
 ## 1. Purpose
 
-AgentDeck supervises agent CLIs through named backend definitions. A backend selects one of four
+Chuck supervises agent CLIs through named backend definitions. A backend selects one of four
 ACP adapter types, owns a model catalog and defaults, may supply environment settings, and declares
-the capability boundary AgentDeck can honestly offer. This spec covers backend/model configuration,
+the capability boundary Chuck can honestly offer. This spec covers backend/model configuration,
 credential feedback, launch behavior and the shipped Claude, Codex, OpenCode and OpenHands matrix.
 Configuration-source federation for Claude/Codex is FS-08.
 
@@ -18,7 +18,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 
 - **R1** — `backends.json` version 2 is a map of user-chosen backend ids to
   `{name,type,default,default_model,models,env}`. Each model is
-  `{name,model,env}`; the map key is AgentDeck's selectable model id and `model` is the provider/CLI
+  `{name,model,env}`; the map key is Chuck's selectable model id and `model` is the provider/CLI
   model string sent at launch.
 - **R2** — The only valid backend types are `claude-acp`, `codex-acp`, `opencode-acp`, and
   `openhands-acp`. Unknown types are rejected on `PUT /api/backends` with a field-level
@@ -41,7 +41,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   backend/model, and resets the selected model to that backend's default when the backend changes.
   The launch API rejects an unknown backend or model instead of guessing.
 - **R28** — A `codex-acp` backend may set `autosync_models: true`. On dashboard startup (after
-  seeding), AgentDeck reads the Codex CLI's local model cache
+  seeding), Chuck reads the Codex CLI's local model cache
   (`${CODEX_HOME:-~/.codex}/models_cache.json`) and **adds** every user-visible model
   (`visibility:"list"`) not already present to that backend's `models` map, keyed by the Codex model
   slug, with the slug as the provider string and the catalog `display_name` as the label. Sync is
@@ -53,7 +53,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R35** — A model entry may declare optional **effort capability**: `efforts`, a
   non-empty array of distinct non-empty provider effort-level strings, and `default_effort`, which
   must be one of them. Both are optional. A model that declares no `efforts` has no effort
-  capability and AgentDeck offers no effort choice for it anywhere. AgentDeck defines no effort
+  capability and Chuck offers no effort choice for it anywhere. Chuck defines no effort
   vocabulary of its own: a level is whatever string the provider accepts, so Codex's `ultra` and
   Claude's `max` coexist without translation or cross-provider normalization. `PUT /api/backends`
   rejects a blank or duplicated level, a `default_effort` outside `efforts`, and a `default_effort`
@@ -76,7 +76,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   levels simply contributes none. Claude's configured-model sync in R45 does not discover
   effort capability, so Claude effort levels remain hand-declared.
 - **R45** — A `claude-acp` backend may also set `autosync_models: true`. On dashboard
-  startup after seeding, AgentDeck reads only the user-level `~/.claude/settings.json` and collects
+  startup after seeding, Chuck reads only the user-level `~/.claude/settings.json` and collects
   model selectors from `model`, every string entry in `availableModels`, and every string entry in
   the `fallbackModel` array (also tolerating the older singular string shape). Each distinct,
   non-empty selector that passes the existing model-string validation and is not already represented
@@ -115,9 +115,9 @@ Configuration-source federation for Claude/Codex is FS-08.
   warning were removed by R71.
 
 - **R50** — A model entry may declare optional **fast-mode capability**:
-  `fast`, a boolean. Absent or `false` means the model has no fast-mode capability and AgentDeck
+  `fast`, a boolean. Absent or `false` means the model has no fast-mode capability and Chuck
   offers no fast-mode choice for it anywhere, exactly as a model declaring no `efforts` gets no
-  effort choice under R35. Fast mode is a single on/off speed setting, not a level: AgentDeck
+  effort choice under R35. Fast mode is a single on/off speed setting, not a level: Chuck
   declares no speed vocabulary and there is no per-model default, because the providers describe
   fast mode as trading increased usage for speed and the conservative resolution is off. `PUT
   /api/backends` rejects `fast: true` on a model under a backend whose adapter declares no
@@ -153,7 +153,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   settings argv is injected.
 - **R11** — `opencode-acp` launches `opencode acp`, uses provider-qualified model ids, strips
   inherited `CLAUDECODE`, `OPENCODE_CONFIG`, and `OPENCODE_CONFIG_CONTENT`, and has no lifecycle-hook
-  registration. With effective skip-permissions true, AgentDeck injects an ephemeral
+  registration. With effective skip-permissions true, Chuck injects an ephemeral
   `OPENCODE_CONFIG_CONTENT` permission block; with it false, ordinary ACP permission requests use
   the shared gate.
 - **R12** — `openhands-acp` launches `openhands acp`, carries the selected provider model in
@@ -164,28 +164,28 @@ Configuration-source federation for Claude/Codex is FS-08.
   only for `claude-acp`; all other types return `422 terminal_unavailable`. The New Agent UI hides
   or disables Terminal for those types rather than offering a combination the server rejects.
 - **R14** — A same-backend resume supplies the prior native session id for all four adapters; a
-  cross-backend switch has no compatible native id and uses AgentDeck's bounded history-primer
+  cross-backend switch has no compatible native id and uses Chuck's bounded history-primer
   handoff on the same stable `agent_id`.
-- **R15** — Every chat launch receives AgentDeck's scoped HTTP messaging MCP entry through the ACP
+- **R15** — Every chat launch receives Chuck's scoped HTTP messaging MCP entry through the ACP
   `mcpServers` session parameter. Whether each real CLI/version accepts that registration is an
   external compatibility gate, not inferred from fake-ACP success.
-- **R43** — AgentDeck launches every `codex-acp` process (launch, resume, and switch)
-  with `CODEX_HOME` pointed at an AgentDeck-owned directory instead of the user's personal Codex
-  home, so Codex writes its rollouts and native session index there and AgentDeck-created Codex
+- **R43** — Chuck launches every `codex-acp` process (launch, resume, and switch)
+  with `CODEX_HOME` pointed at a Chuck-owned directory instead of the user's personal Codex
+  home, so Codex writes its rollouts and native session index there and Chuck-created Codex
   conversations never appear in the user's native `codex` resume picker or Codex app history.
-  AgentDeck's own transcript, archive, search, and every session created after this behavior ships
+  Chuck's own transcript, archive, search, and every session created after this behavior ships
   resume from that same dedicated home. Isolation is always on for `codex-acp`; there is no per-agent
   or per-backend toggle. Sessions already written into the personal home are not moved and may no
-  longer native-resume through AgentDeck after the change; the user may archive those natively.
+  longer native-resume through Chuck after the change; the user may archive those natively.
   Claude, OpenCode, and OpenHands are unaffected.
-- **R44** — Before every `codex-acp` process starts, AgentDeck refreshes its dedicated
+- **R44** — Before every `codex-acp` process starts, Chuck refreshes its dedicated
   home from the user's effective Codex home (`${CODEX_HOME:-~/.codex}`): configuration,
   authentication, skills, agents, rules, plugins, and MCP setup are copied into the private profile,
   while Codex session/history data is never copied. The refresh is one-way: the personal home remains
   authoritative; additions, edits, and removals appear in the private profile at the next process
-  start, and AgentDeck never writes through to the personal home. A rejected refresh leaves the prior
+  start, and Chuck never writes through to the personal home. A rejected refresh leaves the prior
   private setup intact; a switch detects that rejection before stopping its working Codex runtime.
-  AgentDeck's own
+  Chuck's own
   configuration-federation discovery (FS-08) and Codex model autosync (R28) keep reading the user's
   real Codex home, so a bound source or an `autosync_models` backend behaves exactly as before.
 
@@ -196,8 +196,8 @@ Configuration-source federation for Claude/Codex is FS-08.
   explicit per backend as R26 requires.
 - **R40** — For `claude-acp` chat, the chosen effort is applied immediately after the
   native session is created rather than as part of creating it, because the adapter accepts effort
-  only as a post-creation session setting and AgentDeck will not write a person's native Claude
-  settings files to seed it (FS-08.R7). If that application fails, AgentDeck stops the just-started
+  only as a post-creation session setting and Chuck will not write a person's native Claude
+  settings files to seed it (FS-08.R7). If that application fails, Chuck stops the just-started
   agent and fails the launch with a bounded error; it never leaves a running agent at an effort the
   person did not choose. Codex chat and Claude terminal carry effort as part of starting the
   process, so they have no such window.
@@ -221,7 +221,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R60** — Backend catalog responses include read-only launch support for every
   registered backend type, including types with no configured backend. For each of chat and
   terminal, support reports whether that interface is implemented and whether it can deliver effort
-  and fast settings. This describes AgentDeck's integration, not executable installation, account
+  and fast settings. This describes Chuck's integration, not executable installation, account
   entitlement, a model's declared choices, or a live session's availability. The existing support
   matrix in R13/R39/R52 is unchanged. The metadata is not user-editable configuration and creates
   no stored preference, session data, or retention change.
@@ -257,18 +257,18 @@ Configuration-source federation for Claude/Codex is FS-08.
 ### User-installed Claude and Codex providers
 
 - **R68** — Claude and Codex use the user's installed provider executable by
-  default, not the provider copy shipped as an adapter dependency. Packaged AgentDeck continues
+  default, not the provider copy shipped as an adapter dependency. Packaged Chuck continues
   to own its ACP adapters, SDK dependencies and Node runtime. Claude terminal uses the same selected
   provider as Claude chat; other providers and terminal eligibility are unchanged. Updating a
-  provider can enable its newer models without updating AgentDeck, provided the existing adapter
-  can deliver their settings. AgentDeck does not promise support for every future provider version
+  provider can enable its newer models without updating Chuck, provided the existing adapter
+  can deliver their settings. Chuck does not promise support for every future provider version
   or a new provider feature merely because the CLI was updated. This supersedes the provider-binary
   default, not the adapter/session contracts, in R29 and TS-04.R13.
 - **R69 — retired 2026-10-03:** Unconditional override authority replaced by mode-scoped R76.
 - **R70** — Selection is resolved for every new provider process: launch, resume,
   clone where it starts a process, switch and rollback, task/pipeline activation, wake, and Claude
   terminal. In Installed mode, a normal provider update at its installed launcher path is picked up by the next
-  process without restarting AgentDeck. A newly installed CLI outside the dashboard's inherited
+  process without restarting Chuck. A newly installed CLI outside the dashboard's inherited
   search path may require an explicit path or a dashboard restart. Running agents are not restarted
   or deliberately rebound; frozen model/effort/prompt and native session identity remain unchanged.
   No per-conversation provider installation or provider-version pin is created. Codex's private
@@ -281,7 +281,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   produces neither an import refusal nor an incompatibility warning. This supersedes R59/A29 when
   shipped and extends the existing best-effort local-override behavior to the default. Claude keeps
   R45's configured-selector import and R46's aliases; neither provider gains a network model scan.
-  Exact provider model strings can still be added in Settings without an AgentDeck release.
+  Exact provider model strings can still be added in Settings without a Chuck release.
   Existing entries, effort/fast declarations and defaults are not rewritten. A missing, unreadable
   or malformed source remains a non-blocking skipped import, and a discovered model may still be
   refused by the provider/account at launch.
@@ -307,14 +307,14 @@ Configuration-source federation for Claude/Codex is FS-08.
   executable editor or new remote configuration authority.
 
 - **R75** — Each Claude/Codex backend offers **Installed provider (default)** or
-  **AgentDeck bundle** in its existing Settings definition. There is exactly one managed provider
-  bundle per provider in the running AgentDeck release, shared by all backends selecting it; there
+  **Chuck bundle** in its existing Settings definition. There is exactly one managed provider
+  bundle per provider in the running Chuck release, shared by all backends selecting it; there
   is no per-model/per-chat bundle, version picker or historical bundle manager. Both choices use
   the same managed adapter/SDK stack. Missing mode means Installed, including existing backends.
   A saved choice applies to subsequent process starts under R70, never hot-switches running work,
   and persists until explicitly changed. New Agent reports the choice but does not add another
   selector. Saving uses the ordinary Settings interaction, not a second confirmation modal.
-  Explain beside the choice that Installed follows the user's updates, Bundle follows AgentDeck
+  Explain beside the choice that Installed follows the user's updates, Bundle follows Chuck
   releases, and neither promises new models/account access or safe downgrade of native sessions.
 - **R76** — In Installed mode, executable overrides use model > backend > inherited
   environment precedence, then discovery. The advanced backend field uses existing
@@ -325,9 +325,9 @@ Configuration-source federation for Claude/Codex is FS-08.
   unrelated configuration and never write a managed absolute path into user environment settings.
 - **R77** — Recovery follows the selected source. Missing/old Installed providers
   offer official install/update instructions, path repair where applicable, or a link to the
-  backend's Bundle choice. A missing Bundle offers Installed or repair of the AgentDeck installation;
-  an old Bundle offers Installed or AgentDeck update guidance without promising an available release
-  fixes it. Known adapter incompatibility may require an AgentDeck update. Unknown errors do not
+  backend's Bundle choice. A missing Bundle offers Installed or repair of the Chuck installation;
+  an old Bundle offers Installed or Chuck update guidance without promising an available release
+  fixes it. Known adapter incompatibility may require a Chuck update. Unknown errors do not
   guess; failed input stays intact. Recovery links do not save the choice or retry work: the person
   saves Settings and explicitly retries. No automatic source switching/reversion, provider install/
   update, model substitution or prompt replay. Server availability checks remain authoritative.
@@ -360,7 +360,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   records what actually ran.
 - **R54** — Launch resolves fast mode in one precedence order: an
   explicitly requested fast mode; else off. There is no configuration-source override and no model
-  default, so a launch that asks for nothing runs at normal speed and AgentDeck never turns on a
+  default, so a launch that asks for nothing runs at normal speed and Chuck never turns on a
   cost-increasing setting the person did not ask for. Unlike effort, what is frozen into the session
   snapshot is the fast mode that **actually applied** (R55), not the one requested — so the chat
   header, the dashboard card, and the archive stay truthful for a task- or pipeline-launched agent
@@ -368,7 +368,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R55** — Fast mode is applied only when the live session advertises it.
   Both adapters return the session's available configuration options from session creation and
   resume, and both surface fast mode only when the session's current model really supports it.
-  AgentDeck sends the fast-mode setting only when that advertisement includes it. A requested fast
+  Chuck sends the fast-mode setting only when that advertisement includes it. A requested fast
   mode the session does not advertise **does not fail the launch**: the agent starts and runs at
   normal speed, its applied fast mode is off, and the chat header explains that this model does not
   offer fast mode (FS-03.R46). This deliberately diverges from effort's fail-closed rule in R40,
@@ -400,7 +400,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   created while requesting one model at one level came up on the user's own Codex default model and
   level instead, and that the same values applied cleanly as configuration options afterwards. Every
   Codex chat agent has therefore been running the user's configured Codex default rather than the
-  model and effort chosen in AgentDeck, while `PUT /api/backends` validation, the New Agent picker,
+  model and effort chosen in Chuck, while `PUT /api/backends` validation, the New Agent picker,
   and the recorded session identity all reported the chosen values. Fixing this changes which model
   existing Codex agents run, from their next launch or resume onward; that is the behavior R7 and
   R21 already specify and the New Agent screen already promises. `claude-acp` is unaffected and keeps
@@ -424,7 +424,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   names Claude and the failed stage, gives bounded recovery guidance for a recognized resource,
   nested-launch, authentication, or runtime-compatibility failure, and never returns raw adapter
   stderr. No failed startup is left registered as a running agent.
-- **R25** — Ambient adapter-specific environment that could override AgentDeck composition is
+- **R25** — Ambient adapter-specific environment that could override Chuck composition is
   removed according to R10–R12 and R29 before backend/model/hook values are applied. Other host environment
   variables remain inherited subject to the standing env-inheritance decision in FS-00/TS-05.
 - **R26** — OpenCode/OpenHands expose no terminal mode or native hook surface merely because their
@@ -435,7 +435,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **R42** — A requested effort the selected model does not declare fails launch, switch
   runtime, and pipeline run start with a field-level error naming the effort field and the levels
   that model does declare, before any process starts — exactly as an unknown model does under R7.
-  AgentDeck never substitutes a different level and never silently drops the request. A model whose
+  Chuck never substitutes a different level and never silently drops the request. A model whose
   declared levels are later edited does not retroactively change a frozen running or archived
   session (R4).
 - **R49** — Creating durable work that will launch an agent later is a
@@ -460,17 +460,17 @@ Configuration-source federation for Claude/Codex is FS-08.
   read path. `GET /api/backends` returns the in-memory default catalog just as it does for a missing
   or malformed file; the logged diagnostic names `backends.json`. The file is not overwritten until
   the person explicitly saves a valid catalog.
-- **R32** — `codex-acp` receives AgentDeck's frozen composed role/project prompt through its
+- **R32** — `codex-acp` receives Chuck's frozen composed role/project prompt through its
   documented `CODEX_CONFIG` session-config overlay as `developer_instructions`, on both new and
-  resumed chats. AgentDeck preserves unrelated keys from a valid existing `CODEX_CONFIG` object and
+  resumed chats. Chuck preserves unrelated keys from a valid existing `CODEX_CONFIG` object and
   places a pre-existing string `developer_instructions` before the composed prompt. Malformed,
   non-object config, or a non-string existing `developer_instructions` fails that launch with a
-  bounded configuration error; AgentDeck never silently drops the selected role.
+  bounded configuration error; Chuck never silently drops the selected role.
 - **R33** — Fresh homes seed Claude's default model as `sonnet` (labelled as the current
   Claude Sonnet) and Codex's as `gpt-5.6-sol` (labelled `GPT-5.6-Sol`). Seed updates never rewrite an
   existing `backends.json`, change an existing default, or replace a person’s model entry.
 - **R34** — Claude and Codex readiness recognize provider-native sign-in as well as the
-  applicable configured API-key path. AgentDeck does not start or proxy native login; it only probes
+  applicable configured API-key path. Chuck does not start or proxy native login; it only probes
   the resulting readiness and returns a bounded ready/unready/unavailable/failed outcome. For Codex,
   a valid native login and a valid `OPENAI_API_KEY` are independent acceptable readiness paths.
 
@@ -499,7 +499,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   `openhands` CLIs, verify ACP handshake and one streamed turn, permission round-trip and
   skip-permissions behavior, stop, native resume or documented primer fallback, provider/model/env
   mapping, and HTTP `mcpServers` registration. Model and system-prompt delivery is checked at the
-  effective provider, not at the request AgentDeck emits: both backends send a top-level
+  effective provider, not at the request Chuck emits: both backends send a top-level
   `systemPrompt` and OpenCode depends on a top-level `model`, and neither member is in the ACP
   session-request schema (TS-04.R54). OpenHands' model arrives through `LLM_MODEL` instead, so its
   top-level `model` is redundant either way. Until recorded, these backends pass fake-ACP tests but
@@ -532,7 +532,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   defaults, while a pre-existing catalog remains byte-for-byte unchanged by seeding. *Verified by*
   seed/config tests.
 - **A13** — Fake provider-native Claude/Codex readiness produces bounded outcomes
-  without AgentDeck starting a login process or receiving credential bytes; Codex API-key readiness
+  without Chuck starting a login process or receiving credential bytes; Codex API-key readiness
   remains supported. *Verified by* credential-check tests and FS-04.A14's UI test.
 
 - **A22** (R49) — A task created with an effort its model does not declare is
@@ -555,17 +555,17 @@ Configuration-source federation for Claude/Codex is FS-08.
   is rejected at save; an undeclared level is rejected at launch, switch runtime, and pipeline run
   start with no process started; and precedence resolves explicit over source override over
   `default_effort` over omitted. Emission is checked against the pinned session-request schema, not
-  against the shape AgentDeck asserted (TS-04.R54); live honoring stays A16's gated claim.
+  against the shape Chuck asserted (TS-04.R54); live honoring stays A16's gated claim.
   *Verify by* runtime parameter/process-environment tests, the pinned-schema session-parameter
   check, a fake-ACP post-session failure regression, launch/switch/pipeline validation tests, and
   the federation precedence tests named in FS-08.A8.
 - **A16** `(planned)` `(GATED — real CLI credentials)` — Against pinned authenticated Codex and
   Claude CLIs, confirm that a chosen level is actually honored by the running agent for Codex chat,
-  Claude chat, and Claude terminal, and that an undeclared level surfaces as AgentDeck's rejection
+  Claude chat, and Claude terminal, and that an undeclared level surfaces as Chuck's rejection
   rather than a provider-side failure. Until recorded, effort mapping is fixture-tested against the
   pinned adapters but live provider honoring is not claimed.
 - **A17** (R43, R44) — A `codex-acp` launch, resume, and switch set the child
-  `CODEX_HOME` to the AgentDeck-owned directory, overriding ambient/backend/model values, so the
+  `CODEX_HOME` to the Chuck-owned directory, overriding ambient/backend/model values, so the
   rollout and native session index are written there and nothing is added to the user's personal
   Codex `session_index.jsonl`. Before each child starts, its private profile refreshes copied
   authentication, configuration, skills, agents, rules, plugins, and MCP setup from the personal
@@ -755,18 +755,18 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Effort levels are declared, not discovered, for Claude.** Codex publishes its per-model levels
   in the cache `autosync_models` already reads, so R38 can fill them. Claude reports its levels only
   through the running adapter's session config options, so a Claude model's levels are hand-declared
-  and can drift from what the installed CLI accepts; R42 then rejects a level AgentDeck believes is
+  and can drift from what the installed CLI accepts; R42 then rejects a level Chuck believes is
   valid only after the person edits the catalog. Discovering Claude levels at launch would require a
   probe with no offline equivalent and is deliberately out of scope.
 - **Claude chat effort has a brief post-creation window (R40).** Between session creation and the
-  effort call the native session exists at the CLI's own level. AgentDeck sends no prompt in that
+  effort call the native session exists at the CLI's own level. Chuck sends no prompt in that
   window and tears the agent down if the call fails, so no turn ever runs at an unchosen level, but
   the launch cost of a failed effort application is one spawned-then-stopped process.
 - **OpenCode/OpenHands live acceptance is gated (A6).** Their binary/ACP commands, native
   `session/load`, exact OpenCode permission keys, OpenHands CLI-side approval mode, and HTTP MCP
   acceptance are based on adapter contracts plus fake ACP tests, not a recorded authenticated run.
   Their top-level `systemPrompt`, and OpenCode's top-level `model`, are outside the ACP
-  session-request schema; the two pinned adapters AgentDeck did check strip such members, and
+  session-request schema; the two pinned adapters Chuck did check strip such members, and
   whether these two CLIs' own decoders do is unverified because neither is installed. Treat that
   delivery as unproven rather than working — it is the exact shape BR-1 took — and do not remove
   the members before the live check establishes the real mechanism (TS-04.R47, TS-04.R54).
@@ -791,7 +791,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   a real new turn and native resume.
 - **Model/API compatibility remains partial.** Codex model import is best-effort candidate discovery
   (R71); probing an executable during configuration reads would add side effects. The ACP adapter may ignore
-  AgentDeck's requested model in favor of its own identifiers, and older endpoints do not yet share
+  Chuck's requested model in favor of its own identifiers, and older endpoints do not yet share
   one error envelope.
 
 ## 7. Traceability
@@ -817,7 +817,7 @@ Configuration-source federation for Claude/Codex is FS-08.
 - **Capability/composition:** `internal/server/terminal.go`, `launch.go`, `resume.go`, `switch.go`.
 - **Codex isolated profile (R43/R44):** final `CODEX_HOME` child override composed in
   `internal/server/{launch,resume,switch}.go`, one-way profile refresh under `internal/config`, spawn
-  application in `internal/runtime/chat.go`; AgentDeck's own-home reads stay in
+  application in `internal/runtime/chat.go`; Chuck's own-home reads stay in
   `internal/server/config_sources.go` and `internal/config/codexmodels.go` (see TS-04.R20/R21).
 - **UI:** `ui/src/schemas/backends.ts`, `ui/src/lib/backendTypes.ts`,
   `ui/src/lib/providerRuntime.ts`, `ui/src/features/settings/ProviderSection.tsx`,

@@ -6,9 +6,9 @@
 
 ## 1. Purpose
 
-Configuration federation lets an AgentDeck Claude or Codex backend use the user's existing native
-CLI setup without AgentDeck writing to that native source. Native files remain authoritative;
-AgentDeck stores an explicit binding, optional model/effort overrides, approved roots, and redacted
+Configuration federation lets a Chuck Claude or Codex backend use the user's existing native
+CLI setup without Chuck writing to that native source. Native files remain authoritative;
+Chuck stores an explicit binding, optional model/effort overrides, approved roots, and redacted
 provenance. Codex session isolation additionally creates a private runtime profile from that source
 for the Codex child only (R32). The feature covers discovery, preview and consent, linked/mirrored
 operation, freshness, launch/resume semantics, and the Settings/onboarding experience.
@@ -46,33 +46,33 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   named backend before consuming the token, so an invalid or unsaved backend does not spend consent.
 - **R6** — Every source read is constrained to a canonical root the user approved during preview,
   plus the currently selected project's canonical root. A symlink that resolves outside those
-  roots produces `approval_required`; AgentDeck never silently expands the approved boundary.
+  roots produces `approval_required`; Chuck never silently expands the approved boundary.
 - **R7** — Preview, resolve, refresh, bind, and unbind never write a native source file. The stored
-  `config-sources.json` manifest and any AgentDeck cache live beneath `AGENTDECK_HOME` with
+  `config-sources.json` manifest and any Chuck cache live beneath `CHUCK_HOME` with
   owner-only permissions.
 
 ### Binding modes and effective view
 
 - **R8** — Two binding modes ship. In `linked` mode the native tree is read directly and remains
-  authoritative. In `mirrored` mode the same authority rule applies, but AgentDeck also maintains
+  authoritative. In `mirrored` mode the same authority rule applies, but Chuck also maintains
   an owner-only redacted cache as disposable compatibility/display state. Cache failure never
   changes source authority or makes a stale launch valid.
-- **R9** `(planned)` — Detached import is the only mode in which AgentDeck would materialize and
+- **R9** `(planned)` — Detached import is the only mode in which Chuck would materialize and
   own a copy. It is not shipped: `DELETE ...?detach=true` returns `501 not_implemented`, and the UI
   labels detached import/copy unavailable. Plain unbind (`detach=false`) is supported.
 - **R10** — A binding may explicitly override `model` and `effort`. Empty/reset values mean inherit.
-  Settings identifies an AgentDeck override versus an inherited native value and provides
+  Settings identifies a Chuck override versus an inherited native value and provides
   **Apply override** and **Reset to inherit** actions.
 - **R11** — Claude resolution recognizes user, project, local, and managed settings; inventories
   `CLAUDE.md` imports plus user/project rules, skills, agents, hooks, plugins, and MCP declarations.
-  Managed settings are applied after ordinary native layers and AgentDeck overrides, so managed
+  Managed settings are applied after ordinary native layers and Chuck overrides, so managed
   policy remains authoritative.
 - **R12** — Codex resolution recognizes user configuration, an explicitly selected profile, and a
   trusted project's `.codex/config.toml`; it inventories `AGENTS.md`, user/project skills and
   agents, and declared rules, hooks, plugins, MCP servers, and configured model catalog entries.
   Untrusted project configuration is reported as skipped rather than applied.
 - **R13** — Setup assets are inventory/reference metadata only (`path`, scope, kind, fingerprint,
-  status, detachability). AgentDeck does not translate Claude setup into Codex setup, copy it, or
+  status, detachability). Chuck does not translate Claude setup into Codex setup, copy it, or
   claim that a configured model is enabled for the user's account. The private Codex runtime-profile
   refresh in R32 is the narrow exception: it reproduces the user's Codex setup for an isolated
   `codex-acp` child without writing back to the source.
@@ -91,33 +91,33 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   may remain visible, but `source_invalid`, missing/unapproved content, or another failed fresh
   resolution blocks the dependent launch; stale cache is never used as launch input.
 - **R17** — For a bound launch, an explicit launch model wins over a stored source override. If no
-  explicit model exists, a source override is used. If neither exists, AgentDeck omits the model
+  explicit model exists, a source override is used. If neither exists, Chuck omits the model
   from the ACP request so the native CLI selects its own default rather than receiving a guessed
-  AgentDeck model.
+  Chuck model.
 - **R31** — The stored effort override in R10 becomes launch input rather than display
   state only: for a bound launch, an explicit launch effort wins over the stored source override,
-  which in turn wins over the model's declared default, and if none exists AgentDeck omits effort so
+  which in turn wins over the model's declared default, and if none exists Chuck omits effort so
   the native CLI selects its own. This is the same precedence R17 already applies to the model, and
   the resolved level is subject to the declared-capability rejection in FS-09.R42. Settings continues
-  to show whether the effective effort is an AgentDeck override or inherited from the native source.
+  to show whether the effective effort is a Chuck override or inherited from the native source.
 - **R18** — A bound launch freezes a redacted versioned object in the session snapshot: backend,
   provider, profile, mode, requested/resolved high-level values, source digest/fingerprints, and
   whether the model was natively inherited. No secret values are frozen.
 - **R19** — Resume and runtime switch use that frozen federation object by default. A resume request
   with `config_refresh:true` explicitly resolves the current source and freezes the new result.
   Source changes never hot-mutate an already running agent.
-- **R20** — AgentDeck passes the real project working directory and native user home through to the
+- **R20** — Chuck passes the real project working directory and native user home through to the
   CLI, allowing provider-native project instructions and setup to remain discoverable without
-  AgentDeck copying them. The isolated Codex child is the exception in R32: it receives a
+  Chuck copying them. The isolated Codex child is the exception in R32: it receives a
   refreshed private profile rather than the personal `CODEX_HOME`.
-- **R21** — A native declaration named `agentdeck-messaging` conflicts with AgentDeck's reserved
+- **R21** — A native declaration named `chuck-messaging` conflicts with Chuck's reserved
   per-session messaging MCP id. Launch fails `409 source_conflict`; neither declaration is silently
   overwritten.
 - **R32** — Codex session isolation (FS-09.R43/R44) gives each `codex-acp` child one
-  AgentDeck-owned `CODEX_HOME`. Immediately before each launch, resume, or switch, AgentDeck makes a
+  Chuck-owned `CODEX_HOME`. Immediately before each launch, resume, or switch, Chuck makes a
   one-way, owner-only managed mirror of the effective personal Codex setup in that profile: native
   configuration, authentication, skills, agents, rules, plugins, and MCP setup are available to the
-  child, while session/history data remains private to AgentDeck. Source changes and removals take
+  child, while session/history data remains private to Chuck. Source changes and removals take
   effect at the next child start; a rejected refresh keeps the previous private setup and does not
   stop a working runtime; running children are not hot-mutated. The mirror never creates a
   source symlink or writes to the source tree. This is internal execution setup, not the user-facing
@@ -140,7 +140,7 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
   user-level source while connecting; the backend-global binding still resolves the launched agent's
   actual project later under R12/R16/R20. R2/R3 remain the compatible explicit-project API form.
 
-  Before activation, the action explains that AgentDeck reads native setup without copying or
+  Before activation, the action explains that Chuck reads native setup without copying or
   modifying it. Success replaces the action with concise global bound status and the existing
   effective-view, provenance, overrides, refresh, and unlink controls, enables continuing model
   sync, and runs FS-09.R47's immediate target-only provider import. A discovery, preview, consent,
@@ -276,13 +276,13 @@ FS-04 and FS-09. OpenCode and OpenHands do not participate in federation.
 
 ## 6. Deviations & open decisions
 
-- **Federation effort is an explicit AgentDeck override.** R31 deliberately uses only the binding's
+- **Federation effort is an explicit Chuck override.** R31 deliberately uses only the binding's
   stored override in launch precedence; a provider-native effective effort remains provenance and
   is not silently imported as a launch choice.
 - **Detached import is planned, not shipped (R9).** Every discovered setup asset is currently
   `reference_only`; no verified provider-specific launch-injection path can honor an independent
   copy. Implementing detach requires a new specification update defining exactly which values/assets become
-  AgentDeck-owned and how launches consume them.
+  Chuck-owned and how launches consume them.
 - **Custom root/profile UI is incomplete.** The API accepts an explicit root and profile, but the
   current Settings/onboarding panel discovers only `root:"auto"` and has no profile picker.
 - **Effective view is loaded on demand.** `GET /api/config-sources` returns candidates and binding

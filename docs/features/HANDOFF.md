@@ -1,4 +1,4 @@
-# AgentDeck — Implementation handoff
+# Chuck — Implementation handoff
 
 **Live agent state.** Read **Current position** and **Active change**, then open the requirements
 they name. Settled state through 2026-10-04 is archived in
@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `rename-product-to-chuck.md` (in progress; see **Active change**).
+- **Active change:** none.
 - **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
   GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
   manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
@@ -23,6 +23,14 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) was reviewed 2026-10-04 and its
   findings were fixed the same day; the unit is closed apart from its owed credentialed and
   rendered gates. The test-only `post-release-flaky-test-synchronization` fixes are available.
+  `rename-product-to-chuck` (2026-10-04, `36afbf2`..closure commit: module
+  `github.com/AsaphNoam/Chuck`, `cmd/chuck`, `CHUCK_*`/`~/.chuck`, Chuck install tree/archive,
+  `chuck-messaging`/`X-Chuck-Token`, `chuck-` tmux prefix, FirstMate, `operating-chuck`, UI/phone
+  branding, legacy annotation recognition, storage copy-forward, `scripts/check-old-name.sh`,
+  docs and `docs/chuck-cutover.md`; FS-00.R19, FS-04.R52, FS-10.R15/R25–R26, FS-13.R24,
+  FS-18.R18, TS-02.R40–R41, TS-04.R78, TS-06.R24, TS-08.R58, TS-11.R18) is available. Docs prose
+  was a delegated pass; historical old-name mentions were kept deliberately (retired items,
+  `AGENTDECK_CODEX_VERSION` history, the Figma URL).
 - **Fix units:** `notifications-open-conversation` and
   `phone-desktop-flow-and-agent-management.md` each keep one Worth-fixing UI-coverage finding; the
   phone unit's Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
@@ -35,28 +43,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-`rename-product-to-chuck.md` — in progress (started 2026-10-04). Module path becomes
-`github.com/AsaphNoam/Chuck`; release repo `AsaphNoam/Chuck` (GitHub rename is operational).
-
-Slices:
-1. Go/scripts/release identity: module, `cmd/chuck`, `CHUCK_*`, `~/.chuck`, install tree, MCP
-   name/header, hook scripts, tmux prefix, FirstMate role, `operating-chuck`, authored strings,
-   annotation prefix with legacy recognition, CI old-name assertion. Keep historical
-   `testdata/superseded_*` bytes; drop the `agentdecker` digest entry (no new digest machinery).
-2. UI: branding, renamed storage keys with copy-forward (TS-08.R58), SharedWorker, phone surfaces.
-3. Docs: README and non-archived docs/specs prose (delegated pass, reviewed here), cutover runbook
-   (FS-10.R25), planned→shipped marks; closure matrix + `make dist`.
-
-Slices 1–2 are committed together (one cut; build/tests green). Slice 3 is next: the delegated
-prose pass sits uncommitted in the tree and needs review before commit. Exceptions kept on purpose:
-legacy annotation line recognition, storage copy-forward keys, rejection tests, historical
-`testdata/superseded_*`. `scripts/check-old-name.sh` is the TS-06.R24 guard (CI + release).
-`TestCodexProberAcceptsNativeLoginWithoutAPIKey` timed out once under full-suite load; passes alone.
-
-Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`.
 
 ## Acceptance gates still owed
+
+- FS-10.R25/A14, TS-02.R41: one supervised cutover rehearsal on a disposable copy of the real
+  AgentDeck home, following `docs/chuck-cutover.md`, with a receipt. Before the first Chuck release
+  the GitHub repository must be renamed to `AsaphNoam/Chuck` (installer and updater fetch there),
+  and the release notes must say paired phones re-pair at the new `chuck` address.
 
 - FS-02.A46: real-browser toast click check and a manual macOS desktop-notification click are
   owed; automated component and `sse.test.ts` coverage passes.
@@ -168,6 +163,10 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-04 — Rename: AgentDeck is now Chuck.** Code, release, UI and docs renamed in one cut;
+  supervised cutover guide written. `make test`, UI suite (595) and `make dist` pass. Rehearsal,
+  GitHub repository rename and first Chuck release remain.
 
 - **2026-10-04 — Release: `v0.9.0` published.** 46 commits after `v0.8.0`. The operator package and
   README already matched the range; pins unchanged. `make test`, full UI suite (591) and

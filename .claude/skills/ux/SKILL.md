@@ -3,7 +3,7 @@ name: ux
 description: "Use automatically with `/design-feature` or implementation only when work changes an established task flow or introduces an unfamiliar or consequential decision, ambiguous state, recovery path, long-running operation, or AI uncertainty. Also run when the user sends `/ux` for focused critique. Do not trigger for ordinary user-facing additions, familiar interactions, internal data wiring, style-only changes, specification-preserving fixes, or the broad acceptance review owned by `/usability-review`."
 ---
 
-# Shape and test the AgentDeck experience
+# Shape and test the Chuck experience
 
 This is a task-experience companion to the active role, not authority to choose or enlarge the
 work. Automatic use does not select a feature, turn critique into implementation, or replace the

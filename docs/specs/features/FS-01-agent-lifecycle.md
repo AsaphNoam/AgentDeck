@@ -23,7 +23,7 @@ orphaned processes.
 ### Launch
 
 - **R1** — An agent launches from either the **New Agent modal** (fields: name, role, project,
-  backend, model, interface) or the **CLI** `agentdeck <role>@<project> [flags]`. Both go through
+  backend, model, interface) or the **CLI** `chuck <role>@<project> [flags]`. Both go through
   `POST /api/sessions` and produce an **identical** running agent — a dashboard card plus an openable
   chat/terminal. The modal auto-suggests a name; the CLI form auto-suggests when `--name` is omitted.
 - **R2** — The CLI positional splits on the **last** `@`; both `role` and `project` are required, else
@@ -105,13 +105,13 @@ orphaned processes.
   dialog**; the source agent is untouched. Superseded by R36: Clone is now a conversation fork, and
   the settings-only meaning no longer ships.
 - **R36** — **Clone** is a conversation fork, not a settings duplicate. It creates a
-  new AgentDeck agent with a new `agent_id`, the source agent's role, project, backend, model,
+  new Chuck agent with a new `agent_id`, the source agent's role, project, backend, model,
   interface, effort, fast mode and group, and a provider-native conversation fork at the source's
   latest completed turn. The new agent receives the provider context and a durable copy of the
   source's visible transcript through that boundary plus a fork marker linking back to the source;
   later source events never enter the clone. The source is untouched and the clone launches
   immediately without a confirmation dialog. Clone is available only for a chat runtime that
-  advertises native session fork and has a native session to fork; AgentDeck never silently falls
+  advertises native session fork and has a native session to fork; Chuck never silently falls
   back to the superseded settings-only meaning. While the source has an active turn or unresolved
   permission, Clone is unavailable with an explanation that cloning requires a completed
   conversation point. A stopped, non-archived source remains cloneable from its last native
@@ -133,8 +133,8 @@ orphaned processes.
   resumed agent's permission policy or accessible directories. The live identity row supplies
   backend/model/interface (kept current by switch-runtime), so a previously switched agent resumes
   under its current runtime, not a stale one.
-- **R11** — **Resume from the CLI**: `agentdeck <role>@<project> --resume <id>` resumes that
-  `agent_id` directly. The bare form (`agentdeck <role>@<project>`) resumes when exactly one inactive
+- **R11** — **Resume from the CLI**: `chuck <role>@<project> --resume <id>` resumes that
+  `agent_id` directly. The bare form (`chuck <role>@<project>`) resumes when exactly one inactive
   session matches that `role@project`; multiple matches list the candidates and require `--resume` or
   `--new`; no match falls through to a fresh launch.
 - **R12** — Resume optionally re-resolves a bound configuration source with the latest native setup
@@ -169,7 +169,7 @@ orphaned processes.
     supports on resume) keeps the CLI's own native session; only the changed argument differs.
   - **`primer`** — a **cross-backend** switch (e.g. Claude ↔ Codex/OpenCode), or a model swap on a
     backend that cannot switch model on resume, starts a fresh native session and injects a bounded
-    history primer synthesized from AgentDeck's transcript, appended to the launch composition for
+    history primer synthesized from Chuck's transcript, appended to the launch composition for
     that resume only (not persisted to the role). A `backend_switch` marker records the transition;
     the logical session (same `agent_id`, same transcript) continues unbroken.
 - **R15** — **Switch matrix.** The terminal interface is supported **only** on `claude-acp`; a switch
@@ -341,7 +341,7 @@ transitions:
   later source turn appears only on the source. The same action succeeds from a stopped source by
   reopening its native session for the fork. A busy or waiting source, a terminal or non-advertising
   runtime, and a source without a native session expose no weaker clone path, while a rejected fork
-  leaves no partial AgentDeck state. *Verify by* lifecycle/runtime/API tests and card-menu tests for
+  leaves no partial Chuck state. *Verify by* lifecycle/runtime/API tests and card-menu tests for
   capability, state, success and rollback, plus journey J7.
 
 - **A21 (shipped 2026-09-26)** (R37) — Launch from both global and fixed-project entry points without opening

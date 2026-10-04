@@ -2,14 +2,14 @@
 
 **Status:** Partial
 **Code:** `scripts/release/`, `internal/release/`, `internal/cli/`, `.github/workflows/release.yml`, `README.md` · **Journeys:** J1, J2
-**Absorbed:** The regular AgentDeck installer idea from `docs/ideas.md`.
+**Absorbed:** The regular Chuck installer idea from `docs/ideas.md`.
 
 ## 1. Purpose
 
-AgentDeck's MVP release path lets a friend install and run AgentDeck on an Apple-silicon Mac without
+Chuck's MVP release path lets a friend install and run Chuck on an Apple-silicon Mac without
 cloning this repository, compiling Go, installing Node/npm, or globally installing ACP adapters. It
 also makes the first provider sign-in and later upgrades clear without taking ownership of the
-person's provider credentials or AgentDeck configuration.
+person's provider credentials or Chuck configuration.
 
 ## 2. Behavior
 
@@ -20,31 +20,31 @@ person's provider credentials or AgentDeck configuration.
   privileges are not prerequisites.
 - **R2** — A documented GitHub Releases installer installs a selected release, or the
   current release when no version is selected. It clearly reports the installed version and the
-  command that starts AgentDeck. Re-running it for the same version is safe and does not duplicate
-  the installation or overwrite AgentDeck user state.
-- **R3** — The release contains a self-contained private runtime: the AgentDeck binary,
+  command that starts Chuck. Re-running it for the same version is safe and does not duplicate
+  the installation or overwrite Chuck user state.
+- **R3** — The release contains a self-contained private runtime: the Chuck binary,
   a compatible Node runtime, and the reviewed official Claude and Codex ACP adapter packages. The
-  `agentdeck` command finds these private components itself; it does not require or alter global
+  `chuck` command finds these private components itself; it does not require or alter global
   Node/npm packages, global `claude-agent-acp`/`codex-acp` commands, or the user's shell PATH beyond
-  the one AgentDeck command shim.
-- **R4** — Installation files live separately from AgentDeck's configuration, sessions,
+  the one Chuck command shim.
+- **R4** — Installation files live separately from Chuck's configuration, sessions,
   and credentials. Installing, updating, rolling back, or uninstalling the application runtime never
-  overwrites `$AGENTDECK_HOME` (normally `~/.agentdeck`) or provider-owned configuration. A person
+  overwrites `$CHUCK_HOME` (normally `~/.chuck`) or provider-owned configuration. A person
   can keep using a source build independently of the release installation.
 - **R5 — superseded 2026-10-03 by R21/R23:** Described checking the default Claude backend's
   readiness and offering the *bundled* provider sign-in flow by default. Backend selection now
   defaults to Installed (R23); an interactive fresh install checks the selected backend's readiness
   and offers that target's guided sign-in under R21, falling back to the bundled flow only when the
-  person explicitly selects Bundle. `agentdeck auth claude`/`agentdeck auth codex` remain the same
+  person explicitly selects Bundle. `chuck auth claude`/`chuck auth codex` remain the same
   guided flow later, and declining/cancelling/failing sign-in still leaves a working installation
   that routes the person to the dashboard/onboarding or the same command, printing no credentials.
-- **R6** — At the end of an interactive install, AgentDeck starts the dashboard in the
+- **R6** — At the end of an interactive install, Chuck starts the dashboard in the
   background and opens the loopback dashboard in the default browser. `--no-start` and
   non-interactive installation suppress that action. If startup fails, the installer reports that
   installation succeeded, gives the exact start command and log location, and does not claim the
   dashboard opened.
-- **R7** — Updates are explicit. AgentDeck never checks for, downloads, or applies an
-  update in the background. `agentdeck update` reports the available release and asks before
+- **R7** — Updates are explicit. Chuck never checks for, downloads, or applies an
+  update in the background. `chuck update` reports the available release and asks before
   installing it; `--yes` permits non-interactive use, `--check` only reports availability, and
   `--rollback` explicitly returns to the immediately preceding installed release. Updating keeps the
   prior runtime usable until activation succeeds. A dashboard already running from the old release
@@ -55,10 +55,10 @@ person's provider credentials or AgentDeck configuration.
   or dashboard startup, with one next action.
 - **R9** — MVP release artifacts are distributed through GitHub Releases with published
   SHA-256 checksums. They are deliberately neither code-signed nor notarized. Documentation warns
-  that macOS may require the person to approve an unidentified developer on first open; AgentDeck
+  that macOS may require the person to approve an unidentified developer on first open; Chuck
   never attempts to bypass Gatekeeper or asks for an administrator password.
 
-- **R15 — The installed product is Chuck.** (planned) The release installs the `chuck`
+- **R15 — The installed product is Chuck.** The release installs the `chuck`
   command into a Chuck-named install tree (`~/Library/Application Support/Chuck` by default,
   `$CHUCK_APP_ROOT` to override), publishes `chuck-<version>-<target>.tar.gz`, and names its
   manifest component `chuck`. `agentdeck` is not installed, aliased, or kept on PATH; a person
@@ -83,7 +83,7 @@ person's provider credentials or AgentDeck configuration.
   Release instructions identify source/destination, completion checks, recovery from the preserved
   source, phone re-pairing and optional old-install removal after success. Never run both versions
   against shared state/worktrees. This design authorizes no live transfer or deletion itself.
-- **R26** `(planned)` — Chuck resolves only `$CHUCK_HOME`, default `~/.chuck`, and otherwise uses
+- **R26** — Chuck resolves only `$CHUCK_HOME`, default `~/.chuck`, and otherwise uses
   ordinary fresh-home startup. It does not inspect, move, merge or repair an AgentDeck home.
   Every product-defined/injected variable becomes `CHUCK_*`, including home, app root, hooks,
   agent identity, interface, skill/resources, logging, provider/login overrides and installer
@@ -91,7 +91,7 @@ person's provider credentials or AgentDeck configuration.
   preparation in R25; ordinary fresh installs require none of that preparation.
 
 - **R20 — retired 2026-10-03:** Installed-only setup replaced by explicit-bundle alternative R23.
-- **R21** — `agentdeck auth claude|codex` delegates to the same selected
+- **R21** — `chuck auth claude|codex` delegates to the same selected
   provider selection used by the matching backend/default model. Optional `--backend <id>` and
   `--model <id>` select a configured target; a provider/type mismatch or ambiguous backend requires
   correction rather than guessing. The command identifies its target/executable before interactive
@@ -102,7 +102,7 @@ person's provider credentials or AgentDeck configuration.
   Validate & Continue to re-probe the provider instead. Fresh installation without a backend catalog
   uses ambient provider selection without creating or rewriting configuration.
 - **R22 — retired 2026-10-03:** Installed-only update ownership replaced by two-source R24.
-- **R23** — Packaged AgentDeck supplies one managed Claude provider and one managed
+- **R23** — Packaged Chuck supplies one managed Claude provider and one managed
   Codex provider with its tested adapters/SDKs/Node, but backend selection defaults to Installed
   (FS-09.R75). Without an installed CLI, the dashboard still opens and offers official provider
   installation instructions or the backend's explicit Bundle choice; never select it automatically.
@@ -112,12 +112,12 @@ person's provider credentials or AgentDeck configuration.
   a separately installed provider is not necessary if the user explicitly selects Bundle. No provider
   installer or independent bundle updater runs automatically.
 - **R24** — Installed providers update through their own installer/package manager;
-  bundled providers update only with AgentDeck releases. An application update changes its managed
+  bundled providers update only with Chuck releases. An application update changes its managed
   stack but preserves each backend's mode and saved overrides; it never updates the user's CLI or
   automatically reverts Installed to Bundle. A running dashboard keeps its own release's bundle;
   restarting into the new application release makes that release's bundle available for subsequent
   starts. Old immutable release directories may remain for application rollback, not a provider
-  version picker. Neither changing mode nor rolling back AgentDeck migrates/downgrades native
+  version picker. Neither changing mode nor rolling back Chuck migrates/downgrades native
   sessions. Rollback to a pre-policy binary restores that binary's old selection behavior and must
   be disclosed. Existing configs lacking mode adopt Installed without rewriting user state.
 
@@ -135,12 +135,12 @@ person's provider credentials or AgentDeck configuration.
 ## 4. Edge cases & errors
 
 - **R12** — If no suitable writable command location is already on PATH, the interactive
-  installer asks before adding one idempotent AgentDeck-owned PATH entry to the user's zsh startup
+  installer asks before adding one idempotent Chuck-owned PATH entry to the user's zsh startup
   file. Refusal keeps the install valid and prints the absolute command path; it does not edit a
   shell profile silently. Non-interactive installation never edits shell profiles.
 - **R13** — If another installation/update is active, a second one exits without
   changing the selected runtime. A failed update never stops a running dashboard, deletes an older
-  runtime, or makes `agentdeck` resolve to a partial directory.
+  runtime, or makes `chuck` resolve to a partial directory.
 - **R14** — A missing network connection, unavailable GitHub release, unsupported
   provider login flow, or unavailable browser is reported separately from integrity failures. The
   command gives a retryable action and retains the working installation where one exists.
@@ -148,7 +148,7 @@ person's provider credentials or AgentDeck configuration.
 ## 5. Acceptance criteria
 
 - **A1** — On a clean macOS arm64 home with no Go, Node, npm, or global ACP adapter on
-  PATH, the documented release installer produces a runnable `agentdeck --version` and dashboard.
+  PATH, the documented release installer produces a runnable `chuck --version` and dashboard.
   *Verified:* automated fresh-home installer integration test plus manual J1 release-install run.
 - **A2** — The installed command resolves its Node runtime and both official ACP adapter
   entry points from the selected private runtime, without changing global package locations or
@@ -160,8 +160,8 @@ person's provider credentials or AgentDeck configuration.
   *Verified:* fake-provider command tests and manual J2 credential branches; successful real-provider
   sign-in is credential-gated. Current coverage: A10–A12 below.
 - **A4** — A successful explicit update activates the new version without modifying
-  `$AGENTDECK_HOME`; a simulated download/checksum/unpack interruption preserves the previous
-  command; `agentdeck update --rollback` restores it. *Verified:* installer/update integration tests.
+  `$CHUCK_HOME`; a simulated download/checksum/unpack interruption preserves the previous
+  command; `chuck update --rollback` restores it. *Verified:* installer/update integration tests.
 - **A5** — `--no-start` and non-interactive installation neither launch a dashboard nor
   edit a shell profile, including after the installer re-executes under its operation lock;
   interactive installation starts and opens the dashboard only after the runtime activates.
@@ -171,14 +171,14 @@ person's provider credentials or AgentDeck configuration.
   sign-in requirement, and explicit update/rollback commands. *Verified:* release-documentation
   review against this specification.
 
-- **A7** (R15, R26) — (planned) A fresh install on a clean macOS arm64 home produces a runnable
+- **A7** (R15, R26) — A fresh install on a clean macOS arm64 home produces a runnable
   `chuck --version` and dashboard, installs nothing named `agentdeck` on PATH or in the install
   tree, and the launched agent environment contains only `CHUCK_*` product variables. *Verified:*
   fresh-home installer integration test extended to assert the absent old command, plus a
   launch-environment test asserting no `AGENTDECK_` prefix is injected.
 - **A8 — retired 2026-10-03:** General migration matrix replaced by bounded A13–A14.
 - **A9 — retired 2026-10-03:** Cutover documentation is covered by A14.
-- **A13** `(planned)` (R26) — With a populated old home and `AGENTDECK_HOME` set, startup uses
+- **A13** (R26) — With a populated old home and `AGENTDECK_HOME` set, startup uses
   only the chosen Chuck home and leaves the old home untouched; an absent Chuck home seeds normally.
   *Verify by* focused home-resolution/startup tests, not a migration failure matrix.
 - **A14** `(planned)` (R25) — Rehearse the documented cutover on a disposable copy representative
@@ -205,8 +205,13 @@ person's provider credentials or AgentDeck configuration.
 
 ## 6. Deviations & open decisions
 
+- R15 and R26 shipped 2026-10-04 with the rename; A7 and A13 are covered by the installer and
+  home-resolution tests plus the release workflow's old-name check. R25's instructions are
+  [`docs/chuck-cutover.md`](../../chuck-cutover.md); R25 and A14 stay planned until one supervised
+  rehearsal on a disposable copy of the real installation is recorded.
+
 - R21 and R23–R24 shipped 2026-10-04: backend selection defaults to Installed, Bundle is an explicit
-  choice, `agentdeck auth claude|codex` delegates to the selected target, and Settings/onboarding
+  choice, `chuck auth claude|codex` delegates to the selected target, and Settings/onboarding
   offer Refresh provider / Validate & Continue respectively rather than running login. R5 and A3 are
   superseded. Automated fixtures cover the implemented behavior, but A10–A12 stay planned until the
   rendered journeys and the authorized credentialed provider runs (TS-06.R31) are recorded.
