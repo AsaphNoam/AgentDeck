@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -96,6 +97,9 @@ func TestShimPublishesManagedRootWithoutShadowingProviders(t *testing.T) {
 // explicit Bundle choice under the published root finds both providers
 // without any global install (TS-06.R30, FS-09.A45).
 func TestPublishedRootSelectsTheBundledProviders(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the release bundle exists only for macOS (TS-06.R13)")
+	}
 	l := newLayout(t)
 	name := buildRunnableVersion(t, l, "1.0.0")
 	if err := VerifyLayout(l.VersionDir(name)); err != nil {

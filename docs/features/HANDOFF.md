@@ -8,13 +8,14 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 ## Current position
 
 - **Active change:** none.
-- **Release:** `v0.9.0` is tagged locally on the release commit, **not pushed**; `main` is 44
-  commits ahead of `origin/main`. Pushing `main` and the tag triggers release CI and publication and
-  needs explicit authorization. The 46-commit range after `v0.8.0` ships the installed-provider
+- **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
+  GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
+  manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
+  the bundle path exists only on darwin by design, so the test now skips elsewhere. The 46-commit range after `v0.8.0` ships the installed-provider
   default with explicit per-backend bundle, lean personas with shared operating context, Tasks as
   project-grouped work in motion, notifications that open the conversation, exact context tokens,
-  and the phone desktop flow. The operator package and README already matched the range. After
-  push: confirm the release workflow and the archive/checksum/manifest assets (workflow §16.6).
+  and the phone desktop flow. The operator package and README already matched the range.
+  Credentialed Claude/Codex gates remain owed.
 - **Work units:** `rename-product-to-chuck.md` is waiting to start: supervised data-preserving
   cutover, new sessions, no general legacy migration (FS-10.R25–R26).
   `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
@@ -152,7 +153,7 @@ supplied.
 
 ## Changelog
 
-- **2026-10-04 — Release: `v0.9.0` prepared.** 46 commits after `v0.8.0`. The operator package and
+- **2026-10-04 — Release: `v0.9.0` published.** 46 commits after `v0.8.0`. The operator package and
   README already matched the range; pins unchanged. `make test`, full UI suite (591) and
-  `make dist VERSION=0.9.0` pass. Settled state archived to `HANDOFF-through-2026-10-04`. Tag is
-  local; push awaits authorization.
+  `make dist VERSION=0.9.0` pass. Settled state archived to `HANDOFF-through-2026-10-04`. Release
+  workflow passed; Linux CI's darwin-only bundle test now skips off macOS (test-only).
