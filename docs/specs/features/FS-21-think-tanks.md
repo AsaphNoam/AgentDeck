@@ -142,7 +142,7 @@ not an approved feature scope or implementation-ready change.
   No simultaneous provider turns are required for one agent, and the room does not silently skip
   its selected speaker. Private turns do not consume room contribution allowance or masquerade as
   room contributions. Queueing a normal private Send remains distinct from steering a running
-  turn; the active-room Steer boundary remains open in §6.
+  turn; R33 governs normal Steer during a room-owned turn.
 - **R29** (planned) — The group view and canonical room activity contain only room activity.
   Participant private exchanges, earlier session history, and unrelated tool/file/command activity
   are not automatically imported into the room. Full individual histories remain available through
@@ -158,6 +158,24 @@ not an approved feature scope or implementation-ready change.
   ordinary launch configuration and cancellation/failure behavior. After discussion ends, the
   selected-agent and New task destinations remain available; Room delivery is unavailable and
   does not reopen completed discussion. FS-13.R27 governs these room-source destinations.
+- **R31** (planned) — When optional synthesis is enabled, its judge is a fresh normal agent,
+  configured through ordinary agent launch settings and launched only after participant discussion
+  ends. It begins with its own fresh conversation, reads the completed room artifact, and produces
+  the attributed synthesis under R13. An existing participant/provider history is not adopted as
+  the judge's conversation. Final-step accounting and recovery remain in §6.
+- **R32** (planned) — The operator can **End discussion** before the automatic ending conditions.
+  If a room turn is active, it finishes normally before discussion ends; no further participant
+  turn starts, including a not-yet-started closing turn. With no active room turn, discussion ends
+  without waiting for a selected participant's private work. History and objections are preserved,
+  completion identifies the operator's action, and the configured optional judge runs afterward.
+  This does not stop, archive or delete participant sessions or cancel their private work.
+- **R33** (planned) — Normal Steer remains available under FS-03.R50 while a participant is taking
+  a room turn. The individual agent view clearly identifies the active Think Tank turn, so the
+  person can understand that steering affects the room contribution being formed. The steering
+  instruction stays in the agent's ordinary private conversation rather than being silently copied
+  into the room; the resulting room contribution retains its normal room attribution and accounting.
+  Existing capability, immediate-delivery/fallback and refusal behavior remains unchanged. Steer
+  does not turn a private instruction into a new shared user message or independently pause the room.
 
 ## 3. States & transitions
 
@@ -166,7 +184,8 @@ discussion → closing-message opportunity when one participant retains allowanc
 → optional judge synthesis. The discussion completion reason remains distinct from the state of
 the optional final step. R15/R18 add pause requested during a turn → paused after the turn finishes
 → explicit resume. R19 holds progression for approval/failure intervention. R28 waits for a selected
-speaker's private work without automatically pausing the room. Assigned-work conflicts,
+speaker's private work without automatically pausing the room. R32 adds end requested during a
+room turn → finish that turn → discussion ended → optional fresh judge under R31. Assigned-work conflicts,
 restart/interruption, synthesis failure, and failed-opening publication await the decisions in §6.
 
 ## 4. Edge cases & errors
@@ -281,7 +300,7 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   and no overlapping provider turn for that agent. Complete its private work and then its room
   contribution. Only the room contribution consumes allowance or appears as a room reply.
   *Verified by:* fake-provider/room scheduling integration tests and a rendered room/private-chat
-  journey; steering an active room turn awaits §6.
+  journey; steering an active room turn is additionally covered by A23.
 - **A19** (planned; R24, R26, R29) — Seed participants with earlier and private messages, files,
   commands and tool events, then give each distinguishable room-turn activity. Inspect the room's
   conversation, Files/Commands and participant affordances: room activity is attributed and
@@ -296,46 +315,73 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   Cancel creation or refuse delivery and preserve drafts. After room completion, Room delivery is
   unavailable while selected-agent/New task follow-up still works and records its source annotation.
   *Verified by:* room/annotation/launch integration tests and a rendered three-destination journey.
+- **A21** (planned; R2, R13, R31) — Configure optional judge synthesis and complete participant
+  discussion. Observe no judge launch during discussion; afterward a distinct fresh normal agent
+  starts with the room context and its own fresh conversation, then appends the attributed synthesis.
+  A room with synthesis disabled launches no judge. *Verified by:* fake-provider/room launch and
+  context-delivery integration tests, plus A7's synthesis-quality check.
+- **A22** (planned; R7, R25, R31–R32) — End discussion during an active room turn and verify that
+  turn can finish, no later participant/closing turn starts, the actual stop reason and objections
+  survive, and the fresh judge runs only if configured. Separately end while waiting for another
+  agent's private work; completion does not cancel that work or delete participant sessions.
+  *Verified by:* room/fake-provider state integration tests and a rendered early-ending journey.
+- **A23** (planned; R14, R29, R33) — While a participant holds a room turn, open its normal
+  conversation and observe the Think Tank turn identification. Use supported normal Steer and
+  verify that the instruction enters that agent's private transcript, can affect its room
+  contribution, and is not copied as a shared user entry. The contribution consumes its normal
+  allowance; no additional turn or pause is fabricated. Preserve ordinary capability/refusal and
+  turn-finished fallback checks. *Verified by:* room/agent composer fake-provider integration tests
+  and a rendered room-turn steering journey.
 
 ## 6. Deviations & open decisions
 
-Nothing is shipped. Product confirmation is required before technical design.
+Nothing is shipped. R1–R33 record the confirmed core, with retired R8 superseded by R12/R20.
+The following proposed closure defaults are **unconfirmed**, not binding requirements. Overall
+feature-scope confirmation is required before technical design.
 
-- Minimum participant count; eligibility of busy agents, agents assigned other work, archived agents,
-  and terminal agents. Mixed new/existing selection and cross-project participation from non-archived
-  projects are confirmed by R11/R22.
-- Departure permission defaults. Departure messages are optional under R12; whether explicit
-  goal-achievement judgments require a separate ending mechanism beyond permitted departures.
-- Judge selection/configuration, final-step budget accounting, and failure/retry behavior. Optional
-  synthesis by an end-only judge is settled by R13; there is no live monitoring judge.
-- Per-participant turn limits are confirmed by R14. Remaining choices: turn order, whether the
-  same limit applies to everyone or individual limits can differ. R20 confirms ending below two
-  eligible participants with a closing-message opportunity within the sole remaining participant's
-  allowance; no extra turn is granted when none remains.
-- Agent-visible ceilings and contribution accounting are confirmed by R16–R17/R21. The judge's
-  separate budget still needs configuration.
-- Pause/resume and user messages between turns are confirmed by R15; R18 confirms letting the
-  active turn finish on pause. Decide what happens to user input submitted while a participant
-  is speaking or during independent openings. A separate room Stop action and live goal/membership
-  edits have not been requested in the confirmed control scope.
-- Waiting and recovery: assigned work and ordinary mail competing for a participant's session,
-  pending approval,
-  failure before contribution, restart during a turn, and incomplete independent openings. R19
-  confirms waiting visibly for intervention rather than automatically skipping or retrying.
-- Local retention until explicit room deletion, including survival of agent/project deletion, is
-  confirmed by R23. Remaining boundaries: room read/contribution authority, deletion while active or
-  paused, and retention of published excerpts versus pointers when sources disappear. Export has
-  not been requested.
-- R24–R29 confirm a distinct project-started group-chat workspace with familiar features, links to
-  normal participant cards in their own projects, room-only activity, and continued scheduling
-  during private work with a wait at the busy agent's turn. R27 confirms a full application
-  conversation page; R30 confirms Room, selected-agent and New task/new-agent annotation targets.
-  Steer during an active room-owned turn remains open. Files and Commands retain participant
-  attribution; provider runtime controls remain participant-owned under R2.
-- Room list/history discovery after leaving the workspace or removing the originating project,
-  participant-qualified file/skill autocomplete, and
-  agent/API creation/inspection authority remain to be scoped. No new externally visible protocol
-  is selected by this draft.
+- **Setup and scheduling:** at least two distinct non-archived chat agents from non-archived
+  projects; existing busy agents can join and wait at their turn without preempting other assigned
+  work. Turn-taking cycles through the configured participant order, with an individually set
+  positive contribution limit and departure permission per participant. Departure permission defaults
+  on; independent openings and judge synthesis default off. Membership and the goal remain fixed
+  after start; newly created annotation follow-up agents do not automatically join the room.
+- **Input:** submitted room user messages and Room annotations wait durably for a participant-turn
+  boundary. During independent openings they wait until all openings have been published, so they
+  do not change later participants' opening input. Shared input does not consume participant
+  allowance. File/skill autocomplete requires explicit participant context rather than inventing a
+  shared cwd or provider command list.
+- **Judge:** configure normal judge launch settings during room setup; launch the fresh judge only
+  at the end, in its chosen non-archived project, for one completed synthesis contribution. Judge
+  failure is shown separately while participant discussion remains ended; ordinary launch-setting
+  repair and explicit retry do not reopen discussion.
+- **Recovery:** after server restart, retain committed discussion and hold unfinished rooms for
+  explicit resume/recovery rather than replaying uncertain in-flight turns. Preserve withheld
+  openings during a failure and wait for explicit retry. End during openings publishes completed
+  openings as an explicitly partial set and records missing openings without inventing answers.
+  Pending room input is retained at End and identified as not discussed when no participant received
+  it. An archived/removed participant or project holds the room with a reason: restore/unarchive
+  the same identity and retry where the normal lifecycle permits, or End discussion. Deleted
+  identities are not silently replaced; a new discussion/follow-up can use retained history.
+- **Access:** ordinary agent-facing room actions are membership-scoped. Recorded participants,
+  including those who left, can retrieve room history while it exists; the fresh judge gets room
+  access when launched. Agents retrieve/contribute/leave within their membership and turn authority;
+  room creation,
+  membership, configuration, manual ending and deletion remain user-controlled. Membership does not
+  authorize private-transcript or unrelated project-data retrieval through room actions. The existing
+  local API/same-machine trust boundary remains unchanged (TS-05.R3); this is not new process isolation.
+- **Discovery and retention:** list rooms on their originating project and provide room entries
+  in Archive, including rooms whose project was removed. The room retains committed messages and
+  the room activity shown with them, including tools/diffs and source attribution; file viewing
+  itself does not snapshot entire files. Annotation excerpts are retained point-in-time, and file
+  links retain enough origin context for ordinary inspection when their files remain available.
+- **Deletion and exclusions:** explicitly delete only a paused or ended room with no active room
+  turn, using the normal confirmation flow. Delete room history without deleting normal agent
+  histories or participants. Live goal/membership editing, autonomous agent room creation,
+  configurable full-file snapshots, export, and new phone room UI are outside this change.
+
+Technical design must still verify the existing seams before choosing protocols, persistence,
+turn/cursor commit rules or provider-specific compatibility. No new externally visible protocol is
+selected by this feature draft.
 
 ## 7. Traceability
 

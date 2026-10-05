@@ -42,24 +42,13 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
-  Think tanks resumed 2026-10-05: FS-21 is a draft of the independent-session/shared-artifact core.
-  Mixed new/existing agents, per-participant departure permission with optional final message,
-  optional end-only judge synthesis, per-agent turn limits, and pause/resume/inter-turn user
-  messages are confirmed. Agents see remaining ceilings, openings consume one turn, departure
-  messages stay within their turn, and judge synthesis has a separate budget. Pause lets the active
-  turn finish; approval/failure holds for intervention; below two eligible participants the sole
-  remaining agent can give a closing message within its allowance. Only completed contributions
-  consume limits. Cross-project participants require non-archived projects; local history persists
-  until explicit room deletion, independently of agent/project removal. A full group-chat view
-  includes normal features and individual agent cards; FS-13 has planned room annotation sources.
-  It is a distinct project-started workspace with a button beside New agent; participant links
-  reach normal cards/sessions in their own projects. Private follow-ups keep scheduling active,
-  waiting at a busy participant's turn, and group activity is room-only. FS-02 has the planned
-  creation entry point. The room is a full conversation page like an agent's; room annotations
-  target Room, selected agent, or New task (new agent), with individual/new-agent follow-up still
-  available after completion. Judge setup, End discussion and active-room Steer are the next
-  questions; remaining UX/recovery details, eligibility, access and deletion behavior need scope
-  agreement before technical design.
+  Think tanks resumed 2026-10-05: FS-21 remains Draft. Independent sessions over the canonical
+  shared artifact and the group-chat/follow-up flow are confirmed, including fresh end-only judge,
+  graceful End discussion and normal private Steer with room-turn identification. Planned adjacent
+  coverage is FS-02.R65/A47 (project entry), FS-03.R69/A50 (agent turn identity), and
+  FS-13.R26–R27/A17–A18 (room annotations). The remaining setup/input/recovery/access/discovery/
+  deletion defaults are proposed together in FS-21 §6, awaiting overall scope approval before
+  technical design. No product code or ready change exists.
 - **Branch:** `main`.
 
 ## Active change
@@ -131,6 +120,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank judge, manual ending and Steer confirmed.** FS-21.R31–R33/
+  A21–A23 record the fresh end-only judge, graceful End discussion, and normal private Steer with
+  visible room-turn identity. FS-03.R69/A50 add planned agent-view identification. Remaining product
+  defaults are consolidated as unconfirmed proposals in FS-21 §6; technical design awaits scope
+  approval. No product code was written.
 
 - **2026-10-05 — Design: Think Tank conversation page and annotation destinations confirmed.**
   FS-21.R27/R30/A20 and FS-13.R27/A18 record the ordinary full conversation-page navigation and

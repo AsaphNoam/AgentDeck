@@ -552,6 +552,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   message text keeps rendering them as text; Chuck does not reinterpret message text as notices.
 
 
+- **R69** (planned) — While a normal agent's active turn belongs to a Think Tank, its individual
+  conversation view identifies that room/turn so ordinary Send and Steer remain understandable.
+  Normal Steer retains R50's capability, delivery, fallback and refusal behavior under FS-21.R33.
+  Its instruction remains in the agent's private conversation, while the resulting room contribution
+  is attributed and accounted for in the room. Private Send remains distinct from Steer and does
+  not automatically pause the room under FS-21.R28. This does not merge the room with the provider
+  conversation or add a shared provider identity.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -931,7 +939,18 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   runtime tests, transcript replay tests, `ChatPanel` and phone-render component tests.
 
 
+- **A50** (planned; R48–R50, R69) — Open the individual conversation for a participant currently
+  taking a room turn, observe its Think Tank identification, then exercise normal Send and
+  supported Steer separately. Send stays queued behind the current turn; Steer retains its existing
+  immediate/fallback behavior and private transcript record. The shared room records only the room
+  contribution and does not import the private instruction as shared user input. *Verified by:*
+  agent composer/room fake-provider integration tests and FS-21.A23's rendered steering journey.
+
 ## 6. Deviations & open decisions
+
+- R69/A50 are planned as part of the Think Tank draft; ordinary Send/Steer behavior remains
+  unchanged, with room-turn identification added for the new work source. No implementation-ready
+  Think Tank change exists yet.
 
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is
   swallowed, leaving an empty transcript until a later SSE event/refetch. Prompt, cancel, and

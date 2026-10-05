@@ -59,11 +59,14 @@ the relevant feature and technical specifications; it does not change product co
   only room activity appears in the group view. The room opens as a full conversation page like an
   agent conversation. Room annotations can target Room, a selected agent or New task (the existing
   flow that creates a new agent); after completion, selected-agent/new-agent follow-up remains.
-  Judge setup, an optional End discussion control, and active-room Steer behavior are the next
-  questions.
+  Optional synthesis uses a fresh normal judge launched only after discussion ends. End discussion
+  lets the active room turn finish, then ends progression and runs the configured judge. Normal
+  Steer is retained with active-room identification in the individual agent view; its instruction
+  remains private but may affect the room contribution. Proposed remaining setup, input, judge,
+  recovery, access, discovery and deletion defaults are consolidated in FS-21 §6 for scope approval.
   The former consensus-based ending and assumption of mostly UX over reused backend are superseded.
   Core feature draft: [`FS-21`](specs/features/FS-21-think-tanks.md). Await product agreement on
-  remaining UX/control/recovery details, eligibility, judge setup, access and deletion behavior;
+  those remaining defaults before technical design;
   no technical specification or ready change yet.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
