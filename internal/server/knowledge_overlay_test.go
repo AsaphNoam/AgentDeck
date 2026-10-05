@@ -190,8 +190,8 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 		t.Run(tc.lifecycle+" with the package available", func(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{Available: true, Root: root, SkillDir: skillDir}
 			spec := tc.compose(t)
-			if len(spec.AutoApproveTools) != 19 {
-				t.Fatalf("Chuck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
+			if want := len(srv.messaging.ToolNames()); len(spec.AutoApproveTools) != want {
+				t.Fatalf("Chuck auto-approve identities = %d, want %d", len(spec.AutoApproveTools), want)
 			}
 			if _, ok := spec.AutoApproveTools["mcp__chuck-messaging__report_task_result"]; !ok {
 				t.Fatal("task result action missing from runtime overlay")
@@ -228,8 +228,8 @@ func TestKnowledgeOverlayReachesEveryLifecycleComposer(t *testing.T) {
 		t.Run(tc.lifecycle+" with the package unavailable", func(t *testing.T) {
 			srv.knowledge = agentknowledge.Installation{}
 			spec := tc.compose(t)
-			if len(spec.AutoApproveTools) != 19 {
-				t.Fatalf("Chuck auto-approve identities = %d, want 19", len(spec.AutoApproveTools))
+			if want := len(srv.messaging.ToolNames()); len(spec.AutoApproveTools) != want {
+				t.Fatalf("Chuck auto-approve identities = %d, want %d", len(spec.AutoApproveTools), want)
 			}
 			if countStr(spec.StartAddDirs(), root) != 0 ||
 				strings.Contains(spec.StartSystemPrompt(), skillDir) ||

@@ -22,3 +22,4 @@ Read only the reference needed for the current job:
 - [Operate agents](references/operate-agents.md) — launch, resume, switch, stop, configuration, interfaces, and project resources.
 - [Coordinate work](references/coordinate-work.md) — messages, durable tasks, assignments, attachments, dependencies, and context links.
 - [Build and run pipelines](references/build-and-run-pipelines.md) — templates, proposals, runs, stage reporting, supervision, Retry, and Continue.
+- [Take part in a Think Tank](references/think-tanks.md) — room turns, bounded reads, explicit contributions, ceilings, departure, and the end-only judge.

@@ -92,6 +92,7 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 		"references/build-and-run-pipelines.md",
 		"references/coordinate-work.md",
 		"references/operate-agents.md",
+		"references/think-tanks.md",
 	}
 	if len(files) != len(want) {
 		t.Fatalf("inventory size = %d, want %d", len(files), len(want))
@@ -126,6 +127,15 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 	} {
 		if !strings.Contains(coordination, phrase) {
 			t.Errorf("coordination reference is missing %q", phrase)
+		}
+	}
+	// FS-18.R19: the room reference names the current tools and frames the
+	// ceiling as a maximum without granting room control.
+	room := string(files["references/think-tanks.md"])
+	for _, phrase := range []string{"`read_think_tank`", "`submit_think_tank_turn`", "ceiling, not a quota",
+		"cannot create, end, pause, or delete rooms"} {
+		if !strings.Contains(room, phrase) {
+			t.Errorf("think tank reference is missing %q", phrase)
 		}
 	}
 	pipeline := string(files["references/build-and-run-pipelines.md"])
