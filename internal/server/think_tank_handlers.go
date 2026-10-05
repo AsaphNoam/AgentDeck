@@ -208,45 +208,28 @@ func (s *Server) handleThinkTankEntries(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "entries": out, "complete": complete})
 }
 
-type thinkTankInputRequest struct {
-	CommandID string          `json:"command_id"`
-	Body      string          `json:"body"`
-	Context   json.RawMessage `json:"context,omitempty"`
+type thinkTankMessageRequest struct {
+	CommandID string `json:"command_id"`
+	Body      string `json:"body"`
 }
 
-// handleThinkTankMessage and handleThinkTankAnnotation add durable shared
-// input: published between turns, or held for the active turn's boundary
-// (FS-21.R15, R30, R35).
+// handleThinkTankMessage adds durable shared user input: published between
+// turns, or held for the active turn's boundary (FS-21.R15, R35).
 func (s *Server) handleThinkTankMessage(w http.ResponseWriter, r *http.Request) {
-	s.handleThinkTankInput(state.ThinkTankEntryUser)(w, r)
-}
-
-func (s *Server) handleThinkTankAnnotation(w http.ResponseWriter, r *http.Request) {
-	s.handleThinkTankInput(state.ThinkTankEntryAnnotation)(w, r)
-}
-
-func (s *Server) handleThinkTankInput(kind string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var req thinkTankInputRequest
-		if !decodeThinkTankBody(w, r, &req) {
-			return
-		}
-		context := ""
-		if len(req.Context) > 0 && string(req.Context) != "null" {
-			context = string(req.Context)
-		}
-		input, d, err := s.stateStore.AddThinkTankInput(r.PathValue("id"), req.CommandID, kind, req.Body, context)
-		if err != nil {
-			s.writeThinkTankError(w, err)
-			return
-		}
-		s.publishThinkTankUpdate(d)
-		s.kickThinkTanks()
-		writeJSON(w, http.StatusOK, map[string]any{
-			"version": thinkTankWireVersion, "input_id": input.InputID, "published_seq": input.EntrySeq,
-			"room": s.thinkTankDetailWire(d),
-		})
+	var req thinkTankMessageRequest
+	if !decodeThinkTankBody(w, r, &req) {
+		return
 	}
+	input, d, err := s.stateStore.AddThinkTankInput(r.PathValue("id"), req.CommandID, state.ThinkTankEntryUser, req.Body, "")
+	if err != nil {
+		s.writeThinkTankError(w, err)
+		return
+	}
+	s.publishThinkTankUpdate(d)
+	s.kickThinkTanks()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"version": thinkTankWireVersion, "input_id": input.InputID, "published_seq": input.EntrySeq,
+	})
 }
 
 func (s *Server) handleThinkTankControl(action func(string) (state.ThinkTankDetail, error)) http.HandlerFunc {

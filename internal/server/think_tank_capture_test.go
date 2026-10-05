@@ -131,6 +131,47 @@ func TestThinkTankCaptureProjectsRoomActivity(t *testing.T) {
 	}
 }
 
+// FS-21.A20, FS-13.R26–R27: Room delivery is shared input refused after the
+// discussion ends; selected-agent delivery records the attributed batch in
+// room history first and then delivers it as ordinary annotation mail.
+func TestThinkTankAnnotationDestinations(t *testing.T) {
+	srv, h := roomRESTServer(t)
+	rec := doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two"))
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(rec.Body.Bytes(), &room)
+	base := "/api/think-tanks/" + room.RoomID
+	doJSON(t, h, http.MethodPost, base+"/messages", `{"command_id":"m1","body":"Consider eviction"}`)
+	batch := func(cmd, target string) string {
+		return `{"command_id":"` + cmd + `","annotations":[{"anchor":"entry","seq":1,"excerpt":"eviction","instruction":"expand on this"}],"target":` + target + `}`
+	}
+	if rec := doJSON(t, h, http.MethodPost, base+"/annotations", batch("a1", `{"kind":"room"}`)); rec.Code != http.StatusOK {
+		t.Fatalf("room annotation = %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := doJSON(t, h, http.MethodPost, base+"/annotations",
+		`{"command_id":"bad","annotations":[{"anchor":"entry","seq":99,"excerpt":"x","instruction":"y"}],"target":{"kind":"room"}}`); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown anchor = %d", rec.Code)
+	}
+	doJSON(t, h, http.MethodPost, base+"/end", "")
+	if rec := doJSON(t, h, http.MethodPost, base+"/annotations", batch("a2", `{"kind":"room"}`)); rec.Code != http.StatusConflict {
+		t.Fatalf("room annotation after end = %d", rec.Code)
+	}
+	if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: "a_two", PID: 1, SessionID: "s", Interface: "chat"}); err != nil {
+		t.Fatal(err)
+	}
+	if rec := doJSON(t, h, http.MethodPost, base+"/annotations", batch("a3", `{"kind":"agent","agent_id":"a_two"}`)); rec.Code != http.StatusOK {
+		t.Fatalf("agent annotation after end = %d %s", rec.Code, rec.Body.String())
+	}
+	entries, _ := srv.stateStore.ListThinkTankEntries(room.RoomID, 0, 10)
+	if len(entries) != 3 || entries[1].Kind != state.ThinkTankEntryAnnotation ||
+		!strings.Contains(entries[1].Body, "Room entry 1 by the user") || !strings.Contains(entries[2].Context, `"recipient":"Bea"`) {
+		t.Fatalf("entries = %+v", entries)
+	}
+	mail, err := srv.stateStore.ListMessages("a_two", false, 10)
+	if err != nil || len(mail) != 1 || !strings.Contains(mail[0].Body, "expand on this") {
+		t.Fatalf("delivered mail = %+v %v", mail, err)
+	}
+}
+
 // TS-14.R16, FS-21.A3: an opening's activity is withheld until publication.
 func TestThinkTankOpeningActivityIsWithheld(t *testing.T) {
 	srv, h := roomRESTServer(t)

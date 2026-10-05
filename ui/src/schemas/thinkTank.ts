@@ -47,6 +47,7 @@ export const thinkTankSummarySchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   ended_at: z.string().optional(),
+  active_agent_id: z.string().optional().default(""),
 });
 
 export const thinkTankDetailSchema = thinkTankSummarySchema.extend({

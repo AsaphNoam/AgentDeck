@@ -75,42 +75,12 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [events, busy, reasoning]);
 
-  // One row renderer for the root list and every nested child (TS-08.R59).
-  const renderEvents = (list: TranscriptEvent[], ancestry: string[], depth: number): ReactNode =>
-    groupTranscriptRows(list).map((row, index) => {
-      if (row.kind === "tool-run") {
-        return (
-          <ToolRun
-            key={`run-${keyOf(row.events[0], index)}`}
-            events={row.events}
-            renderEvent={(event, eventIndex) => (
-              <TranscriptEventFrame
-                agentId={agentId}
-                event={event}
-                key={keyOf(event, eventIndex)}
-                onAnnotate={(draft) => addAnnotation(agentId, draft)}
-                onContextMenu={openMenu}
-                onOpenFile={onOpenFile}
-                className="tool-run-event"
-              />
-            )}
-          />
-        );
-      }
-      if (kindOf(row.event) === "activity") {
-        return <ChildActivity key={keyOf(row.event, index)} node={row.event.node as ChildNode} ancestry={ancestry} depth={depth} renderEvents={renderEvents} />;
-      }
-      return (
-        <TranscriptEventFrame
-          agentId={agentId}
-          event={row.event}
-          key={keyOf(row.event, index)}
-          onAnnotate={(draft) => addAnnotation(agentId, draft)}
-          onContextMenu={openMenu}
-          onOpenFile={onOpenFile}
-        />
-      );
-    });
+  const renderEvents = eventRenderer({
+    agentId,
+    onAnnotate: (draft) => addAnnotation(agentId, draft),
+    onContextMenu: openMenu,
+    onOpenFile,
+  });
 
   const jumpToLatest = () => {
     const el = scrollRef.current;
@@ -155,6 +125,53 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       <AnnotationContextMenu menu={menu} onClose={() => setMenu(null)} />
     </div>
   );
+}
+
+// eventRenderer is the one row renderer for the root list and every nested
+// child (TS-08.R59). A Think Tank room reuses it for each attempt's retained
+// activity, scoped to that attempt's source agent (TS-14.R15).
+export function eventRenderer({ agentId, onAnnotate, onContextMenu, onOpenFile }: {
+  agentId: string;
+  onAnnotate: (draft: AnnotationDraft) => void;
+  onContextMenu: (mouse: MouseEvent<HTMLDivElement>, event: TranscriptEvent) => void;
+  onOpenFile?: (link: FileLink | null) => void;
+}) {
+  const renderEvents = (list: TranscriptEvent[], ancestry: string[], depth: number): ReactNode =>
+    groupTranscriptRows(list).map((row, index) => {
+      if (row.kind === "tool-run") {
+        return (
+          <ToolRun
+            key={`run-${keyOf(row.events[0], index)}`}
+            events={row.events}
+            renderEvent={(event, eventIndex) => (
+              <TranscriptEventFrame
+                agentId={agentId}
+                event={event}
+                key={keyOf(event, eventIndex)}
+                onAnnotate={onAnnotate}
+                onContextMenu={onContextMenu}
+                onOpenFile={onOpenFile}
+                className="tool-run-event"
+              />
+            )}
+          />
+        );
+      }
+      if (kindOf(row.event) === "activity") {
+        return <ChildActivity key={keyOf(row.event, index)} node={row.event.node as ChildNode} ancestry={ancestry} depth={depth} renderEvents={renderEvents} />;
+      }
+      return (
+        <TranscriptEventFrame
+          agentId={agentId}
+          event={row.event}
+          key={keyOf(row.event, index)}
+          onAnnotate={onAnnotate}
+          onContextMenu={onContextMenu}
+          onOpenFile={onOpenFile}
+        />
+      );
+    });
+  return renderEvents;
 }
 
 // HeldMessage is the pending tail: the message the person submitted while the
@@ -288,13 +305,13 @@ function ForkBoundary({ sourceId }: { sourceId: string }) {
   return <div className="backend-switch-divider">Cloned from {source || "another agent"}</div>;
 }
 
-function canAnnotate(event: TranscriptEvent) {
+export function canAnnotate(event: TranscriptEvent) {
   const kind = String(event.kind ?? event.type ?? "");
   return event.seq != null && !["session_meta", "permission_resolved", "turn_end", "annotation"].includes(kind);
 }
 
 // The highlighted text, but only when the highlight lives inside the right-clicked event.
-function selectionWithin(host: HTMLElement): string | null {
+export function selectionWithin(host: HTMLElement): string | null {
   const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   if (!host.contains(selection.getRangeAt(0).commonAncestorContainer)) return null;
@@ -302,7 +319,7 @@ function selectionWithin(host: HTMLElement): string | null {
   return text.trim() ? text : null;
 }
 
-function eventDraft(event: TranscriptEvent): AnnotationDraft {
+export function eventDraft(event: TranscriptEvent): AnnotationDraft {
   const raw = event.text ?? event.delta ?? event.new_text ?? event.content ?? JSON.stringify(event, null, 2);
   const excerpt = clipAnnotationExcerpt(typeof raw === "string" ? raw : JSON.stringify(raw, null, 2));
   return { seq: Number(event.seq), excerpt, instruction: "" };

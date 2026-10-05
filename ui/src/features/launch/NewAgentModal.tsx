@@ -5,7 +5,7 @@ import { useRoles } from "../../api/config";
 import { useProjects } from "../../api/config";
 import { useBackends } from "../../api/config";
 import { useConfig } from "../../api/config";
-import { useLaunchAgent } from "../../api/config";
+import { useLaunchAgent, type LaunchParams } from "../../api/config";
 import { useConfigSources } from "../../api/configSources";
 import { launchSupportFor, type LaunchSupport } from "../../schemas/backends";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
@@ -23,9 +23,14 @@ interface NewAgentModalProps {
   fixedProject?: string;
   /** Called after a successful launch, before this modal closes. */
   onLaunched?: (agentId: string) => void;
+  /** Collect chat launch settings without launching. Think Tank setup and judge
+   *  repair reuse this form; the room launches later (FS-21.R11, R36). */
+  onConfigure?: (params: LaunchParams) => void;
+  /** Dialog title; defaults to "New agent". */
+  title?: string;
 }
 
-export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched }: NewAgentModalProps) {
+export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched, onConfigure, title = "New agent" }: NewAgentModalProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData, refetch: refetchBackends, isFetching: backendsFetching } = useBackends();
@@ -147,7 +152,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const chatSupportMissing = !!selectedBackend && !chatSupport;
   const terminalSupportMissing = !!selectedBackend && !terminalSupport;
   const supportMissing = chatSupportMissing || terminalSupportMissing;
-  const canTerminal = terminalAvailable && !!terminalSupport?.available;
+  // Room participants and judges are chat agents (FS-21.R34).
+  const canTerminal = !onConfigure && terminalAvailable && !!terminalSupport?.available;
   const offerEffort = effortLevels.length > 0 && !!interfaceSupport?.effort;
   const offerFast = !!selectedModel?.fast && !!interfaceSupport?.fast;
   const defaultEffort = selectedModel?.default_effort ?? "";
@@ -177,11 +183,17 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
     e.preventDefault();
     setLaunchError(null);
     if (unverifiedSelection) return;
+    const params: LaunchParams = {
+      name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined,
+      effort: (offerEffort && effort) || undefined, fast: offerFast && fast, interface: agentInterface,
+    };
+    if (onConfigure) {
+      onConfigure({ ...params, interface: "chat" });
+      onClose();
+      return;
+    }
     launch.mutate(
-      {
-        name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined,
-        effort: (offerEffort && effort) || undefined, fast: offerFast && fast, interface: agentInterface,
-      },
+      params,
       {
         onSuccess: (result) => {
           onLaunched?.(result.agent.agent_id);
@@ -203,7 +215,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
         <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
-          <Dialog.Title>New agent</Dialog.Title>
+          <Dialog.Title>{title}</Dialog.Title>
           <form onSubmit={handleSubmit} className="config-form">
             <div className="form-field">
               <label htmlFor="new-agent-role">Role</label>
@@ -331,7 +343,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                 type="submit"
                 disabled={launch.isPending || !role || !project || unverifiedSelection}
               >
-                {launch.isPending ? "Launching…" : "Launch"}
+                {onConfigure ? "Use these settings" : launch.isPending ? "Launching…" : "Launch"}
               </button>
             </div>
           </form>

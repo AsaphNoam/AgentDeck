@@ -365,6 +365,18 @@ func applyThinkTankBoundaryTx(tx *sql.Tx, roomID string) error {
 // held for the boundary (FS-21.R35). An exact CommandID replay returns the
 // original input; ended discussion refuses Room delivery (R30).
 func (s *Store) AddThinkTankInput(roomID, commandID, kind, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
+	return s.addThinkTankInput(roomID, commandID, kind, body, context, false)
+}
+
+// AddThinkTankRecord records a room-source annotation delivered to a selected
+// or new agent. It enters canonical history at once, in any phase, before that
+// delivery happens; it is not shared input held for a turn boundary
+// (FS-13.R26, FS-21.R30).
+func (s *Store) AddThinkTankRecord(roomID, commandID, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true)
+}
+
+func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string, record bool) (ThinkTankInput, ThinkTankDetail, error) {
 	if kind != ThinkTankEntryUser && kind != ThinkTankEntryAnnotation {
 		return ThinkTankInput{}, ThinkTankDetail{}, thinkTankInvalid("unknown input kind %q", kind)
 	}
@@ -391,7 +403,7 @@ FROM think_tank_inputs WHERE room_id = ? AND command_id = ?`, roomID, commandID)
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if d.Room.Phase == ThinkTankPhaseEnded {
+		if d.Room.Phase == ThinkTankPhaseEnded && !record {
 			return thinkTankConflict("discussion has ended")
 		}
 		id, err := newThinkTankID("tti_", 8)
@@ -403,6 +415,15 @@ FROM think_tank_inputs WHERE room_id = ? AND command_id = ?`, roomID, commandID)
 		if _, err := tx.Exec(`INSERT INTO think_tank_inputs(input_id, room_id, command_id, kind, body, context, created_at)
 VALUES(?, ?, ?, ?, ?, ?, ?)`, id, roomID, commandID, kind, body, context, formatTime(input.CreatedAt)); err != nil {
 			return fmt.Errorf("state: insert think tank input: %w", err)
+		}
+		if record {
+			seq, err := insertThinkTankEntryTx(tx, ThinkTankEntry{RoomID: roomID, Kind: kind, Body: body, InputID: id, Context: context})
+			if err != nil {
+				return err
+			}
+			input.EntrySeq = seq
+			_, err = tx.Exec(`UPDATE think_tank_inputs SET entry_seq = ? WHERE input_id = ?`, seq, id)
+			return err
 		}
 		if d.Active == nil && d.Room.Phase != ThinkTankPhaseOpenings && d.Room.Phase != ThinkTankPhaseSetup {
 			if err := publishPendingInputsTx(tx, roomID); err != nil {

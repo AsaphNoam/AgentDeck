@@ -58,6 +58,9 @@ type thinkTankSummaryWire struct {
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	EndedAt       *time.Time `json:"ended_at,omitempty"`
+	// ActiveAgentID names the agent taking the room's running turn, so that
+	// agent's own conversation can identify the room turn (FS-03.R69).
+	ActiveAgentID string `json:"active_agent_id,omitempty"`
 }
 
 func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
@@ -68,11 +71,15 @@ func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
 			names = append(names, m.AgentName)
 		}
 	}
-	return thinkTankSummaryWire{
+	out := thinkTankSummaryWire{
 		Version: thinkTankWireVersion, RoomID: r.RoomID, Goal: r.Goal, OriginProject: r.OriginProject,
 		Phase: r.Phase, Control: r.Control, Hold: r.Hold, EndReason: r.EndReason, JudgeStatus: r.JudgeStatus,
 		Participants: names, Revision: r.Revision, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, EndedAt: r.EndedAt,
 	}
+	if d.Active != nil {
+		out.ActiveAgentID = d.Active.AgentID
+	}
+	return out
 }
 
 type thinkTankMemberWire struct {
