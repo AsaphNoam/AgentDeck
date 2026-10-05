@@ -114,7 +114,7 @@ not an approved feature scope or implementation-ready change.
   user-message composition. Contributions identify their speaker and originating project. These
   capabilities preserve their normal behavior and source-specific availability; there is no
   synthetic shared provider identity, runtime, or working directory. R29 defines activity scope;
-  annotation targets and participant-qualified autocomplete remain open in §6.
+  R30 defines annotation targets; participant-qualified autocomplete remains open in §6.
 - **R25** (planned) — Each participant remains an individual normal agent with its ordinary card
   in its own project. The room presents participant identity, project, live state and access to
   that normal card/session under R27. A person can follow up privately or continue work with that
@@ -127,14 +127,15 @@ not an approved feature scope or implementation-ready change.
   interaction. A file or diff retains its originating participant/project so equal relative paths
   in different workspaces are not conflated. File viewing resolves from the appropriate participant
   context under the existing conversation reader behavior. Room-source annotations are governed
-  by FS-13.R26; delivery target behavior remains open in §6.
+  by FS-13.R26–R27 and R30.
 - **R27** (planned) — Think Tank is a distinct room workspace, started from a non-archived project
-  using a dedicated button beside **New agent**. It opens as its own conversation workspace, not as
+  using a dedicated button beside **New agent**. It opens as its own full conversation page inside
+  Chuck, like the existing agent-conversation page, not as
   a fabricated provider agent or a group of agent cards expanded into one provider conversation.
   Starting from one project does not move participating agents from their own projects. Clicking a
   participant in the room takes the person to that agent's normal card/conversation in its project.
-  Whether the separate workspace occupies the current application page or a separate browser/OS
-  window remains open in §6.
+  This uses the application's normal conversation-page navigation rather than requiring a separate
+  browser or OS window.
 - **R28** (planned) — Sending a private follow-up does not automatically pause the room. Other
   scheduled room turns continue. When the room reaches an agent busy with private work, it holds
   that speaker's opportunity, shows the wait, and starts the room turn when the agent is available.
@@ -148,6 +149,15 @@ not an approved feature scope or implementation-ready change.
   the participants' normal cards/conversations. Room tools, approvals, files and commands retain
   originating participant attribution under R24/R26. This scopes recorded activity; an independent
   agent still retains its normal private context under R2, which can inform a later room contribution.
+- **R30** (planned) — Room annotations offer three explicit destinations: **Room**, a selected
+  agent, or **New task**. Room delivery becomes attributed shared user input between participant
+  turns, available through the shared artifact; it does not privately prompt every participant or
+  interrupt the current speaker. Selected-agent delivery uses ordinary annotation delivery and
+  independent follow-up behavior. **New task** means creating a new normal agent through the existing
+  New Agent flow and delivering the annotations as that agent's initial work, preserving the
+  ordinary launch configuration and cancellation/failure behavior. After discussion ends, the
+  selected-agent and New task destinations remain available; Room delivery is unavailable and
+  does not reopen completed discussion. FS-13.R27 governs these room-source destinations.
 
 ## 3. States & transitions
 
@@ -250,7 +260,7 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   a file excerpt and diff lines, and annotate a room message. Verify correct participant/project
   attribution, path/line identity, captured excerpt, normal bounded tray behavior and preservation
   after a failed send. *Verified by:* room/file/annotation integration tests and a rendered room
-  annotation/file-view journey; target routing awaits §6.
+  annotation/file-view journey; destination routing is additionally covered by A20.
 - **A16** (planned; R2, R24–R25) — Read a room containing Markdown, code, a diagram, tools, a diff,
   an approval, and user messages. Exercise the corresponding familiar controls inside the room,
   then open a participant card and continue in that agent's normal conversation, preserving its
@@ -263,8 +273,8 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   participants from other non-archived projects. Verify that actual participant cards remain in
   their own projects, the room is not a provider-agent card, and clicking each room participant
   reaches its own normal card/conversation with preserved identity and history. *Verified by:*
-  project/room navigation component tests and a rendered creation/follow-up journey; page versus
-  separate browser-window behavior awaits §6.
+  project/room navigation component tests and a rendered creation/follow-up journey, using the
+  normal application's full conversation-page navigation.
 - **A18** (planned; R4, R14, R21, R28–R29) — Send a private follow-up to an off-floor participant
   while another agent holds the room turn. Let the room advance to that still-busy participant:
   verify visible waiting with the same scheduled speaker, no automatic pause or skipped speaker,
@@ -279,6 +289,13 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   still exposes its own history. Equal relative paths from two room participants open in the
   correct workspace. *Verified by:* room projection/file integration tests and a rendered group
   view versus individual-history journey.
+- **A20** (planned; R15, R26, R30) — From a room annotation tray, exercise Room, selected-agent
+  and New task delivery. Verify shared Room input appears between participant contributions and
+  is read on subsequent turns; selected-agent delivery reaches that normal session; New task opens
+  the normal New Agent flow and starts a new agent whose initial work is the delivered annotations.
+  Cancel creation or refuse delivery and preserve drafts. After room completion, Room delivery is
+  unavailable while selected-agent/New task follow-up still works and records its source annotation.
+  *Verified by:* room/annotation/launch integration tests and a rendered three-destination journey.
 
 ## 6. Deviations & open decisions
 
@@ -311,10 +328,10 @@ Nothing is shipped. Product confirmation is required before technical design.
   not been requested.
 - R24–R29 confirm a distinct project-started group-chat workspace with familiar features, links to
   normal participant cards in their own projects, room-only activity, and continued scheduling
-  during private work with a wait at the busy agent's turn. Remaining UX decisions: full application
-  page versus separate browser/OS window, room annotation delivery targets, and Steer during an
-  active room-owned turn. Files and Commands retain participant attribution; provider runtime
-  controls remain participant-owned under R2.
+  during private work with a wait at the busy agent's turn. R27 confirms a full application
+  conversation page; R30 confirms Room, selected-agent and New task/new-agent annotation targets.
+  Steer during an active room-owned turn remains open. Files and Commands retain participant
+  attribution; provider runtime controls remain participant-owned under R2.
 - Room list/history discovery after leaving the workspace or removing the originating project,
   participant-qualified file/skill autocomplete, and
   agent/API creation/inspection authority remain to be scoped. No new externally visible protocol

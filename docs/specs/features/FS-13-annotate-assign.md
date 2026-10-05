@@ -12,7 +12,7 @@ current agent, another running chat agent, or a newly launched agent. Chuck pres
 annotation as structured, located context — captured excerpt, anchor, instruction, target — never as
 hand-pasted chat text. The chat surface belongs to FS-03, the archived view to FS-05, mail delivery
 to FS-06, and launch to FS-01; this spec owns the annotation interaction, its records, and its
-delivery behavior. Agent-session requirements are shipped; R26/A17 add a planned room-source
+delivery behavior. Agent-session requirements are shipped; R26–R27/A17–A18 add a planned room-source
 extension for Think tanks.
 
 ## 2. Behavior
@@ -188,8 +188,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   applicable; a room entry is not represented as an unrelated event in a participant's private
   transcript. Equal relative paths in different participant workspaces remain distinct. Successful
   room-source sends record the annotation in the canonical room history before delivery; failure
-  preserves the tray. Room delivery targets and completed-room behavior await FS-21 §6; this does
+  preserves the tray. R27 defines room delivery targets and completed-room behavior; this does
   not change R1–R25's ordinary agent-session contract.
+- **R27** (planned) — A room-source batch can target Room, a selected agent, or New task under
+  FS-21.R30. Room delivery is shared user input between participant turns, preserving correct source
+  attribution rather than privately prompting all participants. Selected-agent delivery uses the
+  normal recipient availability and annotation delivery contract. New task retains R9's meaning:
+  launch a new normal agent through the existing New Agent flow and deliver the batch as its initial
+  work, with the chosen normal role/project/runtime configuration. Cancelling launch preserves the
+  tray. After discussion ends, selected-agent and New task delivery remain available; Room delivery
+  is unavailable and cannot silently resume the room.
 
 ## 5. Acceptance criteria
 
@@ -263,12 +271,20 @@ Each acceptance item names its delivered verification.
   distinct source attribution, bounded drafts, failure preservation, and a canonical room annotation
   recorded before successful delivery. Ordinary agent-session annotation checks continue to pass.
   *Verified by:* room annotation integration/component tests and the FS-21.A15 rendered journey;
-  target routing and completed-room cases await FS-21 §6.
+  A18 additionally covers target routing and completed-room cases.
+- **A18** (planned; R26–R27) — Send room-source batches to Room, a selected agent, and New task.
+  Verify that Room input is shared at a participant-turn boundary, selected-agent delivery reaches
+  the chosen normal session, and New task creates a new normal agent with the batch as its initial
+  work. Cancel the new-agent flow and preserve the tray. Complete the room and repeat selected-agent
+  and New task sends while Room delivery remains unavailable. Ordinary session-source destinations
+  are unchanged. *Verified by:* room annotation/launch integration tests and FS-21.A20's rendered
+  three-destination journey.
 
 ## 6. Deviations & open decisions
 
-- R26/A17 are planned as part of the Think Tank draft. Room-source delivery targets and
-  completed-room annotation behavior are unresolved; no implementation-ready change exists yet.
+- R26–R27/A17–A18 are planned as part of the Think Tank draft. Room destinations are confirmed;
+  busy-turn input timing and retained-source handling remain in FS-21 §6. No implementation-ready
+  change exists yet.
 
 - The numeric limits in R2, R3, and R4 are initial values and may be tuned only through a
   spec-first update.

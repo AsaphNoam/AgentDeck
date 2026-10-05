@@ -823,12 +823,12 @@ picker and launches with the route project's id; the general modal continues to 
   New agent to reach the separate room creation/workspace flow; an archived project offers no such
   action. Verify ordinary agent creation and participant cards in their original projects still
   work, without adding a synthetic room-agent card. *Verified by:* scoped dashboard component
-  tests and the FS-21.A17 rendered journey; final page/window behavior awaits FS-21 §6.
+  tests and the FS-21.A17 rendered journey, using normal full conversation-page navigation.
 
 ## 6. Deviations & open decisions
 
 - R65/A47 are planned as part of the Think Tank feature draft; FS-21 governs the room's unresolved
-  page/window and creation behavior. No implementation-ready change exists yet.
+  creation details and confirmed conversation-page behavior. No implementation-ready change exists yet.
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
   is surfaced as `done` rather than `error` (R11, R16, A11); reversing either requires an explicit

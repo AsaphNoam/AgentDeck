@@ -55,9 +55,11 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   It is a distinct project-started workspace with a button beside New agent; participant links
   reach normal cards/sessions in their own projects. Private follow-ups keep scheduling active,
   waiting at a busy participant's turn, and group activity is room-only. FS-02 has the planned
-  creation entry point. Page versus separate browser window and annotation targets are the next
-  questions; remaining UX/recovery details, eligibility, judge setup, access and deletion behavior
-  need scope agreement before technical design.
+  creation entry point. The room is a full conversation page like an agent's; room annotations
+  target Room, selected agent, or New task (new agent), with individual/new-agent follow-up still
+  available after completion. Judge setup, End discussion and active-room Steer are the next
+  questions; remaining UX/recovery details, eligibility, access and deletion behavior need scope
+  agreement before technical design.
 - **Branch:** `main`.
 
 ## Active change
@@ -129,6 +131,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank conversation page and annotation destinations confirmed.**
+  FS-21.R27/R30/A20 and FS-13.R27/A18 record the ordinary full conversation-page navigation and
+  Room, selected-agent and New task destinations. New task retains its current meaning of launching
+  a new normal agent with annotations as initial work. After room completion, selected-agent/new-agent
+  follow-up remains available. Judge setup, End discussion and active-room steering await choices.
 
 - **2026-10-05 — Design: Think Tank workspace entry and independent follow-up clarified.**
   FS-21.R27–R29/A17–A19 record the project-started separate workspace, normal participant cards in

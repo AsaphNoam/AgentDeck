@@ -56,8 +56,11 @@ the relevant feature and technical specifications; it does not change product co
   private follow-up and continuation. Start a dedicated room workspace from a project button beside
   New agent; clicking a room participant reaches its normal card/session in its own project.
   Private follow-ups keep the room running, with a wait when the selected participant is busy;
-  only room activity appears in the group view. Page versus separate browser window and room
-  annotation targets are the next questions; active-room Steer behavior remains to be agreed.
+  only room activity appears in the group view. The room opens as a full conversation page like an
+  agent conversation. Room annotations can target Room, a selected agent or New task (the existing
+  flow that creates a new agent); after completion, selected-agent/new-agent follow-up remains.
+  Judge setup, an optional End discussion control, and active-room Steer behavior are the next
+  questions.
   The former consensus-based ending and assumption of mostly UX over reused backend are superseded.
   Core feature draft: [`FS-21`](specs/features/FS-21-think-tanks.md). Await product agreement on
   remaining UX/control/recovery details, eligibility, judge setup, access and deletion behavior;
