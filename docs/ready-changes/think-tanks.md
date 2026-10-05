@@ -1,6 +1,6 @@
 # Think Tank discussions between independent agents
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Human `/design-feature` request, resumed 2026-10-05 from the **Think tanks** idea recorded
 2026-10-04; feature scope and SQLite/explicit-tool boundary confirmed 2026-10-06.
 **Relevant requirements:** FS-21.R1–R7/R9–R40, FS-02.R65, FS-03.R69–R70, FS-05.R39,

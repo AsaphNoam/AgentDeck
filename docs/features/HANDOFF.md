@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `think-tanks.md` (in progress; see **Active change**).
 - **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
   GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
   manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
@@ -42,17 +42,28 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
-  Think tanks completed design 2026-10-06: `docs/ready-changes/think-tanks.md` is Waiting to start.
-  FS-21 and TS-14 specify independent normal sessions over SQLite room authority with explicit
-  read/submission tools, committed checkpoints, rich group chat, normal private follow-up,
-  per-agent ceilings, graceful pause/End and optional fresh end-only judge. Adjacent planned
-  requirements and implementation acceptance are named by the ready change. No active change or
-  product code was created; rendered/credentialed gates belong to implementation.
 - **Branch:** `main`.
 
 ## Active change
 
-None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+`think-tanks.md` — in progress (started 2026-10-06). FS-21 over TS-14; all items stay `(planned)`
+until their slice ships. Slices (each closes with focused tests, handoff update and commit):
+
+1. **State** — `internal/state/think_tanks.go`: migration for rooms, members, attempts, entries,
+   inputs, activity (no agent/project FKs, TS-14.R12); create/list/get/delete; attempt admission
+   with frozen head, staging, finalization transaction (publication, allowance, checkpoint, queued
+   input, rotation, pause/end), opening barrier, closing opportunity; bounded paged reads.
+2. **Room engine** — server service selecting the next opportunity and dispatching a `think_tank`
+   activation through `StartActivation`; turn-end finalization; executing-turn-id emission (R4).
+3. **MCP tools** — `read_think_tank`/`submit_think_tank_turn`, approval exemption, redacted
+   activity projector.
+4. **REST/SSE** — `/api/think-tanks` family, `think_tank_update`/`think_tank_activity`, wire fixture.
+5. **Activity capture, judge, recovery/deletion.**
+6. **UI** — project button and setup, room page, Archive entries, annotations/file route, agent-view
+   room-turn identification.
+7. **Knowledge/docs + closure matrix**, rendered and credentialed gates recorded as owed.
+
+Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`.
 
 ## Acceptance gates still owed

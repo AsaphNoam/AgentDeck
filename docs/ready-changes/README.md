@@ -43,8 +43,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`think-tanks.md`](think-tanks.md) — independent normal agents deliberate over a canonical
-  SQLite room, with explicit contributions, incremental reads, rich group chat and optional end-only judge.
 - [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
   by default with a backend-level bundle choice, scoped runtime feedback, local model refresh and
   explicitly capped compatibility work.
