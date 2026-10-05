@@ -36,8 +36,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Fix units:** `phone-chat-streamed-deltas` closed 2026-10-05 (phone folds the transcript with
   `foldTranscript`; `ui/scripts/phone-render.mjs` renders the phone conversation at iPhone size).
   `notifications-open-conversation` closed 2026-10-05 apart from its owed browser/macOS click
-  checks. `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage finding; the
-  phone unit's Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
+  checks. `phone-desktop-flow-and-agent-management.md` closed 2026-10-05 apart from its owed
+  fakeACP browser passes at phone size (FS-20.A10–A11). Claude 5.5 launch compatibility keeps one Worth-fixing
   finding; its Must-fix is closed; the installed-provider correction it depends on still owes
   the credentialed gate.
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
@@ -126,17 +126,6 @@ supplied.
   This finding remains open until the credentialed runtime-selection correction is verified;
   the retired bundled-default/opt-in draft is not the intended fix.
 
-### Phone desktop flow and agent management — reviewed 2026-10-02 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-- **Worth fixing** — the phone UI suite still does not prove several A10-A12 workflows. The
-  2026-10-02 fix added desktop agent/project archival, switch-runtime effort/live-sync, and exact
-  **Open diff** target tests. **Still uncovered:** request/response UI tests for New agent launch
-  and Start pipeline from a project page, rename, effort/fast, clone, refusal-preserves-draft paths,
-  the Commands view, **Open file** content, focused `RunScreen.tsx` controls, and the `/task/<id>`
-  redirect. **Normal-use trigger:** regress one of those phone controls while the suite stays green.
-  **Requirement:** FS-20.A10-A13; INV §17. **Suggested fix/test:** add those UI request tests and
-  update FS-20 §7 traceability, which now names each gap.
-
 ## Decisions needing your input
 
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
@@ -155,6 +144,14 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Phone UI coverage completed; Manage refusals shown.** Request/response tests now
+  cover project-page launch and Start pipeline (with refusals keeping entered values), rename,
+  fast/effort, clone, Commands, Open file, `RunScreen` controls, and the `/task/<id>` link
+  (INV §17 independent oracle: MSW doubles return the server's error envelope). The refused-rename
+  test failed first: the Manage tab never showed the Mac's reason (FS-20.R27); it now does. Phone
+  UI tests (45) pass. Unit `phone-desktop-flow-and-agent-management` closed apart from its owed
+  fakeACP phone-size browser passes.
 
 - **2026-10-05 — Notification stale-agent path proved.** `NotificationCenter.test.tsx` now mounts
   the real `ChatPanel` route with a hydrated store lacking the agent, clicks the toast, and asserts

@@ -375,14 +375,17 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   `TestRemoteRuntimeOptionsAreSecretFree`), `annotations_test.go`
   (`TestRemoteAnnotationUsesSharedDelivery`). The phone orchestrator-replacement form has no
   focused UI test yet.
-- A10 (automated half): `ProjectScreen.test.tsx` (launch defaults), `PhoneApp.test.tsx` (Home);
-  `remote_routes_test.go` (`TestRemoteAllowlistAndFieldFilter`,
-  `TestRemotePipelineStartUsesMacDefaults`). Launching and starting a pipeline from the page have
-  no UI request test yet.
-- A11 (automated half): `AgentScreen.test.tsx` (archive confirmation, desktop archival, switch
-  runtime with the chosen model's effort and live-runtime sync), `ProjectScreen.test.tsx`
-  (desktop project archival). Rename, fast/effort, and clone have no UI request test yet.
-- A12 (automated half): `AgentScreen.test.tsx` (Open diff shows the requested diff);
-  `remote_routes_test.go` (`TestRemoteTrackedFileRead`, `TestRemoteRouteInventoryIsClassified`).
+- A10 (automated half): `ProjectScreen.test.tsx` (launch defaults, non-default runtime launch,
+  refused launch keeps values, Start pipeline in the project, refused start keeps the goal),
+  `PhoneApp.test.tsx` (Home); `remote_routes_test.go` (`TestRemoteAllowlistAndFieldFilter`,
+  `TestRemotePipelineStartUsesMacDefaults`).
+- A11 (automated half): `AgentScreen.test.tsx` (rename, refused rename keeps the draft and shows
+  the reason, fast/effort, clone at idle and its unavailable reason, archive confirmation, desktop
+  archival, switch runtime with the chosen model's effort and live-runtime sync),
+  `ProjectScreen.test.tsx` (desktop project archival); `RunScreen.test.tsx` (continue, retry, stop,
+  refused continue keeps input, offline disables controls).
+- A12 (automated half): `AgentScreen.test.tsx` (Commands list, Open file content, Open diff shows
+  the requested diff); `remote_routes_test.go` (`TestRemoteTrackedFileRead`,
+  `TestRemoteRouteInventoryIsClassified`).
 - A13 (automated half): `remote_routes_test.go` (`TestRemoteDeniesEveryTaskRoute`),
-  `remote_home_test.go`; the `/task/<id>` redirect has no UI test yet.
+  `remote_home_test.go`; `PhoneApp.test.tsx` (`/task/<id>` opens Home).

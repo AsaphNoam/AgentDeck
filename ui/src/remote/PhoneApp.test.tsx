@@ -99,6 +99,14 @@ describe("PhoneApp", () => {
     expect(screen.queryByRole("region", { name: "Since you last looked" })).toBeNull();
   });
 
+  // FS-20.R40 — tasks left the phone; an old task link lands on Home.
+  it("opens Home for a /task/<id> link", async () => {
+    window.history.replaceState(null, "", "/task/t1");
+    renderApp();
+    expect(await screen.findByRole("region", { name: "Needs you" })).toHaveTextContent("needs permission");
+    expect(screen.queryByText(/task/i)).toBeNull();
+  });
+
   it("pairs from the QR link's code once the Mac allows it", async () => {
     paired = false;
     window.history.replaceState(null, "", "/pair#abcd2345");

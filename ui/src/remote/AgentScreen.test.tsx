@@ -292,6 +292,108 @@ describe("AgentScreen", () => {
   });
 });
 
+// FS-20.A11/A12 — agent management, Commands, and Open file send the desktop's
+// requests and show its refusals.
+describe("AgentScreen management and views", () => {
+  const idle: AgentState = { ...agent, state: "idle", detail: "", fast_available: true, effort: "high", clone: { available: true, reason: "" } };
+  const options = { backends: [{ id: "claude", name: "Claude", default: true, default_model: "m", models: [{ id: "m", name: "M", efforts: ["low", "high"], default_effort: "high", fast: true }] }] };
+  let bodies: string[] = [];
+  let refuse = false;
+  const record = (name: string, reply: unknown) => async ({ request }: { request: Request }) => {
+    bodies.push(`${name} ${await request.text()}`);
+    if (refuse) return HttpResponse.json({ error: { code: "conflict", message: `${name} refused by the Mac` } }, { status: 409 });
+    return HttpResponse.json(reply);
+  };
+
+  beforeEach(() => {
+    bodies = [];
+    refuse = false;
+    window.history.replaceState(null, "", "/agent/a1");
+    useConnection.setState({ agents: { a1: idle } });
+    server.use(
+      http.get("/api/remote/runtime-options", () => HttpResponse.json(options)),
+      http.post("/api/sessions/a1/rename", record("rename", {})),
+      http.post("/api/sessions/a1/session-config", record("config", { fast: true })),
+      http.post("/api/sessions/a1/clone", record("clone", { agent: { agent_id: "a7" }, history_handoff: "native_fork", forked_from_agent_id: "a1", forked_from_seq: 4 })),
+    );
+  });
+
+  function openManage() {
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Manage" }));
+  }
+
+  it("renames the agent", async () => {
+    openManage();
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "builder" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(bodies).toEqual(['rename {"name":"builder"}']));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(""));
+  });
+
+  it("shows the Mac's reason and keeps the draft when a rename is refused", async () => {
+    refuse = true;
+    openManage();
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "builder" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    expect(await screen.findByText("rename refused by the Mac")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("builder");
+  });
+
+  it("changes fast mode and effort on the running agent", async () => {
+    openManage();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Fast mode" }));
+    await waitFor(() => expect(bodies).toEqual(['config {"fast":true}']));
+    const efforts = await screen.findAllByRole("combobox", { name: "Effort" });
+    await waitFor(() => expect(efforts[efforts.length - 1]).toBeEnabled());
+    fireEvent.change(efforts[efforts.length - 1], { target: { value: "low" } });
+    await waitFor(() => expect(bodies).toEqual(['config {"fast":true}', 'config {"effort":"low"}']));
+  });
+
+  it("clones an idle agent and opens the clone", async () => {
+    openManage();
+    fireEvent.click(screen.getByRole("button", { name: "Clone" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/agent/a7"));
+    expect(bodies).toEqual(["clone "]);
+  });
+
+  it("shows why Clone is unavailable while a turn is active", () => {
+    useConnection.setState({ agents: { a1: { ...idle, state: "busy", clone: { available: false, reason: "Wait for the current turn to finish." } } } });
+    openManage();
+    expect(screen.getByRole("button", { name: "Clone" })).toBeDisabled();
+    expect(screen.getByText("Wait for the current turn to finish.")).toBeInTheDocument();
+  });
+
+  it("lists the agent's commands", async () => {
+    server.use(http.get("/api/sessions/a1/commands", () => HttpResponse.json({ agent_id: "a1", commands: [
+      { command: "go test ./...", seq: 5, ts: "", tool_call_id: "t5", exit_status: "exit 1", exit_error: "FAIL" },
+      { command: "make build", seq: 6, ts: "", tool_call_id: "t6", exit_status: "", exit_error: "" },
+    ] })));
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Commands" }));
+    const view = await screen.findByRole("region", { name: "Commands" });
+    await waitFor(() => expect(view).toHaveTextContent("go test ./...exit 1 · FAIL"));
+    expect(view).toHaveTextContent("make buildRunning");
+  });
+
+  it("opens a changed file's current text", async () => {
+    const paths: string[] = [];
+    server.use(
+      http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: [{ path: "src/main.go", edit_count: 2, last_ts: "2026-10-02T00:00:00Z", has_diff: false, diff_refs: [] }] })),
+      http.get("/api/sessions/a1/file", ({ request }) => {
+        paths.push(new URL(request.url).searchParams.get("path") ?? "");
+        return HttpResponse.json({ path: "src/main.go", content: "package main\n", truncated: false });
+      }),
+    );
+    renderScreen();
+    fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open file" }));
+    const content = await screen.findByRole("region", { name: "File content" });
+    await waitFor(() => expect(content).toHaveTextContent("package main"));
+    expect(paths).toEqual(["src/main.go"]);
+  });
+});
+
 // FS-20.R32 — the phone's diff-line annotate-and-assign form over the shared
 // FS-13 tray and batch request.
 describe("AgentScreen diff annotations", () => {
