@@ -31,7 +31,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications that open the agent conversation, project creation and planned Think Tank entry point |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, settings/onboarding, exact seed-prompt migration, and planned four-role consolidation preserving legacy configuration |
-| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking |
+| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Partial | Session archive, full-text search, resume from archive, file/command tracking and planned Think Tank discovery |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent mail with waking/deferred delivery and bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
@@ -47,7 +47,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Shared operating skill, progressive references, exact prompt migration, and planned lean personas with standing context and native-prompt preservation |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 | FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, phone web app (planned desktop-flow dashboard, project pages, agent management), attention notifications, keep-awake |
-| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Draft | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis; scope decisions pending |
+| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Partial | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis |
 
 ### Technical specs
 
@@ -66,6 +66,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional skill delivery, planned shared standing context and four-role seeding, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | TS-13 | [tech/TS-13-remote-control.md](tech/TS-13-remote-control.md) | Current | Embedded Tailscale node, tailnet listener guard and allowlist, phone pairing and device credentials, Web Push, keep-awake, phone web-app entry, desktop-flow phone dashboard, and agent management |
+| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Partial | Canonical SQLite rooms, normal-session activation/turn ownership, committed read checkpoints, explicit publication, rich retention and UI/MCP contracts |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

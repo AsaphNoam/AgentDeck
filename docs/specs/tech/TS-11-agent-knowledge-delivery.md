@@ -241,6 +241,14 @@ Implementation closure runs the applicable TS-06.R5 matrix once after the final 
 this design-only update runs spec lint, twin-skill comparison and diff checks. No rendered redesign,
 new evaluation service or model-selection policy is part of the change.
 
+**R19** (planned) — Extend the embedded `operating-chuck` package with one progressively linked
+`references/think-tanks.md` for FS-18.R19. Update the verified file inventory, install/overlay
+fixtures and producer-derived tool checks together. Describe canonical room versus normal session,
+bounded reads, explicit staged publication, ceilings, departure, intervention and end-only judge;
+tool definitions own exact arguments/results. No persona, repository instruction or provider-global
+configuration duplication. The fixed activation instruction points at current room tools; mutable
+room goal, phase and turn data are fetched rather than frozen into launch configuration.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:

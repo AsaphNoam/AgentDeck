@@ -282,9 +282,8 @@ Each acceptance item names its delivered verification.
 
 ## 6. Deviations & open decisions
 
-- R26–R27/A17–A18 are planned as part of the Think Tank draft. Room destinations are confirmed;
-  busy-turn input timing and retained-source handling remain in FS-21 §6. No implementation-ready
-  change exists yet.
+- R26–R27/A17–A18 are planned in `docs/ready-changes/think-tanks.md`; FS-21.R35/R39 and TS-14
+  govern boundary input and retained room sources. No room annotation behavior has shipped.
 
 - The numeric limits in R2, R3, and R4 are initial values and may be tuned only through a
   spec-first update.

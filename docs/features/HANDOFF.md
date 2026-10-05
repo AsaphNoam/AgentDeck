@@ -42,13 +42,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
-  Think tanks resumed 2026-10-05: FS-21 remains Draft. Independent sessions over the canonical
-  shared artifact and the group-chat/follow-up flow are confirmed, including fresh end-only judge,
-  graceful End discussion and normal private Steer with room-turn identification. Planned adjacent
-  coverage is FS-02.R65/A47 (project entry), FS-03.R69/A50 (agent turn identity), and
-  FS-13.R26–R27/A17–A18 (room annotations). The remaining setup/input/recovery/access/discovery/
-  deletion defaults are proposed together in FS-21 §6, awaiting overall scope approval before
-  technical design. No product code or ready change exists.
+  Think tanks completed design 2026-10-06: `docs/ready-changes/think-tanks.md` is Waiting to start.
+  FS-21 and TS-14 specify independent normal sessions over SQLite room authority with explicit
+  read/submission tools, committed checkpoints, rich group chat, normal private follow-up,
+  per-agent ceilings, graceful pause/End and optional fresh end-only judge. Adjacent planned
+  requirements and implementation acceptance are named by the ready change. No active change or
+  product code was created; rendered/credentialed gates belong to implementation.
 - **Branch:** `main`.
 
 ## Active change
@@ -120,6 +119,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Design: Think Tanks ready to implement.** Human confirmed the remaining feature
+  defaults and SQLite plus explicit room tools. FS-21.R34–R40/A24–A30 and TS-14.R1–R18 close
+  setup, retention, recovery, publication/read checkpoints and turn ownership; adjacent FS/TS
+  requirements join shared launch, action, approval, persistence, UI and knowledge contracts.
+  Added `docs/ready-changes/think-tanks.md`, removed the source idea, and left implementation
+  inactive. Spec lint, twin-skill comparison and diff checks passed; a focused consistency check
+  confirmed the ownership/read/privacy rules and clarified pending-judge deletion and catalog wording.
 
 - **2026-10-05 — Design: Think Tank judge, manual ending and Steer confirmed.** FS-21.R31–R33/
   A21–A23 record the fresh end-only judge, graceful End discussion, and normal private Steer with

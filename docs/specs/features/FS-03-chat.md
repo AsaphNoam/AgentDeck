@@ -560,6 +560,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   not automatically pause the room under FS-21.R28. This does not merge the room with the provider
   conversation or add a shared provider identity.
 
+- **R70** (planned) — `read_think_tank` and `submit_think_tank_turn` join R40–R41's own-action
+  approval exemption and recorded activity through the authoritative registry. Their membership,
+  floor and disposition permissions are enforced server-side under FS-21.R38. The other tool
+  families and their chosen permission policy remain unchanged; R40's listed inventory grows by
+  these two actions rather than introducing a separate approval bypass.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -750,7 +756,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   `sse.test.ts` multi-open and delayed-response cases, a `transcriptStore.test.ts` case applying an
   out-of-order transcript, and a pane render test beside `ChatPanel.test.tsx`.
 
-- **A24** (R40–R42) — Each of the fifteen Chuck actions raised as an
+- **A24** (R40–R42) — Each of R40's original fifteen Chuck actions raised as an
   approval request executes with no `waiting_input` transition and no pending request, under a
   launch policy with `skip_permissions` false. A same-named tool advertised by a different MCP
   server, an unnamed approval request, and an ordinary file-edit, shell, and fetch request each
@@ -946,18 +952,23 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   contribution and does not import the private instruction as shared user input. *Verified by:*
   agent composer/room fake-provider integration tests and FS-21.A23's rendered steering journey.
 
+- **A51** (planned; R40–R41, R70) — With ordinary approval policy, invoke both room tools and an
+  ordinary gated tool in the same room turn. Room actions proceed without human approval and are
+  recorded; the ordinary tool still waits for its usual approval. A nonmember or stale contribution
+  is refused server-side without bypassing authority. *Verified by:* runtime permission/MCP room
+  integration tests, with catalog membership derived from actual tool registrations.
+
 ## 6. Deviations & open decisions
 
-- R69/A50 are planned as part of the Think Tank draft; ordinary Send/Steer behavior remains
-  unchanged, with room-turn identification added for the new work source. No implementation-ready
-  Think Tank change exists yet.
+- R69–R70/A50–A51 are planned in `docs/ready-changes/think-tanks.md`; ordinary Send/Steer behavior
+  remains unchanged, with room-turn identification and registry-backed room actions added.
 
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is
   swallowed, leaving an empty transcript until a later SSE event/refetch. Prompt, cancel, and
   permission mutation failures are surfaced as required above; initial history-load diagnostics are
   an open UX gap.
 
-- **Confirmed Chuck-action approval boundary.** R40–R44 exempt Chuck's own fifteen actions
+- **Confirmed Chuck-action approval boundary.** R40–R44 exempt Chuck's original fifteen actions
   from the approval gate and stop the default auto-deny. They add no per-tool, per-role, per-stage,
   or per-template autonomy setting, do not change what `skip_permissions` means for any other tool,
   do not pre-authorize anything at the provider CLI, and add no agent-facing tool, argument, result,

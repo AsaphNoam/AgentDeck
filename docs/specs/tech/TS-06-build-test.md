@@ -263,6 +263,15 @@ reruns R31's two-point smoke for both providers, adding one notice (where a prov
 one steer during a running command and one refused model switch where the account's policy allows
 staging it; missing receipts stay owed.
 
+**R33** (planned) — Think Tank closure follows R5 once after the final relevant edit, with TS-14.R18/
+§4's focused state, runtime, MCP, REST/SSE, race and UI matrix. Independent provider-frame, wire
+fixture and durable-row assertions prove ownership, publication, read checkpoints, privacy and
+failure behavior. Render the specified desktop journeys in every appearance. A bounded
+credentialed Claude and Codex smoke covers room-tool read/submit, an ordinary approval/denial,
+private Send/Steer, native resume and end-only judge; record versions/results and keep missing
+receipts explicitly owed. Fake ACP and documentation checks cannot satisfy those gates. Design
+closure runs only spec lint, applicable twin-skill comparisons and diff checks.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

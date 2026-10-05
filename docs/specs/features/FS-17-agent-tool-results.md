@@ -109,7 +109,7 @@ remain supported.
 - **R15 (planned) — Exact mechanics are disclosed only when needed.** The shared
   `operating-chuck` skill explains when to choose messaging, tasks, context links, or pipelines
   and directs an agent to action-specific command help for exact input fields, limits, effects, and
-  result fields. Chuck does not inject the complete action catalog and all fifteen input schemas
+  result fields. Chuck does not inject the complete action catalog and all its input schemas
   into every conversation. A mail activation names the action that reads mail; a task activation
   names the action that reads the assignment; a pipeline assignment names the result action. An
   autonomously activated agent therefore has an exact next step without loading unrelated action
@@ -157,6 +157,14 @@ remain supported.
   credential does not satisfy this gate. The chosen transport returns to design review before
   implementation; no direct-action product code ships from this specification while the gate is
   unmet.
+
+- **R21** (planned) — The two room tools in TS-14 join R1–R8's shared MCP result contract and the
+  producer-derived tool/approval inventory. Classify `room_not_found`, `room_forbidden`,
+  `stale_room_turn`, `leave_forbidden`, `closing_only` and `room_reply_conflict` as `never`;
+  `room_read_incomplete` is `after_change` with the remaining read continuation; storage failures
+  use the existing transient class. Reuse existing validation/cursor codes. Update every closed
+  catalog/contract fixture for the added tools rather than preserving a literal fifteen-tool count.
+  This adds room actions through released MCP; R20's paused migration stays separate.
 
 ## 3. States & transitions
 
@@ -248,6 +256,11 @@ Each names the verification that demonstrates it.
   success for the same representative actions, so the claimed context reduction is measured and no
   material execution regression is hidden. *Verify:* checked-in measurement fixture and the A9 live
   gate.
+
+- **A12** (planned; R1–R8, R21) — Exercise successful read/staging and every room handler refusal
+  using real registered MCP tools. Assert matching text/structured results, stable class, safe repair
+  fields and the authoritative approval catalog; repeat foreign/stale/conflicting submissions and
+  verify no mutation. *Verified by:* messaging contract and room authorization integration tests.
 
 ## 6. Deviations & open decisions
 

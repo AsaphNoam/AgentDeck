@@ -827,8 +827,8 @@ picker and launches with the route project's id; the general modal continues to 
 
 ## 6. Deviations & open decisions
 
-- R65/A47 are planned as part of the Think Tank feature draft; FS-21 governs the room's unresolved
-  creation details and confirmed conversation-page behavior. No implementation-ready change exists yet.
+- R65/A47 are planned in `docs/ready-changes/think-tanks.md`; FS-21 governs room creation and
+  the confirmed conversation-page behavior. No room entry point has shipped.
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
   is surfaced as `done` rather than `error` (R11, R16, A11); reversing either requires an explicit

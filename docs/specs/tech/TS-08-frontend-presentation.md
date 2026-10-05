@@ -975,6 +975,16 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   family or dependency. Component tests cover each severity, unknown→`info`, replay order and the
   backgrounded state (FS-03.A48–A49).
 
+- **R87** (planned) — The Think Tank page composes existing conversation/content, participant-card,
+  file/command, permission and annotation seams under TS-14.R15–R16. Source unions distinguish
+  room anchors from agent transcript anchors; renderer/tool grouping is actor/attempt-scoped.
+  Add the route and stable room hooks to the presentation contract and all appearances together.
+  The reading order is goal/phase → attributed discussion → current action, with compact participant
+  identities and ordinary card links. Queued input, pending pause/end, private-work wait, failure,
+  closing, judge and retained-source states have explicit text and applicable controls. Preserve
+  drafts and origin labels; no new styling framework, decorative motion or phone room surface.
+  Rendered validation is owed at implementation, not inferred from existing screenshots.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

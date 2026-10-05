@@ -204,6 +204,13 @@ prompt snapshots on resume must be verified and any delayed adoption recorded ho
 discarding conversation history or claiming a changed effective prompt merely because a request
 was sent.
 
+**R19** (planned) — Agents receive Think Tank operating judgment through the same verified shared
+skill, with `references/think-tanks.md` linked for that job. This extends R5's three-file inventory;
+it does not make every agent load every reference. Explain room authority versus private sessions,
+explicit contribution/leave, incremental reads, ceilings rather than quotas, independent openings,
+intervention and final-only judge. Current tool definitions own invocation details. Guidance grants
+no ability to create/end/delete rooms, edit membership, poll progress or manufacture consensus.
+
 ## 3. States & transitions
 
 - **Package:** absent or older cache → dashboard startup attempts to install the current complete
@@ -333,6 +340,13 @@ preset with Chuck additions; Claude terminal retains its additive flag; Codex re
 developer-instruction composition without a base-prompt replacement. *Verify by* pinned adapter
 contract and runtime parameter tests plus a credentialed fresh/resume provider check, recording
 any native snapshot limitation rather than claiming delivery from model self-report alone.
+
+**A15** (planned; R1, R3–R6, R19) — Verify the new progressively linked reference in embedded,
+installed and overlay package inventories, readable on fresh/resumed normal sessions. Exercise a
+room participant and end-only judge without persona-specific mechanics: each reads through room
+tools and explicitly stages its own contribution, preserves ceilings and unresolved objections,
+and claims no user-only authority. *Verified by:* package/overlay/tool-definition fixtures and
+TS-06.R33's bounded credentialed room smoke.
 
 ## 6. Deviations & open decisions
 

@@ -554,6 +554,13 @@ target transcript. Any failure after the fork is created deletes the forked prov
 discards the target transcript, removes its index rows and rolls back the partial agent rows, so
 no half-copied clone survives (INV §3/§9/§15).
 
+**R42** (planned) — Forward migrations add TS-14's room/member/attempt/entry/activity/input records
+through the existing sole state writer. Room retention has no cascading agent/project foreign keys;
+source identity/cwd snapshots survive deletion. Publication, completed count, delivered read
+checkpoint and control progression share one transaction. The generic activation references an
+attempt without becoming room history. Commit setup/dispatch intent before provider effects and
+publish SSE only after durable mutation; no agent-written canonical file or second DB writer.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:

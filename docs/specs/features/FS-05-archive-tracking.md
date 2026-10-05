@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -222,6 +222,12 @@ R22's `active` validation remain binding.
   and each expanded project's agents independently, resets both levels when the query/filter changes,
   labels non-archived hits by running/stopped state, and preserves retry-visible error behavior.
 
+- **R39** (planned) — Archive also discovers Think Tank rooms under FS-21.R39, with distinct room
+  identity, originating project, phase/completion reason and link to the room conversation page.
+  Active and ended rooms remain discoverable after their project or participating agents are
+  removed. Room entries are not synthetic agent sessions and do not alter the existing agent
+  archive/resume contracts; opening an ended room does not automatically restart discussion.
+
 ## 5. Acceptance criteria
 
 - **A1 — retired 2026-07-29:** Flat archive listing acceptance is superseded by A19.
@@ -310,7 +316,16 @@ R22's `active` validation remain binding.
   duplicated pages, child session ids, background-task reconstruction and summary-only reports.
 
 
+- **A22** (planned; R39) — List active and ended rooms in Archive, open the correct room workspace,
+  then remove their originating project and a participant and repeat. Verify retained readable
+  attribution and room history, preserved normal session archive/resume behavior, and no automatic
+  discussion restart. *Verified by:* Archive/room integration and component tests plus FS-21.A29's
+  rendered retained-room discovery journey.
+
 ## 6. Deviations & open decisions
+
+- R39/A22 are planned as part of Think Tank room discovery; room data/lifecycle is owned by
+  FS-21 and its technical design. No room behavior has shipped.
 
 - **Turn documents deliberately narrow search context.** Terms and phrases do not span
   turn/annotation documents. This is the simplifying trade-off that removes whole-session rewrites;
