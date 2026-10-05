@@ -14,6 +14,10 @@ const (
 	// rather than mail's one per agent, and it stays actionable until its owning
 	// task confirms its start (TS-10.R5).
 	ActivationKindDependency = "dependency"
+	// ActivationKindThinkTank is one room turn. Its durable opportunity is the
+	// room's own state, and its attempt is the room attempt row committed in the
+	// turn's before callback, so it never writes an activations row (TS-14.R3).
+	ActivationKindThinkTank = "think_tank"
 
 	ActivationPending   = "pending"
 	ActivationClaimed   = "claimed"

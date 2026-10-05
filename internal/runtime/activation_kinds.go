@@ -37,6 +37,16 @@ var activationKinds = map[string]ActivationKind{
 		StatusDetail: "starting assigned task",
 		LastTrace:    "TaskActivation",
 	},
+	// A room turn names only the room tools. Goal, peer contributions, role and
+	// remaining ceiling are pulled through read_think_tank as data, never
+	// carried in the prompt (TS-14.R3, FS-21.R16).
+	state.ActivationKindThinkTank: {
+		Instruction: "It is your turn in a Think Tank discussion. Call read_think_tank to read the goal, " +
+			"your role, your remaining turn ceiling and the new discussion, following its cursor until the " +
+			"read is complete. Then call submit_think_tank_turn once with your contribution and the read_receipt.",
+		StatusDetail: "taking a Think Tank turn",
+		LastTrace:    "ThinkTankActivation",
+	},
 }
 
 // LookupActivationKind returns the contract for a kind and whether it exists.

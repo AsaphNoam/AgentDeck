@@ -441,7 +441,7 @@ VALUES(?, ?, ?, ?, ?, (SELECT COUNT(*) FROM think_tank_members WHERE room_id = ?
 }
 
 // MarkThinkTankJudgeLaunched records the reserved judge's launch outcome.
-func (s *Store) MarkThinkTankJudgeLaunched(roomID, launchErr string) (ThinkTankDetail, error) {
+func (s *Store) MarkThinkTankJudgeLaunched(roomID, name, launchErr string) (ThinkTankDetail, error) {
 	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.JudgeStatus != ThinkTankJudgeLaunching {
 			return thinkTankConflict("the judge is not launching")
@@ -454,9 +454,12 @@ func (s *Store) MarkThinkTankJudgeLaunched(roomID, launchErr string) (ThinkTankD
 			status, launchErr, roomID); err != nil {
 			return fmt.Errorf("state: mark think tank judge: %w", err)
 		}
-		_, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ? WHERE room_id = ? AND agent_id = ?`,
-			setup, launchErr, roomID, d.Room.JudgeAgentID)
-		return err
+		if _, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?,
+  agent_name = CASE WHEN ? = '' THEN agent_name ELSE ? END
+WHERE room_id = ? AND agent_id = ?`, setup, launchErr, name, name, roomID, d.Room.JudgeAgentID); err != nil {
+			return fmt.Errorf("state: mark think tank judge member: %w", err)
+		}
+		return nil
 	})
 }
 

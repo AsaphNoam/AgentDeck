@@ -751,14 +751,15 @@ func bumpThinkTankTx(tx *sql.Tx, roomID string) error {
 // outcome. When every participant is ready, the room leaves setup. A failed
 // slot keeps the room in setup with a hold naming it; retry relaunches only
 // that slot, never a ready one (TS-14.R2).
-func (s *Store) MarkThinkTankMemberSetup(roomID, agentID string, launchErr string) (ThinkTankDetail, error) {
+func (s *Store) MarkThinkTankMemberSetup(roomID, agentID, name, launchErr string) (ThinkTankDetail, error) {
 	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		state := ThinkTankSetupReady
 		if launchErr != "" {
 			state = ThinkTankSetupFailed
 		}
-		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?
-WHERE room_id = ? AND agent_id = ? AND setup_state != 'ready'`, state, launchErr, roomID, agentID)
+		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?,
+  agent_name = CASE WHEN ? = '' THEN agent_name ELSE ? END
+WHERE room_id = ? AND agent_id = ? AND setup_state != 'ready'`, state, launchErr, name, name, roomID, agentID)
 		if err != nil {
 			return fmt.Errorf("state: mark think tank setup: %w", err)
 		}

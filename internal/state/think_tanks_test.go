@@ -448,7 +448,7 @@ func TestThinkTankJudgeLifecycle(t *testing.T) {
 	if err := st.DeleteThinkTank(room); !errors.Is(err, ErrThinkTankConflict) {
 		t.Fatalf("delete while judge launching err = %v", err)
 	}
-	if _, err := st.MarkThinkTankJudgeLaunched(room, ""); err != nil {
+	if _, err := st.MarkThinkTankJudgeLaunched(room, "Judge", ""); err != nil {
 		t.Fatal(err)
 	}
 	j, items, r := ttTurn(t, st, room)
@@ -466,7 +466,7 @@ func TestThinkTankJudgeLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.ReserveThinkTankJudge(room, "j2", "Judge 2", "p")
-	st.MarkThinkTankJudgeLaunched(room, "")
+	st.MarkThinkTankJudgeLaunched(room, "Judge", "")
 	j2, _, r := ttTurn(t, st, room)
 	f = ttSubmit(t, st, j2, r, ThinkTankReply, "Synthesis; B's objection unresolved")
 	if f.Detail.Room.JudgeStatus != ThinkTankJudgeCompleted || f.Published[0].Kind != ThinkTankEntrySynthesis {
@@ -526,16 +526,16 @@ func TestThinkTankSetupSlots(t *testing.T) {
 	if _, ok := NextThinkTankOpportunity(d); ok {
 		t.Fatal("setup room offers a turn")
 	}
-	d, err := st.MarkThinkTankMemberSetup(d.Room.RoomID, "n", "launch failed")
+	d, err := st.MarkThinkTankMemberSetup(d.Room.RoomID, "n", "", "launch failed")
 	if err != nil || d.Room.Hold == "" || d.Room.Phase != ThinkTankPhaseSetup {
 		t.Fatalf("failed slot: %+v %v", d.Room, err)
 	}
 	d, _ = st.RetryThinkTankSetup(d.Room.RoomID)
-	d, err = st.MarkThinkTankMemberSetup(d.Room.RoomID, "n", "")
+	d, err = st.MarkThinkTankMemberSetup(d.Room.RoomID, "n", "Nova", "")
 	if err != nil || d.Room.Phase != ThinkTankPhaseDiscussion || d.Room.Hold != "" {
 		t.Fatalf("after setup: %s hold=%q %v", d.Room.Phase, d.Room.Hold, err)
 	}
-	if _, err := st.MarkThinkTankMemberSetup(d.Room.RoomID, "a", ""); !errors.Is(err, ErrThinkTankConflict) {
+	if _, err := st.MarkThinkTankMemberSetup(d.Room.RoomID, "a", "", ""); !errors.Is(err, ErrThinkTankConflict) {
 		t.Fatalf("relaunching a ready slot err = %v", err)
 	}
 }

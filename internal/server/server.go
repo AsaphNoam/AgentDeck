@@ -71,6 +71,8 @@ type Server struct {
 	// taskStartSlots bounds task starts in flight across dispatch passes. The
 	// budget bounds runtimes; this bounds workers (TS-10.R3, R17).
 	taskStartSlots chan struct{}
+	// thinkTankKick nudges the single Think Tank progression worker.
+	thinkTankKick chan struct{}
 	// taskStartMu protects taskStartLocks. The locks themselves are per task, so
 	// unrelated task launches retain the configured concurrency (INV §5).
 	taskStartMu    sync.Mutex
@@ -288,6 +290,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		activationCh:              activationCh,
 		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
 		taskStartSlots:            make(chan struct{}, taskDispatchBatch),
+		thinkTankKick:             make(chan struct{}, 1),
 		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,
 		log:                       log,
@@ -364,6 +367,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 			if ev.Type == runtime.EvTurnEnd {
 				generation := registry.Generation(ev.AgentID)
 				go s.dispatchTurnEnd(ev.AgentID, generation)
+				go s.finishThinkTankTurn(ev)
 			}
 		})
 	}
@@ -508,6 +512,10 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("recover dependent work: %w", err)
 	}
 	s.startTaskDispatcher(sweepCtx)
+	if err := s.startThinkTanks(sweepCtx); err != nil {
+		ln.Close()
+		return fmt.Errorf("recover think tanks: %w", err)
+	}
 	go s.runKeepAwake(sweepCtx)
 	go s.runPushSender(sweepCtx)
 	defer s.keepAwake.Close()

@@ -52,9 +52,13 @@ until their slice ships. Slices (each closes with focused tests, handoff update 
 1. **State** — done 2026-10-06 (`internal/state/think_tank{s,_turns}.go`, schema v36; tests
    `go test ./internal/state -run ThinkTank`, both variants and `-race` passed). Seam map and
    slice notes: `docs/plans/think-tanks.md`.
-2. **Room engine** (next) — server service selecting the next opportunity and dispatching a `think_tank`
-   activation through `StartActivation`; turn-end finalization; executing-turn-id emission (R4).
-3. **MCP tools** — `read_think_tank`/`submit_think_tank_turn`, approval exemption, redacted
+2. **Room engine** — done 2026-10-06: `runtime.Event.TurnID` (executing turn, R4), `think_tank`
+   activation kind, `server/think_tanks.go` single progression worker (5s sweep + kick), setup and
+   judge launches, eligibility holds, `finishThinkTankTurn` from the turn-end sink;
+   `think_tank_update` publisher in `server/think_tank_wire.go`. Tests: `go test ./internal/server
+   -run TestThinkTank` (fake ACP `hold_turn`; test acts as the agent's tool calls) and runtime
+   `TestEventsCarryTheExecutingTurnAcrossAHeldSuccessor`; server/runtime/state suites passed.
+3. **MCP tools** (next) — `read_think_tank`/`submit_think_tank_turn`, approval exemption, redacted
    activity projector.
 4. **REST/SSE** — `/api/think-tanks` family, `think_tank_update`/`think_tank_activity`, wire fixture.
 5. **Activity capture, judge, recovery/deletion.**

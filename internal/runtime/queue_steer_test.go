@@ -504,3 +504,47 @@ func TestMapSteerResultRejectsAnythingButTheTwoOutcomes(t *testing.T) {
 		t.Fatalf("call error = %v, want it surfaced verbatim", err)
 	}
 }
+
+// TS-14.R4: events carry the executing turn, not the counter. The held
+// successor's id is reserved before the first turn's terminal emission, yet
+// that turn_end still names the original turn and the successor's events name
+// its own.
+func TestEventsCarryTheExecutingTurnAcrossAHeldSuccessor(t *testing.T) {
+	c, h, ch, release, _ := busyAgent(t)
+	ctx := context.Background()
+	events, err := c.Transcript(h.AgentID)
+	if err != nil {
+		t.Fatalf("Transcript: %v", err)
+	}
+	first := ""
+	for _, ev := range events {
+		if ev.Type == EvUserPrompt {
+			first = ev.TurnID
+		}
+	}
+	if first == "" {
+		t.Fatal("the first turn's prompt carries no executing turn id")
+	}
+	if held, err := c.SendPromptOrHold(ctx, h.AgentID, "second"); err != nil || !held {
+		t.Fatalf("SendPromptOrHold = %v %v", held, err)
+	}
+	release()
+	var ends, prompts []string
+	deadline := time.After(5 * time.Second)
+	for len(ends) < 2 {
+		select {
+		case ev := <-ch:
+			switch ev.Type {
+			case EvTurnEnd:
+				ends = append(ends, ev.TurnID)
+			case EvUserPrompt:
+				prompts = append(prompts, ev.TurnID)
+			}
+		case <-deadline:
+			t.Fatalf("turn ends = %v", ends)
+		}
+	}
+	if ends[0] != first || len(prompts) != 1 || prompts[0] == first || ends[1] != prompts[0] {
+		t.Fatalf("turn ends %v, successor prompt %v, first turn %s", ends, prompts, first)
+	}
+}

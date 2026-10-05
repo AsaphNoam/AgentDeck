@@ -215,9 +215,14 @@ type agentState struct {
 	skipPerms        bool // auto-approve every permission request (techspec §5.2)
 	autoApproveTools map[string]struct{}
 
-	mu         sync.Mutex
-	seq        int64
-	turnSeq    int64
+	mu      sync.Mutex
+	seq     int64
+	turnSeq int64
+	// execTurnID is the turn actually executing, distinct from turnSeq, which
+	// a held/Steer successor reservation advances before the old turn's
+	// terminal emission. Events carry it so a consumer never infers ownership
+	// from the counter (TS-14.R4).
+	execTurnID string
 	context    contextReading
 	turnActive bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
@@ -749,6 +754,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 		as.mu.Unlock()
 		return err
 	}
+	as.setExecTurn(turnID)
 	// Persist the accepted user side of the turn before handing it to ACP. This
 	// gives it the same durable sequence, replay, and index path as assistant
 	// output, so a reconnect cannot replace the chat with a one-sided history.
@@ -915,7 +921,16 @@ func (c *ChatRuntime) clearInlineMail(agentID, deliveryKey string) {
 func (c *ChatRuntime) finishTurn(as *agentState, td TurnEndData) {
 	c.applyTurnEndStatus(as, td)
 	c.emit(as, EvTurnEnd, td)
+	as.mu.Lock()
+	as.execTurnID = ""
+	as.mu.Unlock()
 	c.deliverHeld(as)
+}
+
+func (as *agentState) setExecTurn(turnID string) {
+	as.mu.Lock()
+	as.execTurnID = turnID
+	as.mu.Unlock()
 }
 
 // deliverHeld runs the agent's held follow-up as the next turn. Taking the
@@ -1403,6 +1418,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 		as.mu.Unlock()
 		return false, fmt.Errorf("runtime: write activation status: %w", err)
 	}
+	as.setExecTurn(turnID)
 
 	go func() {
 		params := map[string]any{
@@ -1727,7 +1743,7 @@ func (c *ChatRuntime) emitIn(as *agentState, scope activityScope, typ string, da
 	as.mu.Lock()
 	as.seq++
 	ev := Event{
-		AgentID: as.agentID, Generation: as.generation,
+		AgentID: as.agentID, Generation: as.generation, TurnID: as.execTurnID,
 		Seq:  as.seq,
 		Type: typ,
 		Data: raw,
