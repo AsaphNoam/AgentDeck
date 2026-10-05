@@ -103,7 +103,8 @@ capability; it is not by itself authority to remove the fallback or ship the def
 - **Steering.** The pinned Claude 0.75.1 and Codex 1.12.0 adapters advertise
   `_session/steering`, and AgentDeck uses it. Codex 1.12.0 still starts a detached turn when a steer
   arrives idle and ignores AgentDeck's `promptRequired` metadata, so the packaged steering patch
-  remains necessary until upstream advertises the same no-consumption contract.
+  remains necessary until upstream advertises the same no-consumption contract. Codex ACP 2.1.1
+  (checked 2026-10-05) still needs it.
 - **Host-held queued Send.** AgentDeck holds a busy agent's next prompt because the pinned Claude
   adapter queues while the pinned Codex adapter supersedes and interrupts the active turn. Keep the
   host-side hold even after steering exists: Send must remain portable, withdrawable, and distinct
@@ -112,7 +113,10 @@ capability; it is not by itself authority to remove the fallback or ship the def
   authenticated HTTP MCP server. `migrate-internal-actions-from-mcp.md` is paused until packaged
   Codex/ACP exposes a narrowly scoped direct transport reachable under the default sandbox. The
   pinned Codex ACP 1.12.0 still advertises ACP MCP transport unsupported and HTTP supported, so the
-  gate stays closed.
+  gate stays closed. Rechecked 2026-10-05 against Codex ACP 2.1.1 (`acp:false`) and Claude ACP
+  0.85.1 (`http`/`sse` only): still closed. Watch ACP's unstable MCP-over-ACP server type (now
+  stateless `mcp/message` in ACP SDK 1.7.0); adopting it would change the migration's goal and
+  needs design review (TS-04 §5).
 - **Semantic agent wake.** Mail and task activation use a short, host-generated `session/prompt`
   because ACP exposes no portable notification that wakes an idle model. Replace this bridge only
   if an adapter advertises a semantic wake capability; steering is not that capability.

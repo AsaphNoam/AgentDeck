@@ -60,6 +60,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
   give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,
   project-page pipeline start, agent management, and tracked-file views; remove phone task UI.
+- [`refresh-provider-bundle-2026-10.md`](refresh-provider-bundle-2026-10.md) — bump the bundle to
+  Claude ACP 0.85.1 and Codex ACP 2.1.1/Codex 0.159.3 plus go-sdk 1.8.0; show agent notices,
+  steer-backgrounded tools and truthful model-policy refusals.
 
 ## Paused changes
 

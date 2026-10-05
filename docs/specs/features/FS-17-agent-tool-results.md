@@ -254,6 +254,13 @@ Each names the verification that demonstrates it.
 R1–R12 are shipped. Live-provider compatibility remains tracked as acceptance gate A6. R13–R20
 are planned and the migration is paused behind R20.
 
+- **Transport gate recheck (2026-10-05).** For R20, Claude ACP 0.85.1 and Codex ACP 2.1.1 still offer only HTTP (and,
+  for Claude, SSE) MCP servers, so the gate stays closed. The candidate to watch is ACP's unstable
+  MCP-over-ACP server type (TS-04 §5 transport watch). It would carry the existing MCP actions over
+  each agent's stdio connection instead of replacing them with the packaged command, so adopting
+  it changes this migration's goal and returns to design review; the goal is unchanged until an
+  adapter ships it.
+
 - The idea that prompted this work asked for a structured `retry_when` condition an agent could
   wait on. Tracing every refusal the MCP layer emits found none that a durable wait would repair:
   `create_task` does not refuse a busy target — it records the task and lets the dispatcher park it

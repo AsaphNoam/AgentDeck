@@ -535,6 +535,21 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   **used / total tokens** figure beside its existing percentage. When raw counts are unavailable it
   retains the percentage-only label. This changes neither the runtime controls nor transcript and
   archive retention.
+- **R67** `(planned)` — **A steer during a running tool can background that tool.** When the
+  runtime reports that a Steer moved the in-flight foreground tool call (for example a command or
+  subagent) to the background instead of aborting it, the tool call stays in the transcript, is
+  marked as continuing in the background, and appears as an R59 background task with the same
+  status, output and targeted Stop. The steered message joins the turn as R50 describes. Chuck does
+  not cancel, retry or re-run the tool itself, and a runtime that aborts the tool instead keeps
+  today's behavior. This adds no new control.
+- **R68** `(planned)` — **Agent notices appear as compact transcript rows.** A runtime advisory
+  notice — for example a warning about configuration, quota or a degraded feature — renders in the
+  transcript as one compact row with its severity (`info` or `warning`; anything else reads as
+  `info`), a short title and optional description, visually distinct from agent messages. Notices
+  are durable transcript entries: they replay in live, archived and phone transcripts in their
+  original order. They do not change the agent's state, raise notifications or toasts, count as
+  agent replies, or enter search snippets as agent text. A runtime that sends advisories as ordinary
+  message text keeps rendering them as text; Chuck does not reinterpret message text as notices.
 
 
 ## 3. States & transitions
@@ -903,6 +918,17 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   card show the same exact used/total token reading and rounded percentage from one live state
   update; a percentage-only state keeps the existing label on both surfaces. *Verify:*
   `ChatPanel`, `AgentCard`, and shared `ContextBar` component tests.
+- **A48** `(planned)` (R67, R59, R50) — Against a fake runtime that backgrounds a running command
+  on Steer, the steered message appears in the turn, the command's tool call shows as continuing in
+  the background, its background task row reaches `completed` with its output, and targeted Stop
+  works on a second backgrounded command; Chuck sends no cancel. A runtime that aborts the tool on
+  Steer renders exactly as today. *Verify by* fake ACP runtime tests, `ChatPanel` component tests,
+  and the credentialed Claude steer in the TS-06.R31 smoke.
+- **A49** `(planned)` (R68) — A fake runtime's `info`, `warning` and unknown-severity notices
+  render as compact rows (unknown as `info`) between the surrounding messages, survive reload,
+  archive and phone replay in order, and change no agent state, unread or notification count; a
+  runtime without notice support still shows its advisory as message text. *Verify by* fake ACP
+  runtime tests, transcript replay tests, `ChatPanel` and phone-render component tests.
 
 
 ## 6. Deviations & open decisions

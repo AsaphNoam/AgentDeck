@@ -695,6 +695,54 @@ non-archived chat identities in active projects, preserving project/authenticati
 while separating addressability from current wake eligibility. No new tool or provider method is
 required. All send paths use the same state helper; ordinary best-effort FYIs use `wake: false`.
 
+**R79 `(planned)` — The managed adapter baseline moves to Claude ACP 0.85.1 and Codex ACP 2.1.1.**
+This supersedes R61's version numbers when shipped; R61's patch rule carries forward. Claude uses
+`@agentclientprotocol/claude-agent-acp` 0.85.1 over the Claude Agent SDK version that release
+requires (0.3.286 or later); Codex uses `@agentclientprotocol/codex-acp` 2.1.1 with a direct
+`@openai/codex` 0.159.3, the newest release inside the adapter's declared `^0.159.1` range (Codex
+0.160.0 is outside it and is not bundled). Static inspection of 2.1.1 on 2026-10-05 found idle
+steering still starts a detached turn and `parseSessionSteerParams` still drops `_meta`, so the
+`promptRequired` patch is regenerated as `codex-acp-2.1.1-steering-prompt-required.patch` and
+reported as `2.1.1+chuck.1`. Codex ACP 2.0 changed its AIR tool-call contract: the R62 decoder and
+fake are re-derived from the reviewed 2.1.1 shapes, and any AIR feature whose new shape cannot be
+mapped losslessly is withheld under R62 rather than half-decoded. Claude 0.85.1 keeps its MCP,
+system-prompt, executable-resolution and steering request contracts unchanged (inspected
+2026-10-05). Chuck does not adopt Codex's `_meta.mcpStartupAwaitTimeoutMs`, read-only access
+preset, or either adapter's initialize-only ACP v2 surface in this baseline.
+
+**R80 `(planned)` — Session notices are an opt-in, bounded update kind.** Initialize advertises
+ACP's unstable `clientCapabilities.session.notices` capability using the exact key and shape of the
+pinned adapters and `@agentclientprotocol/sdk` 1.7.0 schema. A `notice` `session/update` decodes to
+`{severity, title, description?}` with the title capped at 256 runes and the description at 2,000
+runes (INV §8), maps an unknown or absent severity to `info`, and becomes one durable transcript
+event of a distinct `notice` kind replayed by the existing transcript paths (TS-02) and phone
+projection (TS-13). It never changes agent state,
+unread counts, notifications or search agent-text. Malformed notices are dropped with a bounded
+diagnostic. Withdrawing the capability restores the adapter's message-text fallback with no data
+change, so the unstable ACP surface remains reversible.
+
+**R81 `(planned)` — A steer-backgrounded tool joins the existing background-task contract.** When
+an advertised background-task runtime (R62 `asyncTasks`) marks an in-flight tool call as
+backgrounded in response to Steer (Claude 0.85.1 `_meta.ai.async_tasks.backgrounded` on
+`tool_call_update`, CLI 2.1.286), the mapper updates that tool call and opens or updates the
+matching FS-03.R59 background task through the same normalized events used for commands started
+in the background. No Chuck cancel is issued, and the steer outcome reported to the person is unchanged.
+Without the advertisement or marker, today's steer behavior and rendering stay exact.
+
+**R82 `(planned)` — Provider model policy refusals keep the active runtime truthful.** Launch and
+`session/set_config_option` model application treat an adapter error (including Claude's
+`PreModelSwitch` hook block and allow/deny-list refusal) as a rejected switch, and after any model
+application read the effective model from the returned or next live option list rather than the
+request. A mismatch between requested and effective model is reported as a rejection, never stored
+as the requested model, and never retried with another model.
+
+**R83 `(planned)` — The internal MCP server uses go-sdk 1.8.0 without changing its protocol.**
+Bump `github.com/modelcontextprotocol/go-sdk` to v1.8.0 for its session-leak, close-deadlock and
+input-size fixes. The server keeps its current stateful streamable HTTP mode and negotiated MCP
+revision; it does not enable stateless mode, serve MCP `2026-07-28`, declare `outputSchema` (R31's
+deferral stands), or set any `MCPGODEBUG` compatibility flag. Existing token, origin and hook
+checks must pass unchanged under the new SDK defaults.
+
 One builder formats at most 15 whole messages and at most 64 KiB of serialized UTF-8 mail-section
 content, including attribution and the overflow notice. Use existing 8,000-byte body/200-byte subject
 limits and the effective combined per-turn budget (default 50), frozen for the active turn.
@@ -757,6 +805,7 @@ R55–R60 were unshipped Cursor backend requirements, retired with that design o
 IDs are not reused.
 
 **R61 — The packaged Codex baseline is ACP 1.12.0 with its compatible Codex 0.154.0.**
+(Planned R79 supersedes these version numbers when it ships.)
 The bump consumes 1.11's paginated load/fork history and finalized standalone MCP-elicitation
 permission completion plus 1.12's canonical tool names, elicitation-form fix and turn-diff-derived
 file reports. Chuck neither consumes the adapter's recommended model/reasoning values nor
@@ -1032,6 +1081,9 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
 - Context usage (R25): Claude's `usage_update` payload
   `{sessionUpdate:"usage_update",used:<tokens>,size:<context-window>}` becomes the live
   `context_pct`; prompt-result token accounting is not interpreted as a percentage.
+- Session notices (R80, planned): initialize adds `clientCapabilities.session.notices` in the pinned
+  schema's shape; the `notice` `session/update` (`severity`, `title`, optional `description`)
+  becomes a durable `notice` transcript event `{severity:"info"|"warning", title, description?}`.
 - Activation bridge (R27): one code-owned text block in `session/prompt`; no ACP/MCP notification
   is treated as inference initiation, and message content stays behind `check_messages`.
 - Context links (R28): token-scoped MCP tools over the existing streamable HTTP server; source
@@ -1085,6 +1137,13 @@ or add background compatibility discovery. TS-06.R31 bounds verification and exp
   FS-17.R20 passes and the migration ships. Until then internal MCP remains the released path. The
   unreleased comparison period is test scaffolding, not a product mode; no stdio proxy or released
   fallback survives the cutover.
+- **Transport watch (2026-10-05):** neither pinned nor latest adapter offers a direct transport
+  under FS-17.R20. Claude 0.85.1 advertises MCP `{http, sse}` and Codex 2.1.1
+  `{acp:false, http:true, sse:false}`. ACP's MCP-over-ACP server type (`type:"acp"`) is the
+  candidate to watch: it stays unstable, and `@agentclientprotocol/sdk` 1.7.0 replaced its
+  `mcp/connect`/`mcp/disconnect` connection model with stateless `mcp/message` calls. It would carry
+  Chuck's existing MCP actions over each agent's stdio connection rather than replace them, so any
+  adoption returns to design review with that goal change made explicit.
 - Terminal agents are intentionally non-messageable until an interactive-CLI MCP path is verified.
 - OpenCode/OpenHands executable overrides are honored by credential checks but not consistently by
   launch; missing/old CLI diagnostics are also incomplete. These are tracked product gaps.

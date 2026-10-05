@@ -248,6 +248,21 @@ user CLI releases, historical support matrix, speculative minimum/maximum allowl
 layer. If the audit reveals a genuine incompatibility needing a larger framework, stop and report
 that specific blocker for a scope decision; do not expand this unit or silently waive correctness.
 
+**R32 `(planned)` — The 2026-10 bundle refresh is reproducible and provider-verified.** Release
+inputs pin `@agentclientprotocol/claude-agent-acp` exactly at `0.85.1`,
+`@agentclientprotocol/codex-acp` exactly at `2.1.1` and direct `@openai/codex` exactly at `0.159.3`
+(TS-04.R79); `go.mod` pins `github.com/modelcontextprotocol/go-sdk` at `v1.8.0` (TS-04.R83).
+Lockfile, assembly constants, `install.sh`, manifest expectations, wrapper/archive fixtures and
+release documentation move together. R26's assembly proofs carry forward against 2.1.1: one
+installed Codex package whose version satisfies the adapter's declared range, a hashed unpatched
+adapter bundle, the version-named steering patch applied with zero fuzz, a hashed patched output,
+the `2.1.1+chuck.1` component report and the source comparison proving the patch is still needed.
+The fake ACP runtime adds the reviewed 2.1.1 AIR tool-call shapes, Claude notices and the Claude
+steer-backgrounds-tool marker from the inspected dists, not Chuck's mapper. Real-provider evidence
+reruns R31's two-point smoke for both providers, adding one notice (where a provider emits one),
+one steer during a running command and one refused model switch where the account's policy allows
+staging it; missing receipts stay owed.
+
 ## 3. Interfaces & data shapes
 
 The canonical commands are:

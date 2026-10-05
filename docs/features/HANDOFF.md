@@ -114,6 +114,13 @@ None.
 
 ## Changelog
 
+- **2026-10-05 — Design: provider bundle refresh ready.** Upstream check found Claude ACP 0.85.1,
+  Codex ACP 2.1.1 (Codex `^0.159.1`, so 0.159.3), ACP SDK 1.7.0 and go-sdk 1.8.0. All ACP Wait-list
+  gates stay closed; the Codex steering patch is still required; the MCP-migration gate is rechecked
+  and closed, with MCP-over-ACP recorded as the transport to watch (TS-04 §5, FS-17 §6).
+  `refresh-provider-bundle-2026-10.md` is waiting to start: FS-03.R67–R68/A48–A49,
+  FS-09.R79/A48, TS-04.R79–R83, TS-06.R32, TS-08.R86 (TS-08 now Partial).
+
 - **2026-10-05 — Claude 5.5 launch compatibility closed.** A live probe (release adapter over
   installed Claude Code 2.1.282) served `claude-opus-5-5`; the bundle still refuses it as too old.
   The probe exposed a remaining launch failure (INV §12 accepted-is-not-honored, over-applied):
