@@ -44,9 +44,14 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
   Think tanks resumed 2026-10-05: FS-21 is a draft of the independent-session/shared-artifact core.
   Mixed new/existing agents, per-participant departure permission with optional final message,
-  and optional end-only judge synthesis are confirmed. Budget and operator controls are the next
-  questions; recovery, eligibility, judge setup, access and retention still need scope agreement
-  before technical design.
+  optional end-only judge synthesis, per-agent turn limits, and pause/resume/inter-turn user
+  messages are confirmed. Agents see remaining ceilings, openings consume one turn, departure
+  messages stay within their turn, and judge synthesis has a separate budget. Pause lets the active
+  turn finish; approval/failure holds for intervention; below two eligible participants the sole
+  remaining agent can give a closing message within its allowance. Only completed contributions
+  consume limits. Project scope and local retention are the next questions; eligibility, judge
+  setup, access and remaining control/recovery details still need scope agreement before technical
+  design.
 - **Branch:** `main`.
 
 ## Active change
@@ -118,6 +123,18 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank pause, intervention and closing message confirmed.**
+  FS-21.R18–R21/A11–A13 let the active turn finish on pause, hold the room visibly for approval or
+  failure intervention, and end below two eligible participants with a closing-message opportunity
+  within the sole remaining agent's allowance. Failed attempts do not consume the contribution
+  limit and are not retried automatically. R8 is superseded by R12/R20; FS-21 remains Draft.
+
+- **2026-10-05 — Design: Think Tank budget and operator controls confirmed.** FS-21.R14–R15/A8–A9
+  record per-agent turn ceilings and pause/resume plus user messages between participant turns.
+  FS-21.R16–R17/A10 also record the confirmed remaining-ceiling instruction, opening/departure
+  accounting, and separate end-only judge budget. Pause/recovery and sole-participant closure were
+  subsequently confirmed in R18–R21. No technical design or product code was added.
 
 - **2026-10-05 — Design: Think Tank participation and synthesis confirmed.** FS-21.R11–R13/A6–A7
   record mixed new/existing participants, configurable departure permission and optional final

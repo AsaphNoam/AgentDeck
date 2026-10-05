@@ -30,8 +30,8 @@ not an approved feature scope or implementation-ready change.
   holds the discussion floor at a time, and its contribution is appended under its own identity
   before the discussion advances to another participant.
 - **R5** (planned) — The room has a configured finite discussion budget and a visible completion
-  state. Reaching the budget ends further discussion turns; the exact budget unit and treatment of
-  openings, exits, and the optional judge synthesis remain open in §6.
+  state. R14 defines the budget as per-participant turn ceilings; R17 defines accounting for
+  openings, exits, and optional judge synthesis; R21 defines failed-attempt accounting.
 - **R6** (planned) — Independent openings are optional. When enabled, every participant forms
   its opening without access to the others' opening contributions; those contributions are
   published into the shared discussion before ordinary turn-taking begins. When disabled,
@@ -40,11 +40,8 @@ not an approved feature scope or implementation-ready change.
 - **R7** (planned) — Completion reports why the discussion stopped and preserves material
   disagreement. Agreement itself is not the objective, and a budget ending or participants leaving
   must not be presented as proof that the goal was achieved.
-- **R8** (planned) — A participant can be configured as allowed to leave the discussion. Leaving
-  records that decision in the shared history and removes the participant from future discussion
-  turns; it is distinct from stopping or deleting its normal agent session. After all but one
-  participant have left, the discussion ends. No dedicated judge agent is required to decide when
-  discussion stops.
+- **R8** — retired 2026-10-05: superseded by R12 and R20, which preserve configurable departure
+  and add the sole remaining participant's closing-message opportunity before final completion.
 - **R9** (planned) — A person inspecting the room can see its goal, participants, ordered
   attributed discussion, current phase and speaker when applicable, and completion reason.
 - **R11** (planned) — Participant selection supports both creating a new normal agent and adding
@@ -53,21 +50,61 @@ not an approved feature scope or implementation-ready change.
 - **R12** (planned) — Permission to leave is configurable per participant. An allowed participant
   may choose to publish a final attributed message with its departure, or leave without a final
   message. The departure is recorded either way, and an optional final message is part of the
-  canonical discussion before the remaining-participant completion rule is evaluated.
+  canonical discussion before the remaining-participant completion rule in R20 is evaluated.
 - **R13** (planned) — Final synthesis is optional. When requested, a judge agent is called only
   after the participant discussion has ended, reads the completed shared discussion, and produces
   the synthesis as the last step. Its synthesis is attributed to the judge and retained with the
   room under R1 and preserves unresolved material objections under R7. The judge does not take
   discussion turns or receive activations to monitor progress or decide whether discussion stops.
+- **R14** (planned) — Discussion is bounded by a configured finite maximum turn count for each
+  participant, rather than a room-wide round count or total-turn allowance. A participant cannot
+  receive further discussion turns once its limit is exhausted. A limit is a ceiling, not a target
+  number of contributions or evidence that convergence is required. R16 defines participant budget
+  awareness, R17/R21 define contribution accounting, and R20 governs ending as participants
+  leave or exhaust their limits.
+- **R15** (planned) — The operator can pause discussion progression, resume it, and add user
+  messages between participant turns. No new participant turn starts while the room is paused.
+  User messages are durably ordered and attributed to the user in the canonical room discussion,
+  available through the same incremental reading behavior as participant contributions. Handling
+  an already-running turn is defined by R18; messages submitted during a turn remain open in §6.
+- **R16** (planned) — Participants are told their remaining turn ceiling. The instruction explicitly
+  frames it as a maximum rather than a quota: use turns only for useful contributions, there is no
+  obligation to use every available turn, unresolved material disagreement is acceptable, and early
+  departure is available only when that participant is permitted to leave. This helps participants
+  plan within the limit without requiring agreement or promising a quality improvement.
+- **R17** (planned) — An independent opening consumes one participant turn. An optional final
+  departure message is included within that departure turn, not an additional discussion turn.
+  Optional end-only judge synthesis has its own final-step budget, separate from participant
+  discussion limits. It does not reopen the participant discussion or extend their allowances.
+- **R18** (planned) — Pause requested during an active participant turn lets that turn finish;
+  it does not cancel the turn. Chuck acknowledges the pending pause, preserves the active speaker,
+  and starts no next participant turn. Once the turn finishes, the room is paused until the
+  operator resumes. R19 still applies if the active turn needs approval or fails.
+- **R19** (planned) — If a speaker needs approval or its turn fails, the room waits for intervention
+  and shows the reason. It does not automatically skip the speaker, advance discussion, or retry
+  the failed turn. Waiting for approval/failure intervention does not constitute a departure or
+  exhaust another participant's allowance. Ordinary agent approval controls remain in effect.
+- **R20** (planned) — Ordinary discussion ends when departures or turn-limit exhaustion leave
+  fewer than two eligible participants. A sole remaining participant is offered one closing-message
+  opportunity using one of its remaining turns before room completion and the optional judge step.
+  It may decline; no extra turn beyond its ceiling is granted. If nobody retains allowance, there
+  is no further participant turn. Departure removes a participant from future discussion turns
+  without stopping or deleting its normal session; exhaustion is recorded distinctly from voluntary
+  departure. Approval/failure waits under R19 do not remove a participant for this test. No live
+  judge is needed to decide when discussion stops.
+- **R21** (planned) — Participant turn limits count completed contributions. A failed attempt
+  consumes no contribution allowance; an explicitly retried turn consumes one only when its
+  contribution completes. R19 prevents automatic failed-turn retries. This bounds completed room
+  contributions, not total provider activations, elapsed time, or token cost across manual retries.
 
 ## 3. States & transitions
 
-The core phase distinction from R4–R6 and R13 is optional independent openings → shared discussion
-→ discussion ended → optional judge synthesis. R8 can end discussion when only one participant
-remains. The discussion completion reason remains distinct from the state of the optional final
-step. Busy, approval, interruption, pause/resume, synthesis failure, and failed-opening transitions
-await the decisions in §6; this draft does not specify automatic advancement or recovery for those
-cases.
+The core phase distinction from R4–R6, R13 and R20 is optional independent openings → shared
+discussion → closing-message opportunity when one participant retains allowance → discussion ended
+→ optional judge synthesis. The discussion completion reason remains distinct from the state of
+the optional final step. R15/R18 add pause requested during a turn → paused after the turn finishes
+→ explicit resume. R19 holds progression for approval/failure intervention. Busy-session conflicts,
+restart/interruption, synthesis failure, and failed-opening publication await the decisions in §6.
 
 ## 4. Edge cases & errors
 
@@ -91,7 +128,7 @@ cases.
   answer, and normal discussion begins only after all openings are published. Disable the option
   and prove the next speaker can read the first contribution immediately. *Verified by:* fake-provider
   integration tests; failure/recovery checks await §6.
-- **A4** (planned; R5, R7–R9) — End a discussion at its configured budget with a material objection
+- **A4** (planned; R5, R7, R9, R12, R20) — End a discussion at its configured budget with a material objection
   still present. Separately let permitted participants leave until only one remains, and attempt
   departure from a participant without permission. Check that the room shows the actual stop reason,
   preserves objections, refuses unauthorized departure, and leaves normal agent identities intact.
@@ -100,7 +137,7 @@ cases.
   ordered, attributed discussion survives. A provider failure must not produce a false contribution,
   departure, or success state. *Verified by:* persistence/recovery integration tests; scheduling and
   retry assertions await the recovery contract in §6.
-- **A6** (planned; R2, R8, R11–R12) — Create a room with one new agent and two existing agents,
+- **A6** (planned; R2, R11–R12, R20) — Create a room with one new agent and two existing agents,
   each with distinguishable normal histories. Check that all participate under their own identities
   and existing agents retain their history. Configure departure for one participant and deny it for
   another. Exercise permitted departures with and without a final message in separate runs and
@@ -112,6 +149,43 @@ cases.
   disabled final step starts no judge turn. Preserve a known unresolved objection in the synthesis.
   *Verified by:* fake-provider integration tests and a manual synthesis-quality check; judge
   failure/retry assertions await §6.
+- **A8** (planned; R5, R14, R21) — Configure finite participant turn ceilings and run a fake-provider
+  discussion. Observe completed contributions against their recorded counts and verify that
+  none receives a discussion turn after its allowance is exhausted. Preserve an unresolved objection at budget
+  completion instead of declaring convergence. *Verified by:* room/runtime integration tests;
+  failed-attempt counts and unequal-exhaustion completion are additionally covered by A12–A13.
+- **A9** (planned; R1, R3, R15, R18) — Pause between participant turns, add a user message, and prove
+  that no participant is activated while paused. Resume and verify the next participant can read
+  the correctly ordered and attributed user message, while prior contributions remain intact.
+  Separately request pause during an active fake-provider turn: the UI acknowledges the pending
+  pause, that turn can commit its contribution without cancellation, and no next speaker starts
+  before explicit resume. *Verified by:* fake-provider integration tests and a rendered
+  pause/message/resume journey; message-submission races await §6.
+- **A10** (planned; R6, R12–R14, R16–R17) — Observe the actual activation/context delivered to fake
+  participants and verify that it states their current remaining ceiling and the maximum-not-quota
+  instruction. Exercise independent openings, a departure with a final message, and end-only judge
+  synthesis: the opening uses one participant turn, the departure message grants no extra turn,
+  and the judge operates under its separate final-step budget without extending participant limits.
+  *Verified by:* room/runtime accounting and prompt-delivery integration tests. Real-run checks of
+  quota-filling or premature convergence are qualitative; no quality outcome is promised by R16.
+- **A11** (planned; R10, R18–R19) — Hold the current speaker at an ordinary provider approval,
+  then separately fail a turn. Check that the room names the reason, starts no next speaker or
+  automatic retry, and records no voluntary departure. Resolve approval through normal agent
+  controls; request pause while approval is outstanding and prove that the next speaker remains
+  held after the active turn finishes. *Verified by:* fake-provider/room integration tests and a
+  rendered intervention journey. Restart recovery awaits §6.
+- **A12** (planned; R7, R12–R14, R20) — Use departures and, separately, exhausted turn allowances
+  to leave one eligible participant. Check that ordinary discussion stops, that participant is
+  offered a closing-message opportunity within its remaining allowance, its published message
+  precedes any judge synthesis, and the room preserves the actual stop reason and objections.
+  Exercise declining the closing message and ending when no participant retains allowance; neither
+  grants an extra turn. A temporarily approval-blocked speaker does not trigger this ending.
+  *Verified by:* room/runtime integration tests and a rendered closing-message journey.
+- **A13** (planned; R14, R19, R21) — Fail a participant turn before a completed contribution and
+  verify unchanged remaining allowance and no automatic retry. Explicitly retry, complete one
+  contribution, and verify exactly one consumed turn and one canonical contribution. Reach the
+  ceiling and refuse further participant turns, including a closing turn beyond that ceiling.
+  *Verified by:* fake-provider/room accounting integration tests.
 
 ## 6. Deviations & open decisions
 
@@ -123,11 +197,19 @@ Nothing is shipped. Product confirmation is required before technical design.
   goal-achievement judgments require a separate ending mechanism beyond permitted departures.
 - Judge selection/configuration, final-step budget accounting, and failure/retry behavior. Optional
   synthesis by an end-only judge is settled by R13; there is no live monitoring judge.
-- Budget unit, turn order, and whether independent openings and departures consume that budget.
-- Operator controls and input: start, pause, stop, resume, and whether people can add room messages
-  or change membership/goal during discussion. These are not implied by ordinary agent chat controls.
+- Per-participant turn limits are confirmed by R14. Remaining choices: turn order, whether the
+  same limit applies to everyone or individual limits can differ. R20 confirms ending below two
+  eligible participants with a closing-message opportunity within the sole remaining participant's
+  allowance; no extra turn is granted when none remains.
+- Agent-visible ceilings and contribution accounting are confirmed by R16–R17/R21. The judge's
+  separate budget still needs configuration.
+- Pause/resume and user messages between turns are confirmed by R15; R18 confirms letting the
+  active turn finish on pause. Decide what happens to user input submitted while a participant
+  is speaking or during independent openings. A separate room Stop action and live goal/membership
+  edits have not been requested in the confirmed control scope.
 - Waiting and recovery: busy speaker, ordinary chat/mail competing for its session, pending approval,
-  failure before contribution, restart during a turn, and incomplete independent openings.
+  failure before contribution, restart during a turn, and incomplete independent openings. R19
+  confirms waiting visibly for intervention rather than automatically skipping or retrying.
 - Storage/access boundary, retention after completion and agent/project deletion, and any explicit
   room deletion/export. Existing mail expiry and opaque project-resource rules do not define room
   retention or authorize room disclosure.
