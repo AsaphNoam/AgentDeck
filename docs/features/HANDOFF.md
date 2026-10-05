@@ -35,8 +35,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   history, the Figma URL, the retired BRIEFS, the uncommitted `docs/ideas.md` edit).
 - **Fix units:** `phone-chat-streamed-deltas` closed 2026-10-05 (phone folds the transcript with
   `foldTranscript`; `ui/scripts/phone-render.mjs` renders the phone conversation at iPhone size).
-  `notifications-open-conversation` and
-  `phone-desktop-flow-and-agent-management.md` each keep one Worth-fixing UI-coverage finding; the
+  `notifications-open-conversation` closed 2026-10-05 apart from its owed browser/macOS click
+  checks. `phone-desktop-flow-and-agent-management.md` keeps one Worth-fixing UI-coverage finding; the
   phone unit's Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
   finding; its Must-fix is closed; the installed-provider correction it depends on still owes
   the credentialed gate.
@@ -91,18 +91,6 @@ None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./in
 None.
 
 ## Review findings
-
-### Notifications open the agent's conversation — reviewed 2026-10-03 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Worth fixing** — the stale-agent acceptance path is not proved by the notification tests.
-  **Where:** `ui/src/components/shell/NotificationCenter.test.tsx:66-96` routes notification clicks
-  to a placeholder component, so it cannot assert the required existing **Agent not found** view.
-  **Normal-use trigger:** an agent disappears after its toast is raised but before the person clicks
-  it. **Why it matters:** FS-02.A46 explicitly includes this recovery path, and the current test can
-  keep passing if the real `/agent/:id` route stops rendering current truth for a vanished agent.
-  **Requirement:** FS-02.A46, INV §17. **Suggested fix/test:** mount the real `ChatPanel` route with
-  the agent store hydrated and the target absent, click the toast, and assert both **Agent not
-  found** and toast dismissal.
 
 ### Claude 5.5 launch compatibility — reported 2026-10-01 — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -167,6 +155,12 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Notification stale-agent path proved.** `NotificationCenter.test.tsx` now mounts
+  the real `ChatPanel` route with a hydrated store lacking the agent, clicks the toast, and asserts
+  **Agent not found** plus dismissal (INV §17 independent oracle; fails when the store is left
+  unhydrated). UI tests pass. Unit `notifications-open-conversation` closed apart from FS-02.A46's
+  owed real-browser and macOS click checks.
 
 - **2026-10-05 — Phone chat streamed replies fixed.** The phone conversation folds its joined
   windows with the desktop's `foldTranscript`, so a streamed reply is one message (INV §2 canonical

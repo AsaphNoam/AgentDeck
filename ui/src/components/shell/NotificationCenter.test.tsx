@@ -3,8 +3,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { NotificationCenter } from "./NotificationCenter";
+import { ChatPanel } from "../chat/ChatPanel";
+import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 import type { NotificationPayload } from "../../api/types";
+
+vi.mock("../../api/config", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../api/config")>(),
+  useBackends: () => ({ data: undefined }),
+  useProjects: () => ({ data: undefined }),
+}));
+
+vi.mock("../../api/sse", () => ({
+  sseClient: { registerOpenAgent: () => () => {} },
+}));
 
 function AgentRoute() {
   return <p>conversation {useParams().id}</p>;
@@ -65,7 +77,10 @@ describe("NotificationCenter per-toast timers", () => {
 
 describe("NotificationCenter opens the agent's conversation (FS-02.A46)", () => {
   beforeEach(() => useUiStore.setState({ toasts: [] }));
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    useAgentStore.setState({ agents: {}, order: [], hydrated: false, hydrating: false });
+  });
 
   it("opens the conversation for every agent notification type and dismisses the toast", () => {
     renderCenter();
@@ -83,6 +98,25 @@ describe("NotificationCenter opens the agent's conversation (FS-02.A46)", () => 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
     expect(screen.queryByText("Needs permission")).not.toBeInTheDocument();
     expect(screen.getByText("tasks page")).toBeInTheDocument();
+  });
+
+  // The agent vanished after its toast was raised: the real conversation route
+  // must show its existing recovery view rather than a stale conversation.
+  it("a toast for an agent removed before the click shows Agent not found", () => {
+    useAgentStore.setState({ agents: {}, order: [], hydrated: true, hydrating: false });
+    render(
+      <MemoryRouter initialEntries={["/tasks"]}>
+        <Routes>
+          <Route path="/tasks" element={<p>tasks page</p>} />
+          <Route path="/agent/:id" element={<ChatPanel />} />
+        </Routes>
+        <NotificationCenter />
+      </MemoryRouter>,
+    );
+    notify("permission_required", "gone", "Needs permission");
+    fireEvent.click(screen.getByText("Needs permission"));
+    expect(screen.getByRole("heading", { name: "Agent not found" })).toBeInTheDocument();
+    expect(screen.queryByText("Needs permission")).not.toBeInTheDocument();
   });
 
   it("error toast only dismisses", () => {
