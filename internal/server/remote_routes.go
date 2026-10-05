@@ -77,6 +77,12 @@ var remoteDenied = map[string]bool{
 	// Provider refresh executes a desktop CLI and reports paths (TS-03.R53).
 	"POST /api/backends/{id}/refresh-provider": true,
 	"PUT /api/config":                          true, "GET /api/remote": true, "PUT /api/remote": true,
+	// Think Tank rooms have no phone UI (FS-21.R40, TS-14.R11).
+	"GET /api/think-tanks": true, "POST /api/think-tanks": true, "GET /api/think-tanks/{id}": true,
+	"DELETE /api/think-tanks/{id}": true, "GET /api/think-tanks/{id}/entries": true,
+	"POST /api/think-tanks/{id}/messages": true, "POST /api/think-tanks/{id}/annotations": true,
+	"POST /api/think-tanks/{id}/pause": true, "POST /api/think-tanks/{id}/resume": true,
+	"POST /api/think-tanks/{id}/end": true, "POST /api/think-tanks/{id}/retry": true,
 	"POST /api/remote/pairings": true, "POST /api/remote/pairings/{id}/allow": true,
 	"POST /api/remote/pairings/{id}/decline": true, "GET /api/remote/devices": true,
 	"PATCH /api/remote/devices/{id}": true, "DELETE /api/remote/devices/{id}": true,

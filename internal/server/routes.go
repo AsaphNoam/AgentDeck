@@ -110,6 +110,18 @@ func (s *Server) routeTable() []routeEntry {
 	api("POST /api/tasks/{id}/result", s.handleRecordTaskResult)
 	api("POST /api/tasks/{id}/retry", s.handleRetryTask)
 	api("POST /api/tasks/{id}/rearm", s.handleRearmTask)
+	// Think Tank rooms (FS-21, TS-14 §3). Local only; not in the phone allowlist.
+	api("GET /api/think-tanks", s.handleThinkTanks)
+	api("POST /api/think-tanks", s.handleCreateThinkTank)
+	api("GET /api/think-tanks/{id}", s.handleThinkTankDetail)
+	api("DELETE /api/think-tanks/{id}", s.handleDeleteThinkTank)
+	api("GET /api/think-tanks/{id}/entries", s.handleThinkTankEntries)
+	api("POST /api/think-tanks/{id}/messages", s.handleThinkTankMessage)
+	api("POST /api/think-tanks/{id}/annotations", s.handleThinkTankAnnotation)
+	api("POST /api/think-tanks/{id}/pause", s.handleThinkTankControl(s.stateStore.PauseThinkTank))
+	api("POST /api/think-tanks/{id}/resume", s.handleThinkTankControl(s.stateStore.ResumeThinkTank))
+	api("POST /api/think-tanks/{id}/end", s.handleThinkTankControl(s.stateStore.EndThinkTank))
+	api("POST /api/think-tanks/{id}/retry", s.handleRetryThinkTank)
 	api("POST /api/signals", s.handleFireSignal)
 
 	// Phase 1 session lifecycle (launch, control). The {id} routes

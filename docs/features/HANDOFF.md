@@ -62,8 +62,15 @@ until their slice ships. Slices (each closes with focused tests, handoff update 
    `toolresult`, typed state sentinels, guidance per R16; approvals derive from `ToolNames`).
    `go test ./internal/messaging` passed. Owed at closure: FS-03.R40's enumerated tool list and the
    redacted activity projector (moves to slice 5).
-4. **REST/SSE** (next) — `/api/think-tanks` family, `think_tank_update`/`think_tank_activity`, wire fixture.
-5. **Activity capture, judge, recovery/deletion.**
+4. **REST/SSE** — done 2026-10-06: `server/think_tank_handlers.go` (create/list/detail/entries,
+   messages/annotations, pause/resume/end, retry setup|turn|judge, delete; phone-denied),
+   `think_tank_wire.go` (versioned summary/detail/entry, live member state, next speaker + wait
+   reason). UI fixture `ui/src/features/thinktank/fixtures/room.json`, regenerate with
+   `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test ./internal/server -run TestThinkTankWireFixture`.
+5. **Activity capture** (next) — copy room-turn normalized events (by `Event.TurnID` + attempt)
+   into `think_tank_activity` with caps; shared redacting projector for Chuck tool calls;
+   `GET /{id}/activity|files|commands`, `GET /{id}/sources/{source_id}/file`; `think_tank_activity`
+   SSE; MCP `view=activity`.
 6. **UI** — project button and setup, room page, Archive entries, annotations/file route, agent-view
    room-turn identification.
 7. **Knowledge/docs + closure matrix**, rendered and credentialed gates recorded as owed.
