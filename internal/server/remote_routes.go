@@ -80,6 +80,8 @@ var remoteDenied = map[string]bool{
 	// Think Tank rooms have no phone UI (FS-21.R40, TS-14.R11).
 	"GET /api/think-tanks": true, "POST /api/think-tanks": true, "GET /api/think-tanks/{id}": true,
 	"DELETE /api/think-tanks/{id}": true, "GET /api/think-tanks/{id}/entries": true,
+	"GET /api/think-tanks/{id}/activity": true, "GET /api/think-tanks/{id}/files": true,
+	"GET /api/think-tanks/{id}/commands": true, "GET /api/think-tanks/{id}/sources/{source_id}/file": true,
 	"POST /api/think-tanks/{id}/messages": true, "POST /api/think-tanks/{id}/annotations": true,
 	"POST /api/think-tanks/{id}/pause": true, "POST /api/think-tanks/{id}/resume": true,
 	"POST /api/think-tanks/{id}/end": true, "POST /api/think-tanks/{id}/retry": true,

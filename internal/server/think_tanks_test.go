@@ -187,6 +187,68 @@ func TestThinkTankEngineHoldsMissingSubmission(t *testing.T) {
 	}
 }
 
+// FS-21.A6, A7, A21, TS-14.R2, R13: a reserved new participant launches before
+// discussion starts, and the fresh judge launches only after discussion ends,
+// reads the whole discussion and publishes one attributed synthesis.
+func TestThinkTankEngineLaunchesNewParticipantAndJudge(t *testing.T) {
+	srv, promptLog, ids, hold := thinkTankTestServer(t)
+	existing := strings.Split(ids, ",")[0]
+	config := `{"role":"impl","project":"tmpproj","interface":"chat"}`
+	fresh, err := srv.stateStore.NewAgentID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := srv.stateStore.CreateThinkTank(state.ThinkTankCreate{CommandID: "j", Goal: "Decide", OriginProject: "tmpproj",
+		JudgeConfig: config, Members: []state.ThinkTankMember{
+			{AgentID: existing, AgentName: "Existing", Project: "tmpproj", Cap: 1},
+			{AgentID: fresh, AgentName: "New agent", Project: "tmpproj", Cap: 1, SetupConfig: config},
+		}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := d.Room.RoomID
+	ctx := context.Background()
+	srv.progressThinkTanks(ctx)
+	d = waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return d.Room.Phase == state.ThinkTankPhaseDiscussion })
+	if _, err := srv.stateStore.ReadRunning(fresh); err != nil {
+		t.Fatalf("reserved participant was not launched under its identity: %v", err)
+	}
+	for _, id := range []string{existing, fresh} {
+		srv.progressThinkTanks(ctx)
+		a := waitActiveAttempt(t, srv, room, id)
+		if d.Room.JudgeAgentID != "" {
+			t.Fatal("judge launched during discussion")
+		}
+		actAsAgent(t, srv, a, state.ThinkTankReply, "view of "+id)
+		cur, _ := srv.stateStore.ReadThinkTank(room)
+		releaseTurn(t, hold, srv, room, cur.Room.Revision)
+	}
+	d = waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return d.Room.JudgeStatus == state.ThinkTankJudgeReady })
+	srv.progressThinkTanks(ctx) // launches the judge
+	srv.progressThinkTanks(ctx) // starts its turn
+	d = waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool {
+		return d.Active != nil && d.Active.Turn == state.ThinkTankTurnJudge
+	})
+	judge := *d.Active
+	if judge.AgentID == existing || judge.AgentID == fresh {
+		t.Fatal("a participant was adopted as the judge")
+	}
+	page, err := srv.stateStore.ReadThinkTankPage(state.ThinkTankReadRequest{CallerAgentID: judge.AgentID})
+	if err != nil || len(page.Items) != 2 {
+		t.Fatalf("judge read %d entries: %v", len(page.Items), err)
+	}
+	actAsAgent(t, srv, judge, state.ThinkTankReply, "Synthesis: unresolved")
+	releaseTurn(t, hold, srv, room, d.Room.Revision)
+	d = waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return d.Room.JudgeStatus == state.ThinkTankJudgeCompleted })
+	entries, _ := srv.stateStore.ListThinkTankEntries(room, 0, 10)
+	if last := entries[len(entries)-1]; last.Kind != state.ThinkTankEntrySynthesis || last.AgentID != judge.AgentID {
+		t.Fatalf("last entry = %+v", last)
+	}
+	if promptCount(t, promptLog) != 3 {
+		t.Fatalf("provider prompts = %d, want two participants and one judge", promptCount(t, promptLog))
+	}
+}
+
 // FS-21.R37: an archived participant holds the room with a reason instead of
 // being skipped or substituted.
 func TestThinkTankEngineHoldsIneligibleSpeaker(t *testing.T) {

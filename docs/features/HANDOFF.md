@@ -67,11 +67,12 @@ until their slice ships. Slices (each closes with focused tests, handoff update 
    `think_tank_wire.go` (versioned summary/detail/entry, live member state, next speaker + wait
    reason). UI fixture `ui/src/features/thinktank/fixtures/room.json`, regenerate with
    `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test ./internal/server -run TestThinkTankWireFixture`.
-5. **Activity capture** (next) — copy room-turn normalized events (by `Event.TurnID` + attempt)
-   into `think_tank_activity` with caps; shared redacting projector for Chuck tool calls;
-   `GET /{id}/activity|files|commands`, `GET /{id}/sources/{source_id}/file`; `think_tank_activity`
-   SSE; MCP `view=activity`.
-6. **UI** — project button and setup, room page, Archive entries, annotations/file route, agent-view
+5. **Activity capture** — done 2026-10-06: `server/think_tank_capture.go` (sink-ordered capture
+   keyed by agent+generation+turn, Chuck-tool receipt projector, storage failure fails the turn,
+   live `think_tank_activity` SSE except unpublished openings), `think_tank_activity_handlers.go`
+   (activity/files/commands/source file), state `think_tank_activity.go`, MCP `view=activity`;
+   engine abandons an attempt whose frame never went out. Setup+judge engine test passes.
+6. **UI** (next) — project button and setup, room page, Archive entries, annotations/file route, agent-view
    room-turn identification.
 7. **Knowledge/docs + closure matrix**, rendered and credentialed gates recorded as owed.
 

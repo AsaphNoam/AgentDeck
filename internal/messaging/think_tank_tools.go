@@ -2,8 +2,10 @@ package messaging
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,7 +23,7 @@ import (
 type readThinkTankArgs struct {
 	RoomID string `json:"room_id,omitempty" jsonschema:"room to read; omit during your Think Tank turn to read that room"`
 	Cursor string `json:"cursor,omitempty" jsonschema:"next_cursor from the previous page of the same read"`
-	View   string `json:"view,omitempty" jsonschema:"context (default: what is new for you), or history (revisit published entries from the start)"`
+	View   string `json:"view,omitempty" jsonschema:"context (default: what is new for you), history (revisit published entries from the start), or activity (retained room tool and file activity)"`
 }
 
 type thinkTankEntryOut struct {
@@ -39,6 +41,9 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 	identity, ok := s.caller(req)
 	if !ok {
 		return sessionUnknown()
+	}
+	if args.View == "activity" {
+		return s.readThinkTankActivity(identity.AgentID, args)
 	}
 	page, err := s.store.ReadThinkTankPage(state.ThinkTankReadRequest{
 		CallerAgentID: identity.AgentID, RoomID: args.RoomID, View: args.View, Cursor: args.Cursor,
@@ -88,6 +93,54 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 	}
 	if page.ReadReceipt != "" {
 		result["read_receipt"] = page.ReadReceipt
+	}
+	return jsonResult(result)
+}
+
+// readThinkTankActivity pages retained, already-projected room activity. It
+// never advances conversation delivery (TS-14 §3).
+func (s *Server) readThinkTankActivity(agentID string, args readThinkTankArgs) (*mcp.CallToolResult, any, error) {
+	roomID, err := s.store.ResolveThinkTankMember(agentID, args.RoomID)
+	if err != nil {
+		return s.thinkTankRefusal(agentID, err)
+	}
+	var after int64
+	if args.Cursor != "" {
+		raw, ok := strings.CutPrefix(args.Cursor, "act_")
+		n, perr := strconv.ParseInt(raw, 10, 64)
+		if !ok || perr != nil || n < 0 {
+			return s.thinkTankRefusal(agentID, state.ErrThinkTankCursor)
+		}
+		after = n
+	}
+	rows, err := s.store.ListThinkTankActivity(roomID, after, 200)
+	if err != nil {
+		return s.thinkTankRefusal(agentID, err)
+	}
+	type activityOut struct {
+		Seq    int64           `json:"seq"`
+		Author string          `json:"author"`
+		Event  json.RawMessage `json:"event"`
+	}
+	out := []activityOut{}
+	budget := state.ThinkTankPageBytes
+	last := after
+	for _, a := range rows {
+		if len(out) > 0 && len(a.Payload) > budget {
+			break
+		}
+		event := json.RawMessage(a.Payload)
+		if len(a.Payload) > state.ThinkTankPageBytes {
+			event = json.RawMessage(`{"truncated":true}`)
+		}
+		out = append(out, activityOut{Seq: a.Seq, Author: a.AgentName, Event: event})
+		budget -= len(event)
+		last = a.Seq
+	}
+	result := map[string]any{"ok": true, "room_id": roomID, "view": "activity", "activity": out,
+		"complete": len(out) == len(rows) && len(rows) < 200}
+	if !result["complete"].(bool) {
+		result["next_cursor"] = "act_" + strconv.FormatInt(last, 10)
 	}
 	return jsonResult(result)
 }

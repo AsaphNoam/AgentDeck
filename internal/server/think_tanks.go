@@ -132,12 +132,39 @@ func (s *Server) thinkTankIneligible(agentID string) string {
 // (TS-14.R3). A busy agent reports not-started and keeps the speaker.
 func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail, next state.ThinkTankOpportunity) bool {
 	agentID := next.AgentID
+	var member state.ThinkTankMember
+	for _, m := range d.Members {
+		if m.AgentID == agentID {
+			member = m
+		}
+	}
+	var begun *state.ThinkTankAttempt
 	begin := func(turnID string) error {
-		_, err := s.stateStore.BeginThinkTankAttempt(state.ThinkTankBegin{
+		a, err := s.stateStore.BeginThinkTankAttempt(state.ThinkTankBegin{
 			RoomID: d.Room.RoomID, Revision: d.Room.Revision, AgentID: agentID, Turn: next.Turn,
 			Generation: s.registry.Generation(agentID), TurnID: turnID,
 		})
+		if err == nil {
+			begun = &a
+			s.beginThinkTankCapture(agentID, a, member.AgentName, member.Project)
+		}
 		return err
+	}
+	// An attempt committed in before() whose provider frame then never went
+	// out has no turn end to settle it; fail it now so the room shows the
+	// intervention instead of a turn that never finishes (TS-14.R6).
+	abandon := func(cause error) {
+		if begun == nil {
+			return
+		}
+		s.endThinkTankCapture(agentID, begun.Generation, begun.TurnID)
+		reason := "The room turn could not start."
+		if cause != nil {
+			reason = "The room turn could not start: " + cause.Error()
+		}
+		if f, err := s.stateStore.FailThinkTankAttempt(agentID, begun.Generation, begun.TurnID, reason); err == nil {
+			s.publishThinkTankUpdate(f.Detail)
+		}
 	}
 	if _, err := s.stateStore.ReadRunning(agentID); err == nil {
 		if !s.claimLifecycle(agentID) {
@@ -147,6 +174,9 @@ func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail
 		started, err := s.registry.StartActivation(ctx, agentID, state.ActivationKindThinkTank, begin)
 		if err != nil {
 			s.log.Debug("start think tank turn", "room", d.Room.RoomID, "agent", agentID, "err", err)
+		}
+		if !started {
+			abandon(err)
 		}
 		return started
 	} else if !errors.Is(err, state.ErrNotFound) {
@@ -166,6 +196,9 @@ func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail
 	})
 	if ae != nil {
 		s.log.Debug("resume for think tank turn", "room", d.Room.RoomID, "agent", agentID, "err", ae.Message)
+		if !started {
+			abandon(errors.New(ae.Message))
+		}
 	}
 	return started
 }
@@ -250,7 +283,11 @@ func (s *Server) finishThinkTankTurn(ev runtime.Event) {
 	}
 	var finish state.ThinkTankFinish
 	var err error
-	if td.StopReason == "end_turn" {
+	if s.endThinkTankCapture(ev.AgentID, ev.Generation, ev.TurnID) {
+		// Storage failure prevents final publication (TS-14.R10).
+		finish, err = s.stateStore.FailThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID,
+			"Room activity for this turn could not be saved.")
+	} else if td.StopReason == "end_turn" {
 		finish, err = s.stateStore.FinalizeThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID)
 	} else {
 		finish, err = s.stateStore.FailThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID, thinkTankStopText(td.StopReason))

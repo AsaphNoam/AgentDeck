@@ -73,6 +73,9 @@ type Server struct {
 	taskStartSlots chan struct{}
 	// thinkTankKick nudges the single Think Tank progression worker.
 	thinkTankKick chan struct{}
+	// thinkTankCaptures maps an agent to its running room attempt capture.
+	thinkTankCaptureMu sync.Mutex
+	thinkTankCaptures  map[string]*thinkTankCapture
 	// taskStartMu protects taskStartLocks. The locks themselves are per task, so
 	// unrelated task launches retain the configured concurrency (INV §5).
 	taskStartMu    sync.Mutex
@@ -291,6 +294,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
 		taskStartSlots:            make(chan struct{}, taskDispatchBatch),
 		thinkTankKick:             make(chan struct{}, 1),
+		thinkTankCaptures:         map[string]*thinkTankCapture{},
 		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,
 		log:                       log,
@@ -361,6 +365,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		})
 		registry.SetEventSink(func(ev runtime.Event) {
 			eventBus.PublishRuntimeEvent(ev)
+			s.captureThinkTankEvent(ev)
 			if ev.Type == runtime.EvPermissionRequest || ev.Type == runtime.EvPermissionResolved {
 				s.handlePermissionEvent(ev)
 			}

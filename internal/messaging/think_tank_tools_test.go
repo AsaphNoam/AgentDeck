@@ -122,4 +122,10 @@ func TestThinkTankToolsOverMCP(t *testing.T) {
 	if entries, _ := store.ListThinkTankEntries(room, 0, 10); len(entries) != 1 {
 		t.Fatalf("refusals mutated the room: %d entries", len(entries))
 	}
+	obj, isErr = callRoomTool(t, z, "read_think_tank", map[string]any{"room_id": room, "view": "activity"})
+	wantRoomRefusal(t, obj, isErr, "room_forbidden", "never")
+	obj, isErr = callRoomTool(t, a, "read_think_tank", map[string]any{"room_id": room, "view": "activity"})
+	if isErr || obj["complete"] != true || len(obj["activity"].([]any)) != 0 {
+		t.Fatalf("member activity read = %v", obj)
+	}
 }
