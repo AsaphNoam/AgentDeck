@@ -52,9 +52,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   consume limits. Cross-project participants require non-archived projects; local history persists
   until explicit room deletion, independently of agent/project removal. A full group-chat view
   includes normal features and individual agent cards; FS-13 has planned room annotation sources.
-  Card arrangement, private-send scheduling and group activity visibility are the next questions;
-  remaining UX/recovery details, eligibility, judge setup, access and deletion behavior need scope
-  agreement before technical design.
+  It is a distinct project-started workspace with a button beside New agent; participant links
+  reach normal cards/sessions in their own projects. Private follow-ups keep scheduling active,
+  waiting at a busy participant's turn, and group activity is room-only. FS-02 has the planned
+  creation entry point. Page versus separate browser window and annotation targets are the next
+  questions; remaining UX/recovery details, eligibility, judge setup, access and deletion behavior
+  need scope agreement before technical design.
 - **Branch:** `main`.
 
 ## Active change
@@ -126,6 +129,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank workspace entry and independent follow-up clarified.**
+  FS-21.R27–R29/A17–A19 record the project-started separate workspace, normal participant cards in
+  their own projects, continued room scheduling with waits for private work, and room-only activity.
+  FS-02.R65/A47 add the planned button beside New agent (FS-02 now Partial). Page versus browser
+  window, annotation targets and active-room steering remain open. No product code or technical
+  design was added.
 
 - **2026-10-05 — Design: Think Tank workspace and retention confirmed.** FS-21.R22–R26/A14–A16
   record cross-project participation limited to non-archived projects, local retention until explicit

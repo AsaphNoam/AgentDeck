@@ -113,20 +113,41 @@ not an approved feature scope or implementation-ready change.
   diff inspection, permission actions, annotations, file viewing, Files/Commands inspection, and
   user-message composition. Contributions identify their speaker and originating project. These
   capabilities preserve their normal behavior and source-specific availability; there is no
-  synthetic shared provider identity, runtime, or working directory. The exact activity scope,
-  annotation targets, and participant-qualified autocomplete remain open in §6.
-- **R25** (planned) — The room also presents individual normal agent cards, with each participant's
-  identity, project, live state and ordinary session access. A person can open a participant's
-  normal conversation to follow up privately or continue work with that agent. Leaving or finishing
+  synthetic shared provider identity, runtime, or working directory. R29 defines activity scope;
+  annotation targets and participant-qualified autocomplete remain open in §6.
+- **R25** (planned) — Each participant remains an individual normal agent with its ordinary card
+  in its own project. The room presents participant identity, project, live state and access to
+  that normal card/session under R27. A person can follow up privately or continue work with that
+  agent through the normal conversation. Leaving or finishing
   the room does not automatically stop, archive or delete participant sessions. Existing lifecycle
   availability still governs direct follow-up; a removed agent retains room attribution without
-  an unusable active-chat action. Card arrangement and private-send scheduling remain open in §6.
+  an unusable active-chat action. R28 governs private-send scheduling.
 - **R26** (planned) — Room annotations capture the selected room contribution, diff or file with
   its actual source attribution and point-in-time excerpt, using the familiar selection and tray
   interaction. A file or diff retains its originating participant/project so equal relative paths
   in different workspaces are not conflated. File viewing resolves from the appropriate participant
   context under the existing conversation reader behavior. Room-source annotations are governed
   by FS-13.R26; delivery target behavior remains open in §6.
+- **R27** (planned) — Think Tank is a distinct room workspace, started from a non-archived project
+  using a dedicated button beside **New agent**. It opens as its own conversation workspace, not as
+  a fabricated provider agent or a group of agent cards expanded into one provider conversation.
+  Starting from one project does not move participating agents from their own projects. Clicking a
+  participant in the room takes the person to that agent's normal card/conversation in its project.
+  Whether the separate workspace occupies the current application page or a separate browser/OS
+  window remains open in §6.
+- **R28** (planned) — Sending a private follow-up does not automatically pause the room. Other
+  scheduled room turns continue. When the room reaches an agent busy with private work, it holds
+  that speaker's opportunity, shows the wait, and starts the room turn when the agent is available.
+  No simultaneous provider turns are required for one agent, and the room does not silently skip
+  its selected speaker. Private turns do not consume room contribution allowance or masquerade as
+  room contributions. Queueing a normal private Send remains distinct from steering a running
+  turn; the active-room Steer boundary remains open in §6.
+- **R29** (planned) — The group view and canonical room activity contain only room activity.
+  Participant private exchanges, earlier session history, and unrelated tool/file/command activity
+  are not automatically imported into the room. Full individual histories remain available through
+  the participants' normal cards/conversations. Room tools, approvals, files and commands retain
+  originating participant attribution under R24/R26. This scopes recorded activity; an independent
+  agent still retains its normal private context under R2, which can inform a later room contribution.
 
 ## 3. States & transitions
 
@@ -134,7 +155,8 @@ The core phase distinction from R4–R6, R13 and R20 is optional independent ope
 discussion → closing-message opportunity when one participant retains allowance → discussion ended
 → optional judge synthesis. The discussion completion reason remains distinct from the state of
 the optional final step. R15/R18 add pause requested during a turn → paused after the turn finishes
-→ explicit resume. R19 holds progression for approval/failure intervention. Busy-session conflicts,
+→ explicit resume. R19 holds progression for approval/failure intervention. R28 waits for a selected
+speaker's private work without automatically pausing the room. Assigned-work conflicts,
 restart/interruption, synthesis failure, and failed-opening publication await the decisions in §6.
 
 ## 4. Edge cases & errors
@@ -235,7 +257,28 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   identity/history. Finish the room and prove the remaining normal sessions are still available
   for follow-up. *Verified by:* room component/fake-provider integration tests and a real-browser
   journey in Core, Sky & Grove and Studio at the supported desktop floor and a wider viewport;
-  private-send scheduling and activity visibility await §6.
+  private-send scheduling and activity visibility are additionally covered by A18–A19.
+- **A17** (planned; R11, R22, R25, R27) — From a non-archived project, activate the Think Tank
+  button beside New agent and open the separate room workspace. Mix new participants and existing
+  participants from other non-archived projects. Verify that actual participant cards remain in
+  their own projects, the room is not a provider-agent card, and clicking each room participant
+  reaches its own normal card/conversation with preserved identity and history. *Verified by:*
+  project/room navigation component tests and a rendered creation/follow-up journey; page versus
+  separate browser-window behavior awaits §6.
+- **A18** (planned; R4, R14, R21, R28–R29) — Send a private follow-up to an off-floor participant
+  while another agent holds the room turn. Let the room advance to that still-busy participant:
+  verify visible waiting with the same scheduled speaker, no automatic pause or skipped speaker,
+  and no overlapping provider turn for that agent. Complete its private work and then its room
+  contribution. Only the room contribution consumes allowance or appears as a room reply.
+  *Verified by:* fake-provider/room scheduling integration tests and a rendered room/private-chat
+  journey; steering an active room turn awaits §6.
+- **A19** (planned; R24, R26, R29) — Seed participants with earlier and private messages, files,
+  commands and tool events, then give each distinguishable room-turn activity. Inspect the room's
+  conversation, Files/Commands and participant affordances: room activity is attributed and
+  inspectable, private/earlier activity is not imported, and the normal individual conversation
+  still exposes its own history. Equal relative paths from two room participants open in the
+  correct workspace. *Verified by:* room projection/file integration tests and a rendered group
+  view versus individual-history journey.
 
 ## 6. Deviations & open decisions
 
@@ -258,18 +301,22 @@ Nothing is shipped. Product confirmation is required before technical design.
   active turn finish on pause. Decide what happens to user input submitted while a participant
   is speaking or during independent openings. A separate room Stop action and live goal/membership
   edits have not been requested in the confirmed control scope.
-- Waiting and recovery: busy speaker, ordinary chat/mail competing for its session, pending approval,
+- Waiting and recovery: assigned work and ordinary mail competing for a participant's session,
+  pending approval,
   failure before contribution, restart during a turn, and incomplete independent openings. R19
   confirms waiting visibly for intervention rather than automatically skipping or retrying.
 - Local retention until explicit room deletion, including survival of agent/project deletion, is
   confirmed by R23. Remaining boundaries: room read/contribution authority, deletion while active or
   paused, and retention of published excerpts versus pointers when sources disappear. Export has
   not been requested.
-- R24–R26 confirm a full group-chat workspace with familiar features and independent agent cards.
-  Card arrangement (beside or above chat), room-versus-private activity scope, private-send scheduling,
-  and annotation delivery targets are the next UX decisions. Files and Commands need clear source
-  attribution across projects; provider runtime controls remain participant-owned under R2.
-- Room entry point/list/history discovery, participant-qualified file/skill autocomplete, and
+- R24–R29 confirm a distinct project-started group-chat workspace with familiar features, links to
+  normal participant cards in their own projects, room-only activity, and continued scheduling
+  during private work with a wait at the busy agent's turn. Remaining UX decisions: full application
+  page versus separate browser/OS window, room annotation delivery targets, and Steer during an
+  active room-owned turn. Files and Commands retain participant attribution; provider runtime
+  controls remain participant-owned under R2.
+- Room list/history discovery after leaving the workspace or removing the originating project,
+  participant-qualified file/skill autocomplete, and
   agent/API creation/inspection authority remain to be scoped. No new externally visible protocol
   is selected by this draft.
 

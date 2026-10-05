@@ -53,8 +53,11 @@ the relevant feature and technical specifications; it does not change product co
   Rooms can span non-archived projects. Room history is local and retained until explicit room
   deletion, surviving removal of agents/projects. The room is a full group-chat workspace with
   familiar features including annotations and file viewing, alongside normal agent cards for
-  private follow-up and continuation. Card arrangement, private-send scheduling and group activity
-  visibility are awaiting choices.
+  private follow-up and continuation. Start a dedicated room workspace from a project button beside
+  New agent; clicking a room participant reaches its normal card/session in its own project.
+  Private follow-ups keep the room running, with a wait when the selected participant is busy;
+  only room activity appears in the group view. Page versus separate browser window and room
+  annotation targets are the next questions; active-room Steer behavior remains to be agreed.
   The former consensus-based ending and assumption of mostly UX over reused backend are superseded.
   Core feature draft: [`FS-21`](specs/features/FS-21-think-tanks.md). Await product agreement on
   remaining UX/control/recovery details, eligibility, judge setup, access and deletion behavior;
