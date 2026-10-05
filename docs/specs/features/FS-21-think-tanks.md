@@ -46,7 +46,8 @@ not an approved feature scope or implementation-ready change.
   attributed discussion, current phase and speaker when applicable, and completion reason.
 - **R11** (planned) — Participant selection supports both creating a new normal agent and adding
   an existing normal agent. A single room can mix new and existing agents; existing participants
-  retain their own session history under R2. Project and scheduling eligibility remain open in §6.
+  retain their own session history under R2. R22 governs project eligibility; session scheduling
+  eligibility remains open in §6.
 - **R12** (planned) — Permission to leave is configurable per participant. An allowed participant
   may choose to publish a final attributed message with its departure, or leave without a final
   message. The departure is recorded either way, and an optional final message is part of the
@@ -96,6 +97,36 @@ not an approved feature scope or implementation-ready change.
   consumes no contribution allowance; an explicitly retried turn consumes one only when its
   contribution completes. R19 prevents automatic failed-turn retries. This bounds completed room
   contributions, not total provider activations, elapsed time, or token cost across manual retries.
+- **R22** (planned) — A room can include agents from different projects, provided those projects
+  are not archived. Selection and subsequent room activation must respect this project boundary;
+  participation does not implicitly unarchive a project. An archived project's earlier contributions
+  remain in retained room history. Recovery when a participant's project becomes archived is open
+  in §6.
+- **R23** (planned) — Room history is stored in local Chuck-managed data without automatic expiry,
+  retained until the room itself is explicitly deleted. Completing the room, stopping or deleting
+  an agent, and archiving or deleting a project do not erase the room's committed history or
+  attributed reasoning. Retained attribution remains intelligible after its agent/project is
+  removed. File inspection still reflects the referenced file's actual availability; retention of
+  room history does not imply retaining every file's contents.
+- **R24** (planned) — The room is one chronological group-chat workspace with familiar conversation
+  capabilities available inside it: Markdown, code and diagrams, selection/copy, tool/result and
+  diff inspection, permission actions, annotations, file viewing, Files/Commands inspection, and
+  user-message composition. Contributions identify their speaker and originating project. These
+  capabilities preserve their normal behavior and source-specific availability; there is no
+  synthetic shared provider identity, runtime, or working directory. The exact activity scope,
+  annotation targets, and participant-qualified autocomplete remain open in §6.
+- **R25** (planned) — The room also presents individual normal agent cards, with each participant's
+  identity, project, live state and ordinary session access. A person can open a participant's
+  normal conversation to follow up privately or continue work with that agent. Leaving or finishing
+  the room does not automatically stop, archive or delete participant sessions. Existing lifecycle
+  availability still governs direct follow-up; a removed agent retains room attribution without
+  an unusable active-chat action. Card arrangement and private-send scheduling remain open in §6.
+- **R26** (planned) — Room annotations capture the selected room contribution, diff or file with
+  its actual source attribution and point-in-time excerpt, using the familiar selection and tray
+  interaction. A file or diff retains its originating participant/project so equal relative paths
+  in different workspaces are not conflated. File viewing resolves from the appropriate participant
+  context under the existing conversation reader behavior. Room-source annotations are governed
+  by FS-13.R26; delivery target behavior remains open in §6.
 
 ## 3. States & transitions
 
@@ -186,13 +217,33 @@ restart/interruption, synthesis failure, and failed-opening publication await th
   contribution, and verify exactly one consumed turn and one canonical contribution. Reach the
   ceiling and refuse further participant turns, including a closing turn beyond that ceiling.
   *Verified by:* fake-provider/room accounting integration tests.
+- **A14** (planned; R11, R22–R23) — Create a room with participants from two non-archived projects,
+  refuse an archived project, and retain committed contributions after an agent and a project are
+  removed. Reload and restart to verify the same ordered history and readable attribution, without
+  fabricated live-agent links. Explicitly delete the room under the eventual deletion contract.
+  *Verified by:* room/project lifecycle integration tests and a rendered retained-history journey;
+  active-room archival and deletion behavior await §6.
+- **A15** (planned; R24, R26) — In one room, two participants refer to the same relative file path
+  in different workspaces. Open each file inside the room, inspect source/rendered content, select
+  a file excerpt and diff lines, and annotate a room message. Verify correct participant/project
+  attribution, path/line identity, captured excerpt, normal bounded tray behavior and preservation
+  after a failed send. *Verified by:* room/file/annotation integration tests and a rendered room
+  annotation/file-view journey; target routing awaits §6.
+- **A16** (planned; R2, R24–R25) — Read a room containing Markdown, code, a diagram, tools, a diff,
+  an approval, and user messages. Exercise the corresponding familiar controls inside the room,
+  then open a participant card and continue in that agent's normal conversation, preserving its
+  identity/history. Finish the room and prove the remaining normal sessions are still available
+  for follow-up. *Verified by:* room component/fake-provider integration tests and a real-browser
+  journey in Core, Sky & Grove and Studio at the supported desktop floor and a wider viewport;
+  private-send scheduling and activity visibility await §6.
 
 ## 6. Deviations & open decisions
 
 Nothing is shipped. Product confirmation is required before technical design.
 
-- Project scope and minimum participant count; eligibility of busy agents, agents assigned other
-  work, and terminal agents. New/existing participant selection is settled by R11.
+- Minimum participant count; eligibility of busy agents, agents assigned other work, archived agents,
+  and terminal agents. Mixed new/existing selection and cross-project participation from non-archived
+  projects are confirmed by R11/R22.
 - Departure permission defaults. Departure messages are optional under R12; whether explicit
   goal-achievement judgments require a separate ending mechanism beyond permitted departures.
 - Judge selection/configuration, final-step budget accounting, and failure/retry behavior. Optional
@@ -210,16 +261,23 @@ Nothing is shipped. Product confirmation is required before technical design.
 - Waiting and recovery: busy speaker, ordinary chat/mail competing for its session, pending approval,
   failure before contribution, restart during a turn, and incomplete independent openings. R19
   confirms waiting visibly for intervention rather than automatically skipping or retrying.
-- Storage/access boundary, retention after completion and agent/project deletion, and any explicit
-  room deletion/export. Existing mail expiry and opaque project-resource rules do not define room
-  retention or authorize room disclosure.
-- Expected surface: project entry point, room detail/history, and agent/API creation/inspection
-  authority. No new externally visible protocol is selected by this draft.
+- Local retention until explicit room deletion, including survival of agent/project deletion, is
+  confirmed by R23. Remaining boundaries: room read/contribution authority, deletion while active or
+  paused, and retention of published excerpts versus pointers when sources disappear. Export has
+  not been requested.
+- R24–R26 confirm a full group-chat workspace with familiar features and independent agent cards.
+  Card arrangement (beside or above chat), room-versus-private activity scope, private-send scheduling,
+  and annotation delivery targets are the next UX decisions. Files and Commands need clear source
+  attribution across projects; provider runtime controls remain participant-owned under R2.
+- Room entry point/list/history discovery, participant-qualified file/skill autocomplete, and
+  agent/API creation/inspection authority remain to be scoped. No new externally visible protocol
+  is selected by this draft.
 
 ## 7. Traceability
 
 - Origin: resumed **Think tanks** entry in `docs/ideas.md`; human scope revision 2026-10-05.
 - Adjacent capabilities: FS-01 independent agent lifecycle; FS-03 ordinary provider chat and
-  permission controls; FS-06 point-to-point mail; FS-11 opaque project resources; FS-15 bounded
-  context retrieval; FS-16 durable work coordination. Their existing contracts remain distinct.
+  permission controls; FS-06 point-to-point mail; FS-11 opaque project resources; FS-13 annotations;
+  FS-15 bounded context retrieval; FS-16 durable work coordination. Their existing contracts remain
+  distinct.
 - No product code, technical design, or ready change accompanies this draft.

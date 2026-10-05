@@ -1,6 +1,6 @@
 # FS-13 — Annotate and assign
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/chat/`, `ui/src/features/archive/`, `internal/server/`, `internal/runtime/`, `internal/state/` · **Journeys:** J13
 **Absorbed:** —
 
@@ -12,7 +12,8 @@ current agent, another running chat agent, or a newly launched agent. Chuck pres
 annotation as structured, located context — captured excerpt, anchor, instruction, target — never as
 hand-pasted chat text. The chat surface belongs to FS-03, the archived view to FS-05, mail delivery
 to FS-06, and launch to FS-01; this spec owns the annotation interaction, its records, and its
-delivery behavior. Every requirement below is shipped.
+delivery behavior. Agent-session requirements are shipped; R26/A17 add a planned room-source
+extension for Think tanks.
 
 ## 2. Behavior
 
@@ -180,6 +181,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   target through the existing prompt or mail delivery; the file itself is never reread and
   unselected content is never persisted.
 
+- **R26** (planned) — Think Tank room contributions, displayed diffs and loaded conversation
+  files are annotation sources under FS-21.R26. The familiar selection, excerpt/instruction bounds,
+  point-in-time capture and bounded browser-local tray behavior apply, with drafts scoped to the
+  room source. Captures identify the actual room entry and originating participant/project when
+  applicable; a room entry is not represented as an unrelated event in a participant's private
+  transcript. Equal relative paths in different participant workspaces remain distinct. Successful
+  room-source sends record the annotation in the canonical room history before delivery; failure
+  preserves the tray. Room delivery targets and completed-room behavior await FS-21 §6; this does
+  not change R1–R25's ordinary agent-session contract.
+
 ## 5. Acceptance criteria
 
 Each acceptance item names its delivered verification.
@@ -246,7 +257,18 @@ Each acceptance item names its delivered verification.
   file-viewer/tray/store tests, annotation endpoint and formatter compatibility tests, transcript
   live/replay tests, and journey J13 with a mixed transcript/file batch.
 
+- **A17** (planned; R26) — Annotate a Think Tank message, a displayed diff selection, and a loaded
+  file excerpt from participants in different projects, including identical relative paths. Reload
+  with drafts pending, then exercise failed and successful delivery. Verify preserved excerpts,
+  distinct source attribution, bounded drafts, failure preservation, and a canonical room annotation
+  recorded before successful delivery. Ordinary agent-session annotation checks continue to pass.
+  *Verified by:* room annotation integration/component tests and the FS-21.A15 rendered journey;
+  target routing and completed-room cases await FS-21 §6.
+
 ## 6. Deviations & open decisions
+
+- R26/A17 are planned as part of the Think Tank draft. Room-source delivery targets and
+  completed-room annotation behavior are unresolved; no implementation-ready change exists yet.
 
 - The numeric limits in R2, R3, and R4 are initial values and may be tuned only through a
   spec-first update.

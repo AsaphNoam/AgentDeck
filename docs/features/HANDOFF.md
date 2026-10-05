@@ -49,9 +49,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   messages stay within their turn, and judge synthesis has a separate budget. Pause lets the active
   turn finish; approval/failure holds for intervention; below two eligible participants the sole
   remaining agent can give a closing message within its allowance. Only completed contributions
-  consume limits. Project scope and local retention are the next questions; eligibility, judge
-  setup, access and remaining control/recovery details still need scope agreement before technical
-  design.
+  consume limits. Cross-project participants require non-archived projects; local history persists
+  until explicit room deletion, independently of agent/project removal. A full group-chat view
+  includes normal features and individual agent cards; FS-13 has planned room annotation sources.
+  Card arrangement, private-send scheduling and group activity visibility are the next questions;
+  remaining UX/recovery details, eligibility, judge setup, access and deletion behavior need scope
+  agreement before technical design.
 - **Branch:** `main`.
 
 ## Active change
@@ -123,6 +126,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank workspace and retention confirmed.** FS-21.R22–R26/A14–A16
+  record cross-project participation limited to non-archived projects, local retention until explicit
+  room deletion, and a full group-chat workspace with familiar features plus independent agent
+  cards. FS-13.R26/A17 add planned room annotation sources (FS-13 now Partial). Card arrangement,
+  private-send scheduling and room-versus-private activity visibility await choices. No product
+  code or technical design was added.
 
 - **2026-10-05 — Design: Think Tank pause, intervention and closing message confirmed.**
   FS-21.R18–R21/A11–A13 let the active turn finish on pause, hold the room visibly for approval or

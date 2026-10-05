@@ -50,9 +50,14 @@ the relevant feature and technical specifications; it does not change product co
   ends below two eligible participants, offering the sole remaining agent a closing message within
   its remaining allowance. Only completed contributions consume the per-agent limit; explicit
   retries of failed turns do not consume allowance until a contribution completes.
+  Rooms can span non-archived projects. Room history is local and retained until explicit room
+  deletion, surviving removal of agents/projects. The room is a full group-chat workspace with
+  familiar features including annotations and file viewing, alongside normal agent cards for
+  private follow-up and continuation. Card arrangement, private-send scheduling and group activity
+  visibility are awaiting choices.
   The former consensus-based ending and assumption of mostly UX over reused backend are superseded.
   Core feature draft: [`FS-21`](specs/features/FS-21-think-tanks.md). Await product agreement on
-  control/recovery details, eligibility, judge setup, access and retention;
+  remaining UX/control/recovery details, eligibility, judge setup, access and deletion behavior;
   no technical specification or ready change yet.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live

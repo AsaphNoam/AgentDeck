@@ -39,7 +39,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Partial | macOS installation, guided provider setup, application updates/rollback and installed-versus-bundled update ownership |
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | Chuck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Core, Sky & Grove and Studio share creative-workspace composition and polish; Studio acceptance is closed |
-| FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Current | Annotate and assign: select diff lines/transcript events, instruct, route to an agent or new task |
+| FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events/files, instruct, route to an agent or new task; planned Think Tank room sources |
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail browser acceptance pending |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks, armed starts, lineage and scoped repair; project-grouped work-in-motion view |
@@ -47,7 +47,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Shared operating skill, progressive references, exact prompt migration, and planned lean personas with standing context and native-prompt preservation |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 | FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, phone web app (planned desktop-flow dashboard, project pages, agent management), attention notifications, keep-awake |
-| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Draft | Independent agent deliberation over a canonical shared discussion, optional independent openings, mixed new/existing participants, bounded turns, permitted departures and optional end-only judge synthesis; scope decisions pending |
+| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Draft | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis; scope decisions pending |
 
 ### Technical specs
 
