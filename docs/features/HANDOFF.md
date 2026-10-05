@@ -33,9 +33,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   the unit is closed apart from its owed rehearsal, repository rename and release notice.
   Historical old-name mentions were kept deliberately (retired items, `AGENTDECK_CODEX_VERSION`
   history, the Figma URL, the retired BRIEFS, the uncommitted `docs/ideas.md` edit).
-- **Fix units:** `phone-chat-streamed-deltas` (investigated 2026-10-05; trivial/easy) keeps one
-  confirmed Must-fix and one Worth-fixing phone-render harness; its reproduction test is committed
-  skipped. `notifications-open-conversation` and
+- **Fix units:** `phone-chat-streamed-deltas` closed 2026-10-05 (phone folds the transcript with
+  `foldTranscript`; `ui/scripts/phone-render.mjs` renders the phone conversation at iPhone size).
+  `notifications-open-conversation` and
   `phone-desktop-flow-and-agent-management.md` each keep one Worth-fixing UI-coverage finding; the
   phone unit's Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
   finding; its Must-fix is closed; the installed-provider correction it depends on still owes
@@ -149,40 +149,6 @@ supplied.
   **Requirement:** FS-20.A10-A13; INV §17. **Suggested fix/test:** add those UI request tests and
   update FS-20 §7 traceability, which now names each gap.
 
-### Phone chat text broken up — reported 2026-10-05 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-**Report (verbatim).** “the mobile chat display is broken / The chat text is broken up, use the
-browser in mobile mode (or some other way if you have a better alternative) so you can see what the
-mobile view looks like and debug appropriately and future agents can fix or build with actual view”
-No version, device, or log was supplied; investigated at `b93fa71`.
-
-- **Must fix** — the phone conversation renders every streamed reply chunk as its own transcript
-  row (**confirmed code defect**, reproduced). **Where:** `ui/src/remote/AgentScreen.tsx:195` maps
-  each wire event through `normalizeEvent` alone, so it never runs `foldTranscript` /
-  `appendRenderedEvent`, which coalesce consecutive `assistant_text` deltas on the desktop; the
-  local `withResolutions` (`:46`) is a forked copy of `foldTranscript`'s permission folding. Present
-  since the phone conversation shipped (`9a1c131`, 2026-09-28); its tests passed because their
-  fixtures use whole `text` events, never `delta` chunks. **Normal-use trigger:** open any chat
-  agent whose reply streamed; at iPhone width a 29-chunk reply became 29 separate paragraphs, a few
-  words each, with markdown split across chunks. **Why it matters:** FS-20.R13 requires messages in
-  full and TS-08.R73 requires reusing the desktop transcript primitives; the phone also skips every
-  other `appendRenderedEvent` transform (for example FS-13.R23 prompt suppression). **Requirement:**
-  FS-20.R13, TS-08.R73, INV §2. **Suggested fix/test:** replace the mapping and `withResolutions`
-  with `foldTranscript([...earlier, ...live])` (concatenate before folding so a window edge cannot
-  split a message); un-skip `renders a streamed reply as one message, not one row per delta` in
-  `ui/src/remote/AgentScreen.test.tsx`. That exact edit was tried locally and the suite passed 16/16.
-- **Worth fixing** — no repeatable way to see the phone app as a phone (**confirmed observability
-  gap**). **Where:** jsdom tests cannot see layout (INV §13), and the loopback dev server cannot
-  open a phone conversation without a paired tailnet device or a live transcript. **Normal-use
-  trigger:** this report; the defect was only visible once rendered. **Why it matters:** the user
-  asked that future agents fix and build phone UI against the actual view. **Suggested fix:** commit
-  a small `ui/scripts/phone-render.mjs` that the investigation used ad hoc: start Vite
-  (`npx vite --port 5199`) against any running Chuck server, launch Playwright Chromium with
-  `devices['iPhone 13']`, `page.route('**/api/sessions/*/transcript*')` to a fixture of streamed
-  `assistant_text` deltas plus a tool call, load `/remote.html`, push `/agent/<id>` via
-  `history.pushState` + `popstate` (Vite serves the desktop entry for deep links), and write a
-  full-page screenshot; document it in TS-06 next to the UI checks.
-
 ## Decisions needing your input
 
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
@@ -201,6 +167,13 @@ No version, device, or log was supplied; investigated at `b93fa71`.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Phone chat streamed replies fixed.** The phone conversation folds its joined
+  windows with the desktop's `foldTranscript`, so a streamed reply is one message (INV §2 canonical
+  helpers); the forked permission folding is gone. `ui/scripts/phone-render.mjs` screenshots the
+  phone conversation at iPhone size with stubbed APIs (INV §13), documented in TS-06; Playwright
+  1.63.0 is a UI dev dependency. Reproduction test un-skipped (failed before, passes); UI tests
+  pass. Unit closed.
 
 - **2026-10-05 — Rename fixes; resident role is Chucky.** Cutover now rewrites and audits frozen
   session paths (`cwd`, `add_dirs`, prompt; `launch_config_json` audited), and A14 rehearses a

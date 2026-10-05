@@ -21,7 +21,7 @@ import {
 } from "../api/client";
 import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types";
 import { useAnnotationStore } from "../store/annotationStore";
-import { normalizeEvent } from "../store/transcriptStore";
+import { foldTranscript, normalizeEvent } from "../store/transcriptStore";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
@@ -40,19 +40,6 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 
 export function agentTitle(agent: Pick<AgentState, "name" | "role" | "project">) {
   return agent.name || `${agent.role}@${agent.project}`;
-}
-
-/** withResolutions marks each permission request with its terminal decision. */
-function withResolutions(events: TranscriptEvent[]): TranscriptEvent[] {
-  const decisions = new Map<string, string>();
-  for (const event of events) {
-    if (event.kind === "permission_resolved" && event.tool_call_id) decisions.set(String(event.tool_call_id), String(event.decision ?? ""));
-  }
-  return events.map((event) =>
-    event.kind === "permission_request" && decisions.has(String(event.tool_call_id))
-      ? ({ ...event, resolved: decisions.get(String(event.tool_call_id)) } as TranscriptEvent)
-      : event,
-  );
 }
 
 /** requestSummary shows the command or the file a permission is for (FS-20.R12). */
@@ -191,8 +178,10 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     enabled: chat && !!agent?.running,
   });
 
+  // Fold the joined windows as the desktop does, so streamed deltas coalesce
+  // into one message even across a window edge (TS-08.R73).
   const events = useMemo(
-    () => withResolutions([...(earlier?.events ?? []), ...(transcript.data?.events ?? [])].map((event) => normalizeEvent(event))),
+    () => foldTranscript([...(earlier?.events ?? []), ...(transcript.data?.events ?? [])]),
     [earlier, transcript.data],
   );
   // The server derives both from the whole session, so they hold when the

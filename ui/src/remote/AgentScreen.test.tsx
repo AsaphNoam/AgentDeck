@@ -349,10 +349,9 @@ describe("AgentScreen diff annotations", () => {
     ]);
   });
 
-  // Reproduces the phone-chat-streamed-deltas investigation finding (HANDOFF review findings):
-  // the server stores a streamed reply as one assistant_text delta per chunk, and the phone
-  // renders each chunk as its own transcript row. The fix un-skips this test.
-  it.skip("renders a streamed reply as one message, not one row per delta", async () => {
+  // The server stores a streamed reply as one assistant_text delta per chunk; the phone must
+  // fold them into one message as the desktop does (FS-20.R13, TS-08.R73).
+  it("renders a streamed reply as one message, not one row per delta", async () => {
     const delta = (seq: number, text: string) => ({ agent_id: "a1", seq, type: "assistant_text", ts: "", data: { delta: text } });
     live = {
       agent_id: "a1",

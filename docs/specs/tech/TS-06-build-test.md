@@ -259,6 +259,12 @@ cd ui && npm test && npm run build
 make dist
 ```
 
+Phone UI work checks the rendered view, which jsdom cannot see (INV §13):
+`cd ui && node scripts/phone-render.mjs [transcript.json] [out.png]` serves the phone entry through
+Vite with every `/api` call and the event stream stubbed, opens an agent conversation at iPhone 13
+size in Playwright Chromium, and writes a full-page screenshot. It needs no Chuck server or paired
+device and is a development aid, not part of closure.
+
 The exact required checks for work/review roles are defined by
 [`../../features/AGENT-WORKFLOW.md`](../../features/AGENT-WORKFLOW.md); this spec owns what each
 shared target guarantees.
