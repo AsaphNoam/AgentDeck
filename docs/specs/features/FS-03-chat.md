@@ -176,8 +176,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   tool call names one of the actions Chuck itself exposes to its agents — `list_agents`,
   `send_message`, `check_messages`, `report_pipeline_stage_result`, `propose_pipeline_template`,
   `propose_pipeline_run`, `get_assigned_task`, `create_task`, `cancel_task`, `report_task_result`,
-  `share_context`, `list_context_links`, `read_context_link`, `set_context_link_visibility`, or
-  `revoke_context_grant` — the call proceeds immediately. The agent does not enter `waiting_input`
+  `share_context`, `list_context_links`, `read_context_link`, `set_context_link_visibility`,
+  `revoke_context_grant`, `read_think_tank`, or `submit_think_tank_turn` — the call proceeds
+  immediately. The agent does not enter `waiting_input`
   for it, no approval is asked for, and no approval deadline can apply to it. This holds for every
   chat agent, whatever role or global `skip_permissions` policy was frozen at its launch, and it is
   the only category of tool that gains the treatment. Every other tool keeps R14's gate exactly as

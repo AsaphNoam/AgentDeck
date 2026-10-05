@@ -3,6 +3,8 @@ import { QUERY_KEYS, queryClient } from "./config";
 import { REMOTE_QUERY_KEY } from "./remote";
 import { PIPELINE_QUERY_KEYS } from "./pipelines";
 import { TASK_QUERY_KEYS } from "./tasks";
+import { THINK_TANK_KEYS } from "./thinkTanks";
+import { thinkTankUpdateSchema } from "../schemas/thinkTank";
 import type { Config } from "../schemas/config";
 import type { AgentState, BusEvent, NotificationPayload, RuntimeActivity, TranscriptEvent } from "./types";
 import { pipelineUpdateSchema, type PipelineRunDetail } from "../schemas/pipeline";
@@ -13,6 +15,14 @@ import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
 import { discardChatDraft } from "../components/chat/drafts";
 import { notificationAgentId, openAgentConversation } from "../lib/agentConversation";
+
+function parseBusData(raw: string): unknown {
+  try {
+    return (JSON.parse(raw) as BusEvent<unknown>).data;
+  } catch {
+    return undefined;
+  }
+}
 
 class SseClient {
   private es: EventSourceLike | null = null;
@@ -62,6 +72,7 @@ class SseClient {
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runs });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.proposals });
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.all });
       queryClient.invalidateQueries({ queryKey: REMOTE_QUERY_KEY });
     };
     this.es.onerror = () => useUiStore.getState().setConnection("reconnecting");
@@ -77,6 +88,10 @@ class SseClient {
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: PIPELINE_QUERY_KEYS.runDetails });
     });
+    // Room events are notifications only: committed room state comes back over
+    // REST, and a reconnect refills it the same way (TS-14.R16).
+    this.es.addEventListener("think_tank_update", (event) => this.onThinkTankUpdate(event as MessageEvent<string>));
+    this.es.addEventListener("think_tank_activity", (event) => this.onThinkTankActivity(event as MessageEvent<string>));
     this.es.addEventListener("config_source_update", () => this.onConfigSourceUpdate());
     // Remote-control state is refetched, never trusted from the event (TS-13.R3).
     this.es.addEventListener("remote_update", () => queryClient.invalidateQueries({ queryKey: REMOTE_QUERY_KEY }));
@@ -84,6 +99,25 @@ class SseClient {
       this.lastPing = Date.now();
     });
     this.startWatchdog();
+  }
+
+  private onThinkTankUpdate(event: MessageEvent<string>) {
+    const parsed = thinkTankUpdateSchema.safeParse(parseBusData(event.data));
+    queryClient.invalidateQueries({ queryKey: [...THINK_TANK_KEYS.all, "list"] });
+    if (!parsed.success) {
+      queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.all });
+      return;
+    }
+    if (parsed.data.deleted) {
+      queryClient.removeQueries({ queryKey: THINK_TANK_KEYS.room(parsed.data.room_id) });
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.room(parsed.data.room_id) });
+  }
+
+  private onThinkTankActivity(event: MessageEvent<string>) {
+    const parsed = thinkTankUpdateSchema.safeParse(parseBusData(event.data));
+    if (parsed.success) queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.activity(parsed.data.room_id) });
   }
 
   registerOpenAgent(agentId: string) {
