@@ -42,6 +42,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
+  Think tanks resumed 2026-10-05: FS-21 is a draft of the independent-session/shared-artifact core.
+  Participant selection, departure defaults and end output are awaiting human choices; budget,
+  controls/recovery, access and retention also need scope agreement before technical design.
 - **Branch:** `main`.
 
 ## Active change
@@ -113,6 +116,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think tanks resumed.** Replaced the initial consensus/group-chat framing
+  with independent normal provider sessions and a canonical append-only shared discussion,
+  incremental retrieval, optional independent openings, bounded discussion, and permitted departure
+  ending when one participant remains. FS-21 is Draft; unresolved behavior is recorded there and
+  in `docs/ideas.md`. No technical specification, ready change, or product code was written.
 
 - **2026-10-05 — Design: provider bundle refresh ready.** Upstream check found Claude ACP 0.85.1,
   Codex ACP 2.1.1 (Codex `^0.159.1`, so 0.159.3), ACP SDK 1.7.0 and go-sdk 1.8.0. All ACP Wait-list

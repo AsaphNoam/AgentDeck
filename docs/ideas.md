@@ -34,6 +34,17 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Think tanks.** From the 2026-10-04 design request: iterate a design or research question
+  collaboratively among several agents sharing one goal. Resumed 2026-10-05 with independent
+  normal provider sessions and a canonical durable, append-only room discussion: attributed
+  contributions, one speaker at a time, bounded discussion, and incremental per-participant reads.
+  Optional independent openings withhold others' answers until all openings are published.
+  Preserve useful disagreement; permitted participants can leave, ending discussion when only one
+  remains, without requiring a separate judge. The former consensus-based ending and assumption of
+  mostly UX over reused backend are superseded. Core feature draft:
+  [`FS-21`](specs/features/FS-21-think-tanks.md). Await participant selection, departure defaults,
+  end output, then product agreement on budget, control/recovery, access and retention; no technical
+  specification or ready change yet.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,
