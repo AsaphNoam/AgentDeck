@@ -142,6 +142,8 @@ func TestRegisteredToolsShareResultContract(t *testing.T) {
 		"read_context_link":           {"context_ref_id": "context_1"},
 		"set_context_link_visibility": {"grant_id": "grant_1", "hidden": true},
 		"revoke_context_grant":        {"grant_id": "grant_1"},
+		"read_think_tank":             {},
+		"submit_think_tank_turn":      {"turn_token": "ttk_1", "disposition": "reply", "message": "m", "read_receipt": "r"},
 	}
 	for _, tool := range listed.Tools {
 		if tool.OutputSchema != nil {

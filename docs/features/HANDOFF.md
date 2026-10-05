@@ -58,9 +58,11 @@ until their slice ships. Slices (each closes with focused tests, handoff update 
    `think_tank_update` publisher in `server/think_tank_wire.go`. Tests: `go test ./internal/server
    -run TestThinkTank` (fake ACP `hold_turn`; test acts as the agent's tool calls) and runtime
    `TestEventsCarryTheExecutingTurnAcrossAHeldSuccessor`; server/runtime/state suites passed.
-3. **MCP tools** (next) — `read_think_tank`/`submit_think_tank_turn`, approval exemption, redacted
-   activity projector.
-4. **REST/SSE** — `/api/think-tanks` family, `think_tank_update`/`think_tank_activity`, wire fixture.
+3. **MCP tools** — done 2026-10-06: `messaging/think_tank_tools.go` (FS-17.R21 codes in
+   `toolresult`, typed state sentinels, guidance per R16; approvals derive from `ToolNames`).
+   `go test ./internal/messaging` passed. Owed at closure: FS-03.R40's enumerated tool list and the
+   redacted activity projector (moves to slice 5).
+4. **REST/SSE** (next) — `/api/think-tanks` family, `think_tank_update`/`think_tank_activity`, wire fixture.
 5. **Activity capture, judge, recovery/deletion.**
 6. **UI** — project button and setup, room page, Archive entries, annotations/file route, agent-view
    room-turn identification.

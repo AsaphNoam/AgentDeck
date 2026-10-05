@@ -284,6 +284,14 @@ func New(store *state.Store, log *slog.Logger) *Server {
 		Name:        "revoke_context_grant",
 		Description: "Withdraw a context share you granted. The reference and any other grant are unaffected.",
 	}, s.handleRevokeContextGrant)
+	addTool(s, &mcp.Tool{
+		Name:        "read_think_tank",
+		Description: "Read a Think Tank room you belong to: its goal, your role and remaining turn ceiling, and the attributed discussion in bounded pages. During your turn the default view is what is new for you; follow next_cursor until complete to get your turn_token and read_receipt.",
+	}, s.handleReadThinkTank)
+	addTool(s, &mcp.Tool{
+		Name:        "submit_think_tank_turn",
+		Description: "Submit your current Think Tank turn once: reply with a message, leave (only when permitted, optionally with a final message), or decline_closing on a closing turn. It is published when your turn completes.",
+	}, s.handleSubmitThinkTankTurn)
 
 	// getServer resolves the per-request server. Reading the token header here
 	// proves the per-agent session binding arrives over the transport (§3.1);

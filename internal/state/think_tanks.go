@@ -99,6 +99,15 @@ var (
 	ErrThinkTankStale = errors.New("state: think tank attempt is not current")
 	// ErrThinkTankNotMember refuses an agent room action from a nonmember.
 	ErrThinkTankNotMember = errors.New("state: not a think tank member")
+
+	// Specific refusals the agent tools classify (FS-17.R21). Each also
+	// matches its general class above.
+	ErrThinkTankReadIncomplete = fmt.Errorf("%w: read the full new conversation with read_think_tank and pass its read_receipt", ErrThinkTankConflict)
+	ErrThinkTankReplyConflict  = fmt.Errorf("%w: this turn already staged a different submission", ErrThinkTankConflict)
+	ErrThinkTankLeaveForbidden = fmt.Errorf("%w: you are not permitted to leave this room", ErrThinkTankConflict)
+	ErrThinkTankClosingOnly    = fmt.Errorf("%w: decline_closing is only available on the closing turn", ErrThinkTankInvalid)
+	ErrThinkTankCursor         = fmt.Errorf("%w: cursor is not valid for this read", ErrThinkTankInvalid)
+	ErrThinkTankNoTurn         = fmt.Errorf("%w: you have no active Think Tank turn; pass room_id to read a room you belong to", ErrThinkTankConflict)
 )
 
 func thinkTankInvalid(format string, args ...any) error {

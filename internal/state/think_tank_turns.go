@@ -129,10 +129,10 @@ func (s *Store) StageThinkTankTurn(callerAgentID, token, disposition, message, r
 		if a.Disposition == disposition && a.Message == message {
 			return a, nil
 		}
-		return ThinkTankAttempt{}, thinkTankConflict("this turn already staged a different submission")
+		return ThinkTankAttempt{}, ErrThinkTankReplyConflict
 	}
 	if !thinkTankDelivered(a) || receipt != thinkTankReadReceipt(a) {
-		return ThinkTankAttempt{}, thinkTankConflict("read the full new conversation with read_think_tank and pass its read_receipt")
+		return ThinkTankAttempt{}, ErrThinkTankReadIncomplete
 	}
 	member, err := scanThinkTankMember(tx.QueryRow(`SELECT `+thinkTankMemberColumns+` FROM think_tank_members WHERE room_id = ? AND agent_id = ?`, a.RoomID, a.AgentID))
 	if err != nil {
@@ -154,11 +154,11 @@ func (s *Store) StageThinkTankTurn(callerAgentID, token, disposition, message, r
 			return ThinkTankAttempt{}, thinkTankInvalid("leaving is not available on this turn")
 		}
 		if !member.MayLeave {
-			return ThinkTankAttempt{}, thinkTankConflict("you are not permitted to leave this room")
+			return ThinkTankAttempt{}, ErrThinkTankLeaveForbidden
 		}
 	case ThinkTankDeclineClosing:
 		if a.Turn != ThinkTankTurnClosing {
-			return ThinkTankAttempt{}, thinkTankInvalid("decline_closing is only available on the closing turn")
+			return ThinkTankAttempt{}, ErrThinkTankClosingOnly
 		}
 		if message != "" {
 			return ThinkTankAttempt{}, thinkTankInvalid("decline_closing takes no message")
@@ -596,11 +596,11 @@ func (c thinkTankCursor) encode() string {
 func decodeThinkTankCursor(s string) (thinkTankCursor, error) {
 	raw, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
-		return thinkTankCursor{}, thinkTankInvalid("cursor is not valid")
+		return thinkTankCursor{}, ErrThinkTankCursor
 	}
 	parts := strings.Split(string(raw), "|")
 	if len(parts) != 6 || parts[0] != "1" {
-		return thinkTankCursor{}, thinkTankInvalid("cursor is not valid")
+		return thinkTankCursor{}, ErrThinkTankCursor
 	}
 	c := thinkTankCursor{room: parts[1], view: parts[2]}
 	var e1, e2, e3 error
@@ -608,7 +608,7 @@ func decodeThinkTankCursor(s string) (thinkTankCursor, error) {
 	c.seq, e2 = strconv.ParseInt(parts[4], 10, 64)
 	c.off, e3 = strconv.Atoi(parts[5])
 	if e1 != nil || e2 != nil || e3 != nil || c.off < 0 {
-		return thinkTankCursor{}, thinkTankInvalid("cursor is not valid")
+		return thinkTankCursor{}, ErrThinkTankCursor
 	}
 	return c, nil
 }
@@ -642,7 +642,7 @@ WHERE agent_id = ? AND state = ? AND (? = '' OR room_id = ?) ORDER BY created_at
 	case !errors.Is(err, ErrNotFound):
 		return ThinkTankReadPage{}, err
 	case roomID == "":
-		return ThinkTankReadPage{}, thinkTankConflict("you have no active Think Tank turn; pass room_id to read a room you belong to")
+		return ThinkTankReadPage{}, ErrThinkTankNoTurn
 	}
 	member, err := scanThinkTankMember(tx.QueryRow(`SELECT `+thinkTankMemberColumns+` FROM think_tank_members
 WHERE room_id = ? AND agent_id = ? ORDER BY ord LIMIT 1`, roomID, req.CallerAgentID))
@@ -674,7 +674,7 @@ WHERE room_id = ? AND agent_id = ? ORDER BY ord LIMIT 1`, roomID, req.CallerAgen
 			return ThinkTankReadPage{}, err
 		}
 		if c.room != roomID || c.view != view || c.head != head || c.seq <= from {
-			return ThinkTankReadPage{}, thinkTankInvalid("cursor belongs to a different read")
+			return ThinkTankReadPage{}, ErrThinkTankCursor
 		}
 		pos = c
 	}
