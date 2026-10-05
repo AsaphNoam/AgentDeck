@@ -31,7 +31,7 @@ not an approved feature scope or implementation-ready change.
   before the discussion advances to another participant.
 - **R5** (planned) — The room has a configured finite discussion budget and a visible completion
   state. Reaching the budget ends further discussion turns; the exact budget unit and treatment of
-  openings, exits, and a possible synthesis remain open in §6.
+  openings, exits, and the optional judge synthesis remain open in §6.
 - **R6** (planned) — Independent openings are optional. When enabled, every participant forms
   its opening without access to the others' opening contributions; those contributions are
   published into the shared discussion before ordinary turn-taking begins. When disabled,
@@ -43,16 +43,31 @@ not an approved feature scope or implementation-ready change.
 - **R8** (planned) — A participant can be configured as allowed to leave the discussion. Leaving
   records that decision in the shared history and removes the participant from future discussion
   turns; it is distinct from stopping or deleting its normal agent session. After all but one
-  participant have left, the discussion ends. No dedicated judge agent is required.
+  participant have left, the discussion ends. No dedicated judge agent is required to decide when
+  discussion stops.
 - **R9** (planned) — A person inspecting the room can see its goal, participants, ordered
   attributed discussion, current phase and speaker when applicable, and completion reason.
+- **R11** (planned) — Participant selection supports both creating a new normal agent and adding
+  an existing normal agent. A single room can mix new and existing agents; existing participants
+  retain their own session history under R2. Project and scheduling eligibility remain open in §6.
+- **R12** (planned) — Permission to leave is configurable per participant. An allowed participant
+  may choose to publish a final attributed message with its departure, or leave without a final
+  message. The departure is recorded either way, and an optional final message is part of the
+  canonical discussion before the remaining-participant completion rule is evaluated.
+- **R13** (planned) — Final synthesis is optional. When requested, a judge agent is called only
+  after the participant discussion has ended, reads the completed shared discussion, and produces
+  the synthesis as the last step. Its synthesis is attributed to the judge and retained with the
+  room under R1 and preserves unresolved material objections under R7. The judge does not take
+  discussion turns or receive activations to monitor progress or decide whether discussion stops.
 
 ## 3. States & transitions
 
-The core phase distinction from R4–R6 is optional independent openings → shared discussion →
-ended. R8 can end discussion when only one participant remains. Busy, approval, interruption,
-pause/resume, and failed-opening transitions await the decisions in §6; this draft does not specify
-automatic advancement or recovery for those cases.
+The core phase distinction from R4–R6 and R13 is optional independent openings → shared discussion
+→ discussion ended → optional judge synthesis. R8 can end discussion when only one participant
+remains. The discussion completion reason remains distinct from the state of the optional final
+step. Busy, approval, interruption, pause/resume, synthesis failure, and failed-opening transitions
+await the decisions in §6; this draft does not specify automatic advancement or recovery for those
+cases.
 
 ## 4. Edge cases & errors
 
@@ -85,17 +100,29 @@ automatic advancement or recovery for those cases.
   ordered, attributed discussion survives. A provider failure must not produce a false contribution,
   departure, or success state. *Verified by:* persistence/recovery integration tests; scheduling and
   retry assertions await the recovery contract in §6.
+- **A6** (planned; R2, R8, R11–R12) — Create a room with one new agent and two existing agents,
+  each with distinguishable normal histories. Check that all participate under their own identities
+  and existing agents retain their history. Configure departure for one participant and deny it for
+  another. Exercise permitted departures with and without a final message in separate runs and
+  verify the recorded departure, optional message ordering, and refusal for the participant without
+  permission. *Verified by:* room selection/action integration tests and a rendered setup journey.
+- **A7** (planned; R7, R13) — Run rooms with synthesis enabled and disabled, ending by budget and
+  by departures. Observe judge provider activations: none occur during participant discussion; an
+  enabled final step reads the completed discussion and appends an attributed synthesis, while a
+  disabled final step starts no judge turn. Preserve a known unresolved objection in the synthesis.
+  *Verified by:* fake-provider integration tests and a manual synthesis-quality check; judge
+  failure/retry assertions await §6.
 
 ## 6. Deviations & open decisions
 
 Nothing is shipped. Product confirmation is required before technical design.
 
-- Participant selection: fresh normal agents, existing agents, or both; project scope and minimum
-  participant count; eligibility of busy agents, agents assigned other work, and terminal agents.
-- Departure permission defaults and whether a departing participant must record a reason or final
-  objection. How explicit goal-achievement judgments end discussion without suppressing objections.
-- End output: shared history alone, a participant synthesis, or an operator-requested synthesis;
-  author selection, budget accounting, and failure behavior if synthesis is included.
+- Project scope and minimum participant count; eligibility of busy agents, agents assigned other
+  work, and terminal agents. New/existing participant selection is settled by R11.
+- Departure permission defaults. Departure messages are optional under R12; whether explicit
+  goal-achievement judgments require a separate ending mechanism beyond permitted departures.
+- Judge selection/configuration, final-step budget accounting, and failure/retry behavior. Optional
+  synthesis by an end-only judge is settled by R13; there is no live monitoring judge.
 - Budget unit, turn order, and whether independent openings and departures consume that budget.
 - Operator controls and input: start, pause, stop, resume, and whether people can add room messages
   or change membership/goal during discussion. These are not implied by ordinary agent chat controls.

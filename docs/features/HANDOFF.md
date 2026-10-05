@@ -43,8 +43,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
   Think tanks resumed 2026-10-05: FS-21 is a draft of the independent-session/shared-artifact core.
-  Participant selection, departure defaults and end output are awaiting human choices; budget,
-  controls/recovery, access and retention also need scope agreement before technical design.
+  Mixed new/existing agents, per-participant departure permission with optional final message,
+  and optional end-only judge synthesis are confirmed. Budget and operator controls are the next
+  questions; recovery, eligibility, judge setup, access and retention still need scope agreement
+  before technical design.
 - **Branch:** `main`.
 
 ## Active change
@@ -116,6 +118,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Design: Think Tank participation and synthesis confirmed.** FS-21.R11–R13/A6–A7
+  record mixed new/existing participants, configurable departure permission and optional final
+  departure message, and optional synthesis by a judge activated only after discussion ends.
+  Discussion budget and operator controls are awaiting choices; the feature remains Draft.
 
 - **2026-10-05 — Design: Think tanks resumed.** Replaced the initial consensus/group-chat framing
   with independent normal provider sessions and a canonical append-only shared discussion,
