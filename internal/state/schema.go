@@ -606,4 +606,10 @@ ALTER TABLE sessions ADD COLUMN last_context_used INTEGER;
 ALTER TABLE sessions ADD COLUMN last_context_size INTEGER;
 `,
 	},
+	{
+		// Think Tank rooms: SQLite-owned discussion authority with no
+		// agent/project foreign keys, so history outlives both (TS-14.R1, R12).
+		version: 36,
+		apply:   migrateThinkTanks,
+	},
 }

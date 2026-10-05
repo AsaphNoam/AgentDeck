@@ -49,11 +49,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 `think-tanks.md` — in progress (started 2026-10-06). FS-21 over TS-14; all items stay `(planned)`
 until their slice ships. Slices (each closes with focused tests, handoff update and commit):
 
-1. **State** — `internal/state/think_tanks.go`: migration for rooms, members, attempts, entries,
-   inputs, activity (no agent/project FKs, TS-14.R12); create/list/get/delete; attempt admission
-   with frozen head, staging, finalization transaction (publication, allowance, checkpoint, queued
-   input, rotation, pause/end), opening barrier, closing opportunity; bounded paged reads.
-2. **Room engine** — server service selecting the next opportunity and dispatching a `think_tank`
+1. **State** — done 2026-10-06 (`internal/state/think_tank{s,_turns}.go`, schema v36; tests
+   `go test ./internal/state -run ThinkTank`, both variants and `-race` passed). Seam map and
+   slice notes: `docs/plans/think-tanks.md`.
+2. **Room engine** (next) — server service selecting the next opportunity and dispatching a `think_tank`
    activation through `StartActivation`; turn-end finalization; executing-turn-id emission (R4).
 3. **MCP tools** — `read_think_tank`/`submit_think_tank_turn`, approval exemption, redacted
    activity projector.
