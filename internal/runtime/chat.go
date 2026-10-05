@@ -1479,7 +1479,7 @@ func (c *ChatRuntime) SetSessionConfig(ctx context.Context, agentID string, effo
 	defer func() { change.FastAvailable = as.configOptions.has(fastID) }()
 
 	if effort != nil {
-		if err := applyRequiredOption(ctx, as.transport, as.sessionID, effortID, *effort, as.configOptions); err != nil {
+		if err := applyRequiredOption(ctx, as.transport, as.sessionID, effortID, *effort, as.configOptions, false); err != nil {
 			return change, err
 		}
 		change.Effort, change.EffortApplied = *effort, true
@@ -1502,7 +1502,7 @@ func (c *ChatRuntime) SetSessionConfig(ctx context.Context, agentID string, effo
 	if *fast {
 		value = "on"
 	}
-	if err := setConfigOption(ctx, as.transport, as.sessionID, fastID, value, as.configOptions); err != nil {
+	if err := setConfigOption(ctx, as.transport, as.sessionID, fastID, value, as.configOptions, false); err != nil {
 		return change, err
 	}
 	change.Fast, change.FastApplied = *fast, true
@@ -2465,7 +2465,13 @@ func withProviderGuidance(err error, spec LaunchSpec) error {
 // reporting a different effective value — the silent ignore BR-1 shipped — so the
 // independently reported currentValue, not the RPC envelope, decides whether the
 // setting was honored (INV §12).
-func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement) error {
+//
+// canonicalizes marks a peer that answers an unlisted value with the listed row
+// it resolved to: the pinned Claude adapter maps a full model id such as
+// `claude-opus-5-5` onto the `opus` row whose resolved model it is, refuses
+// values it cannot resolve, and never crosses model versions. Only then may a
+// listed reported row stand in for an unlisted request.
+func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement, canonicalizes bool) error {
 	result, err := transport.Call(ctx, "session/set_config_option", map[string]any{
 		"sessionId": sessionID, "configId": id, "value": value,
 	})
@@ -2481,6 +2487,9 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 	// An unreported value is not a mismatch: the peer is entitled to omit it, and
 	// treating silence as failure would fail launches that actually worked (INV §7).
 	if reported, ok := advertised[id]; ok && reported != "" && reported != value {
+		if canonicalizes && !configOptionOffers(result, id, value) && configOptionOffers(result, id, reported) {
+			return nil
+		}
 		return fmt.Errorf("%w: %s is %q after requesting %q", ErrSettingIgnored, id, reported, value)
 	}
 	return nil
@@ -2490,14 +2499,14 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 // model and effort both stay fail-closed under TS-04.R19/R47 and FS-09.R40,
 // because running at a level or on a model the person did not choose is wrong in
 // a way a slower agent is not.
-func applyRequiredOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement) error {
+func applyRequiredOption(ctx context.Context, transport *Transport, sessionID, id, value string, advertised sessionConfigAdvertisement, canonicalizes bool) error {
 	if id == "" {
 		return fmt.Errorf("%w: %s", ErrSettingUnsupported, value)
 	}
 	if !advertised.has(id) {
 		return fmt.Errorf("%w: %s", ErrSettingUnavailable, id)
 	}
-	return setConfigOption(ctx, transport, sessionID, id, value, advertised)
+	return setConfigOption(ctx, transport, sessionID, id, value, advertised, canonicalizes)
 }
 
 // sessionConfigResult is what the ordered session-configuration step actually
@@ -2522,13 +2531,13 @@ type sessionConfigResult struct {
 func applySessionConfig(ctx context.Context, transport *Transport, ad backend.BackendAdapter, spec LaunchSpec, sessionID string, advertised sessionConfigAdvertisement) (sessionConfigResult, error) {
 	modelID, effortID, fastID := ad.SessionConfigIDs()
 	if (spec.BackendType == "codex-acp" || spec.BackendType == "claude-acp") && spec.ModelID != "" {
-		if err := applyRequiredOption(ctx, transport, sessionID, modelID, spec.ModelID, advertised); err != nil {
+		if err := applyRequiredOption(ctx, transport, sessionID, modelID, spec.ModelID, advertised, spec.BackendType == "claude-acp"); err != nil {
 			return sessionConfigResult{}, withProviderGuidance(err, spec)
 		}
 	}
 	if spec.Effort != "" {
 		if mode, _ := ad.EffortDelivery(spec.Agent.Interface); mode == backend.EffortPostSession {
-			if err := applyRequiredOption(ctx, transport, sessionID, effortID, spec.Effort, advertised); err != nil {
+			if err := applyRequiredOption(ctx, transport, sessionID, effortID, spec.Effort, advertised, false); err != nil {
 				return sessionConfigResult{}, err
 			}
 		}
@@ -2542,7 +2551,7 @@ func applySessionConfig(ctx context.Context, transport *Transport, ad backend.Ba
 	// Fast mode is fail-open under FS-09.R55/TS-04.R45: an unavailable or refused
 	// speed boost leaves the agent cheaper and slower, which is not worth killing
 	// a working launch over. The agent records fast mode off and the header says why.
-	if err := setConfigOption(ctx, transport, sessionID, fastID, "on", advertised); err != nil {
+	if err := setConfigOption(ctx, transport, sessionID, fastID, "on", advertised, false); err != nil {
 		slog.Warn("runtime: fast mode was requested but not applied; continuing at normal speed",
 			"agent", spec.Agent.AgentID, "err", err)
 		return out, nil

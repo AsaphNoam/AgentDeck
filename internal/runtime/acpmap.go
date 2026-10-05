@@ -118,6 +118,41 @@ func normalizeConfigValue(raw json.RawMessage) string {
 	return wrapped.Value
 }
 
+// configOptionOffers reports whether a configOptions response lists value as a
+// selectable entry of option id, flat or one level grouped as ACP allows.
+func configOptionOffers(result json.RawMessage, id, value string) bool {
+	type entry struct {
+		Value   string  `json:"value"`
+		Options []entry `json:"options"`
+	}
+	var response struct {
+		ConfigOptions []struct {
+			ID       string  `json:"id"`
+			ConfigID string  `json:"configId"`
+			Options  []entry `json:"options"`
+		} `json:"configOptions"`
+	}
+	if json.Unmarshal(result, &response) != nil {
+		return false
+	}
+	for _, option := range response.ConfigOptions {
+		if option.ID != id && option.ConfigID != id {
+			continue
+		}
+		for _, e := range option.Options {
+			if e.Value == value {
+				return true
+			}
+			for _, grouped := range e.Options {
+				if grouped.Value == value {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // CommandItem is one entry of a chat runtime's advertised ACP command snapshot,
 // projected verbatim to the composer command picker (TS-03.R24). InputHint is the
 // unstructured `input.hint` when the adapter supplies one.

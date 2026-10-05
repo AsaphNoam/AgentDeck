@@ -193,6 +193,11 @@ rebuilt list reports a different effective value, which is the silent ignore BR-
 `currentValue` — not the RPC envelope — decides whether a setting Chuck required was honored
 (INV §12, INV §17). A value the peer does not report is treated as unreported rather than as a
 mismatch, so an adapter that legitimately omits it does not fail an otherwise good launch (INV §7).
+One Claude model exception: the pinned Claude adapter answers a full model id it does not list
+(`claude-opus-5-5`) with the listed alias row that resolves to it (`opus`), refuses values it cannot
+resolve, and never crosses model versions; a listed reported row therefore honors an unlisted Claude
+model request, while a listed request reported as another row stays ignored (confirmed live
+2026-10-05 against claude-agent-acp 0.75.1 over Claude Code 2.1.282).
 The readback is adapter configuration evidence and nothing more: it says the adapter accepted and
 recorded the setting, not that the provider executed at it, and R54 forbids citing it as an
 effective-model or effective-effort oracle.

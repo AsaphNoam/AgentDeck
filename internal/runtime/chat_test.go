@@ -1175,6 +1175,29 @@ func TestSessionConfigurationRejectsAnAcceptedButIgnoredSetting(t *testing.T) {
 	}
 }
 
+// FS-09.R46, INV §12 — the Claude adapter answers a full model id with the alias
+// row that resolves to it. That listed row stands in for an unlisted request;
+// a listed request reported as another row, or another backend, stays ignored.
+func TestClaudeModelAliasRowHonorsAFullModelID(t *testing.T) {
+	for _, tc := range []struct {
+		backend, model string
+		wantIgnored    bool
+	}{
+		{"claude-acp", "claude-opus-5-5", false},
+		{"claude-acp", "default", true},
+		{"codex-acp", "claude-opus-5-5", true},
+	} {
+		c, spec := newChatTest(t, "stream_text")
+		spec.BackendType, spec.ModelID = tc.backend, tc.model
+		spec.Env = append(spec.Env, "FAKEACP_MODEL_ALIAS=opus")
+
+		_, err := c.Start(context.Background(), spec)
+		if got := errors.Is(err, ErrSettingIgnored); got != tc.wantIgnored || (!tc.wantIgnored && err != nil) {
+			t.Fatalf("%s %s: Start error = %v, want ignored=%v", tc.backend, tc.model, err, tc.wantIgnored)
+		}
+	}
+}
+
 // FS-09.A24, FS-03.A29 — a launch requesting fast mode on a session that does
 // not advertise it still starts, records fast mode off, and records that the
 // session never offered it so the chat header can say so (FS-03.R46) instead of

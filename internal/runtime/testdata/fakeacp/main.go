@@ -423,9 +423,14 @@ func fakeConfigOptions() []map[string]any {
 	defer configMu.Unlock()
 	out := make([]map[string]any, 0, len(configOrder))
 	for _, id := range configOrder {
+		rows := []map[string]any{{"value": configValues[id], "name": configValues[id]}}
+		// FAKEACP_MODEL_ALIAS lists only `default` and that alias row, the way the
+		// pinned Claude adapter lists `opus` rather than `claude-opus-5-5`.
+		if alias := os.Getenv("FAKEACP_MODEL_ALIAS"); alias != "" && id == "model" {
+			rows = []map[string]any{{"value": "default", "name": "Default"}, {"value": alias, "name": alias}}
+		}
 		out = append(out, map[string]any{
-			"id": id, "name": id, "type": "select", "currentValue": configValues[id],
-			"options": []map[string]any{{"value": configValues[id], "name": configValues[id]}},
+			"id": id, "name": id, "type": "select", "currentValue": configValues[id], "options": rows,
 		})
 	}
 	return out
@@ -447,6 +452,11 @@ func applyConfigOption(id, value string) {
 	configValues[id] = value
 	if id != "model" {
 		return
+	}
+	// The pinned Claude adapter answers a full model id with the alias row that
+	// resolves to it (verified live against claude-agent-acp 0.75.1).
+	if alias := os.Getenv("FAKEACP_MODEL_ALIAS"); alias != "" {
+		configValues[id] = alias
 	}
 	// Setting the model rebuilds what the session offers. The pinned Claude
 	// adapter drops the effort and fast options outright for a model that has

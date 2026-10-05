@@ -37,9 +37,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `foldTranscript`; `ui/scripts/phone-render.mjs` renders the phone conversation at iPhone size).
   `notifications-open-conversation` closed 2026-10-05 apart from its owed browser/macOS click
   checks. `phone-desktop-flow-and-agent-management.md` closed 2026-10-05 apart from its owed
-  fakeACP browser passes at phone size (FS-20.A10–A11). Claude 5.5 launch compatibility keeps one Worth-fixing
-  finding; its Must-fix is closed; the installed-provider correction it depends on still owes
-  the credentialed gate.
+  fakeACP browser passes at phone size (FS-20.A10–A11). Claude 5.5 launch compatibility closed
+  2026-10-05 (live Installed probe plus alias-row fix); the broader TS-06.R31 smoke stays owed.
   The former bundled-default, opt-in recovery draft FS-09.R64–R67/A33–A36 is retired;
   no product change has shipped from it.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -81,7 +80,9 @@ None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./in
   cancel, Steer, a role/skill and an MCP action), plus two rendered fake-provider journeys
   (Installed update → Refresh → choose new model; missing Installed → Bundle save → retry →
   back to Installed with overrides). Needs authorization and credentials; `assemble.sh`'s native
-  probes run first in release CI. The Claude 5.5 finding below closes only with that receipt.
+  probes run first in release CI. Claude Installed fresh launch at `claude-opus-5-5` passed live
+  2026-10-05 (adapter 0.75.1/SDK 0.3.257, Claude Code 2.1.282, macOS, the user's existing login); the
+  Bundle still refuses it with Claude Code 2.1.257's version error, as designed.
 - TS-06.R26: the credentialed Codex 1.12.0 receipt gating FS-03.A41/A42 and FS-01.A20.
 - FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove
   with Codex capabilities.
@@ -92,39 +93,7 @@ None.
 
 ## Review findings
 
-### Claude 5.5 launch compatibility — reported 2026-10-01 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-**Report (verbatim).** “claude can't deploy opus5.5 or sonnet 5.5. Setting backend to sonnet / opus defaults to version
-  5, setting to claude-sonnet- 5-5 or claude-opus-5-5 both fail runtime: provider rejected the
-  setting: model: Internal error. After launching claude opus 5 I can run /model
-  claude-sonnet-5-5 and it works, but running /model claude-opus-5-5 returns API error: 400
-  {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"Claude Code
-  2.1.257 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or
-  update the Claude desktop app, then try again.\",\"details\":{\"error_code\":
-  \"claude_code_version_too_old\"}},\"request_id\":\"req_011Cfb3xhNe67bnHyTaUpWs5\"}. My local
-  CLI version is 2.1.286, checked in the same terminal running agentdeck before starting the
-  dashboard. Asking the claude within agentdeck revealed that the agentdeck bundle is at 2.1.257.
-  Why did we choose to bundle versions separately and not use what the user has installed locally?”
-  AgentDeck version was not stated; the current shipped release is v0.8.0. No separate log file was
-supplied.
-
-- **Worth fixing** — the packaged Claude runtime lags the minimum needed for Opus 5.5, with no
-  version disclosure analogous to packaged Codex (**confirmed specification gap and compatibility
-  limitation**). **Where:** `scripts/release/package.json:10` pins `claude-agent-acp` 0.75.1, whose
-  locked `@anthropic-ai/claude-agent-sdk` 0.3.257 embeds Claude Code 2.1.257; the release wrapper
-  prepends that private adapter to PATH. FS-09.R29 and TS-04.R13 deliberately make that adapter own
-  the chat executable, while FS-09.R59 exposes exact packaged-runtime/cache compatibility only for
-  Codex. **Normal-use trigger:** the local Claude CLI is new enough for a newly available model, but
-  a chat launch uses the older immutable release runtime. **Why it matters:** exact model selectors
-  can be configured and passed verbatim yet remain unusable until AgentDeck ships a dependency
-  bump, and the UI gives no way to distinguish that state from the user's installed CLI. The moving
-  `sonnet`/`opus` aliases resolving to version 5 is otherwise expected under FS-09.R46, not a model
-  translation bug; terminal agents remain direct-user-CLI launches. **Requirement:** coverage gap
-  beside FS-09.R29/R46/R59, TS-04.R13, TS-06.R14-R15, and INV §10/§12/§17. **Suggested fix/test:**
-  verify the implemented installed-provider/Bundle change (FS-09.R75–R78/A45–A47) and complete
-  the bounded fixed-adapter gate in TS-06.R31.
-  This finding remains open until the credentialed runtime-selection correction is verified;
-  the retired bundled-default/opt-in draft is not the intended fix.
+None.
 
 ## Decisions needing your input
 
@@ -144,6 +113,14 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Claude 5.5 launch compatibility closed.** A live probe (release adapter over
+  installed Claude Code 2.1.282) served `claude-opus-5-5`; the bundle still refuses it as too old.
+  The probe exposed a remaining launch failure (INV §12 accepted-is-not-honored, over-applied):
+  the Claude adapter answers a full model ID with its alias row (`opus`/`opus[1m]`), which Chuck
+  rejected as an ignored setting. A listed reported row now honors an unlisted Claude model
+  request (TS-04.R46 note); listed requests and other backends stay strict. Fake-adapter test
+  failed first; Chuck's real launch path passed live and failed without the fix.
 
 - **2026-10-05 — Phone UI coverage completed; Manage refusals shown.** Request/response tests now
   cover project-page launch and Start pipeline (with refusals keeping entered values), rename,
