@@ -348,4 +348,20 @@ describe("AgentScreen diff annotations", () => {
       `annotations ${JSON.stringify({ annotations: [{ ...draft, instruction: "rename this" }], target: { kind: "agent", agent_id: "a3" } })}`,
     ]);
   });
+
+  // Reproduces the phone-chat-streamed-deltas investigation finding (HANDOFF review findings):
+  // the server stores a streamed reply as one assistant_text delta per chunk, and the phone
+  // renders each chunk as its own transcript row. The fix un-skips this test.
+  it.skip("renders a streamed reply as one message, not one row per delta", async () => {
+    const delta = (seq: number, text: string) => ({ agent_id: "a1", seq, type: "assistant_text", ts: "", data: { delta: text } });
+    live = {
+      agent_id: "a1",
+      events: [{ agent_id: "a1", seq: 1, type: "user_text", ts: "", data: { text: "Status?" } }, delta(2, "All "), delta(3, "tests "), delta(4, "pass now.")],
+      has_more: false,
+    };
+    renderScreen();
+    const conversation = await screen.findByRole("list", { name: "Conversation" });
+    await waitFor(() => expect(conversation).toHaveTextContent("All tests pass now."));
+    expect(conversation.children).toHaveLength(2);
+  });
 });
