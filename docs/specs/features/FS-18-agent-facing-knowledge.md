@@ -6,11 +6,11 @@
 
 ## 1. Purpose
 
-Chuck's reusable operating knowledge currently lives mainly in the seeded `firstmate` role
+Chuck's reusable operating knowledge currently lives mainly in the seeded `chucky` role
 prompt. That knowledge becomes stale as the product changes, is unavailable to other roles, and is
 not refreshed on installations where the role already exists. This feature moves shared product
 expertise into a release-matched `operating-chuck` skill available to every Chuck-launched
-agent, while keeping FirstMate as the resident operator whose prompt defines only its purpose,
+agent, while keeping Chucky as the resident operator whose prompt defines only its purpose,
 stance, and requested orchestration behavior.
 
 This specification owns what agents observe and how the knowledge layers divide responsibility.
@@ -29,11 +29,11 @@ regardless of role, on fresh launch, resume, or runtime switch and through both 
 interfaces. The skill adds knowledge only: it grants no tool, permission, identity, or lifecycle
 authority. R11 owns safe behavior when installation is unavailable.
 
-**R2 — FirstMate is a thin resident-operator role.** The shipped FirstMate role id
-remains `firstmate`, including the FirstMate-only pipeline-proposal authority owned by FS-14.
+**R2 — Chucky is a thin resident-operator role.** The shipped Chucky role id
+remains `chucky`, including the Chucky-only pipeline-proposal authority owned by FS-14.
 Its seeded system prompt is exactly:
 
-> You are FirstMate, Chuck's resident operator. Help users use Chuck effectively, answer
+> You are Chucky, Chuck's resident operator. Help users use Chuck effectively, answer
 > Chuck product questions, and orchestrate agent work when they ask. Use current Chuck
 > operating guidance and available tool contracts for Chuck-specific behavior; be concise,
 > state uncertainty, and do not initiate orchestration the user did not request.
@@ -68,7 +68,7 @@ agent not to read every reference up front and links one level deep to exactly t
   assignments/attachments, and context links, including mail budgets, wake, authorization, and
   recovery rules.
 - `references/build-and-run-pipelines.md` for templates, runs, proposals, stage-result reporting,
-  supervision, Retry, accepted and `blocked` attempt finality, review-only FirstMate proposals,
+  supervision, Retry, accepted and `blocked` attempt finality, review-only Chucky proposals,
   and the human Continue boundary.
 
 Each reference remains independently usable and bounded to its named job. Examples appear only
@@ -87,7 +87,7 @@ prompt instructs an agent to open a turn by checking coordination state, to chec
 is "woken with no new instruction", or to treat `check_messages` or `get_assigned_task` as a
 standing habit. Concretely, the shipped `teammate` prompt keeps its assignment-queue stance without
 the per-turn coordination check, and the shipped `implementer`, `reviewer`, and `researcher` prompts
-drop their trailing mail-check instruction; `firstmate` (R2) and `pm` already satisfy this and do
+drop their trailing mail-check instruction; `chucky` (R2) and `pm` already satisfy this and do
 not change. No tool, argument, result, authorization, or lifecycle behavior changes — an agent still
 calls `check_messages` and `get_assigned_task`, because the activation that started its turn told it
 to. This extends the R2 cleanup, which reached only the PM and teammate prompts, to the remaining
@@ -97,12 +97,12 @@ the polling this text asks for. R13 owns whether an existing install receives th
 
 ### 2.2 Compatibility and lifecycle timing
 
-**R7 — superseded 2026-09-10.** Only-FirstMate exact-prompt migration is replaced by R13, which
+**R7 — superseded 2026-09-10.** Only-Chucky exact-prompt migration is replaced by R13, which
 applies the same exact-match, package-gated, field-preserving, idempotent correction to every role
 Chuck seeds. No guarantee it made was weakened; only its one-role scope was widened.
 
 **R13 — The same exact-match correction reaches every seeded role, not only
-FirstMate.** A dashboard start that verified the package replaces only the `system_prompt` field
+Chucky.** A dashboard start that verified the package replaces only the `system_prompt` field
 of a seeded role whose stored prompt bytes exactly equal a prompt Chuck previously shipped for
 that same role id. Everything R7 and R10 already guarantee is unchanged and now applies per role: no
 substring, whitespace-normalized, title-, or age-based matching; a prompt the user edited by even one
@@ -115,7 +115,7 @@ user edits a prompt, and produces no unsolicited provider prompt, transcript eve
 lifecycle transition (R8). FS-04.R47 owns the seeding exception and TS-11.R13 owns its mechanics.
 
 **R14 — retired 2026-10-03:** Legacy publication/prompt migration replaced by R18.
-**R18** — Current product-authored agent knowledge says Chuck and FirstMate:
+**R18** — Current product-authored agent knowledge says Chuck and Chucky:
 `operating-chuck` frontmatter/body, seeded prompts, MCP tool descriptions, history-primer framing
 and rendered-context errors. Ordinary verified publication supplies only the current managed
 package; no special old-directory retirement or rename-specific prompt migration is added.
@@ -161,7 +161,7 @@ the four roles in FS-04.R50 contain a short purpose and a few standing principle
 checklists or copies of the shared R15 text. They guide follow-up turns as well as the initial task
 and allow explicit user reassignment within the runtime's actual authority. Content contracts:
 
-- **FirstMate:** help the user understand and operate Chuck and coordinate requested work.
+- **Chucky:** help the user understand and operate Chuck and coordinate requested work.
   Ground answers and actions in current product state and operating guidance. For authorized
   coordination, give bounded assignments with relevant context and completion criteria, delegate
   where there is a concrete benefit, reconcile returned evidence and retain responsibility for
@@ -230,7 +230,7 @@ or interface contract.
 knowledge.** If the bundled package cannot be securely installed and verified, Chuck starts and
 logs a clear warning, but that dashboard process exposes no native discovery directory, direct-path
 instruction, or `CHUCK_SKILL_DIR` value and makes no claim that `operating-chuck` is
-available. It also leaves an exact historical FirstMate prompt unmigrated. Launch, resume, switch,
+available. It also leaves an exact historical Chucky prompt unmigrated. Launch, resume, switch,
 chat, terminal, and pipeline behavior otherwise continue unchanged. A later dashboard start retries
 installation and then the exact migration normally.
 
@@ -269,14 +269,14 @@ covers the same criteria for the other seeded roles.
 implementation.
 
 **A7** (R1–R6) — After successful installation, with pinned Claude and Codex providers,
-an ordinary non-FirstMate role can identify the native skill and open one routed reference; a
+an ordinary non-Chucky role can identify the native skill and open one routed reference; a
 provider with native discovery disabled can reach the same file through the direct pointer.
-FirstMate answers a Chuck question from the skill and creates no orchestration action until
+Chucky answers a Chuck question from the skill and creates no orchestration action until
 asked.
 
 **A8** (R8, R11) — Installation or verification failure emits the startup warning and
 still permits ordinary launch/resume/switch behavior, while composition exposes none of the skill
-directory, pointer, or environment variable and leaves an exact historical FirstMate prompt
+directory, pointer, or environment variable and leaves an exact historical Chucky prompt
 unchanged. A successful later startup restores the full R1/R6 overlay and performs the exact
 migration once. Package refresh or role migration causes no unsolicited provider prompt, transcript
 event, restart, or lifecycle transition.
@@ -317,7 +317,7 @@ package retains only truthful environment/authority guidance and no path/availab
 Role files, frozen snapshots, permissions and transcripts are unchanged by the overlay. *Verify
 by* launch/resume/switch composition and package-failure tests across chat and terminal paths.
 
-**A12** `(planned)` (R15–R16) — Fixed manual scenarios exercise: a FirstMate product question
+**A12** `(planned)` (R15–R16) — Fixed manual scenarios exercise: a Chucky product question
 without initiating coordination; requested coordination with bounded delegation and synthesis; a focused
 implementation preserving unrelated edits; review of a change with one known defect and one
 non-defect, followed by a fix response; an internal feature trace; and external version-specific
@@ -336,14 +336,14 @@ any native snapshot limitation rather than claiming delivery from model self-rep
 
 ## 6. Deviations & open decisions
 
-- R15–R17 and FS-04.R50–R51 were confirmed on 2026-10-02: coordination stays in FirstMate and
+- R15–R17 and FS-04.R50–R51 were confirmed on 2026-10-02: coordination stays in Chucky and
   existing legacy roles/references are preserved. The change introduces no permissions, model
   presets, background work or new role configuration schema. Naming follows the independently
   selected product-rename change.
 
 - No UI, REST endpoint, MCP documentation tool, agent-facing release command, mutable knowledge
   store, or new runtime interface is introduced.
-- Customized FirstMate roles remain user-owned even if they contain a stale copy of product
+- Customized Chucky roles remain user-owned even if they contain a stale copy of product
   knowledge. Chuck does not infer that they should migrate. R13 widens the exact-match
   correction to the other seeded roles on the same terms and does not weaken this: a role whose
   prompt the user touched is still user-owned and is never rewritten.

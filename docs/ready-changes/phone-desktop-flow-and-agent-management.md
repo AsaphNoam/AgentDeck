@@ -24,7 +24,7 @@ Commands with tracked-path-only file reads (`O_NOFOLLOW`); tailnet allowlist cha
 denying every task route; narrowed home attention and push; runtime-option defaults; and one shared
 project-dashboard derivation for desktop and phone.
 
-Excluded: phone task UI, the global New work screen and Ask FirstMate, the first-message field,
+Excluded: phone task UI, the global New work screen and Ask Chucky, the first-message field,
 terminal agents, interface switching, worktree forks, restore and archive search, agent mail,
 arbitrary file reads, and file search. When this ships, retire or narrow the superseded shipped
 items listed in FS-20 §6 in the same change.

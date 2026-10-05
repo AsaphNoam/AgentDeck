@@ -146,11 +146,11 @@ describe("PhoneApp", () => {
     const stream = FakeEventSource.last!;
     act(() => {
       useConnection.setState({
-        agents: { stale: { agent_id: "stale", role: "firstmate", project: "old", state: "busy" } as never },
+        agents: { stale: { agent_id: "stale", role: "chucky", project: "old", state: "busy" } as never },
         transcriptRev: { stale: 3 },
       });
       stream.onopen?.();
-      stream.emit("state_update", { data: { agent_id: "fresh", role: "firstmate", project: "new", state: "idle" } });
+      stream.emit("state_update", { data: { agent_id: "fresh", role: "chucky", project: "new", state: "idle" } });
     });
     expect(useConnection.getState().link).toBe("reconnecting");
     expect(useConnection.getState().agents.stale).toBeDefined();

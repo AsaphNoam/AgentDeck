@@ -263,8 +263,8 @@ func TestHomeResolutionIgnoresLegacyHome(t *testing.T) {
 	if err := s.SeedIfAbsent(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.ReadRole("firstmate"); err != nil {
-		t.Fatalf("fresh Chuck home did not seed FirstMate: %v", err)
+	if _, err := s.ReadRole("chucky"); err != nil {
+		t.Fatalf("fresh Chuck home did not seed Chucky: %v", err)
 	}
 	entries, err := os.ReadDir(filepath.Join(legacy, "roles"))
 	if err != nil || len(entries) != 1 || entries[0].Name() != "custom.json" {
@@ -449,7 +449,7 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 		ids = append(ids, id)
 	}
 	slices.Sort(ids)
-	if want := []string{"firstmate", "implementer", "researcher", "reviewer"}; !slices.Equal(ids, want) {
+	if want := []string{"chucky", "implementer", "researcher", "reviewer"}; !slices.Equal(ids, want) {
 		t.Fatalf("seeded roles = %v, want %v", ids, want)
 	}
 	for id, role := range roles {
@@ -460,9 +460,9 @@ func TestSeedIfAbsentNoClobber(t *testing.T) {
 	if cfg, err := s.ReadConfig(); err != nil || cfg.DefaultRole != "implementer" {
 		t.Fatalf("default role = %q, %v; want implementer", cfg.DefaultRole, err)
 	}
-	firstmate, err := s.ReadRole("firstmate")
-	if err != nil || firstmate.SystemPrompt != firstMatePrompt || strings.Contains(firstmate.SystemPrompt, "propose_pipeline") {
-		t.Fatalf("seeded FirstMate prompt is not the thin role: role=%+v err=%v", firstmate, err)
+	chucky, err := s.ReadRole("chucky")
+	if err != nil || chucky.SystemPrompt != chuckyPrompt || strings.Contains(chucky.SystemPrompt, "propose_pipeline") {
+		t.Fatalf("seeded Chucky prompt is not the thin role: role=%+v err=%v", chucky, err)
 	}
 	if _, err := s.ReadProject("my-app"); err != nil {
 		t.Fatalf("seeded project: %v", err)

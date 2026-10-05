@@ -14,6 +14,6 @@ Pipelines are saved, model-neutral templates whose stages run as bounded durable
 - Stage outputs live in Chuck's durable run and task records and stay inspectable after completion. Persisted outputs, not transcripts, are what later stages and supervision read.
 - A run may reach several repositories, but only ones the run's existing Chuck project configuration already reaches. The pipeline grants no cross-project access and no additional filesystem roots.
 - Owning an active run does not make an agent unaddressable, but stage work reaches the standing orchestrator through its current durable assignment; an unrelated task assignment cannot take that agent over while the run owns it. Normal messaging, resume, archive, and task-target rules apply again once run ownership ends.
-- FirstMate may propose a template or exact run configuration only for human review. A proposal neither saves nor starts anything; the operator confirms those actions in Chuck. Other roles do not gain proposal authority from this skill.
+- Chucky may propose a template or exact run configuration only for human review. A proposal neither saves nor starts anything; the operator confirms those actions in Chuck. Other roles do not gain proposal authority from this skill.
 
 Use the pipeline tool definitions and CLI help for exact arguments and current result fields.

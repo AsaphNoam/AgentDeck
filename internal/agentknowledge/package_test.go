@@ -129,7 +129,7 @@ func TestEmbeddedSkillUsesBoundedProgressiveReferences(t *testing.T) {
 		}
 	}
 	pipeline := string(files["references/build-and-run-pipelines.md"])
-	for _, phrase := range []string{"`blocked`", "Continue", "FirstMate"} {
+	for _, phrase := range []string{"`blocked`", "Continue", "Chucky"} {
 		if !strings.Contains(pipeline, phrase) {
 			t.Errorf("pipeline reference is missing %q", phrase)
 		}

@@ -66,9 +66,9 @@ never read into API, SSE, transcript, analytics, or log data merely by this feat
 
 **R14 — Pipeline controls preserve the local trust boundary.** Pipeline REST routes stay
 under the whole-mux Host/Origin guard and have the same unauthenticated same-user authority as the
-rest of `/api`. Stage-result and FirstMate-proposal MCP calls additionally require the existing
+rest of `/api`. Stage-result and Chucky-proposal MCP calls additionally require the existing
 random launch token and server-derived caller identity; a role/id supplied in tool arguments is never
-authority. FirstMate's exact-payload Save/Start confirmation is a UI interaction guard, not a claim
+authority. Chucky's exact-payload Save/Start confirmation is a UI interaction guard, not a claim
 that a shell-capable same-user process cannot invoke the ordinary CLI/API. Pipeline text is treated
 like prompt/transcript content: owner-only and bounded, but not a credential vault or automatically
 redacted secret field.

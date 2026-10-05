@@ -212,7 +212,7 @@ func launchWorkload(ctx context.Context, baseURL string, workers int) ([]launche
 	for i, name := range names {
 		role := "implementer"
 		if i == 0 {
-			role = "firstmate"
+			role = "chucky"
 		}
 		var session launchedSession
 		if err := postJSON(ctx, baseURL+"/api/sessions", map[string]string{

@@ -130,7 +130,7 @@ attempt lineage/reports, current named values/provenance, and start idempotency 
 forward-only SQLite tables written only through `internal/state`. Pipeline-table foreign keys may
 cascade within a deleted run but must not cascade into `agents`, `sessions`, transcripts, or archive
 projections. The migration uses non-null JSON defaults/collection decoding, indexes for active-run
-and agent-attempt lookup, and a schema-version guard test. Durable FirstMate proposal records are
+and agent-attempt lookup, and a schema-version guard test. Durable Chucky proposal records are
 part of the same SQLite-owned set and are specified by R22. TS-09 owns the logical shapes.
 
 **R18 — Effort is an additive catalog field and frozen execution data.**
@@ -219,7 +219,11 @@ destination. Preserve a consistent database snapshot, transcripts and custom con
 not globally replace strings in history, native-provider records or SQLite bytes. Adapt explicit
 role-id references and path-bearing configuration/records only as required by the concrete copy.
 Audit project/resource paths, native profile paths and owned-worktree Git links/ownership records:
-a directory copy alone is not evidence these still resolve. Leave source data recoverable, keep
+a directory copy alone is not evidence these still resolve. Frozen session snapshots are executable
+paths, not history: resume and file reads use `sessions.cwd`, `sessions.add_dirs` and the frozen
+prompt verbatim, so a destination-only repair rewrites the source-home prefix in those columns and
+audits `launch_config_json` for remaining source-home paths, leaving transcripts and messages
+unchanged. Leave source data recoverable, keep
 automatic work paused until references validate, and start new processes only after the destination
 passes FS-10.A14. Retain existing record identities/history; do not invent a general migration
 framework or promise native-session continuity. Derived managed skill files are republished by
@@ -286,7 +290,7 @@ Tailscale node state lives in `$CHUCK_HOME/remote/tailscale/` (`0700`) and the V
 lost on restart. The phone's "since you last looked" time lives only in the phone's own storage
 (TS-13.R10, R7, R8, R11).
 
-**R22 — FirstMate proposal records are authoritative, consumable, and
+**R22 — Chucky proposal records are authoritative, consumable, and
 bounded.** A forward-only `pipeline_proposals` table is the durable authority for the Pipelines
 approval surface: content-addressed `proposal_id`, kind, digest, non-null canonical `payload_json`,
 `created_at`, and `consumed_at`. A record is committed before its MCP tool reports success. Because

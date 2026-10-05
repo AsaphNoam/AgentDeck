@@ -8,7 +8,7 @@
 
 This specification owns the product-managed `operating-chuck` skill package, its release-time
 source, secure cache installation, delivery to every Chuck-launched process, safe degradation
-when the package is unavailable, and the exact legacy FirstMate-prompt migration.
+when the package is unavailable, and the exact legacy Chucky-prompt migration.
 
 It does not create a documentation API, MCP documentation tool, mutable knowledge store, managed
 role system, provider-home synchronization, or development/release-maintenance workflow. Feature
@@ -119,7 +119,7 @@ versus pipeline, durable dependencies instead of polling, pull-only/non-waking c
 derived authority, structured-result behavior, and routing to tool definitions for exact mechanics.
 `coordinate-work.md` owns coordination-only details including messaging budgets.
 `build-and-run-pipelines.md` owns pipeline-only details including accepted/`blocked` attempt
-finality, human Continue, and review-only FirstMate proposals. `operate-agents.md` owns lifecycle,
+finality, human Continue, and review-only Chucky proposals. `operate-agents.md` owns lifecycle,
 configuration, interface, and project-resource detail. Examples are limited to commonly misused
 behavior; planned, experimental, secret-bearing, credential-specific, and unverifiable claims are
 excluded. As an alignment cleanup, the fresh PM and teammate seed prompts remove duplicated

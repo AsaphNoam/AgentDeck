@@ -151,7 +151,7 @@ func TestRolesSeeded(t *testing.T) {
 	if len(roles) != 4 {
 		t.Fatalf("seeded roles = %d, want 4: %v", len(roles), roles)
 	}
-	for _, k := range []string{"firstmate", "implementer", "reviewer", "researcher"} {
+	for _, k := range []string{"chucky", "implementer", "reviewer", "researcher"} {
 		if _, ok := roles[k]; !ok {
 			t.Errorf("missing seeded role %q", k)
 		}

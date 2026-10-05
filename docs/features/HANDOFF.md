@@ -25,15 +25,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   rendered gates. The test-only `post-release-flaky-test-synchronization` fixes are available.
   `rename-product-to-chuck` (2026-10-04, `36afbf2`..`3855419`: module
   `github.com/AsaphNoam/Chuck`, `cmd/chuck`, `CHUCK_*`/`~/.chuck`, Chuck install tree/archive,
-  `chuck-messaging`/`X-Chuck-Token`, `chuck-` tmux prefix, FirstMate, `operating-chuck`, UI/phone
-  branding, legacy annotation recognition, storage copy-forward, `scripts/check-old-name.sh`,
+  `chuck-messaging`/`X-Chuck-Token`, `chuck-` tmux prefix, resident role (now Chucky),
+  `operating-chuck`, UI/phone branding, legacy annotation recognition, storage copy-forward, `scripts/check-old-name.sh`,
   docs and `docs/chuck-cutover.md`; FS-00.R19, FS-04.R52, FS-10.R15/R25–R26, FS-13.R24,
   FS-18.R18, TS-02.R40–R41, TS-04.R78, TS-06.R24, TS-08.R58, TS-11.R18) was reviewed 2026-10-05;
-  one Must-fix cutover-path finding and one Worth-fixing documentation finding remain below.
-  Docs prose was a delegated pass; historical old-name mentions were kept deliberately (retired items,
-  `AGENTDECK_CODEX_VERSION` history, the Figma URL).
-- **Fix units:** `rename-product-to-chuck` keeps the two findings below; fix the cutover instructions
-  before running its owed rehearsal. `notifications-open-conversation` and
+  its findings were fixed 2026-10-05 and the resident role renamed FirstMate → Chucky (`chucky`);
+  the unit is closed apart from its owed rehearsal, repository rename and release notice.
+  Historical old-name mentions were kept deliberately (retired items, `AGENTDECK_CODEX_VERSION`
+  history, the Figma URL, the retired BRIEFS, the uncommitted `docs/ideas.md` edit).
+- **Fix units:** `notifications-open-conversation` and
   `phone-desktop-flow-and-agent-management.md` each keep one Worth-fixing UI-coverage finding; the
   phone unit's Must-fix items are closed. Claude 5.5 launch compatibility keeps one Worth-fixing
   finding; its Must-fix is closed; the installed-provider correction it depends on still owes
@@ -89,49 +89,6 @@ None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./in
 None.
 
 ## Review findings
-
-### Rename the product to Chuck — reviewed 2026-10-05 — **Fix model:** medium — Codex Terra or Claude Opus.
-
-Reviewed `36afbf2`..`3855419`, including current documentation omitted by the prose pass.
-
-- **Must fix** — the cutover leaves executable session paths pointing at the preserved source.
-  **Where:** `docs/chuck-cutover.md:71-76` updates JSON configuration and
-  `project_worktrees.checkout_path`, but does not inventory/adapt `sessions.cwd` or frozen
-  `sessions.add_dirs` (`internal/state/session.go:23-30`). **Normal-use trigger:** after following
-  the guide, resume a stopped agent whose working directory was an owned worktree under the old
-  home. **Why it matters:** `internal/server/resume.go:470-509` uses `snap.Cwd` and `snap.AddDirs`
-  verbatim. While the source is preserved, `internal/server/worktree.go:159-168` accepts its
-  existing directory even though it no longer matches the updated ownership row, so the process
-  can work in the source checkout instead of Chuck's repaired checkout. After optional source
-  removal, the same resume fails; file reads also use the old frozen cwd
-  (`internal/server/fileread.go:84`). This is separate from the explicitly unpromised native-provider
-  session continuity. **Requirement:** FS-10.R25/A14, TS-02.R41; INV §7/§10/§15.
-  **Suggested fix/test:** extend the offline inventory and targeted destination-only repair to the
-  concrete path-bearing session records, including cwd and add_dirs; audit frozen launch-config
-  paths without globally replacing historical text. Rehearse with a stopped worktree session and
-  distinct source/destination files; prove file reads and a new resumed process use the destination,
-  the source stays untouched, and the result still works when the source is unavailable.
-- **Worth fixing** — a current architecture rationale still describes the old product and home.
-  **Where:** `docs/architecture-decisions.md:23-32` says SQLite lives under `~/.agentdeck/` and calls
-  the current transcript/config owner AgentDeck. **Normal-use trigger:** a developer follows the
-  live storage rationale while inspecting or configuring Chuck. **Why it matters:** it directs them
-  to the legacy home Chuck deliberately ignores and contradicts the current technical specs; this
-  is not an archived or explicitly retired passage. **Requirement:** FS-00.R19, FS-10.R26,
-  TS-02.R40; INV §10. **Suggested fix/test:** update current product/path descriptions while keeping
-  historical/archive references intact; repeat the non-archived documentation old-name sweep.
-
-Invariant sweep: checked applicable classes §1–4, §7–8 and §10–17 across storage copy-forward,
-launch/protocol/skill wiring, presentation, retained annotation trays, packaging and cutover. No
-applicable changed concurrency surface (§5), new runtime/interface (§6), or durability primitive
-(§9); mechanical import/comment substitutions introduce no such changes. Existing helpers and
-whole-root publication remain the owners; the absence of legacy aliases, startup migration and
-old-prefix adoption matches the selected specifications. No local-choice question remains.
-Verification: old-name packaging assertion, spec check, diff whitespace check, focused
-config/knowledge/hooks/messaging/runtime/terminal tests, UI style checks and 31 focused browser-state,
-annotation and phone component tests passed. Full `make test` passed in both ordinary and
-`sqlite_fts5` configurations with Go-cache and loopback-listener access after sandbox-only failures.
-The disposable real-home cutover rehearsal, GitHub repository rename and phone re-pairing release
-notice remain owed as recorded above.
 
 ### Notifications open the agent's conversation — reviewed 2026-10-03 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
@@ -208,6 +165,13 @@ supplied.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-05 — Rename fixes; resident role is Chucky.** Cutover now rewrites and audits frozen
+  session paths (`cwd`, `add_dirs`, prompt; `launch_config_json` audited), and A14 rehearses a
+  resumed worktree session with the source unavailable (INV §7/§10/§15). Storage rationale names
+  `~/.chuck` (INV §10). FirstMate/`firstmate` → Chucky/`chucky` across code, UI and specs. Both Go
+  variants, spec/old-name checks and 107 affected UI tests pass. Rehearsal, repository rename and
+  phone re-pair notice remain.
 
 - **2026-10-05 — Rename reviewed.** Runtime, protocol, release and UI wiring passed the focused
   audit. Recorded the cutover's missing frozen-session path repair and stale current storage

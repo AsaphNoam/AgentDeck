@@ -107,7 +107,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   agent's conversation where one exists.
 - **R15 — New work starts against configured projects.** **New work** asks for an
   existing active project, then offers:
-  - **Ask FirstMate** — opens that project's running `firstmate` agent, or launches one with the
+  - **Ask Chucky** — opens that project's running `chucky` agent, or launches one with the
     runtime the desktop New Agent form would preselect, and sends the typed instruction;
   - **New task** — a display name, an instruction, and a role, launched with the preselected runtime
     and no prerequisites (FS-16.R1/R2);
@@ -172,7 +172,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   message field; the person writes to the agent in its conversation. The phone launches only the
   chat interface; terminal agents, worktree forks, groups, and per-launch permission overrides stay
   desktop-only. The new agent opens in its phone conversation. A rejected launch shows the desktop's
-  reason and keeps every entered value (R27). The global **New work** screen — Ask FirstMate, New
+  reason and keeps every entered value (R27). The global **New work** screen — Ask Chucky, New
   task, and its Start pipeline — leaves the phone; R41 moves Start pipeline to the project page.
   This supersedes R15 and R31's defaults-only rule for new agents.
 - **R36 (shipped 2026-10-02) — Agent management actions on the phone.** An agent's phone screen offers,
@@ -291,7 +291,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   with the desktop result; a conversation sends, holds a follow-up, steers, cancels, and stops. —
   UI tests plus a fakeACP browser pass at phone size.
 - **A4** (R14, R27) — From the phone, continue a paused run; a refused action shows the desktop
-  reason and keeps typed text. Task retry, task creation, Ask FirstMate, and the New work screen
+  reason and keeps typed text. Task retry, task creation, Ask Chucky, and the New work screen
   left the phone under R40/R33; starting a pipeline is A10's project-page journey. — server and UI
   tests plus the fakeACP browser pass.
 - **A5 (planned)** (R18–R21, R25, R28) — Each attention event notifies a subscribed phone once,

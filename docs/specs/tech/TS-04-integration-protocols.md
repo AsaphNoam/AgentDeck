@@ -92,7 +92,7 @@ account identity, and credential values never cross the process/log/API boundary
 server adds `report_pipeline_stage_result`, `propose_pipeline_template`, and
 `propose_pipeline_run`; there is no `start_pipeline_run` tool. All derive caller identity from the
 per-launch token and return bounded structured results. Reporting delegates to TS-09's atomic
-current-attempt service. Proposal tools are limited to token-bound FirstMate-role chat sessions,
+current-attempt service. Proposal tools are limited to token-bound Chucky-role chat sessions,
 call the canonical pipeline validator, and commit their bounded canonical proposal record before
 returning data/digests: they cannot save, start, or approve. Tool registration, token generation,
 teardown, transport, and redaction remain the existing R6–R7 authority rather than a second MCP

@@ -129,7 +129,7 @@ cd ui && npm ci && npm run dev   # http://localhost:5173
 ## Layout (`~/.chuck/`)
 
 ```
-roles/{role}.json     personas (seeded: firstmate, implementer, reviewer, researcher)
+roles/{role}.json     personas (seeded: chucky, implementer, reviewer, researcher)
 projects/{p}.json     workspaces (seeded: my-app)
 backends.json         providers + models (version 2)
 config-sources.json   optional Claude/Codex native-config bindings
@@ -159,7 +159,7 @@ Seeding is per-file and if-absent: new roles appear on the next `dashboard start
 and your edits to existing ones are never overwritten. Edit them in Settings or
 directly in `roles/{role}.json`.
 
-- **`firstmate`** — built-in Chuck expert and coordinator. Ask it how anything works
+- **`chucky`** — built-in Chuck expert and coordinator. Ask it how anything works
   (launch syntax, config files, switch-runtime, archive, messaging), or hand it
   a goal: it can launch other agents via the `chuck` CLI and coordinate
   them over MCP messaging when the selected real CLI passes the credentialed HTTP-MCP

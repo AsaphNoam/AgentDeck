@@ -35,7 +35,7 @@ past work — without juggling a dozen terminal tabs.
 - **R16 — retired 2026-10-03:** Automatic migration promise replaced by R19's supervised cutover.
 - **R19** — The product is named Chuck across the application, documentation,
   `chuck` command, `$CHUCK_HOME`, release/install identity, MCP identity/header, agent knowledge
-  and desktop/phone UI. The resident operator is **FirstMate**. FS-10.R15/R25–R26 define a normal
+  and desktop/phone UI. The resident operator is **Chucky**. FS-10.R15/R25–R26 define a normal
   Chuck install and one supervised data-preserving cutover for the sole operator, with stopped old
   sessions and no general legacy migration or runtime aliases. FS-04.R52 owns the new role identity;
   FS-18.R18 owns current agent-facing wording. Existing transcripts, customized user content and
@@ -80,7 +80,7 @@ row per live agent; live status (`state ∈ {busy, idle, waiting_input, done, er
 - **R5** — A **role** is a reusable persona defining *how* an agent behaves, independent of where it
   works: a `system_prompt`, display `title`, and a `skip_permissions` policy (`null` inherits the
   global config value; `true`/`false` override it). Roles are stored as config files and seeded if
-  absent, never overwriting user edits (see FS-04). Seed roles: `firstmate`, `implementer`,
+  absent, never overwriting user edits (see FS-04). Seed roles: `chucky`, `implementer`,
   `reviewer`, `researcher` (FS-04.R50).
 
 ### 2.3 Project — the workspace

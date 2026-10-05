@@ -183,10 +183,11 @@ person's provider credentials or Chuck configuration.
   *Verify by* focused home-resolution/startup tests, not a migration failure matrix.
 - **A14** `(planned)` (R25) — Rehearse the documented cutover on a disposable copy representative
   of the operator's installation. Confirm retained records/transcripts and customized roles are
-  readable, resources and owned Git worktrees resolve, new FirstMate sessions launch, and the
-  preserved source can still be used for recovery after Chuck is stopped. Review stop/pause,
-  draft preservation, phone re-pairing and cleanup instructions. Record what was checked and any
-  native-resume limitation; do not claim a real installation was migrated from this rehearsal.
+  readable, resources and owned Git worktrees resolve, a resumed stopped worktree session and its
+  file reads use the destination checkout (also with the source unavailable), new Chucky sessions
+  launch, and the preserved source can still be used for recovery after Chuck is stopped. Review
+  stop/pause, draft preservation, phone re-pairing and cleanup instructions. Record what was
+  checked and any native-resume limitation; do not claim a real installation was migrated from this rehearsal.
   *Verify by* one supervised rehearsal receipt and release-documentation review.
 
 - **A10** `(planned)` (R21, R23–R24) — A fresh install with no installed provider produces a working dashboard,

@@ -109,7 +109,7 @@ export function RunStartForm({
     setPendingRequest(null);
     setConflicts([]);
     setDiagnostics([]);
-    setNotice("Review the exact FirstMate run proposal before confirming Start.");
+    setNotice("Review the exact Chucky run proposal before confirming Start.");
     setError(null);
     setStep(0);
   }, [proposalSeed]);

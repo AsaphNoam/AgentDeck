@@ -79,7 +79,7 @@ export function TemplateEditor({
     setSavedID(templates.data?.some((entry) => entry.id === seed.id) ? seed.id : null);
     setProposal(seed.proposal);
     setDiagnostics([]);
-    setNotice(seed.proposal ? "Review the exact FirstMate proposal below before confirming Save." : null);
+    setNotice(seed.proposal ? "Review the exact Chucky proposal below before confirming Save." : null);
     setError(null);
     setSelectedStage(0);
   }, [seed]);
@@ -130,7 +130,7 @@ export function TemplateEditor({
           setSavedID(record.id);
           setDraft(copyTemplate(record.template));
           applyDiagnostics(record.diagnostics);
-          setNotice(proposal ? "Exact FirstMate proposal saved." : "Template saved.");
+          setNotice(proposal ? "Exact Chucky proposal saved." : "Template saved.");
           setProposal(undefined);
           onSaved?.(record.id);
         },

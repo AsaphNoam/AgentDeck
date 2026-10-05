@@ -58,7 +58,7 @@ the installed app on iOS.
   with code `remote_route_not_available`, whether or not the loopback mux serves it. The table
   contains only what FS-20 needs: health, capabilities, and the SSE stream; session list, detail, and
   transcript reads; `prompt` (POST/GET/DELETE), `steer`, `cancel`, `stop`, `resume`, and
-  `permission`; `POST /api/sessions` for Ask FirstMate; task list/detail/create and
+  `permission`; `POST /api/sessions` for Ask Chucky; task list/detail/create and
   `cancel`/`result`/`retry`/`rearm`; pipeline run list/detail/start and
   `continue`/`retry`/`replace`/`repair-cleanup`/`stop`; read-only project, role,
   pipeline-template, and configuration (`GET /api/config`, for notification preferences) reads; and

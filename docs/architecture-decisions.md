@@ -20,16 +20,17 @@ is preserved in the [archive](archive/agent-dashboard-prd.md).
 - *Everything in files (with a derived, rebuildable index).* Works, but leaves an index that can drift from the files and still needs reconciliation logic. Since the server is the sole writer (D2), SQLite can simply be **authoritative** for state — no drift, no reconciliation.
 - *Everything in SQLite, including config.* Loses the transparency/hand-editability that makes config pleasant to live with, for no real gain (config is low-volume and single-writer already).
 
-**Local-first is preserved.** One SQLite file under `~/.agentdeck/`, no separate database service,
-no cloud, and user-owned plain-text config. AgentDeck appends its normalized chat transcript under
-`sessions/` and indexes it into FTS5; provider-owned session artifacts may coexist there.
+**Local-first is preserved.** One SQLite file under `~/.chuck/` (`$CHUCK_HOME`), no separate
+database service, no cloud, and user-owned plain-text config. Chuck appends its normalized chat
+transcript under `sessions/` and indexes it into FTS5; provider-owned session artifacts may coexist
+there.
 
-**Phase 7 federation refinement.** “Config in files” does not require AgentDeck to duplicate config
+**Phase 7 federation refinement.** “Config in files” does not require Chuck to duplicate config
 already owned by Claude Code or Codex. For linked backends, the native user/project files remain the
-authoritative plain-text configuration; AgentDeck stores a small `config-sources.json` binding plus
+authoritative plain-text configuration; Chuck stores a small `config-sources.json` binding plus
 explicit overrides and derives a redacted effective view. A mirror, when native pass-through is not
 possible, is disposable cache rather than a second authority. Only an explicit detached import makes
-AgentDeck authoritative for the copied values/assets. This one-way authority rule avoids an
+Chuck authoritative for the copied values/assets. This one-way authority rule avoids an
 irreconcilable two-writer merge while retaining local ownership, inspectability and hand editing.
 
 ---

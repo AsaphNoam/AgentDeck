@@ -392,7 +392,7 @@ type PipelineValueRecord struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-// PipelineProposalRecord is the durable, canonical result of a FirstMate
+// PipelineProposalRecord is the durable, canonical result of a Chucky
 // proposal tool call. Its payload stays opaque here so state remains independent
 // of the pipeline package's template and run request types.
 // DeclinedAt is nil for a record nobody rejected.

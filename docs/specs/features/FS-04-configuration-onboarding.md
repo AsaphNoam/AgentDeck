@@ -63,7 +63,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   without re-creating the project.
 - **R36.** An archived project is ineligible wherever a project is selected for a new
   process. A stored `default_project` may continue to name an archived project as a dormant
-  preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and FirstMate
+  preference, but the New Agent modal, onboarding Launch step, pipeline run setup, and Chucky
   builder list only configured active projects and preselect the default only when it is active.
   Direct JSON edits that archive the default therefore do not create a launch trap; restoring that
   project makes the preference eligible again without rewriting `config.json`. `project.done` in
@@ -198,7 +198,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   FS-18.R12–R13 own the corrected prompt content and its user-visible limits; TS-11.R13 owns the
   comparison, the digest table, and the atomic write.
 - **R48 — retired 2026-10-03:** Startup role conversion replaced by R52 and supervised cutover.
-- **R52** — Chuck seeds `firstmate`, displayed as **FirstMate**, and pipeline-proposal
+- **R52** — Chuck seeds `chucky`, displayed as **Chucky**, and pipeline-proposal
   authorization accepts that id, not `agentdecker`. There is no automatic legacy-role conversion,
   alias or existing-process identity repair. The supervised cutover (FS-10.R25) preserves edited
   role content and adjusts the concrete installation's references offline; it does not overwrite
@@ -209,7 +209,7 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
 
 
 - **R50 — Four lean shipped personas.** Superseding R14–R15 only for the
-  shipped role set, a fresh home seeds the resident operator (`firstmate`, FS-04.R52),
+  shipped role set, a fresh home seeds the resident operator (`chucky`, FS-04.R52),
   `implementer`, `reviewer`, and `researcher`. Coordination is part of the resident operator's
   mandate; no separate coordinator, `pm`, or `teammate` is seeded. The default remains
   `implementer`, all four inherit the existing permission policy, and role editing retains its
@@ -428,8 +428,8 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   `TestMigrateSupersededRolePromptsExactOnly`, `TestMigrateSupersededRolePromptsSkipsUnseededRole`;
   FS-18.A9 covers the per-role failure isolation and package gating.
 - **A28 — retired 2026-10-03:** Automatic role migration replaced by A32 and FS-10.A14.
-- **A32** (R52) — A fresh home seeds FirstMate and pipeline-proposal authorization
-  accepts `firstmate` and rejects `agentdecker`; a prepared customized FirstMate role survives
+- **A32** (R52) — A fresh home seeds Chucky and pipeline-proposal authorization
+  accepts `chucky` and rejects `agentdecker`; a prepared customized Chucky role survives
   startup unchanged under R47. *Verify by* seed/pipeline authorization fixtures. Preservation of
   the operator's old customized role and references is checked in the FS-10.A14 cutover rehearsal.
 

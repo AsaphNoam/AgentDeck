@@ -307,7 +307,7 @@ ALTER TABLE pipeline_attempts ADD COLUMN effort TEXT NOT NULL DEFAULT '';
 		`,
 	},
 	{
-		// FirstMate proposal tool calls must survive adapter transcript shapes and
+		// Chucky proposal tool calls must survive adapter transcript shapes and
 		// be discoverable by a fresh Pipelines page before MCP reports success.
 		version: 14,
 		sql: `

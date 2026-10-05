@@ -19,7 +19,7 @@ export function shouldDropBuilderSession(builderID: string | null, live: boolean
   return Boolean(builderID && hydrated && !hydrating && !live && !justLaunched);
 }
 
-export function FirstMateBuilder({
+export function ChuckyBuilder({
   onTemplateProposal,
   onRunProposal,
   proposalKind,
@@ -55,7 +55,7 @@ export function FirstMateBuilder({
   const templates = usePipelineTemplates();
   // A stopped builder keeps its identity row in the agent store, so presence is
   // not liveness: classifying by presence never expires the persisted id and
-  // leaves a dead "Open FirstMate chat" link behind (INV §1).
+  // leaves a dead "Open Chucky chat" link behind (INV §1).
   const builderRunning = useAgentStore((state) => (builderID ? state.agents[builderID]?.running === true : false));
   const agentsHydrated = useAgentStore((state) => state.hydrated);
   const agentsHydrating = useAgentStore((state) => state.hydrating);
@@ -103,7 +103,7 @@ export function FirstMateBuilder({
     setError(null);
     try {
       const response = await launchAgent({
-        role: "firstmate",
+        role: "chucky",
         project,
         backend: backendID,
         model: modelID,
@@ -132,7 +132,7 @@ export function FirstMateBuilder({
   // a non-empty selection: a selection that has since left the catalog (or a
   // default naming a project that no longer exists) must hold the launch closed
   // rather than enabling a button whose only outcome is a rejected launch.
-  const builderReady = Boolean(roles.data?.firstmate && project && projects.data?.[project] && !projects.data[project].archived && backendID && modelID && description.trim());
+  const builderReady = Boolean(roles.data?.chucky && project && projects.data?.[project] && !projects.data[project].archived && backendID && modelID && description.trim());
   const ofThisKind = (proposal: PipelineListedProposal) => !proposalKind || proposal.kind === proposalKind;
   const pendingProposals = (proposals.data?.pending ?? []).filter(ofThisKind);
   const declinedProposals = (proposals.data?.declined ?? []).filter(ofThisKind);
@@ -143,12 +143,12 @@ export function FirstMateBuilder({
 
   return <section className="pipeline-panel pipeline-builder">
     {showLauncher && <div className="pipeline-panel-header">
-      <div><p className="pipeline-eyebrow">Guided drafting</p><h2>Create with FirstMate</h2></div>
-      <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close builder setup" : "Create with FirstMate"}</button>
+      <div><p className="pipeline-eyebrow">Guided drafting</p><h2>Create with Chucky</h2></div>
+      <button type="button" onClick={() => setOpen((value) => !value)}>{open ? "Close builder setup" : "Create with Chucky"}</button>
     </div>}
     {showLauncher && open && <div className="pipeline-builder-form">
-      <p>Choose the project and chat runtime for the ordinary FirstMate session. This choice is not stored in the model-neutral template.</p>
-      {!roles.data?.firstmate && <p className="form-error">The configured <code>firstmate</code> role is required.</p>}
+      <p>Choose the project and chat runtime for the ordinary Chucky session. This choice is not stored in the model-neutral template.</p>
+      {!roles.data?.chucky && <p className="form-error">The configured <code>chucky</code> role is required.</p>}
       {projectEntries.length === 0 && <p className="form-error">Configure a project before launching the builder.</p>}
       <div className="pipeline-form-grid">
         <label className="form-field"><span>Project</span><select value={project} onChange={(event) => setProject(event.target.value)}>
@@ -166,12 +166,12 @@ export function FirstMateBuilder({
       </div>
       <label className="form-field"><span>Describe the pipeline</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>
       {error && <p className="form-error">{error}</p>}
-      <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch FirstMate builder"}</button></div>
+      <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch Chucky builder"}</button></div>
     </div>}
 
     {showLauncher && builderID && <div className="pipeline-builder-session">
       <p>{!agentsHydrated ? "Loading builder session…" : builderRunning ? <>Builder session: <code>{builderID}</code></> : "The builder session has stopped. Its pending proposals remain available below."}</p>
-      {builderRunning && <Link to={`/agent/${builderID}`}>Open FirstMate chat</Link>}
+      {builderRunning && <Link to={`/agent/${builderID}`}>Open Chucky chat</Link>}
     </div>}
     {proposalFailure && <p className="form-error">{proposalFailure}</p>}
     {pendingProposals.length > 0 && <div className="pipeline-proposal-list">

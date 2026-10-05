@@ -32,7 +32,7 @@ runtime — the messaging MCP server and embedded UI live inside the Go binary (
 | `internal/configsource` | Phase 7 federation: Claude/Codex native-config discovery, binding, effective view |
 | `internal/messaging` | In-process agent-facing MCP gateway and token→agent registry; handlers delegate messaging and TS-09 pipeline result/proposal semantics to their owning services |
 | `internal/contextref` | Canonical context-reference identity, typed source resolution/rendering, direct-grant authorization, and bounded reads; no artifact payload store or scheduler |
-| `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and FirstMate proposal services |
+| `internal/pipeline` | Template validation, durable sequential run state machine, transition reconciliation, stage-result and Chucky proposal services |
 | `internal/backend` | Backend/model adapter contracts, env layering, credential checks (`credcheck`) |
 | `internal/archive` | Session archive queries + FTS-backed search |
 | `internal/transcript` | Append-only normalized Chuck transcript reader/writer; tolerant reads of session artifacts |

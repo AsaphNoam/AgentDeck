@@ -9,7 +9,7 @@ offline cutover. Nothing here runs automatically, and nothing deletes the source
 | Home | `~/.agentdeck` (or `$AGENTDECK_HOME`) | `~/.chuck` (or `$CHUCK_HOME`) |
 | Install tree | `~/Library/Application Support/AgentDeck` | `~/Library/Application Support/Chuck` |
 | Command | `agentdeck` | `chuck` |
-| Resident operator role | `agentdecker` | `firstmate` |
+| Resident operator role | `agentdecker` | `chucky` |
 | tmux sessions | `agentdeck-*` | `chuck-*` |
 | Phone address | `https://agentdeck.<tailnet>.ts.net` | `https://chuck.<tailnet>.ts.net` |
 
@@ -50,6 +50,8 @@ Record, from the source:
   `sqlite3 ~/.agentdeck/state.db 'select count(*) from agents; select count(*) from tasks;'`;
 - owned worktrees: `sqlite3 ~/.agentdeck/state.db 'select repo_path, checkout_path from project_worktrees;'`
   and `git -C <repo> worktree list` for each repository;
+- frozen session paths, which resume and file reads use verbatim:
+  `sqlite3 ~/.agentdeck/state.db "select agent_id, cwd, add_dirs from sessions where cwd like '%/.agentdeck/%' or add_dirs like '%/.agentdeck/%';"`;
 - every path that names the source home:
   `grep -rl '/.agentdeck' ~/.agentdeck --include='*.json'`.
 
@@ -64,14 +66,30 @@ Starting with an empty Chuck home or leaving any of these behind is a separate, 
    `rm -rf ~/.chuck/cache ~/.chuck/mcp ~/.chuck/hooks ~/.chuck/.pid-* ~/.chuck/remote/tailscale`.
    The operating skill is republished as `operating-chuck` on first start.
 4. Adapt the resident role. If you never edited it, delete `~/.chuck/roles/agentdecker.json` and
-   let Chuck seed FirstMate. If you did, rename it to `firstmate.json` (only when that file does
-   not exist) and keep its content. Then replace the role id `agentdecker` with `firstmate` where
+   let Chuck seed Chucky. If you did, rename it to `chucky.json` (only when that file does
+   not exist) and keep its content. Then replace the role id `agentdecker` with `chucky` where
    configuration names it: `default_role` in `config.json` and `orchestrator_role` or role fields in
    `pipelines/*.json`. Leave transcripts and history untouched.
 5. Move owned worktrees and rewrite only the paths that must resolve:
    - in JSON configuration, replace the source home path with the destination home path in each
      file step 3 listed;
-   - in `~/.chuck/state.db`, update `project_worktrees.checkout_path` the same way;
+   - in `~/.chuck/state.db`, rewrite the source-home prefix in worktree ownership rows and in the
+     frozen session snapshots (working directory, extra directories, frozen prompt). Transcripts,
+     messages and other history stay untouched:
+     ```sh
+     src="$HOME/.agentdeck/"; dst="$HOME/.chuck/"
+     sqlite3 ~/.chuck/state.db "
+       update project_worktrees set checkout_path = replace(checkout_path, '$src', '$dst');
+       update sessions set cwd = replace(cwd, '$src', '$dst'),
+         add_dirs = replace(add_dirs, '$src', '$dst'),
+         system_prompt = replace(system_prompt, '$src', '$dst');"
+     ```
+     Then both of these must print nothing; fix any `launch_config_json` hit by hand, and only
+     where the value is a path a resumed process uses:
+     ```sh
+     sqlite3 ~/.chuck/state.db "select agent_id from sessions where cwd like '%/.agentdeck/%' or add_dirs like '%/.agentdeck/%' or system_prompt like '%/.agentdeck/%';"
+     sqlite3 ~/.chuck/state.db "select agent_id from sessions where launch_config_json like '%/.agentdeck/%';"
+     ```
    - repair each repository's links: `git -C <repo> worktree repair <new checkout path>…`, then
      confirm `git -C <repo> worktree list` shows the Chuck paths.
    The source checkouts stay registered nowhere once repaired; the snapshot still holds them.
@@ -82,9 +100,11 @@ Start Chuck (`chuck dashboard start`) with automatic work still paused, then con
 
 - archived agents and their transcripts open and read correctly; tasks, pipelines and context
   links list as before;
-- edited roles appear unchanged and FirstMate is present;
+- edited roles appear unchanged and Chucky is present;
 - each project's resources and owned worktrees resolve, and a worktree project shows its checkout;
-- a new FirstMate chat and a new implementer launch, receive the operating skill, and can message;
+- a stopped agent that worked in an owned worktree resumes in the `~/.chuck` checkout, and its file
+  reads show destination files (rehearse once with the source home moved aside, then put it back);
+- a new Chucky chat and a new implementer launch, receive the operating skill, and can message;
 - `tmux ls` shows only `chuck-*` sessions for new terminal agents.
 
 Then resume automatic work. Turn remote control back on and re-pair each phone at the new

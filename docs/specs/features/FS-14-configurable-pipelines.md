@@ -63,8 +63,8 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   run snapshots the template, display name, goal, project, inputs, roles, and runtime assignments;
   later template edits affect future runs only.
 - **R4.** A run can be started from the dashboard and through a local CLI/API surface.
-  FirstMate may start the same native run by invoking that CLI/API after the user asks it to; the
-  pipeline engine, not FirstMate's conversational context, then owns progression.
+  Chucky may start the same native run by invoking that CLI/API after the user asks it to; the
+  pipeline engine, not Chucky's conversational context, then owns progression.
 
 ### 2.2 Assignment and explicit completion
 
@@ -224,25 +224,25 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   do not complete the attempt or launch the destination. `failure` and `blocked` results may still
   carry useful partial outputs.
 
-### 4.2 Pipelines page and FirstMate-assisted creation
+### 4.2 Pipelines page and Chucky-assisted creation
 
 - **R25 — superseded 2026-08-27 by R35–R45:** A single dedicated **Pipelines** page carried the
   template list, template editor, Start Run form, and run detail/history together on one scrolling
   screen. Combining authoring with supervision made both jobs hard to read and left a live run's
   position visible only as a stage id. R35–R45 split the surface and replace it; the no-graph-canvas
   boundary is carried forward by R35 and hand-editable versioned template JSON by R41.
-- **R26.** Create with FirstMate first lets the user choose one configured active project,
-  backend, and model for the template-building FirstMate session. The project picker lists every
+- **R26.** Create with Chucky first lets the user choose one configured active project,
+  backend, and model for the template-building Chucky session. The project picker lists every
   configured active project and defaults to the configured default project only when that project
   still exists and is active; the builder cannot be launched until a listed project is selected, so
   a stale, removed, or archived default is visible before launch rather than only as a rejected
   launch. The picker shows configured readiness honestly; effort remains a per-run stage assignment
   rather than a template or builder setting. This creator choice is not written into the
   resulting model-neutral template.
-- **R27.** The FirstMate builder accepts a natural-language pipeline description, asks
+- **R27.** The Chucky builder accepts a natural-language pipeline description, asks
   clarifying questions in chat, and submits a structured draft containing stages, roles,
   instructions, named inputs/outputs, outcome routes, approval gates, and loop bounds. Chuck
-  validates and previews the draft in the ordinary editor. FirstMate may request **Save** for the
+  validates and previews the draft in the ordinary editor. Chucky may request **Save** for the
   exact validated draft or **Start** for an exact saved-template run configuration, but neither
   action occurs until the person approves its one-time confirmation in the Pipelines UI. Editing the
   proposed payload invalidates that approval, Save and Start require separate approvals, and chat
@@ -250,16 +250,16 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   approval surface rather than navigating into the builder chat, because the Save/Start controls live
   there. The builder session panel reflects the session's live state: while agent state is still
   hydrating it shows a loading line; while the builder runs it shows the session id and an **Open
-  FirstMate chat** link; and once the builder has stopped it withholds that link and states that the
+  Chucky chat** link; and once the builder has stopped it withholds that link and states that the
   session stopped while its pending proposals remain available for approval below.
 - **R28.** Runs can be started and controlled from the Pipelines page and local CLI/API.
-  FirstMate may invoke that local surface after a user's request, but v1 exposes no agent-facing
+  Chucky may invoke that local surface after a user's request, but v1 exposes no agent-facing
   start-run MCP tool and pipelines cannot start child pipelines.
 - **R29.** Pipeline-level notifications use the existing toast/desktop/mute pipeline for
   exactly two categories: **needs attention** (blocked, approval gate, launch failure, or crash) and
   **completed** (terminal success or terminal failure). Ordinary successful stage transitions do not
   notify.
-- **R30.** The FirstMate Save/Start confirmation is an interaction guard, not a new
+- **R30.** The Chucky Save/Start confirmation is an interaction guard, not a new
   security boundary. The builder integration exposes no unapproved write/start operation and never
   auto-approves its own request, while Chuck retains TS-05's existing same-user local-API trust
   model: a shell-capable agent is not cryptographically prevented from invoking the ordinary local
@@ -320,11 +320,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   reason, or stop any agent.
 - **R41** — The Templates sub-destination lists saved templates with each
   template's title, id, stage count, and validation state, and offers **Create manually** and
-  **Create with FirstMate** under the rules R26, R27, R30, and R33 already define. A template
+  **Create with Chucky** under the rules R26, R27, R30, and R33 already define. A template
   opens in its own full-width editor page carrying the stage-list editing surface R1 and R17
   define. Templates remain hand-editable as versioned Chuck JSON through the same validation
   contract (carried forward from R25).
-- **R42** — A pending FirstMate proposal appears on the sub-destination that
+- **R42** — A pending Chucky proposal appears on the sub-destination that
   can act on it: a `save_template` proposal on Templates and a `start_run` proposal on Runs. The
   other sub-destination shows a count of the proposals waiting on it so neither is hidden. Proposal
   approval, one-time consumption, and edit invalidation are unchanged from R27 and R33.
@@ -759,15 +759,15 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   stage's declared inputs; an unresolved required input prevents accepting the transition; text that
   names a nonexistent path remains opaque rather than receiving a false existence guarantee.
   *Verify:* template validation and run-transition tests.
-- **A10** — Create with FirstMate offers configured project/backend/model choices for
+- **A10** — Create with Chucky offers configured project/backend/model choices for
   the creator, launches the session into the selected project rather than an assumed default, holds
   the launch closed while no listed project is selected, supports a clarifying conversation, and
   places a valid model-neutral draft into the editor. Launching keeps the person on the Pipelines
   approval surface, and the builder session panel shows the loading, running (with an **Open
-  FirstMate chat** link), and stopped (link withheld, pending proposals still listed) states. Its
+  Chucky chat** link), and stopped (link withheld, pending proposals still listed) states. Its
   Save and Start requests show the exact payload for separate one-time approval; denial
   has no effect, payload edits invalidate approval, and an approved request executes once. *Verify:*
-  fake-runtime server test, `ui/src/features/pipelines/FirstMateBuilder.test.tsx`, and J14.
+  fake-runtime server test, `ui/src/features/pipelines/ChuckyBuilder.test.tsx`, and J14.
 
 - **A11** (R31) — Run setup offers effort only for a stage whose assigned model declares
   levels, a run started with per-stage efforts launches each stage agent at its assigned level, an
@@ -785,7 +785,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   caller request id resolve to one record whose exact payload is what the approval surface holds in
   either order, and one unreadable proposal record does not hide the others. *Verify:*
   `internal/pipeline/proposals_test.go`, `internal/state/pipeline_proposals_test.go`, and
-  `ui/src/features/pipelines/FirstMateBuilder.test.tsx`.
+  `ui/src/features/pipelines/ChuckyBuilder.test.tsx`.
 
 - **A14** (R35/R36/R41) — Opening Pipelines lands on Runs; switching to Templates shows
   the template library with no run history and no start form on screen, and switching back shows no
@@ -810,7 +810,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **A18** (R42) — A pending `save_template` proposal is actionable on Templates and
   counted on Runs, a pending `start_run` proposal is actionable on Runs and counted on Templates,
   and approving either still consumes it exactly once. *Verify:*
-  `ui/src/features/pipelines/FirstMateBuilder.test.tsx` and J14.
+  `ui/src/features/pipelines/ChuckyBuilder.test.tsx` and J14.
 - **A19** (R43) — A link to the combined page carrying a selected run opens that run's
   page, and a link naming a deleted run or template explains the absence and returns to the matching
   list. *Verify:* Pipelines routing tests.
@@ -874,7 +874,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   with the durable state rather than applied. — `internal/state/pipeline_proposals_test.go`,
   `internal/pipeline/proposals_test.go` (both orderings for both kinds, and the leftover-offer
   failure mode), `internal/server/pipeline_handlers_test.go`, and
-  `ui/src/features/pipelines/FirstMateBuilder.test.tsx`.
+  `ui/src/features/pipelines/ChuckyBuilder.test.tsx`.
 
 - **A28** (R51) — A pending 32-stage `save_template` proposal renders collapsed:
   its kind, template title, stage count, and pending age are present and its exact payload is not
@@ -887,7 +887,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   and run ledger as the surface's first content. A `start_run` summary names its template's current
   title, follows a rename, and names the template id and says the template is gone once that template
   is deleted. A proposal whose payload cannot be summarized still lists with its
-  kind and proposal id. — `ui/src/features/pipelines/FirstMateBuilder.test.tsx`; J14.
+  kind and proposal id. — `ui/src/features/pipelines/ChuckyBuilder.test.tsx`; J14.
 
 - **A29** (R53) — A rendered assignment states that the boundary is the
   accepted result, that a refused call records nothing and leaves the attempt still owing one, and
@@ -991,8 +991,8 @@ The shipped first version deliberately keeps these product boundaries:
   not claim filesystem isolation.
 - Arguments and stage artifacts are named opaque text only. Templates declare input/output bindings;
   there is no typed path, file copying, or content verification.
-- The Pipelines destination supports manual editing and a provider/model-selected FirstMate
-  builder. FirstMate submits a validated model-neutral draft and may request Save or Start, but
+- The Pipelines destination supports manual editing and a provider/model-selected Chucky
+  builder. Chucky submits a validated model-neutral draft and may request Save or Start, but
   each exact action requires a separate one-time human confirmation. This is a guided-flow guard,
   not a change to Chuck's same-user local-API trust boundary.
 - The §4.3 split reorganizes the pipeline surface only. It changes no template, routing,
@@ -1005,7 +1005,7 @@ The shipped first version deliberately keeps these product boundaries:
   shared page-frame, route-heading, dialog, and repeated-surface rules govern the new pages as they
   govern the existing ones; R44–R45 define the Pipelines-specific hierarchy, disclosure, continuity,
   and reduced-motion behavior those shared rules do not.
-- Runs start through the Pipelines page or local CLI/API, including FirstMate invoking that surface
+- Runs start through the Pipelines page or local CLI/API, including Chucky invoking that surface
   after a user request; there is no start-run MCP tool or child pipeline in v1.
 - Only needs-attention and completed pipeline notifications join the existing notification/mute
   surface.

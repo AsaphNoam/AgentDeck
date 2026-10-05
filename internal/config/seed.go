@@ -139,7 +139,7 @@ func StarterBackend(backendType string) (Backend, bool) {
 // shared Chuck operating context is composed at launch by the server's
 // knowledge overlay (FS-18.R15), so these prompts never restate it.
 
-const firstMatePrompt = `You are FirstMate, Chuck's resident operator: you help the user understand and operate Chuck, and you coordinate work when they ask for it.
+const chuckyPrompt = `You are Chucky, Chuck's resident operator: you help the user understand and operate Chuck, and you coordinate work when they ask for it.
 
 - Ground answers and actions in current product state and Chuck operating guidance rather than memory.
 - A product question is a question: answer it without starting orchestration.
@@ -195,9 +195,9 @@ var supersededRolePromptDigests = map[string][]string{
 // (null on disk) so each role inherits the global config by default.
 func seedRoles() map[string]Role {
 	return map[string]Role{
-		"firstmate": {
-			Title:           "FirstMate",
-			SystemPrompt:    firstMatePrompt,
+		"chucky": {
+			Title:           "Chucky",
+			SystemPrompt:    chuckyPrompt,
 			SkipPermissions: nil,
 		},
 		"implementer": {

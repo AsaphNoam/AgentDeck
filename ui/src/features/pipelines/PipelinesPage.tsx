@@ -12,7 +12,7 @@ import {
 import { PipelineAPIError, usePipelineProposals, usePipelineTemplates } from "../../api/pipelines";
 import { Button, PageHeader } from "../../components/ui";
 import type { PipelineProposal } from "../../schemas/pipeline";
-import { FirstMateBuilder } from "./FirstMateBuilder";
+import { ChuckyBuilder } from "./ChuckyBuilder";
 import { RunDetail, RunsLedger } from "./RunBrowser";
 import { RunStartDialog } from "./RunStartForm";
 import { TemplateEditor, type TemplateEditorSeed } from "./TemplateEditor";
@@ -75,7 +75,7 @@ export function RunsPage() {
           {noTemplate && <small>No template is ready to run yet. <Link to="/pipelines/templates">Create one in Templates</Link>.</small>}
         </div>
       </header>
-      <FirstMateBuilder proposalKind="start_run" showLauncher={false} onRunProposal={reviewProposal} />
+      <ChuckyBuilder proposalKind="start_run" showLauncher={false} onRunProposal={reviewProposal} />
       <RunsLedger />
       <RunStartDialog
         open={startOpen}
@@ -111,11 +111,11 @@ export function TemplatesPage() {
         <div><p className="pipeline-eyebrow">Reusable definitions</p><h2>Templates</h2><p>Keep stage logic model-neutral; choose runtimes only when a run starts.</p></div>
         <Button variant="primary" onClick={() => navigate("/pipelines/templates/new")}>Create manually</Button>
       </header>
-      <FirstMateBuilder proposalKind="save_template" showLauncher onTemplateProposal={reviewProposal} />
+      <ChuckyBuilder proposalKind="save_template" showLauncher onTemplateProposal={reviewProposal} />
       {templates.isLoading && <TemplateLibrarySkeleton />}
       {templates.error && <p className="form-error">{templates.error.message}</p>}
       {!templates.isLoading && (templates.data?.length ?? 0) === 0 && (
-        <section className="pipeline-empty pipeline-empty-library"><strong>No templates yet</strong><p>Start manually or ask FirstMate to shape a reusable pipeline from a description.</p></section>
+        <section className="pipeline-empty pipeline-empty-library"><strong>No templates yet</strong><p>Start manually or ask Chucky to shape a reusable pipeline from a description.</p></section>
       )}
       {(templates.data?.length ?? 0) > 0 && (
         <div className="pipeline-template-library" data-ui="pipeline-template-library" data-slot="list">

@@ -24,7 +24,7 @@ func pipelineProposalFixture(t *testing.T) (*Server, *state.Store, *pipeline.Tem
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = stateStore.Close() })
-	agent := state.Agent{AgentID: "a_builder", Name: "Builder", Role: "firstmate", Project: "app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
+	agent := state.Agent{AgentID: "a_builder", Name: "Builder", Role: "chucky", Project: "app", Backend: "claude", Model: "sonnet", Interface: "chat", CreatedAt: time.Now().UTC()}
 	if err := stateStore.WriteAgent(agent); err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func proposalTemplateArgs() map[string]any {
 	}
 }
 
-// FS-14.A10 / TS-04.R17: proposal tools are FirstMate-only, return data and
+// FS-14.A10 / TS-04.R17: proposal tools are Chucky-only, return data and
 // a digest, cannot mutate the template store themselves, and publish exactly
 // one durable review record before MCP reports success.
 func TestPipelineProposalToolIsScopedAndNonMutating(t *testing.T) {
