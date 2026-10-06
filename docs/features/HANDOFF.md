@@ -22,6 +22,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
   `refresh-provider-bundle-2026-10.md` is ready and waiting to start.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+  Think Tanks (`46379da..539ab11`) is reopened by a human-requested second pass with eight
+  findings (TT2-01–TT2-08) under Review findings; `/fix` takes them.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -83,7 +85,69 @@ None.
 
 ## Review findings
 
-None. Think Tanks TT-01–TT-13 closed 2026-10-06; acceptance gates remain above.
+### Think Tanks second-pass review (`46379da..539ab11`, human-requested 2026-10-06)
+
+Behind-the-scenes pass over context delivery, lifecycle and growth cost. Context delivery is sound:
+frozen heads, checkpoint advance only on success, own-entry suppression, blind-opening barrier,
+UTF-8 continuation and full-discussion judge reads all match TS-14.R7–R8/R13. Turn ownership,
+exit/restart fencing, commit-before-publish and capture teardown hold. INV §2–§4, §6, §8, §10–§14
+and §17: no new applicable surface. Steer during a room turn reaching the contribution is designed
+(FS-21.R33), not a finding.
+
+**Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix — TT2-01 (INV §1, §16):** `server/think_tanks.go` `startThinkTankTurn` stopped-agent
+  branch (~L203–221). When `wakeCandidate` errors/returns `!ok` or `resumeSessionWithHooks` fails
+  before `before()` runs (missing backend/binary, removed cwd/worktree, ACP handshake timeout),
+  `begun` is nil so `abandon` is a no-op: no hold is set, the room shows Running, and every 5s
+  sweep and kick launches another resume attempt indefinitely. A judge stuck this way stays
+  `starting`. Violates FS-21.R37/TS-14.R6 (hold with a reason for intervention) and repeats
+  process launches. Fix: on failure with nothing begun, `SetThinkTankHold(room, "<name> could not
+  start: …")` as `thinkTankIneligible` does. Test: resume failing → one resume attempt, room held
+  with reason, no second attempt on the next sweep.
+- **Worth fixing — TT2-02 (INV §5):** same branch with `server/resume.go` `after()` (~L339–351).
+  `begin` pins `d.Room.Revision` read before a multi-second resume; a room message, annotation or
+  Pause during the resume makes `BeginThinkTankAttempt` refuse, `after()` errors, and
+  `stopAgentClaimed` kills the freshly resumed agent; the next sweep resumes it again. A human
+  prompt landing between `Registry.Resume` and `after()` (gate busy → not started) is likewise
+  stopped mid-turn. Fix: in the room resume path, treat "not admitted" (revision conflict / busy
+  gate) as leave-running-idle so the next sweep takes the running branch. Test: bump revision
+  inside the resume window → agent stays running, next sweep admits.
+- **Worth fixing — TT2-03 (INV §16):** `server/think_tanks.go` worker (~L35–62).
+  `launchThinkTankSetup`, `launchThinkTankJudge` and resumes run inline on the single progression
+  goroutine, so a room with several new participants or a slow/failing resume (amplified by
+  TT2-01) delays admission for every other room. Fix: keep selection on the worker, run
+  launch/resume in a goroutine with a per-room in-flight guard (existing setup claim, judge
+  reservation and the one-running-attempt index already fence double admission).
+- **Worth fixing — TT2-04 (INV §16):** `state/think_tank_activity.go:56` `AppendThinkTankActivity`
+  runs `SUM(LENGTH(payload))` over the attempt's rows for every captured event, re-reading up to
+  64 MiB of payload per tool event — quadratic in a long tool-heavy turn, inside a write
+  transaction. `LENGTH` on TEXT also counts characters, so the TS-14.R17 byte cap is
+  under-enforced for non-ASCII payloads. Fix: keep a running byte total on the in-memory
+  `thinkTankCapture` (or a column on the attempt row) using `len()` bytes.
+- **Worth fixing — TT2-05 (INV §16):** `ui/src/api/sse.ts:120–123` invalidates the room activity
+  query on every `think_tank_activity` event, and `fetchAllActivity` (`ui/src/api/thinkTanks.ts`
+  ~L131) re-pages from `after=0` up to the 5,000-record window (≈10 requests of up to 1 MiB).
+  With an open room during a tool-heavy turn, each event cancels and restarts the full walk.
+  Fix: append from the last seen seq on activity events (full refetch only on gap/revision per
+  TS-14.R16), or throttle the invalidation.
+- **Worth fixing — TT2-06 (FS-21.R31, TS-14.R3):** `runtime/activation_kinds.go:43–49` gives the
+  judge the participant instruction ("your turn in a Think Tank discussion … your remaining turn
+  ceiling"), and `messaging/think_tank_tools.go:79–86` returns `turn_limit/turns_remaining: 0`,
+  `may_leave: false` on the judge's first page (judge member cap 0). Only the trailing guidance
+  string says discussion ended. Every judge run starts with contradictory framing. Fix: omit the
+  ceiling fields for the judge role and make the instruction role-neutral or add a judge kind.
+  Test: judge first page has no ceiling fields.
+- **Worth fixing — TT2-07 (INV §16):** `state/think_tanks.go:270–291` — `think_tank_attempts` has
+  no `room_id` index (only a partial running index and `(agent_id, state)`). `readThinkTankDetail`
+  (~L650) runs for every active room on each 5s sweep and every update, and room deletion cascades,
+  each scanning all attempts ever recorded. Fix: migration adding
+  `idx_think_tank_attempts_room(room_id)`.
+- **Worth fixing — TT2-08 (INV §1):** `server/think_tanks.go` `finishThinkTankTurn` (~L327–344).
+  A non-NotFound store error from Finalize/Fail logs and returns after the capture was removed;
+  the attempt stays `running`, Pause/End stay requested and Delete is refused, with nothing in the
+  room saying how to recover (only Stop or restart fences it). Rare, permanent when hit. Fix:
+  best-effort `SetThinkTankHold`, or have the sweep fail running attempts whose turn has ended.
 
 ## Decisions needing your input
 
@@ -103,6 +167,12 @@ None. Think Tanks TT-01–TT-13 closed 2026-10-06; acceptance gates remain above
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Review: Think Tanks second pass.** Human-requested behind-the-scenes review of
+  `46379da..539ab11`: context delivery verified sound; one Must fix (silent resume-failure retry
+  loop) and seven Worth fixing (resume-window stop, serial worker, quadratic capture cap,
+  UI activity refetch storm, judge framing, missing attempts index, store-failure stuck attempt).
+  Focused `-race` ThinkTank state/server tests pass.
 
 - **2026-10-06 — Release: `v0.10.0` published.** 39 commits after `v0.9.0`: the Chuck rename, Think
   Tanks, phone streamed-reply and Manage-refusal fixes, notification stale-agent coverage and the
