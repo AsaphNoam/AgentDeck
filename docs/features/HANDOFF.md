@@ -23,8 +23,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   FS-21, TS-14 and adjacent FS-02.R65, FS-03.R69–R70, FS-05.R39, FS-13.R26–R27, FS-17.R21,
   FS-18.R19, TS-01.R37, TS-02.R42, TS-03.R55, TS-04.R84, TS-05.R25, TS-08.R87, TS-11.R19) is
   available for review. Reviewer notes: progression is one worker on a 5s sweep plus kicks;
-  child activity after a turn's terminal event is not captured (TS-14 §5); FS-21.R35 autocomplete
-  stays planned.
+  child activity after a turn's terminal event is not captured (TS-14 §5); the composer's `@`/`#`
+  picker moved into the shared `components/chat/autocomplete.tsx` hook for the room composer.
   `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
   resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
   provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,

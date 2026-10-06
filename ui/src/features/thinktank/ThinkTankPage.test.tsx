@@ -90,6 +90,19 @@ describe("ThinkTankPage", () => {
     expect(screen.getByRole("button", { name: "End discussion" })).toBeTruthy();
   });
 
+  // FS-21.R35, A25: suggestions come from the chosen participant and the
+  // inserted path names that participant's workspace.
+  it("qualifies @ file suggestions with the chosen participant", async () => {
+    server.use(http.get("/api/sessions/a_one/file-search", () => HttpResponse.json({ agent_id: "a_one", files: ["notes.md"] })));
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    expect((screen.getByLabelText("Suggestions from") as HTMLSelectElement).value).toBe("a_one");
+    fireEvent.change(box, { target: { value: "see @no", selectionStart: 7 } });
+    const option = await screen.findByRole("option", { name: "notes.md" });
+    fireEvent.mouseDown(option);
+    await waitFor(() => expect(box.value).toBe("see @notes.md (Ari) "));
+  });
+
   it("disables room input once the discussion has ended", async () => {
     detail = { ...room(), phase: "ended", end_reason: "operator", judge_status: "", judge: { enabled: false }, deletable: true };
     renderRoom();

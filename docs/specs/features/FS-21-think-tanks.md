@@ -1,6 +1,6 @@
 # FS-21 — Think tanks
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state/think_tank*.go`, `internal/server/think_tank*.go`,
 `internal/messaging/think_tank_tools.go`, `ui/src/features/thinktank/` · **Journeys:** —
 **Absorbed:** —
@@ -182,7 +182,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   departure permission, enabled by default. Independent openings and synthesis default off. Goal
   and membership remain fixed after start; annotation-created follow-up agents do not automatically
   join the room.
-- **R35** (planned) — Room messages and Room-target annotations submitted during a participant
+- **R35** — Room messages and Room-target annotations submitted during a participant
   turn are durably held for publication at its boundary. During independent openings they wait until
   opening publication, preserving the opening inputs. Shared user input consumes no participant
   allowance. File/skill autocomplete explicitly selects participant context so paths and available
@@ -413,9 +413,9 @@ completion; R37 defines partial opening publication and pending input on End.
 
 ## 6. Deviations & open decisions
 
-Shipped 2026-10-06 apart from R35's participant-qualified file/skill autocomplete: the room
-composer is plain text, while R35's boundary holding of room messages and Room annotations has
-shipped. R8 is superseded by R12/R20. A new participant's turn limit defaults to 3 in setup.
+Shipped 2026-10-06. R35's autocomplete uses the agent composer's shared `@`/`#` picker against one
+participant chosen in the room composer, and appends that participant's name to each inserted
+token. R8 is superseded by R12/R20. A new participant's turn limit defaults to 3 in setup.
 Rendered acceptance so far uses stubbed room data in every appearance at 1024px and 1440px; the
 real-binary fake-ACP journey and the credentialed Claude/Codex smoke (TS-06.R33) remain owed.
 

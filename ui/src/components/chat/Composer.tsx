@@ -1,55 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { cancelTurn, getAvailableCommands, searchSessionFiles, sendPrompt, steerPrompt } from "../../api/client";
-import type { AvailableCommand } from "../../api/types";
+import { useEffect, useRef, useState } from "react";
+import { cancelTurn, sendPrompt, steerPrompt } from "../../api/client";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
 import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { chatDraftRevision, discardChatDraft, getChatDraft, setChatDraft } from "./drafts";
+import { useAutocomplete } from "./autocomplete";
 
-// Composer owns one reusable keyboard-operated autocomplete picker for `@` files
-// and `#` ACP commands (FS-03.R30–R34). Both insert ordinary composer text — no
-// structured attachment, no command persistence — so submission (R6) is unchanged.
-
-type Trigger = { type: "@" | "#"; start: number; query: string };
-
-// A picker entry: `label` is shown, `insert` is the text that replaces the typed
-// trigger token (already including its trailing space), and the optional
-// description/hint annotate a command entry.
-type PickerItem = { label: string; insert: string; description?: string; hint?: string };
-
-// detectTrigger finds the active `@`/`#` token ending at the cursor. A trigger is
-// active only at a word boundary (start of input or after whitespace) with no
-// whitespace between it and the cursor, so `user@example.com` never opens it.
-function detectTrigger(text: string, cursor: number): Trigger | null {
-  for (let i = cursor - 1; i >= 0; i--) {
-    const ch = text[i];
-    if (ch === " " || ch === "\n" || ch === "\t") return null;
-    if (ch === "@" || ch === "#") {
-      const before = i === 0 ? "" : text[i - 1];
-      if (before === "" || before === " " || before === "\n" || before === "\t") {
-        return { type: ch, start: i, query: text.slice(i + 1, cursor) };
-      }
-      return null;
-    }
-  }
-  return null;
-}
-
-// filterCommands keeps commands whose name or description contains the query
-// (case-insensitive); an empty query keeps the whole advertised list (R33).
-function filterCommands(commands: AvailableCommand[], query: string): PickerItem[] {
-  const q = query.toLowerCase();
-  return commands
-    .filter((c) => q === "" || c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q))
-    .map((c) => ({
-      // ACP advertises names without the invocation slash, so insert `/<name>`;
-      // a Codex `$skill` therefore becomes `/$skill` (R33).
-      label: `/${c.name}`,
-      insert: `/${c.name} `,
-      description: c.description,
-      hint: c.input_hint,
-    }));
-}
+// Composer sends to one agent and owns its `@` file / `#` command picker through
+// the shared autocomplete hook (FS-03.R30–R34).
 
 export function Composer({ agentId, busy, running = true, steerable = false, variant }: {
   agentId: string;
@@ -67,29 +25,28 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
   const held = useHeldStore((state) => state.byAgent[agentId]);
   const hold = useHeldStore((state) => state.hold);
   const releaseHeld = useHeldStore((state) => state.release);
-  const [trigger, setTrigger] = useState<Trigger | null>(null);
-  const [items, setItems] = useState<PickerItem[]>([]);
-  const [highlight, setHighlight] = useState(0);
-  // dismissedStart holds the offset of a trigger token dismissed with Escape, so
-  // the picker stays closed for that token until a fresh `@`/`#` is typed (R32).
-  const [dismissedStart, setDismissedStart] = useState<number | null>(null);
   const append = useTranscriptStore((state) => state.appendMessage);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const reqRef = useRef(0);
-  const pendingCursor = useRef<number | null>(null);
   const currentAgentId = useRef(agentId);
   const steeringAgents = useRef(new Set<string>());
   currentAgentId.current = agentId;
+  const autocomplete = useAutocomplete({
+    sourceId: agentId,
+    text,
+    textareaRef,
+    onText: (next) => {
+      setText(next);
+      setChatDraft(agentId, next);
+    },
+  });
 
   useEffect(() => {
     setText(getChatDraft(agentId));
     setError(null);
     setNotice(null);
-    setTrigger(null);
-    setItems([]);
-    setHighlight(0);
-    setDismissedStart(null);
+    autocomplete.reset();
     setSteering(steeringAgents.current.has(agentId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId]);
 
   // Stop, crash, or archive leaves no next turn for a held message, so it comes
@@ -108,72 +65,6 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentId, running, held, releaseHeld]);
 
-  const open = trigger !== null && trigger.start !== dismissedStart;
-  const hasSuggestions = open && items.length > 0;
-
-  // Fetch suggestions whenever the active trigger or its query changes. A per-request
-  // token discards stale answers (INV §1); any failure clears items so the picker
-  // shows an empty state and never blocks the composer (R32).
-  useEffect(() => {
-    if (!open || !trigger) {
-      setItems([]);
-      return;
-    }
-    const token = ++reqRef.current;
-    setHighlight(0);
-    if (trigger.type === "@") {
-      searchSessionFiles(agentId, trigger.query)
-        .then((res) => {
-          if (token === reqRef.current) setItems((res.files ?? []).map((f) => ({ label: f, insert: `@${f} ` })));
-        })
-        .catch(() => {
-          if (token === reqRef.current) setItems([]);
-        });
-    } else {
-      getAvailableCommands(agentId)
-        .then((res) => {
-          if (token === reqRef.current) setItems(filterCommands(res.commands ?? [], trigger.query));
-        })
-        .catch(() => {
-          if (token === reqRef.current) setItems([]);
-        });
-    }
-    // trigger.start is intentionally excluded: only the type and query change what
-    // is fetched; start changes are covered by dismissedStart/open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, open, trigger?.type, trigger?.query]);
-
-  // Restore the caret after a programmatic insert (React resets it on value change).
-  useLayoutEffect(() => {
-    if (pendingCursor.current !== null && textareaRef.current) {
-      const pos = pendingCursor.current;
-      pendingCursor.current = null;
-      textareaRef.current.setSelectionRange(pos, pos);
-    }
-  }, [text]);
-
-  const syncTrigger = (el: HTMLTextAreaElement) => {
-    const next = detectTrigger(el.value, el.selectionStart ?? el.value.length);
-    setTrigger(next);
-    // Leaving the token (whitespace/caret move) clears an Escape dismissal so the
-    // next `@`/`#` reopens the picker.
-    if (!next) setDismissedStart(null);
-  };
-
-  const accept = (item: PickerItem) => {
-    if (!trigger) return;
-    const el = textareaRef.current;
-    const cursor = el?.selectionStart ?? text.length;
-    const next = text.slice(0, trigger.start) + item.insert + text.slice(cursor);
-    const caret = trigger.start + item.insert.length;
-    pendingCursor.current = caret;
-    setText(next);
-    setChatDraft(agentId, next);
-    setTrigger(null);
-    setItems([]);
-    setDismissedStart(null);
-  };
-
   const submit = async () => {
     // Reject whitespace-only drafts (R19) but send the text exactly as displayed:
     // a picker insertion's trailing space is part of the prompt and must reach both
@@ -190,7 +81,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
     // that newer draft alone instead of discarding or overwriting it (INV §1/§5).
     const draftRev = chatDraftRevision(agentId);
     setText("");
-    setTrigger(null);
+    autocomplete.clearTrigger();
     try {
       // A stopped chat agent is woken by this same request (FS-03.R35), so the
       // composer submits normally and only the reply takes longer to start.
@@ -237,7 +128,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
       const result = await steerPrompt(steeringAgentId, typed);
       if (typed) {
         setText("");
-        setTrigger(null);
+        autocomplete.clearTrigger();
         discardChatDraft(agentId);
       } else {
         releaseHeld(agentId);
@@ -268,30 +159,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (open) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setDismissedStart(trigger?.start ?? null);
-        return;
-      }
-      if (hasSuggestions) {
-        if (event.key === "ArrowDown") {
-          event.preventDefault();
-          setHighlight((h) => (h + 1) % items.length);
-          return;
-        }
-        if (event.key === "ArrowUp") {
-          event.preventDefault();
-          setHighlight((h) => (h - 1 + items.length) % items.length);
-          return;
-        }
-        if (event.key === "Enter" || event.key === "Tab") {
-          event.preventDefault();
-          accept(items[highlight]);
-          return;
-        }
-      }
-    }
+    if (autocomplete.onKeyDown(event)) return;
     // Picker closed (or showing an empty state): Enter submits, Shift+Enter newlines.
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -309,35 +177,13 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
             const next = event.target.value;
             setText(next);
             setChatDraft(agentId, next);
-            syncTrigger(event.target);
+            autocomplete.syncTrigger(event.target);
           }}
-          onKeyUp={(event) => syncTrigger(event.currentTarget)}
-          onClick={(event) => syncTrigger(event.currentTarget)}
+          onKeyUp={(event) => autocomplete.syncTrigger(event.currentTarget)}
+          onClick={(event) => autocomplete.syncTrigger(event.currentTarget)}
           onKeyDown={onKeyDown}
         />
-        {open && (
-          <ul className="composer-picker" role="listbox" aria-label={trigger?.type === "@" ? "Files" : "Commands"}>
-            {items.length === 0 ? (
-              <li className="composer-picker-empty" aria-disabled="true">
-                {trigger?.type === "@" ? "No matching files" : "No commands available"}
-              </li>
-            ) : (
-              items.map((item, i) => (
-                <li
-                  key={item.label + i}
-                  role="option"
-                  aria-selected={i === highlight}
-                  className={i === highlight ? "composer-picker-item is-active" : "composer-picker-item"}
-                  onMouseDown={(event) => { event.preventDefault(); accept(item); }}
-                >
-                  <span className="composer-picker-label">{item.label}</span>
-                  {item.description && <span className="composer-picker-desc">{item.description}</span>}
-                  {item.hint && <span className="composer-picker-hint">{item.hint}</span>}
-                </li>
-              ))
-            )}
-          </ul>
-        )}
+        {autocomplete.picker}
       </div>
       {/* Send is always present and is the safe default; Steer appears only where
           the live session advertises it, and never as a disabled control where it

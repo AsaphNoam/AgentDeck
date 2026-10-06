@@ -47,7 +47,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Shared operating skill, progressive references, exact prompt migration, and planned lean personas with standing context and native-prompt preservation |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 | FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, phone web app (planned desktop-flow dashboard, project pages, agent management), attention notifications, keep-awake |
-| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Partial | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis |
+| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Current | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis |
 
 ### Technical specs
 

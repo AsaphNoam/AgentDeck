@@ -1,4 +1,4 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   newCommandID,
@@ -23,6 +23,7 @@ import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMark
 import type { FileLink } from "../../components/chat/renderers/filePath";
 import { canAnnotate, eventDraft, eventRenderer, selectionWithin } from "../../components/chat/TranscriptView";
 import { nestActivities } from "../../components/chat/runtimeActivity";
+import { useAutocomplete } from "../../components/chat/autocomplete";
 import { foldTranscript } from "../../store/transcriptStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useUiStore } from "../../store/uiStore";
@@ -404,6 +405,9 @@ async function loadSourceFile(roomID: string, sourceID: string, path: string): P
   return body as FileContent;
 }
 
+/** RoomComposer writes shared room input. `@` file and `#` command suggestions
+ *  come from one explicitly chosen participant, and each inserted token names
+ *  that participant so paths and commands stay attributed (FS-21.R35). */
 function RoomComposer({ room }: { room: ThinkTankDetail }) {
   const [text, setText] = useState("");
   const [commandID, setCommandID] = useState(newCommandID);
@@ -411,6 +415,17 @@ function RoomComposer({ room }: { room: ThinkTankDetail }) {
   const send = useThinkTankMessage(room.room_id);
   const ended = room.phase === "ended";
   const held = room.active || room.phase === "openings" || room.phase === "setup";
+  const sources = room.members.filter((m) => m.exists);
+  const [sourceId, setSourceId] = useState(sources[0]?.agent_id ?? "");
+  const sourceName = sources.find((m) => m.agent_id === sourceId)?.name ?? "";
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autocomplete = useAutocomplete({
+    sourceId,
+    text,
+    textareaRef,
+    onText: (next) => { setText(next); setCommandID(newCommandID()); },
+    qualify: (item) => `${item.insert.trimEnd()} (${sourceName}) `,
+  });
   const submit = () => {
     if (!text.trim()) return;
     setError("");
@@ -425,20 +440,35 @@ function RoomComposer({ room }: { room: ThinkTankDetail }) {
   return (
     <form className="think-tank-composer" data-ui="composer" onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <label htmlFor="think-tank-message">Message the room</label>
-      <textarea
-        id="think-tank-message"
-        value={text}
-        disabled={ended || send.isPending}
-        placeholder={ended ? "The discussion has ended. Annotate an entry to follow up with an agent." : "Shared with every participant between turns"}
-        onChange={(event) => { setText(event.target.value); setCommandID(newCommandID()); }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            submit();
-          }
-        }}
-      />
+      <div className="composer-input">
+        <textarea
+          id="think-tank-message"
+          ref={textareaRef}
+          value={text}
+          disabled={ended || send.isPending}
+          placeholder={ended ? "The discussion has ended. Annotate an entry to follow up with an agent." : "Shared with every participant between turns. Type @ or # for a participant's files or commands."}
+          onChange={(event) => { setText(event.target.value); setCommandID(newCommandID()); autocomplete.syncTrigger(event.target); }}
+          onKeyUp={(event) => autocomplete.syncTrigger(event.currentTarget)}
+          onClick={(event) => autocomplete.syncTrigger(event.currentTarget)}
+          onKeyDown={(event) => {
+            if (autocomplete.onKeyDown(event)) return;
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              submit();
+            }
+          }}
+        />
+        {autocomplete.picker}
+      </div>
       <div className="think-tank-composer-row">
+        {sources.length > 0 && !ended && (
+          <label className="think-tank-check">
+            Suggestions from
+            <select value={sourceId} onChange={(event) => { setSourceId(event.target.value); autocomplete.reset(); }}>
+              {sources.map((m) => <option key={m.agent_id} value={m.agent_id}>{m.name}</option>)}
+            </select>
+          </label>
+        )}
         <span>{held && !ended ? "Held until the current turn finishes." : ""}</span>
         <Button type="submit" variant="primary" disabled={ended || !text.trim()} busy={send.isPending}>Send to room</Button>
       </div>
