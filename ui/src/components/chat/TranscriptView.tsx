@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { copyText } from "../../lib/copyText";
@@ -17,6 +17,8 @@ import { ChildActivity } from "./renderers/ChildActivity";
 import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
 import { collectTasks, markBackgrounded, nestActivities, type ChildNode } from "./runtimeActivity";
 import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
+import { projectTurns } from "./turnActivity";
+import { TurnList, useFocusReturn, useTurnChoices } from "./TurnList";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { FileViewer } from "./FileViewer";
@@ -34,7 +36,8 @@ import { useUiStore } from "../../store/uiStore";
 // which is that pane's existing route to the full surface (FS-03.R53).
 // taskControl offers targeted background-task Stop; only a live session whose
 // runtime negotiated it passes true, and the archive never does (FS-03.R59).
-export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile, taskControl = false }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null, options?: { replace?: boolean }) => void; taskControl?: boolean }) {
+// reveal names an event the caller is about to scroll to; a fresh object per request.
+export function TranscriptView({ agentId, events, sourceActive = false, annotationsEnabled = true, busy = false, openFile = null, onOpenFile, taskControl = false, reveal = null }: { agentId: string; events: TranscriptEvent[]; sourceActive?: boolean; annotationsEnabled?: boolean; busy?: boolean; openFile?: FileLink | null; onOpenFile?: (link: FileLink | null, options?: { replace?: boolean }) => void; taskControl?: boolean; reveal?: { seq: number } | null }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
@@ -83,6 +86,19 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
     onOpenFile,
   });
 
+  const nested = nestActivities(withReasoning(markBackgrounded(events), reasoning));
+  const choices = useTurnChoices(agentId);
+  const trackFocus = useFocusReturn(scrollRef);
+  // A Files-tab Diff reveal opens the completed turn hiding that row before the
+  // caller scrolls to it.
+  const { setOpen } = choices;
+  useLayoutEffect(() => {
+    if (!reveal) return;
+    const turn = projectTurns(nested).find((item) => item.completed && item.seqs.has(reveal.seq));
+    if (turn) setOpen(turn.key, true);
+    // Only a new reveal request reopens; later updates must not undo a close.
+  }, [reveal]);
+
   const jumpToLatest = () => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -106,8 +122,8 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
           }) : undefined}
         />
       )}
-      <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
-        {renderEvents(nestActivities(withReasoning(markBackgrounded(events), reasoning)), [], 1)}
+      <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll} onFocus={trackFocus}>
+        <TurnList agentId={agentId} events={nested} choices={choices} renderEvents={(list) => renderEvents(list, [], 1)} />
         <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
         {busy && (
           <div className="transcript-pending" aria-live="polite">
@@ -289,7 +305,7 @@ function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: s
   if (kind === "error") return <TurnError event={event} />;
   if (kind === "annotation") return <AnnotationCard event={event} />;
   if (kind === "notice") return <NoticeRow event={event} />;
-  if (kind === "reasoning") return <ThinkingDisclosure text={String(event.text ?? "")} />;
+  if (kind === "reasoning") return <ThinkingDisclosure text={String(event.text ?? "")} activityId={event.activity_id} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
   if (kind === "backend_switch") {
     const from = String(event.from ?? "");

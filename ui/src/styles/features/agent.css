@@ -1199,6 +1199,26 @@
   white-space: pre-wrap;
 }
 
+/* A completed turn's activity: one subdued control at its first activity
+   position; opened rows stay in place behind a quiet rule (TS-08.R105). */
+.turn-activity-toggle {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+  margin-bottom: var(--ad-space-3);
+}
+
+.turn-activity-content {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  margin-bottom: var(--ad-space-3);
+  padding-left: var(--ad-space-3);
+}
+
+.turn-outcome {
+  color: var(--ad-text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 var(--ad-space-2);
+}
+
 /* Native child activity: restrained hierarchy at its causal position (TS-08.R59).
    Indentation stops after two levels; the label keeps the ancestry. */
 .runtime-child {

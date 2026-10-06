@@ -337,6 +337,17 @@
       ],
       "variants": []
     },
+    "turn-activity": {
+      "slots": [
+        "trigger",
+        "content"
+      ],
+      "states": [
+        "collapsed",
+        "expanded"
+      ],
+      "variants": []
+    },
     "runtime-activity": {
       "slots": [
         "thinking",

@@ -11,6 +11,7 @@ import { pipelineUpdateSchema, type PipelineRunDetail } from "../schemas/pipelin
 import { useAgentStore } from "../store/agentStore";
 import { useAnnotationStore } from "../store/annotationStore";
 import { useReasoningStore } from "../store/reasoningStore";
+import { openTurnKey } from "../components/chat/turnActivity";
 import { useTranscriptStore } from "../store/transcriptStore";
 import { useUiStore } from "../store/uiStore";
 import { discardChatDraft } from "../components/chat/drafts";
@@ -188,8 +189,8 @@ class SseClient {
     const envelope = JSON.parse(event.data) as BusEvent<RuntimeActivity>;
     const activity = envelope.data;
     if (!activity?.agent_id || !this.openAgents.has(activity.agent_id)) return;
-    const anchor = useTranscriptStore.getState().byAgent[activity.agent_id]?.length ?? 0;
-    useReasoningStore.getState().append(activity, anchor);
+    const events = useTranscriptStore.getState().byAgent[activity.agent_id] ?? [];
+    useReasoningStore.getState().append(activity, events.length, openTurnKey(events));
   }
 
   // A federation source changed on disk (or was refreshed/bound): invalidate the

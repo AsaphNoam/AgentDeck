@@ -5,6 +5,7 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import * as client from "../../api/client";
+import type { TranscriptEvent } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useHeldStore } from "../../store/heldStore";
@@ -466,5 +467,96 @@ describe("TranscriptView notices", () => {
     expect(within(notes[1]).getByText("warning").closest('[data-ui="badge"]')).toHaveAttribute("data-variant", "warning");
     expect(within(notes[0]).getByText("info").closest('[data-ui="badge"]')).toHaveAttribute("data-variant", "neutral");
     expect(container.querySelector('[data-variant="notice"] .message')).toBeNull();
+  });
+});
+
+describe("TranscriptView quiet completed turns (FS-03.A55–A57)", () => {
+  const turn = (base: number, answer: string): TranscriptEvent[] => [
+    { kind: "user_text", seq: base, text: `Ask ${base}` },
+    { kind: "assistant_text", seq: base + 1, text: `Working ${base}` },
+    { kind: "tool_call", seq: base + 2, tool_call_id: `t${base}`, name: "Read" },
+    { kind: "tool_result", seq: base + 3, tool_call_id: `t${base}`, status: "completed", content: "out" },
+    { kind: "assistant_text", seq: base + 4, text: answer },
+    { kind: "turn_end", seq: base + 5, stop_reason: "end_turn" },
+  ];
+
+  it("leaves input and response visible behind one keyboard-operable control per turn", () => {
+    renderTranscript(true, turn(1, "Final one"));
+    expect(screen.getByText("Ask 1")).toBeInTheDocument();
+    expect(screen.getByText("Final one")).toBeInTheDocument();
+    expect(screen.queryByText("Working 1")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ran 1 tool/ })).toBeNull();
+
+    const control = screen.getByRole("button", { name: /Show activity/ });
+    expect(control).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(control);
+    expect(control).toHaveTextContent("Hide activity");
+    const region = document.getElementById(control.getAttribute("aria-controls")!.split(" ")[0])!;
+    expect(within(region).getByText("Working 1")).toBeInTheDocument();
+    expect(within(region).getByRole("button", { name: /Ran 1 tool/ })).toBeInTheDocument();
+    // Order is preserved: the hidden rows sit before the response.
+    const variants = [...document.querySelectorAll('[data-slot="event"]')].map((node) => node.getAttribute("data-variant"));
+    expect(variants).toEqual(["user", "assistant", "assistant", "turn"]);
+    fireEvent.click(control);
+    expect(screen.queryByText("Working 1")).toBeNull();
+  });
+
+  it("keeps an older reopened turn open when a newer turn completes", () => {
+    const client = new QueryClient();
+    const view = (list: TranscriptEvent[]) => (
+      <QueryClientProvider client={client}><TranscriptView agentId="a1" events={list} /></QueryClientProvider>
+    );
+    const first = turn(1, "Final one");
+    const { rerender } = render(view([...first, ...turn(10, "Final two").slice(0, 3)]));
+    fireEvent.click(screen.getByRole("button", { name: /Show activity/ }));
+    // The running turn is not collapsed.
+    expect(screen.getByText("Working 10")).toBeInTheDocument();
+    rerender(view([...first, ...turn(10, "Final two")]));
+    expect(screen.getByText("Working 1")).toBeInTheDocument();
+    expect(screen.queryByText("Working 10")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /activity/ }).map((button) => button.textContent)).toEqual(["▾ Hide activity", "▸ Show activity"]);
+  });
+
+  it("moves focus from hidden activity to its control when the turn completes", () => {
+    const client = new QueryClient();
+    const running = turn(1, "Final one").slice(0, 4);
+    const view = (list: TranscriptEvent[]) => (
+      <QueryClientProvider client={client}><TranscriptView agentId="a1" events={list} /></QueryClientProvider>
+    );
+    const { rerender } = render(view(running));
+    const tools = screen.getByRole("button", { name: /Ran 1 tool/ });
+    tools.focus();
+    fireEvent.focus(tools);
+    rerender(view(turn(1, "Final one")));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /Show activity/ }));
+  });
+
+  it("keeps a pending approval and a partial outcome visible and opens the turn a diff reveal targets", () => {
+    const cancelled: TranscriptEvent[] = [
+      { kind: "user_text", seq: 1, text: "Go" },
+      { kind: "diff", seq: 2, path: "a.go", new_text: "x" },
+      { kind: "permission_request", seq: 3, tool_call_id: "t1", name: "Run rm" },
+      { kind: "assistant_text", seq: 4, text: "Half an answer" },
+      { kind: "turn_end", seq: 5, stop_reason: "cancelled" },
+    ];
+    const client = new QueryClient();
+    const view = (reveal: { seq: number } | null) => (
+      <QueryClientProvider client={client}><TranscriptView agentId="a1" events={cancelled} reveal={reveal} /></QueryClientProvider>
+    );
+    const { rerender, container } = render(view(null));
+    expect(screen.getByText("Run rm")).toBeInTheDocument();
+    expect(screen.getByText("Cancelled — response is partial")).toBeInTheDocument();
+    expect(container.querySelector('[data-seq="2"]')).toBeNull();
+    rerender(view({ seq: 2 }));
+    expect(container.querySelector('[data-seq="2"]')).not.toBeNull();
+  });
+
+  it("does not offer an empty control for a turn with nothing to hide", () => {
+    renderTranscript(true, [
+      { kind: "user_text", seq: 1, text: "Hi" },
+      { kind: "assistant_text", seq: 2, text: "Hello" },
+      { kind: "turn_end", seq: 3, stop_reason: "end_turn" },
+    ]);
+    expect(screen.queryByRole("button", { name: /activity/ })).toBeNull();
   });
 });

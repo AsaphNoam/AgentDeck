@@ -39,11 +39,14 @@ function renderTranscript(events: TranscriptEvent[]) {
 describe("native child activity (FS-03.A40)", () => {
   it("nests each child at its causal position without merging its text into the root", () => {
     renderTranscript(foldTranscript(history));
+    // The completed turn keeps only its response visible (FS-03.R74).
+    expect(screen.getByText("Root interleaved.")).toBeInTheDocument();
+    expect(screen.queryByText("Root before.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Show activity/ }));
     const child = screen.getByRole("button", { name: /researcher · Completed/ });
     expect(child).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Child says")).toBeNull();
     expect(screen.getByText("Root before.")).toBeInTheDocument();
-    expect(screen.getByText("Root interleaved.")).toBeInTheDocument();
 
     fireEvent.click(child);
     const section = child.closest("[data-slot='child']") as HTMLElement;

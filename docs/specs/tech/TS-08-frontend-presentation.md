@@ -1113,13 +1113,12 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   fabricates its terminal state. Room attempt rendering scopes keys and boundaries by attempt;
   FS-21's canonical contributions/synthesis are not assistant-text activity to hide.
 - **R102 (planned) — Collapse state is local, bounded and transition-owned.** Each mounted
-  transcript owns choices keyed by source agent, stable first durable root-event sequence for the
-  turn, and optional child activity scope; a turn with only a root terminal event uses that
-  `turn_end` sequence. Before any durable root event, use a mounted-source active-turn cursor
-  fenced by generation and observed root boundaries, then adopt the first durable key without
-  losing a manual choice. Optimistic input does not become a durable identity;
-  reconcile it before adopting a key, without resetting a live manual choice when the durable
-  replacement arrives. Component rerenders/refetches preserve stable choices. Root/child reasoning
+  transcript owns choices keyed by source agent, the durable sequence of the boundary that opened
+  the turn (the preceding root `turn_end` or session/backend/clone fence; `start` for the first),
+  and optional child activity scope. That key exists before the turn's first durable event, so
+  optimistic input never becomes an identity and its durable replacement cannot reset a live
+  manual choice; no key adoption step exists. Component rerenders/refetches preserve stable
+  choices. Root/child reasoning
   starts open for a new active turn; manual close applies to later spans in that scope/turn and can
   be explicitly reopened. On first observing its root terminal boundary, that turn's activity and
   nested thought/tool disclosure choices reset closed once. Subsequent replay, task updates and
@@ -1127,9 +1126,11 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   means normalized terminal `activity_state` (completed/failed/stopped/disconnected), not a child
   `turn_end`; it closes thought/tool detail while retaining the attributed outcome in parent activity;
   a root terminal boundary closes all remaining detail. Permission pause is not terminal.
-  Store only user overrides and observed-transition identities, with at most 256 turn records per
-  mounted source and no copies of transcript text; evict oldest completed overrides first. Drop
-  records for absent turns, source change, unmount, deletion, reconnect or runtime-generation change.
+  Store only user overrides, with at most 256 records per mounted source and no copies of
+  transcript text; evict the oldest first. Completed turns start closed, so the reset needs no
+  recorded transition: hidden rows unmount and remount closed. Opened-turn choices live in the
+  mounted transcript and drop on source change or unmount; live thought choices live beside the
+  bounded reasoning spans and drop with them on reconnect or runtime-generation change.
   No localStorage/sessionStorage, server setting, database migration or account preference is added.
 - **R103 (planned) — Ephemeral thoughts have a stable presentation turn association.** Keep
   TS-01.R35/TS-04.R63's runtime notification and reasoning retention unchanged. At live reasoning

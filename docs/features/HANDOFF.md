@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** quiet completed chat turns (in progress; see **Active change**).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -31,7 +31,24 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+**Quiet completed chat turns** — [`quiet-completed-chat-turns.md`](../ready-changes/quiet-completed-chat-turns.md)
+(FS-03.R73–R77/A54–A58, TS-08.R100–R106). Slices:
+
+1. **Done:** shared projection `ui/src/components/chat/turnActivity.ts` (`projectTurns`,
+   `openTurnKey`, `turnOutcome`) and `TurnList.tsx` (Show/Hide activity, `useTurnChoices`,
+   `useFocusReturn`, `ThoughtScopeContext`); desktop `TranscriptView` (full chat, dashboard pane,
+   Archive), live-open thoughts with per-turn/scope collapse in `reasoningStore`, Files-tab Diff
+   reveal opens the hiding turn, `turn-activity` contract hook. TS-08.R102 rewritten to key turns by
+   their opening boundary seq. Focused UI tests and full `npm test` passed.
+2. **Next:** phone `remote/AgentScreen.tsx` consumes `TurnList` + nesting; wire live reasoning via
+   `remote/connection.ts` `runtime_activity` into `reasoningStore` with reconnect clearing (R104).
+3. Think Tank attempt activity reuses `TurnList` scoped by attempt (R104).
+4. Rendered real-binary fake-ACP journeys for A54–A58 (desktop floor/wide, dashboard pane, archive,
+   390px phone; Core, Sky & Grove, Studio; reduced motion), then the TS-06 closure matrix with
+   `make dist`, flip R73–R77/A54–A58/R100–R106 from planned, remove the ready-change file.
+
+Review notes: notices stay visible in completed turns (treated as outcomes); scroll anchoring
+through automatic collapse relies on native `overflow-anchor`.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

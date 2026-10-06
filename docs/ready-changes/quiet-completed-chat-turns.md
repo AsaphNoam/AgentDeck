@@ -1,6 +1,6 @@
 # Quiet completed chat turns and readable live thoughts
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Human `/design-feature` request, 2026-10-06: long chats are noisy because intermediate
 assistant text stays permanently expanded. Human confirmed one activity control per completed
 turn and unchanged ephemeral thought retention.

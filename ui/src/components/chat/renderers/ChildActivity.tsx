@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { TranscriptEvent } from "../../../api/types";
 import { hasPendingPermission, type ChildNode, type ChildState } from "../runtimeActivity";
+import { ThoughtScopeContext, useThoughtScope } from "../TurnList";
 
 const STATE_LABEL: Record<ChildState, string> = {
   active: "Running",
@@ -22,6 +23,7 @@ export function ChildActivity({ node, ancestry, depth, renderEvents }: {
   renderEvents: (events: TranscriptEvent[], ancestry: string[], depth: number) => ReactNode;
 }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
+  const scope = useThoughtScope();
   const open = chosen ?? (node.state === "active" || hasPendingPermission(node));
   const path = [...ancestry, node.name || "Subagent"];
   return (
@@ -37,7 +39,10 @@ export function ChildActivity({ node, ancestry, depth, renderEvents }: {
       {open && (
         <div className="runtime-child-content">
           {node.task && <p className="runtime-child-task">{node.task}</p>}
-          {renderEvents(node.items, path, depth + 1)}
+          {/* A child's terminal outcome ends its live thoughts (FS-03.R73). */}
+          <ThoughtScopeContext.Provider value={scope && { ...scope, live: scope.live && node.state === "active" }}>
+            {renderEvents(node.items, path, depth + 1)}
+          </ThoughtScopeContext.Provider>
         </div>
       )}
     </section>

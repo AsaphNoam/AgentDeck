@@ -237,6 +237,16 @@ export function VisualMatrix() {
               <ToolResult event={{ kind: "tool_result", status: "failed", error: "Representative tool error output" }} />
             </div>
           </article>
+          <div data-ui="turn-activity" data-state="collapsed">
+            <div className="turn-activity-toggle"><button className="tool-toggle" data-slot="trigger" type="button" aria-expanded="false">▸ Show activity</button></div>
+          </div>
+          <div data-ui="turn-activity" data-state="expanded">
+            <div className="turn-activity-toggle"><button className="tool-toggle" data-slot="trigger" type="button" aria-expanded="true">▾ Hide activity</button></div>
+            <div className="turn-activity-content" data-slot="content">
+              <ToolCall event={{ kind: "tool_call", name: "inspect_workspace" }} />
+            </div>
+            <p className="turn-outcome">Cancelled — response is partial</p>
+          </div>
           <article className="permission-prompt" data-ui="permission-prompt" data-state="pending">
             <strong data-slot="title">Permission required</strong>
             <p data-slot="reason">Run a bounded local verification command.</p>
