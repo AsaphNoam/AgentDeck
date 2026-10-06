@@ -22,9 +22,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   projector, room-source annotations, room UI/Archive/project entry, operating-chuck reference;
   FS-21, TS-14 and adjacent FS-02.R65, FS-03.R69–R70, FS-05.R39, FS-13.R26–R27, FS-17.R21,
   FS-18.R19, TS-01.R37, TS-02.R42, TS-03.R55, TS-04.R84, TS-05.R25, TS-08.R87, TS-11.R19) is
-  available for review. Reviewer notes: progression is one worker on a 5s sweep plus kicks;
-  child activity after a turn's terminal event is not captured (TS-14 §5); the composer's `@`/`#`
-  picker moved into the shared `components/chat/autocomplete.tsx` hook for the room composer.
+  reviewed through `60ba960` on 2026-10-06 and remains open for the findings below. The same unit
+  is available for fix; its next review includes those fixes. The single worker with 5s sweeps/kicks
+  and shared composer autocomplete are sound local choices. TS-14 §5's child-capture deviation
+  does not cover late child events stamped with a later turn's identity (finding TT-03).
   `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
   resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
   provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,
@@ -109,7 +110,139 @@ None.
 
 ## Review findings
 
-None.
+### Think Tanks — reviewed 2026-10-06, `46379da`..`60ba960` — **Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix** — TT-01: Stop strands the active room attempt (INV §4/§15).
+  `internal/server/server.go:390` tears down an exiting agent and interrupts tasks but never
+  settles room work. Requested Stop suppresses `turn_end` (`internal/runtime/chat.go:1019`,
+  `:1661`), while room settlement depends on it (`internal/server/think_tanks.go:272`). Stopping
+  the current speaker leaves a running attempt/capture forever: Retry cannot replace it and End
+  waits for a boundary that cannot occur. FS-21.R19/R32/R37, TS-14.R6/R14. Extend generation-scoped
+  exit settlement to fail/release room attempts without charging; test Stop, archive and deletion
+  during participant/closing/judge work, then explicit retry and End. Fix complexity: medium.
+
+- **Must fix** — TT-02: completion can acquire the next turn's identity (INV §5/§11/§15).
+  `internal/runtime/chat.go:995` releases the turn gate before `finishTurn` at `:921` emits the
+  terminal event and clears `execTurnID`. A racing private Send or activation can claim/start B
+  between A's settlement and terminal emission; A's terminal event is then stamped B at `:1746`
+  and B's owner is cleared. A room contribution can remain unfinished or the wrong attempt can
+  settle. TS-14.R4/R6. Bind terminal emission to the completing turn's immutable id and release
+  ownership in the correct order. Regression: block A before terminal emission, admit racing Send
+  B, then assert A's terminal identity and every B event retain their respective owners.
+  Fix complexity: medium.
+
+- **Must fix** — TT-03: late child activity leaks into a later room turn (INV §1/§11).
+  `internal/runtime/subagent.go:136` stores a child's scope without its owning turn;
+  `internal/runtime/chat.go:1746` stamps child events with the root's mutable `execTurnID`.
+  A child spawned by private turn A can emit tools/diffs/permissions while room turn B runs,
+  causing `internal/server/think_tank_capture.go:83` to retain them under B. Late activity from
+  another room attempt is likewise misattributed. FS-21.R29, TS-14.R4/R10. Freeze original ownership
+  in the child scope; test a child announced in A that emits after B starts and assert B captures
+  none of it. The documented idle-gap omission does not permit reassignment. Fix complexity: medium.
+
+- **Must fix** — TT-04: setup launches continue after room deletion (INV §4/§5/§15).
+  `internal/server/think_tanks.go:209` launches pending slots from a stale room snapshot, without
+  an in-flight setup claim or revalidation. During a slow setup launch, Pause/End followed by Delete
+  is allowed (`internal/state/think_tanks.go:1204`); the worker can subsequently launch further
+  reserved participants after deletion, then fail its state update. TS-14.R2/R14, FS-21.R40.
+  Extend the existing durable launch-claim/deletion guard used by the judge to setup, and abandon
+  unstarted slots at End/Delete. Test a blocked setup launch plus End/Delete, including multiple
+  pending slots, and assert no later provider launch survives deleted room authority.
+  Fix complexity: medium.
+
+- **Must fix** — TT-05: eligibility checks do not guard final turn admission (INV §5/§15).
+  `internal/server/think_tanks.go:86` checks archival/assigned work before acquiring the lifecycle
+  claim; its `before(turnID)` callback at `:141` and `BeginThinkTankAttempt`
+  (`internal/state/think_tank_turns.go:28`) recheck only room revision/opportunity. Agent/project
+  archival or task assignment between those checks and admission can start room work under lost
+  eligibility. TS-14.R3, FS-21.R22/R34/R37. Revalidate under the final claim and coordinate with the
+  existing archive start lease and task reservation seam. Test barriers between initial selection
+  and admission with archival/task reservation, observing durable rows and provider frames.
+  Fix complexity: medium.
+
+- **Must fix** — TT-06: missing/unreadable participant projects pass eligibility (INV §7).
+  `internal/server/think_tanks.go:123` uses the general `projectArchiveGate`, which intentionally
+  permits missing definitions, and explicitly ignores its internal-error refusal. Deleting a
+  participant's project definition while retaining its agent leaves that agent room-eligible;
+  corrupt/unreadable definitions also fail open. FS-21.R22/R37, TS-14.R3/R14 require a hold.
+  Use a Think Tank-specific fail-closed live-project check, preserving the general lifecycle
+  contract. Test removed and unreadable projects: no admission and a visible recovery/End reason.
+  Fix complexity: easy.
+
+- **Must fix** — TT-07: replayed annotation commands deliver duplicate mail (INV §15).
+  `internal/server/think_tank_annotations.go:206` deduplicates the room record, then unconditionally
+  inserts a fresh message at `:212`. Retrying the same command after a lost HTTP response delivers
+  the instructions again, despite only one canonical annotation. TS-14.R9/§3, FS-13.R26–R27.
+  Commit the room record and ordinary mail receipt atomically in the shared database, or deduplicate
+  delivery with the command/input identity. Test identical retries and failure/response loss around
+  publication and delivery; one room record and one delivered mail must result. Fix complexity: medium.
+
+- **Must fix** — TT-08: exact create replay fails with any new participant (INV §11/§15).
+  `internal/server/think_tank_handlers.go:135` reserves fresh agent ids on every POST before
+  `CreateThinkTank` compares them (`internal/state/think_tanks.go:392`). Replaying an identical
+  command with a new participant returns 409 rather than the original room. A lost create response
+  therefore cannot be recovered through its stable command id. TS-14.R2/§3. Match immutable request
+  intent and reuse its original reserved identities before allocating new ones; test mixed and
+  all-new participant creation through REST twice with the same command. Fix complexity: medium.
+
+- **Must fix** — TT-09: file links bypass retained room sources (INV §2/§10/§11).
+  `ui/src/features/thinktank/ThinkTankPage.tsx:72` loads sources only while Files is open;
+  `:107` otherwise invents `agent:<id>`, and `:400` uses the ordinary session-file endpoint.
+  Clicking a contribution/diff link first can open a live file, but annotating its excerpt sends
+  that invented source id and is rejected by `resolveThinkTankAnchors`
+  (`internal/server/think_tank_annotations.go:114`). After source deletion even the file read fails,
+  despite retained room cwd. FS-21.R26/R39, FS-13.R26, TS-14.R12/R15. Resolve immutable room source
+  references independently of the Files panel and keep attempt/workspace provenance. Test direct
+  Markdown/diff link → file selection → annotation without opening Files, then after agent deletion.
+  Fix complexity: medium.
+
+- **Must fix** — TT-10: completed activity cannot be inspected (INV §8/§10).
+  `ui/src/features/thinktank/ThinkTankPage.tsx:391` wraps settled activity in a disabled fieldset.
+  This disables ordinary `ToolRun`/`ToolCall` disclosure buttons, result Show more, diff file links
+  and annotation buttons along with permission mutations. When a turn finishes, or an ended room
+  is opened from Archive, retained tools/results can no longer be expanded or followed up normally.
+  FS-21.R24/R26/R30/R39, TS-14.R15. Disable only stale source mutations; keep inspection, copy,
+  file viewing and annotation controls enabled. Test expanding tools/results and annotating diffs
+  in settled and ended rooms while stale approvals remain refused. Fix complexity: easy.
+
+- **Must fix** — TT-11: first activity record defeats the REST byte bound (INV §16).
+  `internal/server/think_tank_activity_handlers.go:38` applies the 1 MiB guard only after adding
+  an item. A first tool/result/diff record may therefore return up to the 8 MiB capture ceiling in
+  one activity response. TS-14.R17. Bound the first item too with an explicit marker/detail or
+  continuation mechanism that preserves its anchor and allows progress. Regression with a 2 MiB
+  first record returned 2,097,566 bytes against a 1,048,576-byte window. Fix complexity: medium.
+
+- **Must fix** — TT-12: bounded activity projections silently omit history (INV §8/§16).
+  `ui/src/api/thinkTanks.ts:137` silently retains only the newest 5,000 activity records, unlike
+  entries which expose a clipping notice. `internal/server/think_tank_activity_handlers.go:87`
+  scans only the oldest 10,000 records for Files/Commands and presents those results as complete;
+  recent files/commands then disappear from valid long rooms. FS-21.R24/R39, TS-14.R16–R17.
+  Keep bounded windows but expose truncation/continuation and choose the appropriate recent window
+  for inspection. Test >5,000 browser rows and >10,000 server records with distinct late files and
+  commands; omissions must be explicit and later activity must remain accessible.
+  Fix complexity: medium.
+
+- **Worth fixing** — TT-13: malformed read cursor panics instead of refusing (INV §8/§11).
+  `internal/state/think_tank_turns.go:730` slices `e.Body[off:]` without validating the decoded
+  cursor offset against the entry length (or UTF-8 boundaries). A syntactically accepted cursor
+  with offset 999 for a five-byte entry causes a slice-bounds panic through the room tool path.
+  TS-14.R7/§3's typed cursor refusal contract. Validate offset/position before slicing and bind
+  continuation identity as specified; test out-of-range and mid-rune offsets with no mutation or
+  panic. Fix complexity: easy.
+
+Review evidence: focused Think Tank state/MCP/server tests passed after allowing temporary loopback
+test listeners; focused room UI and style/presentation checks passed; spec lint and diff checks
+passed. Temporary external Go overlays reproduced TT-07 (two mails), TT-08 (409), TT-11 (oversized
+response), TT-13 (panic), TT-03 (child reassigned to B), TT-01 (running attempt after Stop), TT-06
+(removed project accepted), and the gate-release interleaving underlying TT-02. These are review
+probes, not committed regression coverage. Existing tests do not close the findings. The real-binary
+rendered journey and credentialed provider gates above remain owed.
+
+Invariant sweep: §1–§11 and §13–§17 apply across lifecycle/activation, SQLite, transport, UI,
+capture and tests. No new external CLI invocation (§12) occurs in this unit. Shared launch/teardown,
+closed tool/approval/result registration, room retention without agent/project cascades, array wire
+fixtures, loopback/phone route boundaries, embedded knowledge inventory and defined presentation
+selectors were checked; no separate findings on those surfaces. No product code or specs changed.
 
 ## Decisions needing your input
 
@@ -129,6 +262,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Review: Think Tanks.** Reviewed through `60ba960`; recorded twelve Must-fix
+  findings covering Stop/completion/child ownership, setup/admission/project guards, command replay,
+  retained-source file annotations, settled inspection and bounded activity, plus one malformed-cursor
+  Worth-fixing item. Same unit stays open. Fix model: medium — Codex Terra or Claude Opus.
 
 - **2026-10-06 — Work: Think Tanks implemented.** SQLite rooms with guarded single-floor turns,
   staged explicit contributions, committed read checkpoints, openings barrier, closing turn,
