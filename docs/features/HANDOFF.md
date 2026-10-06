@@ -8,9 +8,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 ## Current position
 
 - **Active change:** none.
-- **Release:** `v0.10.0` is tagged on the release commit and pushed with `main`; confirm the
-  release workflow and GitHub Release assets (archive, `install.sh`, manifest) if not yet recorded.
-  It is the first Chuck release: 39 commits after `v0.9.0` ship the Chuck rename and Think Tanks.
+- **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
+  release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
+  archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
+  API still returns 404 until the rename. It is the first Chuck release: 39 commits after `v0.9.0` ship the Chuck rename and Think Tanks.
   Its notes tell paired phones to re-pair at the new `chuck` address and point existing users at
   `docs/chuck-cutover.md`.
 - **Repository name:** the GitHub repository is still `AsaphNoam/AgentDeck`; the human postponed
@@ -103,9 +104,9 @@ None. Think Tanks TT-01–TT-13 closed 2026-10-06; acceptance gates remain above
 
 ## Changelog
 
-- **2026-10-06 — Release: `v0.10.0` cut.** 39 commits after `v0.9.0`: the Chuck rename, Think
+- **2026-10-06 — Release: `v0.10.0` published.** 39 commits after `v0.9.0`: the Chuck rename, Think
   Tanks, phone streamed-reply and Manage-refusal fixes, notification stale-agent coverage and the
   Claude 5.5 alias-row fix. The operator package (Think Tank reference already added), README and
   pins already matched the range. `make test`, UI suite (625) and `make dist VERSION=0.10.0` pass.
   Released before the repository rename at the human's choice. Settled state archived to
-  `HANDOFF-through-2026-10-06`.
+  `HANDOFF-through-2026-10-06`. Release workflow and CI passed; assets verified.
