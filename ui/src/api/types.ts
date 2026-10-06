@@ -135,6 +135,10 @@ export type PermissionResolution = "approve" | "deny" | "cancelled" | "timeout";
 interface AnnotationDraftBase {
   excerpt: string;
   instruction: string;
+  /** Set only on Think Tank room drafts: seq names a room entry or room
+   *  activity record, and a file anchor names its retained source (FS-13.R26). */
+  room_anchor?: "entry" | "activity" | "file";
+  source_id?: string;
 }
 
 export type AnnotationDraft = AnnotationDraftBase & ({

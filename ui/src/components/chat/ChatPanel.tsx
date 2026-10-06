@@ -20,6 +20,7 @@ import { TerminalTab } from "./TerminalTab";
 import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
 import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
 import { copyText } from "../../lib/copyText";
+import { RoomTurnNotice } from "../../features/thinktank/RoomTurnNotice";
 import type { FileLink } from "./renderers/filePath";
 
 function runtimeSelection(agent: AgentState): RuntimeSelection {
@@ -290,6 +291,7 @@ export function ChatPanel() {
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} /></div>
       </header>
+      <RoomTurnNotice agentId={id} busy={agent.state === "busy" || agent.state === "waiting_input"} />
       <PointerContextMenu menu={headerMenu} onClose={() => setHeaderMenu(null)} />
       <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs" data-slot="tabs">
         <Tabs.List className="chat-tabs-list" data-slot="tabs">

@@ -13,6 +13,7 @@ import { DensityControl } from "./DensityControl";
 import { DashboardChatPane } from "./DashboardChatPane";
 import { EmptyState } from "./EmptyState";
 import { NewAgentModal } from "../../features/launch/NewAgentModal";
+import { ThinkTankSetupDialog } from "../../features/thinktank/ThinkTankSetupDialog";
 import { useProjects } from "../../api/config";
 import { useTasks } from "../../api/tasks";
 import { needsAttention } from "../../features/tasks/taskWork";
@@ -52,6 +53,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const toggleGroupCollapsed = useUiStore((state) => state.toggleGroupCollapsed);
   const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
+  const [showThinkTank, setShowThinkTank] = useState(false);
   const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
   const [releaseGroupError, setReleaseGroupError] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -248,11 +250,17 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     setOrder(mergeScopedOrder(globalIds, ids, reordered));
   };
 
+  // Think Tank starts from an active scoped project only; fixedProject is set
+  // only for a current, non-archived project (FS-02.R65).
+  const thinkTankAction = fixedProject && !projects.data?.[fixedProject]?.archived
+    ? <Button type="button" onClick={() => setShowThinkTank(true)}>Think Tank</Button>
+    : null;
+
   const body =
     ids.length === 0 ? (
 		<>
 			<TaskAttentionLink projectID={projectID} />
-			<EmptyState onNewAgent={() => setShowNewAgent(true)} />
+			<EmptyState onNewAgent={() => setShowNewAgent(true)} actions={thinkTankAction} />
 		</>
     ) : (
       <section className="grid-view" data-ui="dashboard">
@@ -260,7 +268,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         className="grid-toolbar"
         eyebrow="Live operations"
         title={projectTitle ?? "Agents"}
-        actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <Button type="button" onClick={collapseAll}>Collapse all</Button>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button><DensityControl /></>}
+        actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <Button type="button" onClick={collapseAll}>Collapse all</Button>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button>{thinkTankAction}<DensityControl /></>}
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => setRefusedDrop(false)}>
@@ -326,6 +334,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     <>
       {body}
       <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} fixedProject={fixedProject} />
+      {fixedProject && <ThinkTankSetupDialog open={showThinkTank} onClose={() => setShowThinkTank(false)} originProject={fixedProject} />}
       {releaseGroupLabel && (
         <ConfirmDialog
           open

@@ -10,6 +10,7 @@
 @import "./features/archive.css";
 @import "./features/pipelines.css";
 @import "./features/tasks.css";
+@import "./features/think-tank.css";
 @import "./features/settings.css";
 @import "./features/onboarding.css";
 @import "./integrations.css";

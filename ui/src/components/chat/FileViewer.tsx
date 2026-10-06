@@ -19,9 +19,12 @@ type ViewState =
   | { status: "error"; reason: string }
   | { status: "loaded"; file: FileContent; readAt: Date };
 
-export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved, onSelectionMenu }: {
+export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved, onSelectionMenu, load }: {
   agentId: string;
   link: FileLink;
+  /** Reads the file from another retained context, such as a Think Tank
+   *  participant source; agentId then names that context (TS-14.R12). */
+  load?: (path: string) => Promise<FileContent>;
   onClose: () => void;
   onOpenFile?: (link: FileLink) => void;
   onPathResolved?: (path: string) => void;
@@ -35,6 +38,8 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved,
   // must not be overwritten by a slower earlier read landing afterwards — the
   // same guard FilesTab/CommandsTab already carry (TS-08.R57, INV §1).
   const readToken = useRef(0);
+  const loadRef = useRef(load);
+  loadRef.current = load;
 
   // Content is read when the file is opened and when Reload is chosen. There is
   // deliberately no watching and no polling, so the panel keeps showing the text
@@ -51,7 +56,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved,
     republished.current = null;
     const token = ++readToken.current;
     setView({ status: "loading" });
-    getFileContent(agentId, link.path)
+    (loadRef.current ? loadRef.current(link.path) : getFileContent(agentId, link.path))
       .then((file) => {
         if (readToken.current !== token) return;
         setView({ status: "loaded", file, readAt: new Date() });

@@ -1,0 +1,342 @@
+@layer ad-features {
+/* Think Tank room (TS-08.R87). Reading order: goal and phase, then the
+   attributed discussion, then the current action and composer; participants
+   stay compact beside the discussion. */
+.think-tank {
+  display: grid;
+  gap: var(--ad-space-4);
+  margin: 0 auto;
+  max-width: 1440px;
+  min-width: 0;
+  padding: 0 var(--ad-space-6) var(--ad-space-6);
+}
+
+.think-tank-goal {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.think-tank-phase {
+  align-items: center;
+  color: var(--ad-text-secondary);
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+}
+
+.think-tank-body {
+  align-items: start;
+  display: grid;
+  gap: var(--ad-space-6);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+}
+
+.think-tank-discussion {
+  display: grid;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.think-tank-entries,
+.think-tank-members,
+.think-tank-panel ul,
+.think-tank-list ul,
+.think-tank-setup-participants ol {
+  display: grid;
+  gap: var(--ad-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.think-tank-entries > li {
+  display: grid;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.think-tank-empty {
+  color: var(--ad-text-muted);
+}
+
+/* One attributed contribution: the speaker leads, the body reads like an
+   ordinary assistant message. */
+.think-tank-entry {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-inline-start: var(--ad-border-thick) solid var(--ad-border-strong);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-2);
+  min-width: 0;
+  padding: var(--ad-space-3) var(--ad-space-4);
+}
+
+.think-tank-entry[data-variant="user"],
+.think-tank-entry[data-variant="annotation"] {
+  background: var(--ad-surface-subtle);
+  border-inline-start-color: var(--ad-action-primary);
+}
+
+.think-tank-entry[data-variant="synthesis"] {
+  border-inline-start-color: var(--ad-state-done);
+}
+
+.think-tank-entry[data-variant="departure"],
+.think-tank-entry[data-variant="missing_opening"] {
+  background: transparent;
+  border-style: dashed;
+}
+
+.think-tank-entry-meta {
+  align-items: baseline;
+  color: var(--ad-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  gap: var(--ad-space-1) var(--ad-space-3);
+}
+
+.think-tank-author {
+  color: var(--ad-text-primary);
+  font-weight: 700;
+}
+
+.think-tank-entry-kind {
+  color: var(--ad-text-muted);
+}
+
+.think-tank-entry-meta time {
+  margin-inline-start: auto;
+}
+
+.think-tank-entry-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Retained activity sits under the contribution it produced, scoped to that
+   attempt. Settled activity is read-only. */
+.think-tank-activity {
+  margin-inline-start: var(--ad-space-4);
+  min-width: 0;
+}
+
+.think-tank-activity > summary {
+  color: var(--ad-text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.think-tank-activity-body {
+  border: 0;
+  display: grid;
+  gap: var(--ad-space-2);
+  margin: var(--ad-space-2) 0 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.think-tank-status {
+  background: var(--ad-surface-subtle);
+  border-inline-start: var(--ad-border-thick) solid var(--ad-state-idle);
+  display: grid;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-3) var(--ad-space-4);
+}
+
+.think-tank-status[data-state="active"] { border-inline-start-color: var(--ad-state-busy); }
+.think-tank-status[data-state="waiting"] { border-inline-start-color: var(--ad-state-waiting); }
+.think-tank-status[data-state="attention"] { border-inline-start-color: var(--ad-state-error); }
+.think-tank-status[data-state="paused"] { border-inline-start-color: var(--ad-state-unknown); }
+.think-tank-status[data-state="ended"] { border-inline-start-color: var(--ad-state-done); }
+
+.think-tank-status p {
+  margin: 0;
+}
+
+.think-tank-pending {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-status-actions:empty {
+  display: none;
+}
+
+.think-tank-composer {
+  display: grid;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-composer textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.think-tank-composer-row {
+  align-items: center;
+  color: var(--ad-text-secondary);
+  display: flex;
+  font-size: 0.85rem;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+}
+
+.think-tank-side {
+  display: grid;
+  gap: var(--ad-space-4);
+  min-width: 0;
+  position: sticky;
+  top: var(--ad-space-4);
+}
+
+.think-tank-side h2,
+.think-tank-panel h2,
+.think-tank-list h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.think-tank-member {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+  display: grid;
+  gap: var(--ad-space-1);
+  padding-bottom: var(--ad-space-2);
+}
+
+.think-tank-member > div {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-1) var(--ad-space-2);
+  min-width: 0;
+}
+
+.think-tank-member > div:first-child span,
+.think-tank-member-meta {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-member[data-state="speaking"] {
+  border-bottom-color: var(--ad-state-busy);
+}
+
+.think-tank-member[data-state="departed"],
+.think-tank-member[data-state="exhausted"] {
+  color: var(--ad-text-muted);
+}
+
+.think-tank-panel {
+  display: grid;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-panel li,
+.think-tank-list li {
+  display: grid;
+  gap: var(--ad-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.think-tank-panel li span,
+.think-tank-list li span {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-panel code {
+  font-family: var(--ad-font-mono);
+  font-size: 0.85rem;
+}
+
+.think-tank-list {
+  display: grid;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-4) var(--ad-space-6);
+}
+
+.think-tank-list li {
+  border-inline-start: var(--ad-border-thick) solid var(--ad-border-strong);
+  padding-inline-start: var(--ad-space-3);
+}
+
+.think-tank-list li[data-state="ended"] {
+  border-inline-start-color: var(--ad-border-default);
+}
+
+.room-turn-notice {
+  background: var(--ad-surface-subtle);
+  border-inline-start: var(--ad-border-thick) solid var(--ad-state-busy);
+  margin: 0;
+  padding: var(--ad-space-2) var(--ad-space-4);
+}
+
+/* Setup dialog */
+.think-tank-setup {
+  max-width: 720px;
+}
+
+.think-tank-setup-participants {
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-3);
+}
+
+.think-tank-setup-row {
+  align-items: center;
+  display: grid;
+  gap: var(--ad-space-3);
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.think-tank-setup-row input[type="number"] {
+  width: 5rem;
+}
+
+.think-tank-setup-name {
+  display: grid;
+  min-width: 0;
+}
+
+.think-tank-setup-name span {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-setup-order,
+.think-tank-setup-add {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-check {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+}
+
+@media (width < 1100px) {
+  .think-tank-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .think-tank-side {
+    position: static;
+  }
+}
+}

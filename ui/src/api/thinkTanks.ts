@@ -86,9 +86,10 @@ export function newCommandID(): string {
     : `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function useThinkTanks(project?: string) {
+export function useThinkTanks(project?: string, enabled = true) {
   return useQuery({
     queryKey: THINK_TANK_KEYS.list(project ?? ""),
+    enabled,
     queryFn: ({ signal }) => request(
       `/api/think-tanks${project ? `?project=${encodeURIComponent(project)}` : ""}`,
       z.object({ rooms: z.array(thinkTankSummarySchema) }),
@@ -194,7 +195,7 @@ export function sourceFileURL(roomID: string, sourceID: string, path: string): s
   return roomURL(roomID, `/sources/${encodeURIComponent(sourceID)}/file?path=${encodeURIComponent(path)}`);
 }
 
-function useRoomMutation<Input>(run: (input: Input) => Promise<unknown>) {
+function useRoomMutation<Input, Output>(run: (input: Input) => Promise<Output>) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: run,
@@ -219,10 +220,33 @@ export function useThinkTankRetry(id: string) {
     request(roomURL(id, "/retry"), thinkTankDetailSchema, post(input)));
 }
 
-export function useThinkTankInput(id: string) {
-  return useRoomMutation((input: { kind: "messages" | "annotations"; command_id: string; body: string; context?: unknown }) =>
-    request(roomURL(id, `/${input.kind}`), z.object({ input_id: z.string() }).passthrough(),
-      post({ command_id: input.command_id, body: input.body, context: input.context })));
+export function useThinkTankMessage(id: string) {
+  return useRoomMutation((input: { command_id: string; body: string }) =>
+    request(roomURL(id, "/messages"), z.object({ input_id: z.string() }).passthrough(), post(input)));
+}
+
+export interface RoomAnnotationWire {
+  anchor: "entry" | "activity" | "file";
+  seq?: number;
+  source_id?: string;
+  path?: string;
+  side?: "old" | "new";
+  start_line?: number;
+  end_line?: number;
+  excerpt: string;
+  instruction: string;
+}
+
+export interface RoomAnnotationInput {
+  command_id: string;
+  annotations: RoomAnnotationWire[];
+  overall_instruction?: string;
+  target: { kind: "room" } | { kind: "agent"; agent_id: string };
+}
+
+export function useThinkTankAnnotations(id: string) {
+  return useRoomMutation((input: RoomAnnotationInput) =>
+    request(roomURL(id, "/annotations"), z.object({ input_id: z.string() }).passthrough(), post(input)));
 }
 
 export function useDeleteThinkTank(id: string) {

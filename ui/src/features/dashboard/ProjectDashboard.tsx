@@ -1,4 +1,5 @@
 import { useNavigate, useParams, Link } from "react-router-dom";
+import { RoomList } from "../thinktank/RoomList";
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { createPortal } from "react-dom";
@@ -292,6 +293,7 @@ function ScopedProjectView({ id, project }: { id: string; project?: Omit<Project
         )}
       </div>
       <CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} />
+      <RoomList project={id} />
       {forkOpen && project && (
         <WorktreeForkDialog sourceID={id} sourceTitle={project.title} onClose={() => setForkOpen(false)} />
       )}

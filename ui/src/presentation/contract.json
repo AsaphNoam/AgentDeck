@@ -615,6 +615,47 @@
       ],
       "states": [],
       "variants": []
+    },
+    "think-tank": {
+      "slots": [
+        "header",
+        "body",
+        "discussion",
+        "entry",
+        "activity",
+        "status",
+        "participants",
+        "files",
+        "commands",
+        "list",
+        "turn-notice"
+      ],
+      "states": [
+        "setup",
+        "openings",
+        "discussion",
+        "closing",
+        "ended",
+        "active",
+        "waiting",
+        "attention",
+        "paused",
+        "live",
+        "settled",
+        "speaking",
+        "departed",
+        "exhausted"
+      ],
+      "variants": [
+        "opening",
+        "reply",
+        "departure",
+        "closing",
+        "user",
+        "annotation",
+        "synthesis",
+        "missing_opening"
+      ]
     }
   },
   "decorative_slots": [

@@ -7,6 +7,7 @@ import { Badge } from "../../components/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "../../api/config";
 import type { ProjectResponse } from "../../schemas/project";
+import { RoomList } from "../thinktank/RoomList";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -185,6 +186,9 @@ export function ArchivePage() {
           </button>
         </div>
       )}
+      {/* Rooms are fetched separately and never enter the agent archive
+          results (FS-05.R39, TS-03.R55). */}
+      <RoomList title="Think Tanks" emptyText="No Think Tanks yet." />
     </section>
   );
 }

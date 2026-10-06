@@ -110,6 +110,8 @@ class SseClient {
     }
     if (parsed.data.deleted) {
       queryClient.removeQueries({ queryKey: THINK_TANK_KEYS.room(parsed.data.room_id) });
+      // Room drafts are browser state with no other cleanup boundary (INV §1).
+      useAnnotationStore.getState().discard(`room:${parsed.data.room_id}`);
       return;
     }
     queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.room(parsed.data.room_id) });
