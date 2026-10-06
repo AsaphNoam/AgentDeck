@@ -189,7 +189,120 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   origin and current recovery state; all room projections retain existing privacy/activity scope.
   No new MCP action, provider feature, direct-action transport or remote room route is needed.
 
+- **R22 (planned)** — Persist a normalized room `title` (1–120 Unicode runes) separately from
+  goal and include it in normalized create intent/replay matching. UI creation requires it;
+  absent/blank legacy API input and existing rows use the first 120 runes of the whitespace-folded
+  goal, with no goal/history rewrite. A forward migration adds title and backfills only that field.
+  There is no rename endpoint. New participant and fresh-judge launch intent sets ordinary
+  `launchRequest.Group` to the title before reservation/launch, using existing `launchAgent`
+  composition. Ready/existing slots are never regrouped; judge repair/retry applies the same group
+  only when creating a fresh identity. Existing project/group/order/lifecycle mechanisms remain.
+- **R23 (planned)** — FS-21.R48 narrowly supersedes R2/R8's one-attempt constraint during
+  independent openings. Replace the running-room uniqueness with one running non-opening attempt
+  per room plus one running room attempt per agent across rooms. Admit each opening independently
+  in the existing `before(turnID)` transaction using phase/control, fixed-member eligibility,
+  absent running/withheld/completed opening, task-exclusion and R20's pipeline closure guards.
+  Opening starts, resume and retry share those guards and cross-room agent exclusion. Sibling completion,
+  queued-input or ceiling revisions must not falsely veto another eligible opening; strict
+  selected-opportunity/revision admission remains for non-opening work. No opening epoch or
+  second execution service is needed: fixed membership and irreversible phase progression make
+  the member/attempt identities sufficient. Freeze each attempt's own head/token/source tuple;
+  shared inputs remain held until opening publication. State guards also prevent opening/non-opening
+  coexistence, even though distinct partial indexes alone do not prove that exclusion.
+  The existing bounded per-room dispatcher starts eligible opening activations/resumes concurrently
+  through the ordinary lifecycle/start leases, with at most 32 in-flight opening starts per room
+  and 128 process-wide across the existing four room workers. Keep the per-room dispatch claim
+  across those bounded starts, not across provider completion. A busy member stays unattempted
+  without blocking eligible peers. Holds/Pause/End suppress later admission; running siblings settle
+  independently and are not cancelled by another opening's failure. Barrier/partial-End settlement
+  waits until no opening attempt is running, publishes withheld entries/activity in member order
+  once, and retains failed/completed peers for explicit recovery. Startup/exit/delete/capture guards
+  enumerate all active openings; generation/turn matching and per-attempt byte budgets stay intact.
+  An admission committed before Pause/End may settle; an admission losing that transaction race
+  starts no provider frame and stays unattempted on Pause or is abandoned by End. Retry never
+  bypasses a later pipeline Stop. Failed members are not readmitted by a sweep or ordinary Resume:
+  user-controlled explicit turn retry authorizes their next attempt. Extend `{target: "turn"}`
+  retry with `attempt_id` and a stable `command_id` for opening retries, validating that failed
+  attempt's room/member/opening identity. Exact replay returns its acknowledgement; conflicting
+  command reuse or ambiguous multi-failure legacy retry refuses. A paused retry authorizes recovery
+  without starting until Resume; preserve other unresolved failure holds. Partial-End/closing/ended
+  retry refuses, preserving history. Unattempted eligible slots may proceed after explicit recovery,
+  never completed/withheld peers. Existing unambiguous legacy retry shapes remain accepted.
+- **R24 (planned)** — Add an atomic state mutation for an absolute higher participant cap,
+  exposed as `POST /api/think-tanks/{id}/participants/{agent_id}/turn-limit` with
+  `{command_id, expected_limit, limit}`. Require 1–1,000, `limit > expected_limit`, a participant,
+  phase openings/discussion, no End/closing/judge/run-closure authority and the applicable R20 guard.
+  Compare `expected_limit` to the current cap inside the same transaction; concurrent changes return
+  typed conflict without overwriting. Store command intent/result keyed by room/command so exact
+  replay returns its acknowledgement and conflicting reuse refuses. Keep this receipt separate
+  from shared message inputs: a budget change is not a conversation contribution. Receipts are
+  room-owned and removed on room deletion; successful increases are bounded by the finite caps.
+  Update cap and
+  exhausted→active eligibility atomically, preserving departed state, completed/checkpoint counters,
+  control/holds and active attempts; increment room revision, commit, then emit the normal update.
+  A saved change is acknowledged before dispatch; it never uses Send/Steer. Context reads and later
+  activation read authoritative cap, while already-delivered instructions remain historical facts.
+- **R25 (planned)** — Extend shared-message input with optional bounded structured mention ranges
+  `{agent_id, start, end}` over UTF-8 bytes of the submitted body. UI picker selection retains the
+  id/range, updates unaffected ranges and invalidates edited mentions; labels are presentation,
+  never identity. The server validates at most 32 nonoverlapping, rune-boundary ranges and recorded
+  live participant targets (not judge/departed/deleted) within the existing request/text limits,
+  then snapshots addressee id/name/project in the input/entry context. Exact command replay includes
+  mention intent; invalid/stale targets refuse without discarding drafts. Existing messages without
+  mentions retain their meaning. Plain body text/file tokens are never parsed into target authority.
+  Published room/agent-read entry projections expose the attributed addressees, and context guidance
+  explicitly says when the caller is addressed. Reading requires the same full-view receipt; no
+  private prompt, extra activation, membership grant, speaker reorder or new MCP action is added.
+  All participants can read the same shared body/targets, subject to existing opening isolation.
+- **R26 (planned)** — In the successful judge-finalization transaction, insert an immutable
+  agent-owned synthesis read projection with exact body, room/title/entry/attempt attribution,
+  judge id, completion time and source generation/runtime turn id/completion-event seq. Key it
+  uniquely by room/entry; pass the actual completion event seq from `finishThinkTankTurn`. Its
+  foreign key follows ordinary agent-history deletion, never room deletion. Canonical room entry
+  and this result snapshot commit atomically; failed/uncertain/staged attempts create neither result
+  nor successful receipt. Duplicate finalization cannot duplicate the snapshot. This bounded
+  read projection satisfies independent agent-history retention without a second provider writer,
+  invented assistant event, cross-store outbox or new runtime event kind.
+  Add local-only `GET /api/sessions/{id}/think-tank-results`, ordered/cursor-paged with at most
+  500 records/1 MiB encoded per response and the existing 64 KiB per-result body bound. The ordinary
+  desktop transcript/archive renderer merges a source-attributed synthesis row at its captured
+  completion anchor; provider NDJSON/context remains unchanged. Result identity is distinct from
+  provider seq and room anchors; copy/Markdown and room-source inspection retain their existing
+  source availability rather than inventing a provider transcript anchor.
+  An anchor outside the loaded window waits for that window; an unavailable source anchor still
+  offers the retained result with truthful source-unavailable framing. After commit, room updates
+  invalidate/refetch the judge result query, including live clients arriving after completion.
+  Room-link metadata marks a deleted room unavailable without deleting the result. Do not blend
+  the result into an incidental provider assistant delta or change provider history/search records.
+- **R27 (planned)** — Extend existing version-1 room create/list/detail/entry/read shapes with
+  optional-compatible title, stable member summaries/allowances, shared addressee snapshots and an
+  explicit `active_attempts` array. Preserve old fields; singular `active`/`active_agent_id`/
+  `current_actor` describe a sole active attempt only and are absent/empty for multiple openings.
+  All REST/SSE/pipeline projections clear stale singular actors on that transition; new consumers
+  prefer the explicit array when present rather than carrying forward an earlier singular speaker.
+  Lists/summaries carry the full bounded roster and judge presence/status needed for cards
+  without per-card detail fetches or launch-setting disclosure. Remaining allowance derives from
+  cap/completed and departure state; totals exclude departed/judge members and never subtract
+  an unfinished attempt as a completed contribution. Add an indexed `agent_id` list filter for
+  participant/judge membership, independent of current busy state, retaining the existing 200-room
+  bound and explicit clipping feedback. Existing records/callers remain readable; new arrays marshal
+  as `[]`. SSE stays invalidation plus bounded owned activity: no hidden opening data in summaries.
+  Register the new REST surfaces under `localOnly`, outside the phone allowlist, reuse structured
+  errors and keep membership-scoped MCP access unchanged. Update producer-derived Go↔UI fixtures,
+  Zod consumers, shared room projectors and embedded operating knowledge together.
+- **R28 (planned)** — Closure extends R18's focused matrix with FS-21.A33–A37 and FS-02.A53/
+  FS-03.A52–A53: independent overlapping provider frames, per-agent admission races, opening
+  isolation/barrier/failure/Pause/End/restart, increase/replay/end races, mention range/identity and
+  full-context delivery, synthesis/result atomicity/reload/archive/deletion and group launch/retry.
+  Use state/server/runtime race tests in both Go variants, serialized wire fixtures and affected
+  UI tests/style/build checks, then TS-06's applicable closure once. Render the real built UI at
+  1024px and wider in all three appearances, including a side-by-side normal/room composer check.
+  Existing credentialed Claude/Codex room-tool/approval/resume gates remain distinct from fake
+  evidence; extend the finite probe to addressed input and the readable exact judge result.
+
 ## 3. Interfaces & data shapes
+
+R22–R28 extend the initial interface inventory additively; the existing v1 fields and actions remain.
 
 R18's initial REST family is `/api/think-tanks`: `POST` create/setup, bounded `GET` list, `GET /{id}`
 detail, and `GET /{id}/{entries,activity,files,commands}`. `GET /{id}/sources/{source_id}/file` resolves a

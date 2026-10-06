@@ -230,7 +230,79 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   be deleted while retained run history needs it. Run deletion removes only the pin. Standalone
   room creation, manual End, private follow-up, retention and eligible deletion are unchanged.
 
+- **R43 (planned)** — A room has a short title distinct from its full goal. The creation UI asks
+  for a title; existing rooms and API callers omitting it receive a readable goal-derived fallback.
+  Titles are fixed after creation in this change. Project cards, Archive, room navigation and
+  individual-chat room cues use the title. The room's compact header leads with title and phase;
+  the full goal remains available in a subordinate disclosure rather than occupying the first
+  conversation viewport. Title fallback neither rewrites history nor changes the goal.
+- **R44 (planned)** — Originating-project room discovery follows FS-02.R71: one distinct wide
+  room card per row before the agent grid. Show every participant, phase/control, current speaker
+  or all active openings, per-member remaining allowance, the sum of non-departed participants'
+  remaining allowances, judge state and attention/completion reason. Allowance is a maximum, not
+  expected rounds or progress toward agreement. Judge budget is separate. Missing/deleted sources
+  keep retained identity without active-chat actions. A card opens the full room; participant chat
+  links remain independent keyboard-accessible actions. Failed reads expose unavailable state
+  rather than guessed zero allowances or an empty roster.
+- **R45 (planned)** — Participant and judge chats retain the ordinary compact agent header,
+  transcript and private composer. A restrained Think Tank header accent and short title/active-turn
+  cue identify room work; full goals and explanations move into a Think Tank tab beside Files and
+  Commands under FS-03.R71. The tab exposes associated rooms, room status, participants/judge,
+  allowances and links to the whole room and every surviving member's ordinary chat. Membership
+  stays discoverable between turns and after completion, with separate entries for multiple rooms.
+  Private Send/Steer semantics under R28/R33 remain explicit and unchanged.
+- **R46 (planned)** — The room composer is anchored at the bottom of the conversation region,
+  below its scrollable discussion, and looks like the standard Chuck chat input: the same textarea,
+  sizing, surface, spacing, focus treatment and Send action. Enter sends, Shift+Enter inserts a
+  newline, and an open suggestion picker consumes its normal selection keys first. Queued-input
+  and failure feedback stay adjacent; failed drafts remain available. Ended discussion is read-only.
+  `@` offers participant-name mentions alongside distinctly labelled participant-qualified file
+  suggestions; `#` preserves command/skill suggestions. Duplicate names are disambiguated by
+  project/identity. A selected mention records a shared addressee visible to everyone and explicitly
+  identified to that participant on its next scheduled room turn. It neither privately sends nor
+  interrupts/reorders turns, grants allowance or wakes the judge early. Exhausted targets expose
+  their lack of allowance; departed/deleted targets cannot be newly addressed. Plain unselected
+  text is not silently resolved to an agent. R35's boundary/independent-opening hold still applies.
+- **R47 (planned)** — Each participant's room contributions use a consistent subtle bubble
+  background tint with a matching roster cue for that room, including reload and retained history.
+  Every participant and judge is distinguishable; user input is distinct. Speaker names, project
+  attribution, synthesis labels and textual states remain readable independently of color. Code,
+  diffs, permissions and annotations retain their technical contrast in all three appearances.
+- **R48 (planned)** — Eligible independent openings run concurrently: a participant's completion
+  or private-work wait does not serialize other eligible openings. R6's isolation still holds;
+  opening bodies/activity are withheld until all openings settle, then published in configured
+  order. Show each opening's active/waiting/completed/failed state without disclosing hidden content.
+  Ordinary discussion, closing and judge work retain their single-speaker rule. Pause/End prevent
+  new opening starts and let already-running openings finish. Failure retains completed hidden peers
+  for explicit retry; End publishes the completed partial set and records missing answers. Restart
+  fences every uncertain opening for explicit recovery, never replaying completed peers.
+- **R49 (planned)** — The operator can raise an individual participant's positive finite turn
+  ceiling during open openings/discussion, whether running, paused or held. Show completed, maximum
+  and remaining counts with the proposed higher value before Save; acknowledge the saved ceiling
+  and update all room views. Increasing an exhausted member's ceiling restores its eligibility
+  only while discussion is still open. It does not undo departure, failure or private-work waits,
+  resume a pause, interrupt/steer a running turn, or charge a contribution. Subsequent activations
+  receive the new ceiling; an already-running turn keeps its delivered instruction. Closing,
+  end-requested, ended and judging rooms reject increases without reopening. Concurrent updates
+  cannot silently lose an increase, and validation/conflict errors preserve the operator's draft.
+  Decreases and unlimited budgets are excluded; existing finite bounds still apply.
+- **R50 (planned)** — A successfully finalized judge synthesis is readable once as an attributed
+  result in its own ordinary chat as well as canonical room history, with a link back to the room.
+  The body is the exact submitted synthesis, not inferred provider prose or only collapsed tool
+  arguments. Live/reloaded and archived chat show the same result; failed/staged judge output is
+  not a completed synthesis. No synthetic assistant messages are inserted into other participants'
+  chats. Explicit room deletion retains the judge's own result with its ordinary agent history.
+- **R51 (planned)** — Newly deployed room participants and the fresh judge receive an ordinary
+  agent group matching the room title in their own projects, reusing an existing same-named group.
+  Existing participants keep their groups. Group assignment accompanies successful ordinary launch
+  and retry does not reset later manual regrouping. Completing/deleting the room preserves groups
+  and agents; no retrospective regrouping or new membership/group lifecycle is introduced. This
+  narrowly extends FS-02.R65's previous unchanged-grouping statement for new room deployments.
+
 ## 3. States & transitions
+
+The workspace/control upgrade in R43–R51 is planned. It extends the existing room lifecycle;
+R48 changes only independent-opening concurrency and R49 permits live ceiling increases.
 
 The core phase distinction from R4–R6, R13 and R20 is optional independent openings → shared
 discussion → closing-message opportunity when one participant retains allowance → discussion ended
@@ -432,7 +504,52 @@ completion; R37 defines partial opening publication and pending input on End.
   finishes the active turn normally and does not stop agents. *Verify:* lifecycle/race tests under
   FS-14.A49 and the existing standalone End regression coverage.
 
+- **A33 (planned)** (R43–R45, R47, R51) — Create a titled room with a long goal, dense roster and
+  mixed existing/new cross-project agents. At 1024px and a wider desktop in Core, Sky & Grove and
+  Studio, inspect its card before the agent grid, all member identities/budgets, concurrent-opening
+  and attention/ended states, compact room/participant headers and stable speech tints. Navigate
+  project → room → participant → Think Tank tab → another chat/room; multiple memberships and
+  deleted sources stay intelligible. New agents/judge use the title group, existing agents retain
+  theirs, reused labels/manual regrouping survive retries and completion. Existing/title-less
+  creation and pre-migration rows get a fallback without goal/history changes; duplicate create
+  commands reuse reserved identities and the original title. *Verify:* server/UI contracts plus an
+  isolated real-binary fake-provider rendered journey, including Archive.
+- **A34 (planned)** (R46) — The room input matches a normal Chuck chat input side by side in all
+  appearances at desktop floor/wide widths. Scroll a long discussion; the input remains anchored.
+  Exercise Enter/Shift+Enter, keyboard picker selection/Escape, distinguish agent/file/command
+  suggestions and duplicate names, send to multiple shared addressees, preserve failed drafts and
+  queued input through turn/opening boundaries. Targets see explicit addressees on their next room
+  turn; private Send/Steer, speaker order and allowance remain independent. Exhausted/departed/
+  deleted targets, stale membership and ended-room sends report truthful refusal/feedback.
+  *Verify:* state/MCP/wire/UI tests and the rendered A33 journey; include FS-02.A48–A49's planned
+  shared textarea/icon behavior when integrated.
+- **A35 (planned)** (R48) — Hold two or more fake-provider opening turns simultaneously and
+  observe overlapping provider frames before any finishes. Read room history/activity through
+  REST/SSE and another participant: no peer opening leaks. Finish out of order; publication uses
+  configured order once after the barrier. Busy peers, failed opening/retry, Pause/End during
+  concurrent admission/completion, Stop/restart and stale callbacks preserve committed openings
+  and exact accounting without duplicate effects. Ordinary discussion still has one floor.
+  *Verify:* state/server/runtime race integration tests plus A33's concurrent-opening UI journey.
+- **A36 (planned)** (R49) — Increase a ceiling during an active opening/turn and while paused or
+  held; verify persistence/reload, unchanged completed counts, updated cards, future activation
+  context and exhausted-member re-eligibility. Test duplicate commands, simultaneous increases,
+  completion/End/closing races, bounds, departed/judge targets and planned pipeline closure guards.
+  A refused update preserves input and changes no counts/phase; a saved increase does not resume,
+  steer or clear unrelated holds. *Verify:* state/HTTP/MCP tests and A33's live-budget journey.
+- **A37 (planned)** (R50) — Complete synthesis with a body different from the judge's incidental
+  provider reply; inspect its ordinary chat live, on reload and in Archive. Exactly one attributed
+  result equals the committed synthesis and links to the room; failed attempts and duplicated
+  completion callbacks produce no false/duplicate result. Room deletion preserves that result in
+  the judge history; participant chats receive no fabricated assistant messages. *Verify:* durable
+  transcript/projection and UI tests plus the rendered judge/Archive journey in A33.
+
 ## 6. Deviations & open decisions
+
+R43–R51/A33–A37 are the 2026-10-06 confirmed Think Tank workspace/live-control upgrade, including
+the explicit requirement to match the standard Chuck chat input. They remain unshipped and planned.
+FS-02.R66–R67 and TS-08.R88–R89 already own pending shared auto-grow fields and icon actions;
+this upgrade uses their shared seams rather than a separate room input design. Pipeline-owned
+rooms under R41–R42 use these general room controls subject to their run/stage closure guards.
 
 Shipped 2026-10-06. R35's autocomplete uses the agent composer's shared `@`/`#` picker against one
 participant chosen in the room composer, and appends that participant's name to each inserted

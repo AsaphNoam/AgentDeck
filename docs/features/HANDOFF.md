@@ -126,6 +126,19 @@ None open.
 
 ## Changelog
 
+- **2026-10-06 — Design: Think Tank workspace and live controls.** Human confirmed the scope
+  and required the room composer to match standard Chuck chat input. Ready change
+  `think-tank-workspace-and-live-controls.md` is Waiting to start. FS-21.R43–R51/A33–A37,
+  FS-02.R71/A53 and FS-03.R71–R72/A52–A53 cover titled cards, compact chat/tab navigation,
+  anchored shared mentions, speaker tints, concurrent openings, live ceilings, exact judge-chat
+  results and new-agent grouping. TS-14.R22–R28 and TS-08.R96–R99 reuse room admission,
+  finalization, normal launch and shared presentation; independent audits checked pending-design
+  overlap and execution guards. R23 explicitly fences pipeline Stop and failed-opening retries;
+  judge results commit atomically with room synthesis as agent-owned read projections. Integrate
+  shared textarea/icon seams with `ui-polish-fields-icons-labels.md`; keep pipeline-stage work
+  independent and applicable closure guards shared. All new requirements remain planned; no
+  product code changed and the active provider-refresh work remains active.
+
 - **2026-10-06 — Design intake: Think Tank workspace and live controls.** Recorded the requested
   improvements and proposed experience in `docs/ideas.md` under Ideas being defined: titled
   single-column room cards before project agents, compact participant chats with a Think Tank tab,

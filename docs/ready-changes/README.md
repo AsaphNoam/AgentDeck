@@ -70,6 +70,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`ui-polish-fields-icons-labels.md`](ui-polish-fields-icons-labels.md) — auto-grow text fields,
   icon actions, card header order, plain labels, and archived projects hidden on Tasks.
 
+- [`think-tank-workspace-and-live-controls.md`](think-tank-workspace-and-live-controls.md) — titled
+  room cards, standard chat composition and shared mentions, stable speaker tints, concurrent
+  isolated openings, live ceilings, retained judge-chat results and grouping of new room agents.
+
 ## Paused changes
 
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only

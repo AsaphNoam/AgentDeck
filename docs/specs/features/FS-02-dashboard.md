@@ -308,6 +308,15 @@ entries in the same list share a readable name. Status suffixes such as `(archiv
 projects. Their tasks are not changed. A Tasks route or saved focus naming an archived project
 still shows that project's tasks.
 
+**R71** (planned) — A scoped project's Think Tanks section precedes its agent grid and displays
+one wide room card per row, independently of agent column density. Room title/phase lead a quiet
+goal preview, full wrapping roster, current speaker(s), per-member/collective remaining ceilings,
+judge state and attention/completion reason under FS-21.R43–R44. The card has familiar Chuck
+geometry with a restrained collective cue distinct from agent cards. Room and participant links
+are separate accessible actions. Ordinary agent cards remain in their project/groups; FS-21.R51
+narrowly extends R65 by assigning the title group to newly deployed room agents. A room card is
+a navigation surface for canonical room history, with no provider identity or agent lifecycle.
+
 
 **R60.** A project card whose project is active and repo-backed (its expanded `cwd`
 resolves inside a Git working tree) offers **New worktree project** in its context menu (R34/R38),
@@ -872,6 +881,12 @@ picker and launches with the route project's id; the general modal continues to 
 - **A52** (R70) (planned) — With one active and one archived project, the Tasks page lists only the
   active project's section and filter option; opening the archived project's Tasks focus still
   shows its tasks. *Verify:* `TasksPage.test.tsx`.
+
+**A53** (planned) — FS-21.A33 exercises R71's distinct titled room cards before the agent grid,
+full roster/allowances, current speaker(s), attention/ended states and separate accessible links in
+all three appearances at 1024px and a wider desktop. Existing density/group/card behavior remains;
+new room deployments get FS-21.R51's title group. *Verify:* dashboard/wire tests and that real-binary
+rendered journey.
 
 ## 6. Deviations & open decisions
 

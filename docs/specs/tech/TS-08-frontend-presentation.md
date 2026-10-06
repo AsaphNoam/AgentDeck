@@ -1038,6 +1038,52 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   the presentation contract for any new public slots in all three skins. Rendered closure exercises
   FS-14.A50–A51 and FS-16.A30, with no phone room workspace added.
 
+- **R96 (planned)** — FS-02.R71/FS-21.R43–R44 extend the existing `RoomList` feature projection
+  into distinct room navigation cards before the project agent grid, one row per room independent
+  of `CardGrid` density/order. Archive uses titled room discovery without acquiring agent-grid
+  layout. Use existing Surface/Badge/Button/link seams, semantic depth/radius/spacing and full
+  wrapping member identities. Read title/state → quiet goal preview → roster/allowances → current
+  room activity/attention; judge state is separate. Preserve independent link focus, loading/error
+  and retained tombstone states. This refines R87's goal-first hierarchy to compact title/state;
+  the full goal remains available without competing with conversation. No provider-agent card,
+  duplicate layout setting, dashboard grouping system or new motion is introduced.
+- **R97 (planned)** — FS-21.R46's room composer uses the ordinary `composer` construction,
+  shared `composer-input`/actions/picker styling and public `data-ui="composer"` hooks; it receives
+  the same R88 `AutoGrowTextarea` and R89 Send icon as ordinary chat. Extract only repeated visual
+  markup if needed; feature-owned room send/queue state remains separate from private Send/Steer.
+  Do not use the agent-bound `Composer` request handler to submit room input. The conversation
+  region owns scrolling and anchors the same bounded reading-measure input beneath it; the roster
+  and Files/Commands never turn the input into a side form. Use normal Enter/Shift+Enter and picker
+  precedence, with a visually hidden accessible input label and truthful adjacent pending/error
+  feedback. Extend the existing autocomplete hook/picker with discriminated participant versus file
+  items, stable id/range selection and grouping labels; preserve file context selection and `#`
+  behavior. Do not create another suggestion engine or a room-specific textarea style.
+- **R98 (planned)** — FS-03.R71–R72 extend `ChatPanel`/`TranscriptView` with a compact room cue,
+  Think Tank tab and source-attributed host synthesis row. Use room-title membership queries under
+  TS-14.R27, including idle/ended memberships; do not scan only busy-agent turns. Fixed membership
+  and source identities own links, not labels; deleted room/agent links become truthful unavailable
+  text. Header accent is restrained and independent of lifecycle status colors. Full room goal and
+  explanatory Send/Steer text live in the tab, keeping ordinary header height and transcript first
+  view. Merge the TS-14.R26 result query by immutable result identity and captured completion anchor
+  in a pure renderer projection shared by live and archived desktop chat; do not emit fake provider
+  events or duplicate the result row on replay/refetch. Tool arguments do not replace that row. Use the
+  existing Markdown/content seam and a clear synthesis/source label; retained result body remains
+  visible when the room is deleted. Query completion/failure and room switches preserve current
+  drafts and reject stale replies. Existing annotation source availability remains explicit.
+- **R99 (planned)** — FS-21.R47 speaker tints are a finite shared semantic palette keyed by fixed
+  room member order, with one distinct slot for each of the at most 32 participants and a separate
+  judge slot. Retained identity/order keep the same mapping through reload/deletion; judge retries
+  use the judge-role slot. Define colors only through Core tokens and supported skin overrides,
+  deriving feature treatments from those roles. Update the presentation contract for the bounded
+  speaker-slot hook/token family and any new room-card/tab/result hooks; no raw feature colors or
+  unlisted inline visual values. Tints appear behind contribution prose and on a quiet roster cue,
+  not as permission/state meaning or a recoloring of syntax/diffs. Names and textual states remain
+  primary identity/status signals. No decorative animation, new appearance or style dependency.
+  Closure renders FS-21.A33–A34/A37 at 1024px/wide in all three appearances, with matched ordinary
+  and room composer inputs, long goals/names, dense/concurrent openings, live ceiling edits,
+  failure/pending/ended states, keyboard focus and retained judge results. DOM tests do not close
+  visual parity or contrast.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

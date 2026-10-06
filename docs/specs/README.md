@@ -47,7 +47,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Shared operating skill, progressive references, exact prompt migration, and planned lean personas with standing context and native-prompt preservation |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 | FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, phone web app (planned desktop-flow dashboard, project pages, agent management), attention notifications, keep-awake |
-| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Partial | Independent cross-project agent deliberation, durable room history, per-agent ceilings and end-only judge synthesis; planned pipeline-owned rooms |
+| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Partial | Independent agent deliberation and durable room history; planned titled cards, normal chat composition, shared mentions, parallel openings, live ceilings, judge-chat results, deployment grouping and pipeline-owned rooms |
 
 ### Technical specs
 
@@ -66,7 +66,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional skill delivery, planned shared standing context and four-role seeding, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | TS-13 | [tech/TS-13-remote-control.md](tech/TS-13-remote-control.md) | Current | Embedded Tailscale node, tailnet listener guard and allowlist, phone pairing and device credentials, Web Push, keep-awake, phone web-app entry, desktop-flow phone dashboard, and agent management |
-| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Partial | Canonical SQLite rooms, explicit publication and retained activity; planned pipeline origin/context and closure fencing |
+| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Partial | Canonical SQLite rooms, explicit publication and retained activity; planned opening concurrency, ceiling/mention contracts, agent-owned synthesis projections, titled deployment and pipeline closure fencing |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

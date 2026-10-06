@@ -567,6 +567,16 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   families and their chosen permission policy remain unchanged; R40's listed inventory grows by
   these two actions rather than introducing a separate approval bypass.
 
+- **R71 (planned)** — Individual participant/judge conversations use FS-21.R45's compact room
+  cue and Think Tank tab beside Files/Commands, retaining the normal agent header, transcript,
+  private composer and Send/Steer behavior. Full goal/membership navigation belongs in that tab,
+  not a large banner before the first message. Associated room titles and states remain discoverable
+  between turns and after completion; deleted sources retain attribution without dead chat links.
+- **R72 (planned)** — FS-21.R50's successfully committed synthesis is a readable, attributed
+  source-linked result in the judge's ordinary live/replayed/archived chat. It preserves exact
+  submitted text and ordinary history retention independently of subsequent room deletion; it
+  is not an inferred assistant turn or an import into participant conversations.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -958,6 +968,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   recorded; the ordinary tool still waits for its usual approval. A nonmember or stale contribution
   is refused server-side without bypassing authority. *Verified by:* runtime permission/MCP room
   integration tests, with catalog membership derived from actual tool registrations.
+
+- **A52 (planned)** (R71) — FS-21.A33's rendered navigation journey checks compact participant/
+  judge chat cues, the Think Tank tab, multiple/ended memberships and ordinary private Send/Steer;
+  long goals do not push the first message below a large room banner. *Verify:* ChatPanel tests
+  plus that real-binary rendered journey in every appearance at desktop floor/wide widths.
+- **A53 (planned)** (R72) — FS-21.A37 checks exact, single judge synthesis results live, replayed
+  and archived, including room deletion and failed/stale completion. *Verify:* state/HTTP/projection/
+  UI tests and A37's rendered journey.
 
 ## 6. Deviations & open decisions
 
