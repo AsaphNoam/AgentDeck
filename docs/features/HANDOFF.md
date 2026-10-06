@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `refresh-provider-bundle-2026-10.md` (in progress; see **Active change**).
+- **Active change:** none.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -20,32 +20,18 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `AsaphNoam/Chuck` and 404 until the rename; workarounds are `CHUCK_REPO=AsaphNoam/AgentDeck`
   and `chuck update --repo AsaphNoam/AgentDeck`. Renaming later fixes them without a new release.
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-  `refresh-provider-bundle-2026-10.md` is in progress.
+  The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+  The 2026-10 provider bundle refresh (`7c95fa9..2f39c3f`, excluding the interleaved `docs:`
+  design commits) is available. Review note: TS-04.R81 was revised from "decode the backgrounded
+  marker" to deriving the state from the linked task; confirm that reading.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
 
-[`refresh-provider-bundle-2026-10.md`](../ready-changes/refresh-provider-bundle-2026-10.md).
-Slices, each committed when verified:
-
-1. ~~go-sdk v1.8.0 (TS-04.R83)~~ done.
-2–3. ~~Release pins, patch, fixtures; AIR re-derivation (TS-04.R79)~~ done. Assembly proofs were
-   reproduced locally from the lockfile (`npm ci`, hashes, zero-fuzz patch, one Codex). AIR shapes
-   Chuck decodes did not change, so no decoder change was needed (recorded in R79).
-4. ~~Session notices (TS-04.R80, FS-03.R68/A49)~~ done: fake `notice_flow` scenario
-   (`FAKEACP_NO_NOTICES` = adapter fallback), `notices_test.go`, shared `NoticeRow`. TS-08.R86 stays
-   planned until slice 5 adds its backgrounded half.
-5. ~~Backgrounded tool (TS-04.R81, FS-03.R67/A48, TS-08.R86)~~ done with no Go mapper change:
-   the UI derives the state from the task's linked `tool_call_id` (`markBackgrounded`). Review
-   note: R81 was revised from "decode the marker" to this; the reviewer should confirm it.
-6. ~~Model-policy refusals (TS-04.R82, FS-09.R79/A48)~~ done: `modelPolicyRefusal` in `chat.go`
-   surfaces the provider reason; the read-back and no-retry behaviour already existed.
-7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
-
-Next: slice 7 (closure).
+None.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
@@ -92,6 +78,11 @@ scripts/room-render.mjs <outDir> live|ended)`.
   2026-10-05 (adapter 0.75.1/SDK 0.3.257, Claude Code 2.1.282, macOS, the user's existing login); the
   Bundle still refuses it with Claude Code 2.1.257's version error, as designed.
 - TS-06.R26/R32: the credentialed Codex 2.1.1 receipt gating FS-03.A41/A42 and FS-01.A20.
+- TS-06.R32 (2026-10 bundle, Claude ACP 0.85.1 / Codex ACP 2.1.1 / Codex 0.159.3): the two-point
+  Claude and Codex smoke plus one notice, one Steer during a running command (FS-03.A48's
+  credentialed half) and one refused model switch where policy allows staging it. Automated
+  assembly proofs and fake-runtime tests passed 2026-10-06; a release CI `assemble.sh` run is
+  also still owed.
 - FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove
   with Codex capabilities.
 
@@ -121,6 +112,12 @@ None open.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Work: 2026-10 provider bundle refresh.** Pins Claude ACP 0.85.1 (SDK 0.3.286),
+  Codex ACP 2.1.1 with Codex 0.159.3 (steering patch regenerated, still required), go-sdk 1.8.0.
+  AIR shapes Chuck decodes were unchanged. Adds notice rows, steer-backgrounded tool state and
+  model-policy refusal reasons. Closure: `make test`, `make build`, UI test/build/style checks and
+  a focused runtime `-race` pass all passed. TS-06.R32 stays planned until its smokes run.
 
 - **2026-10-06 — Design: quiet completed chat turns.** Human confirmed one per-turn activity
   disclosure and unchanged ephemeral thought retention. Ready change `quiet-completed-chat-turns.md`
