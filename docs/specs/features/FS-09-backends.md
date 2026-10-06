@@ -343,7 +343,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   Do not silently weaken permissions, substitute model/effort, or reinterpret Steer as Send.
   Unknown version alone is not incompatibility. Testing and compatibility work are capped by
   TS-06.R31; this is not an obligation to build old-version emulations or a new capability framework.
-- **R79** `(planned)` — Provider model policy is reported, not overridden. When the provider
+- **R79** — Provider model policy is reported, not overridden. When the provider
   refuses a launch or mid-session model because of a managed allow list, a denied model or a
   model-switch policy hook, the refusal surfaces as the existing rejected launch or switch (FS-03.R23,
   FS-01.R26) with the provider's reason. The agent header and stored runtime show the model the
@@ -731,7 +731,7 @@ Configuration-source federation for Claude/Codex is FS-08.
   unsupported provider cannot expose a falsely usable control; failure still preserves the draft.
   *Verify by* focused protocol fixtures and shared UI supported/unavailable/error states, plus the
   capped recovery journey in TS-06.R31. No real old-provider download is needed for these fixtures.
-- **A48** `(planned)` (R79) — A fake runtime that refuses a model switch, and one that reports
+- **A48** (R79) — A fake runtime that refuses a model switch, and one that reports
   success while keeping the previous model active, both leave the header and stored runtime on the
   active model; the refusal shows the provider's reason and no substitute model is sent. *Verify by*
   fake ACP runtime switch tests and the `ChatPanel` runtime-picker component test.

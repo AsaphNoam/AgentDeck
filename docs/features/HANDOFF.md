@@ -41,13 +41,11 @@ Slices, each committed when verified:
 5. ~~Backgrounded tool (TS-04.R81, FS-03.R67/A48, TS-08.R86)~~ done with no Go mapper change:
    the UI derives the state from the task's linked `tool_call_id` (`markBackgrounded`). Review
    note: R81 was revised from "decode the marker" to this; the reviewer should confirm it.
-6. Model-policy refusals (TS-04.R82, FS-09.A48). Claude 0.85.1: a `set_config_option` veto is a
-   JSON-RPC `-32603` with `data.details` = the hook text; a `session/new` veto succeeds on the SDK
-   default model. `applyRequiredOption`/`setConfigOption` (`chat.go` ~2470–2530) already read back
-   `currentValue`; confirm the reason surfaces, then add tests.
+6. ~~Model-policy refusals (TS-04.R82, FS-09.R79/A48)~~ done: `modelPolicyRefusal` in `chat.go`
+   surfaces the provider reason; the read-back and no-retry behaviour already existed.
 7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
 
-Next: slice 6.
+Next: slice 7 (closure).
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

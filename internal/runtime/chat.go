@@ -2411,6 +2411,40 @@ func (e *ProviderTooOldError) Error() string {
 
 func (e *ProviderTooOldError) Unwrap() error { return ErrProviderIncompatible }
 
+// maxPolicyReason bounds a provider model-policy reason (INV §8).
+const maxPolicyReason = 300
+
+// modelPolicyRefusal recognizes the Claude adapter's model-policy refusals,
+// which arrive as a bare `Internal error` with the CLI's text in data.details
+// (claude-agent-acp 0.85.1): a PreModelSwitch hook veto, whose reason the hook
+// wrote for the person, and a value outside the managed allow/deny lists. Only
+// these closed shapes are reported; other provider data stays unreported
+// (TS-04.R82, R12).
+func modelPolicyRefusal(err error) string {
+	var rpcErr *rpcError
+	if !errors.As(err, &rpcErr) {
+		return ""
+	}
+	var data struct {
+		Details string `json:"details"`
+	}
+	if json.Unmarshal(rpcErr.Data, &data) != nil {
+		return ""
+	}
+	const hook = "blocked by a PreModelSwitch hook:"
+	if _, reason, ok := strings.Cut(data.Details, hook); ok {
+		reason = strings.Join(strings.Fields(reason), " ")
+		if reason == "" {
+			return "a model-switch policy hook blocked it"
+		}
+		return "a model-switch policy hook blocked it: " + strutil.ClipRunes(reason, maxPolicyReason)
+	}
+	if strings.HasPrefix(data.Details, "Invalid value for config option model:") {
+		return "the provider's model policy does not allow it"
+	}
+	return ""
+}
+
 // claudeVersionTooOld recognizes a `claude_code_version_too_old` rejection.
 // The adapter reports only `Internal error` as the message, so without this the
 // person never learns which version is too old (TS-04.R9, INV §8). Anything
@@ -2476,6 +2510,9 @@ func setConfigOption(ctx context.Context, transport *Transport, sessionID, id, v
 	if err != nil {
 		if tooOld := claudeVersionTooOld(err); tooOld != nil {
 			return fmt.Errorf("%w: %s: %w", ErrSettingRejected, id, tooOld)
+		}
+		if reason := modelPolicyRefusal(err); reason != "" {
+			return fmt.Errorf("%w: %s %q: %s", ErrSettingRejected, id, value, reason)
 		}
 		return fmt.Errorf("%w: %s: %s", ErrSettingRejected, id, err)
 	}

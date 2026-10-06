@@ -1085,6 +1085,45 @@ func TestSessionConfigurationReplacesTheOptionListWithExplicitEmpty(t *testing.T
 	}
 }
 
+// FS-09.R79/A48, TS-04.R82 — Claude 0.85.1 refuses a model through a
+// PreModelSwitch hook or its managed allow/deny lists as a bare `Internal
+// error`. The launch is rejected with the provider's policy reason, sends one
+// model call (no substitute), and reports nothing else from the payload.
+func TestModelPolicyRefusalReportsTheProviderReason(t *testing.T) {
+	for _, tc := range []struct {
+		name, details, want string
+	}{
+		{"hook veto", "Model switch blocked by a PreModelSwitch hook: Opus is reserved for release work\n(policy ref req_secret_marker)",
+			"a model-switch policy hook blocked it: Opus is reserved for release work (policy ref req_secret_marker)"},
+		{"denied model", "Invalid value for config option model: claude-opus-5-5 req_secret_marker",
+			"the provider's model policy does not allow it"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, spec := newChatTest(t, "stream_text")
+			spec.ModelID = "claude-opus-5-5"
+			logPath := filepath.Join(t.TempDir(), "config.log")
+			data, _ := json.Marshal(map[string]string{"details": tc.details})
+			spec.Env = append(spec.Env, "FAKEACP_MODEL_REJECT_DATA="+string(data), "FAKEACP_CONFIG_LOG="+logPath)
+
+			_, err := c.Start(context.Background(), spec)
+			if !errors.Is(err, ErrSettingRejected) || errors.Is(err, ErrProviderIncompatible) {
+				t.Fatalf("Start error = %v, want a plain rejected setting", err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, `model "claude-opus-5-5": `+tc.want) {
+				t.Fatalf("error %q missing reason %q", msg, tc.want)
+			}
+			if strings.Contains(msg, "Internal error") || (tc.name == "denied model" && strings.Contains(msg, "req_secret_marker")) {
+				t.Fatalf("error %q leaks provider payload", msg)
+			}
+			raw, _ := os.ReadFile(logPath)
+			if calls := strings.Count(strings.TrimSpace(string(raw)), "\n") + 1; calls != 1 {
+				t.Fatalf("configuration calls = %d, want only the refused model call", calls)
+			}
+		})
+	}
+}
+
 const claudeTooOldData = `API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"Claude Code 2.1.257 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.","details":{"error_code":"claude_code_version_too_old"}},"request_id":"req_secret_marker"}`
 
 // TS-04.R9/R76, FS-09.R77, INV §8 — the Claude adapter reports a model its

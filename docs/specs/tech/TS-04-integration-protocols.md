@@ -742,12 +742,17 @@ result), and the shared UI projection derives its backgrounded state from the li
 Without the advertisement, today's steer behavior and rendering stay exact. The fake's
 `steer_backgrounds_tool` scenario reproduces the inspected 0.85.1 sequence.
 
-**R82 `(planned)` — Provider model policy refusals keep the active runtime truthful.** Launch and
+**R82 — Provider model policy refusals keep the active runtime truthful.** (shipped 2026-10-06) Launch and
 `session/set_config_option` model application treat an adapter error (including Claude's
 `PreModelSwitch` hook block and allow/deny-list refusal) as a rejected switch, and after any model
 application read the effective model from the returned or next live option list rather than the
 request. A mismatch between requested and effective model is reported as a rejection, never stored
-as the requested model, and never retried with another model.
+as the requested model, and never retried with another model. Claude 0.85.1 sends both refusals as
+`-32603 Internal error` with the CLI text in `data.details`; `modelPolicyRefusal` recognizes only the
+hook form (`blocked by a PreModelSwitch hook: <reason>`, reason whitespace-collapsed and capped at
+300 runes) and the denied-value form (`Invalid value for config option model:`, reported without
+the payload), and reports nothing else from the data (R12). A `session/new` veto succeeds on the
+SDK default model, so Chuck's following model application is the call that carries the refusal.
 
 **R83 — The internal MCP server uses go-sdk 1.8.0 without changing its protocol.**
 Bump `github.com/modelcontextprotocol/go-sdk` to v1.8.0 for its session-leak, close-deadlock and

@@ -300,6 +300,26 @@ describe("ChatPanel runtime picker", () => {
     expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
   });
 
+  it("keeps the active model and shows the provider's policy reason when a model is refused (FS-09.A48)", async () => {
+    const reason = 'switch failed, rolled back to previous runtime: runtime: provider rejected the setting: model "opus": a model-switch policy hook blocked it: Opus is reserved for release work';
+    const claude = backends.backends.claude;
+    mocks.useBackends.mockReturnValue({ data: { ...backends, backends: { ...backends.backends, claude: {
+      ...claude, models: { ...claude.models, opus: { name: "Opus", model: "opus" } },
+    } } } });
+    mocks.switchRuntime.mockRejectedValue(new Error(reason));
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+
+    fireEvent.change(await screen.findByLabelText("Model"), { target: { value: "opus" } });
+    fireEvent.click(screen.getByRole("button", { name: "Switch" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Opus is reserved for release work");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("sonnet");
+    expect(useAgentStore.getState().agents.a_live.model).toBe("sonnet");
+    expect(mocks.switchRuntime).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps stopped agents' runtime identity static", () => {
     mocks.useBackends.mockReturnValue({ data: backends });
     useAgentStore.setState({ agents: { a_stopped: { ...liveAgent("a_stopped"), running: false } }, order: ["a_stopped"], hydrated: true, hydrating: false });
