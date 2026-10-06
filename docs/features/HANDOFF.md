@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** quiet completed chat turns (in progress; see **Active change**).
+- **Active change:** none.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -26,31 +26,21 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   design commits) was reviewed and stays open for BU-01 below. TS-04.R81's linked-task derivation
   was confirmed against both pinned adapters; no separate backgrounded-marker decoder is needed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
+  Quiet completed chat turns (`2cf6cfa`, `7680213` and the closure commit after them) is
+  available. Review notes: TS-08.R102 now keys a turn by its opening boundary seq (no key
+  adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
+  automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
+  through `phone-render.mjs`, not a paired device.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
 
-**Quiet completed chat turns** — [`quiet-completed-chat-turns.md`](../ready-changes/quiet-completed-chat-turns.md)
-(FS-03.R73–R77/A54–A58, TS-08.R100–R106). Slices:
+None.
 
-1. **Done:** shared projection `ui/src/components/chat/turnActivity.ts` (`projectTurns`,
-   `openTurnKey`, `turnOutcome`) and `TurnList.tsx` (Show/Hide activity, `useTurnChoices`,
-   `useFocusReturn`, `ThoughtScopeContext`); desktop `TranscriptView` (full chat, dashboard pane,
-   Archive), live-open thoughts with per-turn/scope collapse in `reasoningStore`, Files-tab Diff
-   reveal opens the hiding turn, `turn-activity` contract hook. TS-08.R102 rewritten to key turns by
-   their opening boundary seq. Focused UI tests and full `npm test` passed.
-2. **Done:** phone `remote/AgentScreen.tsx` renders `TurnList` with nested children and live
-   thoughts; `remote/connection.ts` admits `runtime_activity` for open conversations
-   (`watchReasoning`, seq anchors since the phone window slides) and clears on reopen.
-   `withReasoning` moved to `runtimeActivity.ts` so the phone bundle avoids `TranscriptView`.
-3. **Done:** Think Tank attempt activity renders through `TurnList` scoped `${attemptID}:`.
-4. **Next:** rendered real-binary fake-ACP journeys for A54–A58 (desktop floor/wide, dashboard pane, archive,
-   390px phone; Core, Sky & Grove, Studio; reduced motion), then the TS-06 closure matrix with
-   `make dist`, flip R73–R77/A54–A58/R100–R106 from planned, remove the ready-change file.
-
-Review notes: notices stay visible in completed turns (treated as outcomes); scroll anchoring
-through automatic collapse relies on native `overflow-anchor`.
+Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
+-scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411
+<outDir>)`.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
@@ -143,6 +133,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Work: quiet completed chat turns.** Shared turn projection and `TurnList` across
+  full chat, dashboard pane, Archive, phone and Think Tank attempt activity; live thoughts start
+  open with per-turn/scope collapse; cut-short turns label their response partial. Rendered
+  real-binary journey (fake ACP `activity_showcase`) passed at 1024px/1600px in Core, Sky & Grove
+  and Studio plus reduced motion; phone rendered at 390px from that run's transcript. Invariants:
+  1, 2, 8, 10, 11, 13, 16, 17 applied; others have no changed surface.
 
 - **2026-10-06 — Review: 2026-10 provider bundle refresh.** One must-fix finding (BU-01); unit
   stays open. Confirmed pins, patch/hash proofs, MCP revision guard, notice persistence/preview

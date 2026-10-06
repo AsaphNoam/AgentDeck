@@ -577,14 +577,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   submitted text and ordinary history retention independently of subsequent room deletion; it
   is not an inferred assistant turn or an import into participant conversations.
 
-- **R73 (planned) — Live thoughts start open.** Supersedes only R57's collapsed-by-default
+- **R73 — Live thoughts start open.** Supersedes only R57's collapsed-by-default
   behavior and A39's default-state assertion. Provider-exposed root/child thoughts start expanded
   while their turn is running. A person's manual collapse remains respected for later chunks and
   reasoning spans in that same turn and conversation scope until they reopen it. A new turn starts
   open again. A native child's terminal outcome closes that child's thought detail; root completion
   closes all remaining detail. Permission waiting is part of the running turn, not completion.
   R57's ephemeral retention and exclusions remain unchanged; missing thoughts create no placeholder.
-- **R74 (planned) — Completed turns leave the answer prominent.** At success, cancellation or
+- **R74 — Completed turns leave the answer prominent.** At success, cancellation or
   failure, one compact **Show activity** disclosure per root turn starts closed and contains
   thoughts still available in memory, tool calls/results and their diffs, completed native-child
   activity, and intermediate root assistant passages. User input, including in-turn Steer,
@@ -595,7 +595,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   partial rather than successful/final. A turn with no assistant response keeps its outcome and
   inspectable activity. This supersedes R26's uninterrupted-run-only grouping at the completed
   turn level; original event order and individual tool inspection survive inside activity.
-- **R75 (planned) — Activity stays under the person's control.** Completed activity can be
+- **R75 — Activity stays under the person's control.** Completed activity can be
   opened and closed by pointer or keyboard, with its available thoughts, messages, tools and diffs
   inspectable using their ordinary controls. At that turn's terminal transition, thought/tool
   disclosures reset closed even if manually opened during execution. Completing a newer turn
@@ -604,14 +604,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   saved preference, global collapse control or configurable default is introduced. Collapse
   preserves a usable reading position; focus inside automatically hidden content moves to its
   disclosure rather than disappearing, and bottom-follow remains useful for the visible response.
-- **R76 (planned) — Attention remains visible.** Pending root/child approvals remain visible
+- **R76 — Attention remains visible.** Pending root/child approvals remain visible
   and actionable outside collapsed activity. Turn errors and cancellation/interruption outcomes
   stay visible; detailed failed-tool output remains inspectable inside activity. Background work
   still running after a turn ends retains R59's visible status and authorized Stop control; turn
   completion does not claim it completed or stop it. An incomplete historical turn without a
   proven terminal boundary is not labelled successfully completed or silently assigned a final
   answer. Later input cannot retroactively hide its pending approval or invent its outcome.
-- **R77 (planned) — The same compact history works across chat surfaces.** Full agent chat,
+- **R77 — The same compact history works across chat surfaces.** Full agent chat,
   dashboard chat panes, read-only archive and phone chat use the same turn/disclosure semantics
   for the content each surface supports, including existing completed history after reload.
   Retained Think Tank attempt activity may reuse the projection within its attempt boundary;
@@ -1022,30 +1022,30 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   and archived, including room deletion and failed/stale completion. *Verify:* state/HTTP/projection/
   UI tests and A37's rendered journey.
 
-- **A54 (planned)** (R73, R75) — Stream root and child reasoning interleaved with messages/tools.
+- **A54** (R73, R75) — Stream root and child reasoning interleaved with messages/tools.
   Thoughts start open; collapse one scope and stream more chunks and later spans without reopening
   it. Reopen, pause for permission, resume and complete: permission waiting preserves live choices;
   completion closes all thought/tool detail, and the next turn starts thoughts open again.
   *Verify:* reasoning/transcript component tests and a real-binary fake-ACP rendered journey.
-- **A55 (planned)** (R74–R75) — Complete a long multi-tool turn with several assistant passages
+- **A55** (R74–R75) — Complete a long multi-tool turn with several assistant passages
   and a final passage. Only user input, response, outcome and one compact activity control remain
   in the root exchange. Opening/reclosing reveals the earlier messages/tools/diffs in order with
   attribution and ordinary inspection. Include in-turn Steer, text merged across chunks, child
   activity, no text after the final tool, and a tool-only turn; no prose-based guessing or invented
   final response occurs. Reopen an older turn while a newer turn finishes: it stays open.
   *Verify:* shared projection/component tests plus the long-chat rendered journey.
-- **A56 (planned)** (R76) — Exercise approval pause/resume, cancellation, fatal failure and
+- **A56** (R76) — Exercise approval pause/resume, cancellation, fatal failure and
   truncated historical activity, with and without partial text; retain visible actionable
   approvals and truthful outcomes while detail collapses only at a proven terminal boundary.
   A background task outlives its root turn: its status/Stop remain usable and its eventual outcome
   follows the runtime. *Verify:* lifecycle/projection/UI tests and fake-ACP rendered scenarios.
-- **A57 (planned)** (R75, R77) — Reload existing completed history and open it from Archive:
+- **A57** (R75, R77) — Reload existing completed history and open it from Archive:
   activity starts closed, original durable content and annotation targets are unchanged, and
   absent thoughts produce no controls. Reopening available memory-only thoughts before reload
   works; reconnect/reload removes them under R57. Compare full chat, dashboard pane and phone;
   attempt activity cannot swallow a canonical room contribution/synthesis.
   *Verify:* projection/replay/component tests, transcript API regression and rendered navigation.
-- **A58 (planned)** (R75, R77) — Read a long multi-turn chat at the supported desktop floor,
+- **A58** (R75, R77) — Read a long multi-turn chat at the supported desktop floor,
   a wider width, a narrow dashboard pane and 390px phone width in Core, Sky & Grove and Studio.
   Activity stays visually subordinate; final responses remain readable without stacked intermediate
   bubbles. Open/close by keyboard and pointer, complete while focus is inside activity and while
@@ -1055,9 +1055,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ## 6. Deviations & open decisions
 
-- R73–R77/A54–A58 are planned quiet completed turns/live-thought behavior. R57/A39 and R26/A11
-  remain shipped defaults until implementation; the new requirements supersede only their
-  explicitly named presentation behavior and preserve existing retention and durable content.
+- R73–R77/A54–A58 (quiet completed turns, live-open thoughts) shipped 2026-10-06. They supersede
+  only R57/A39's collapsed default and R26/A11's uninterrupted-run grouping at the completed-turn
+  level, preserving retention and durable content. Rendered evidence:
+  `ui/scripts/turns-journey.mjs` against `scripts/stress-fixture -scenario activity_showcase`; the
+  phone view is rendered from that run's real transcript, not a paired tailnet device.
 
 - R69–R70/A50–A51 shipped 2026-10-06 (`features/thinktank/RoomTurnNotice.tsx`, registry-derived
   approvals for the two room tools); ordinary Send/Steer behavior

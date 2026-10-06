@@ -1086,7 +1086,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   failure/pending/ended states, keyboard focus and retained judge results. DOM tests do not close
   visual parity or contrast.
 
-- **R100 (planned) — Turn activity extends the shared transcript presentation.** FS-03.R73–R77
+- **R100 — Turn activity extends the shared transcript presentation.** FS-03.R73–R77
   extend the existing normalized `foldTranscript`/`appendRenderedEvent`, `nestActivities`,
   `groupTranscriptRows`/`ToolRun` and event-renderer seams; add one shared pure turn projection
   over supplied normalized events rather than a second transcript reducer. Partition root turns
@@ -1099,7 +1099,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   nodes at their causal positions rather than moving or duplicating them into a summary.
   This supersedes R39's uninterrupted-only scope at the completed-turn level and R59's default
   collapsed thinking clause; both existing shared ownership and presentation-only constraints stand.
-- **R101 (planned) — Visible response selection is structural and conservative.** For each
+- **R101 — Visible response selection is structural and conservative.** For each
   completed root turn, select its last normalized root `assistant_text` passage as the visible
   response and hide earlier root assistant passages in activity. Consume the shared fold's merged
   passage unchanged: ephemeral thought insertion, task updates and renderer rerenders cannot
@@ -1112,7 +1112,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   existing runtime authority and tool-output ownership; neither root collapse nor child disconnect
   fabricates its terminal state. Room attempt rendering scopes keys and boundaries by attempt;
   FS-21's canonical contributions/synthesis are not assistant-text activity to hide.
-- **R102 (planned) — Collapse state is local, bounded and transition-owned.** Each mounted
+- **R102 — Collapse state is local, bounded and transition-owned.** Each mounted
   transcript owns choices keyed by source agent, the durable sequence of the boundary that opened
   the turn (the preceding root `turn_end` or session/backend/clone fence; `start` for the first),
   and optional child activity scope. That key exists before the turn's first durable event, so
@@ -1132,7 +1132,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   mounted transcript and drop on source change or unmount; live thought choices live beside the
   bounded reasoning spans and drop with them on reconnect or runtime-generation change.
   No localStorage/sessionStorage, server setting, database migration or account preference is added.
-- **R103 (planned) — Ephemeral thoughts have a stable presentation turn association.** Keep
+- **R103 — Ephemeral thoughts have a stable presentation turn association.** Keep
   TS-01.R35/TS-04.R63's runtime notification and reasoning retention unchanged. At live reasoning
   admission, associate each span with its root turn's presentation key and optional child scope
   only when current active-turn lifecycle and event ordering establish ownership, using the
@@ -1145,7 +1145,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Thought association and live manual choices are per mounted source;
   route mounts hydrate only currently available reasoning for a demonstrably active turn.
   Reasoning stays outside durable events, API reads, search, annotations and clone/context history.
-- **R104 (planned) — All chat entries consume one turn contract.** Full agent chat, dashboard
+- **R104 — All chat entries consume one turn contract.** Full agent chat, dashboard
   pane and Archive use the shared projection and existing `TranscriptView` renderer. The phone
   `remote/AgentScreen.tsx` retains its phone composition/permission actions but consumes the same
   projection and disclosure state policy; wire its live reasoning through the existing authenticated
@@ -1156,7 +1156,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   projection within its existing source-agent/attempt boundary without changing room message
   publication, retention or live reasoning availability. Empty/non-chat activity and unknown
   legacy events remain visible under their existing renderer behavior, not silently discarded.
-- **R105 (planned) — The disclosure uses Chuck's existing presentation construction.** Add
+- **R105 — The disclosure uses Chuck's existing presentation construction.** Add
   a documented `turn-activity` hook with `trigger`/`content` slots and `collapsed`/`expanded` states
   to the versioned contract during implementation; use ordinary subdued text, chevron, semantic
   tokens and existing disclosure/button construction. Each shared turn control exposes its expanded
@@ -1168,7 +1168,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   automatic collapse. Focus within hidden content returns to its controlling disclosure. Reuse
   this construction at narrow pane/phone widths and in Core, Sky & Grove and Studio; revealed
   messages retain their original annotation/copy/file targets and supported read-only restrictions.
-- **R106 (planned) — Closure proves lifecycle and rendered long-chat behavior.** FS-03.A54–A58
+- **R106 — Closure proves lifecycle and rendered long-chat behavior.** FS-03.A54–A58
   require independently authored interleaved root/child transcripts and real runtime terminal
   scenarios, including manual choices during later deltas, terminal-only/tool-only/no-terminal
   history, optimistic input reconciliation, in-turn Steer, newer-turn completion after old activity

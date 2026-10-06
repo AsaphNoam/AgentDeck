@@ -35,6 +35,7 @@ type options struct {
 	chunkBytes int
 	delayMS    int
 	repo       string
+	scenario   string
 }
 
 type launchedSession struct {
@@ -52,6 +53,7 @@ func main() {
 	flag.IntVar(&opts.chunkBytes, "chunk-bytes", 128, "bytes per assistant delta")
 	flag.IntVar(&opts.delayMS, "delay-ms", 5, "delay between assistant deltas")
 	flag.StringVar(&opts.repo, "repo", ".", "Chuck repository root")
+	flag.StringVar(&opts.scenario, "scenario", "stress_stream", "fake ACP scenario; any other scenario advertises runtime capabilities and launches no workload")
 	flag.Parse()
 
 	if err := run(opts); err != nil {
@@ -118,6 +120,12 @@ func run(opts options) error {
 		"FAKEACP_STRESS_CHUNK_BYTES": strconv.Itoa(opts.chunkBytes),
 		"FAKEACP_STRESS_DELAY_MS":    strconv.Itoa(opts.delayMS),
 	}
+	// A rendered journey (e.g. ui/scripts/turns-journey.mjs) replays one named
+	// scenario per prompt; children and background tasks reach the UI only
+	// when the fake advertises those capabilities.
+	if opts.scenario != "stress_stream" {
+		claude.Env = map[string]string{"FAKEACP_SCENARIO": opts.scenario, "FAKEACP_CAPS": "1"}
+	}
 	backends.Backends["claude"] = claude
 	for id, backend := range backends.Backends {
 		if id != "claude" {
@@ -150,10 +158,13 @@ func run(opts options) error {
 		cancel()
 		return err
 	}
-	launched, err := launchWorkload(ctx, baseURL, opts.workers)
-	if err != nil {
-		cancel()
-		return err
+	var launched []launchedSession
+	if opts.scenario == "stress_stream" {
+		launched, err = launchWorkload(ctx, baseURL, opts.workers)
+		if err != nil {
+			cancel()
+			return err
+		}
 	}
 
 	fmt.Printf("Chuck stress fixture ready\nURL: %s\nHome: %s\nAgents: %d (Claude Haiku; deterministic fake ACP)\nDeltas: %d x %d bytes per agent, %dms apart\n",
