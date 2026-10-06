@@ -22,9 +22,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
-  The 2026-10 provider bundle refresh (`7c95fa9..2f39c3f`, excluding the interleaved `docs:`
-  design commits) is available. Review note: TS-04.R81 was revised from "decode the backgrounded
-  marker" to deriving the state from the linked task; confirm that reading.
+  The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
+  design commits) was reviewed and stays open for BU-01 below. TS-04.R81's linked-task derivation
+  was confirmed against both pinned adapters; no separate backgrounded-marker decoder is needed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
@@ -92,7 +92,19 @@ None.
 
 ## Review findings
 
-None open.
+### 2026-10 provider bundle refresh — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+**Unit:** `7c95fa9^..2f39c3f`, excluding interleaved design commits.
+
+- **Must fix** — **BU-01 (INV §1/§2): Backgrounded tool labels ignore resume and clone fences.**
+  `ui/src/components/chat/runtimeActivity.ts:114–125` derives `background_state` directly from
+  task events, while `collectTasks` fences old running tasks at `session_meta.resumed_at` and
+  `fork_boundary`. Resume or clone an agent with a running background command and its tool still
+  says "Continues in background", although the task list correctly says it ended with the previous
+  session or stayed with the source agent. This violates TS-08.R86's shared task-state projection
+  and FS-03.R67 / FS-01.R36. A direct execution of both helpers with either boundary reproduced
+  tool=`running`, task=`stopped`. Share the fenced task-state semantics and add resume/clone
+  assertions for the tool label alongside the existing task-list tests.
 
 ## Decisions needing your input
 
@@ -112,6 +124,15 @@ None open.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Review: 2026-10 provider bundle refresh.** One must-fix finding (BU-01); unit
+  stays open. Confirmed pins, patch/hash proofs, MCP revision guard, notice persistence/preview
+  exclusion and model-policy error shapes against the installed dependency sources. Confirmed
+  TS-04.R81's local choice to derive background state from the linked task. Invariant sweep:
+  applicable classes 1, 2, 8, 10, 11, 12, 13, 16 and 17 reviewed; classes 3, 4, 5, 6, 7, 9, 14
+  and 15 have no changed surface. Runtime, transcript, CLI, release and messaging suites passed;
+  CLI needed sandbox-external loopback binds. All 104 focused UI tests, style and presentation
+  checks passed. Live-provider smokes and release-CI assembly remain owed as listed above.
 
 - **2026-10-06 — Work: 2026-10 provider bundle refresh.** Pins Claude ACP 0.85.1 (SDK 0.3.286),
   Codex ACP 2.1.1 with Codex 0.159.3 (steering patch regenerated, still required), go-sdk 1.8.0.
