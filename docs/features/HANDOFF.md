@@ -126,6 +126,15 @@ None open.
 
 ## Changelog
 
+- **2026-10-06 — Design intake: Think Tank workspace and live controls.** Recorded the requested
+  improvements and proposed experience in `docs/ideas.md` under Ideas being defined: titled
+  single-column room cards before project agents, compact participant chats with a Think Tank tab,
+  anchored shared composer and agent mentions, stable speaker tints, concurrent isolated openings,
+  live ceiling increases, judge-chat synthesis and grouping of newly deployed agents. Awaiting
+  feature-side confirmation of mention scheduling, existing-group preservation, terminal budget
+  behavior and title compatibility. No product code, new TS design or ready change in this unit;
+  the active provider refresh and other specification/code work are preserved.
+
 - **2026-10-06 — Design: Think Tank pipeline stages and task collapse.** Human confirmed the
   scope; ready change `pipeline-think-tank-stages-and-task-collapse.md` is Waiting to start.
   FS-14.R81–R86/A48–A52, FS-21.R41–R42/A31–A32 and FS-16.R46–R48/A30–A32 cover fresh same-project
