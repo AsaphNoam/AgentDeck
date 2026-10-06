@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelTurn,
@@ -21,6 +21,7 @@ import {
 } from "../api/client";
 import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types";
 import { useAnnotationStore } from "../store/annotationStore";
+import { useReasoningStore } from "../store/reasoningStore";
 import { foldTranscript, normalizeEvent } from "../store/transcriptStore";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
@@ -28,9 +29,12 @@ import { NoticeRow } from "../components/chat/renderers/NoticeRow";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
-import { markBackgrounded } from "../components/chat/runtimeActivity";
+import { markBackgrounded, nestActivities, withReasoning, type ChildNode } from "../components/chat/runtimeActivity";
+import { ChildActivity } from "../components/chat/renderers/ChildActivity";
+import { ThinkingDisclosure } from "../components/chat/renderers/ThinkingDisclosure";
+import { TurnList, useFocusReturn, useTurnChoices } from "../components/chat/TurnList";
 import { PhoneAnnotationForm } from "./AnnotationForm";
-import { useConnection } from "./connection";
+import { useConnection, watchReasoning } from "./connection";
 import { getRuntimeOptions } from "./api";
 import { navigate } from "./router";
 
@@ -124,9 +128,43 @@ function EventRow({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (
       return <p className="phone-error">{String(event.message ?? event.text ?? "The turn failed.")}</p>;
     case "notice":
       return <NoticeRow event={event} />;
+    case "reasoning":
+      return <ThinkingDisclosure text={String(event.text ?? "")} activityId={event.activity_id} />;
     default:
       return null;
   }
+}
+
+// renderRows is the phone's row renderer inside the shared turn list: tool runs,
+// nested native children and ordinary rows, each one list item (FS-03.R77).
+function renderRows(list: TranscriptEvent[], onAnnotate: (draft: AnnotationDraft) => void, ancestry: string[], depth: number): ReactNode {
+  const nested = (events: TranscriptEvent[], path: string[], level: number) => renderRows(events, onAnnotate, path, level);
+  return groupTranscriptRows(list).map((row, index) => {
+    if (row.kind === "tool-run") {
+      return (
+        <div className="phone-message" role="listitem" key={`run:${row.events[0].seq ?? index}`}>
+          <ToolRun events={row.events} renderEvent={(event) => <EventRow key={`${event.seq}:${event.kind}`} event={event} onAnnotate={onAnnotate} />} />
+        </div>
+      );
+    }
+    const event = row.event;
+    return (
+      <div className="phone-message" role="listitem" key={`${event.seq ?? event.message_id ?? index}:${event.kind}`}>
+        {event.kind === "activity" ? (
+          <ChildActivity node={event.node as ChildNode} ancestry={ancestry} depth={depth} renderEvents={nested} />
+        ) : (
+          <EventRow event={event} onAnnotate={onAnnotate} />
+        )}
+      </div>
+    );
+  });
+}
+
+// The phone stores a span's anchor as the last seq it had seen; place it before
+// the first later row of the current window.
+function slotAfter(events: TranscriptEvent[], seq: number) {
+  const index = events.findIndex((event) => typeof event.seq === "number" && event.seq > seq);
+  return index < 0 ? events.length : index;
 }
 
 export function AgentScreen({ agentId }: { agentId: string }) {
@@ -188,6 +226,21 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     () => foldTranscript([...(earlier?.events ?? []), ...(transcript.data?.events ?? [])]),
     [earlier, transcript.data],
   );
+  // Live reasoning arrives on the same authenticated stream as the desktop's and
+  // shares its bounded store (TS-08.R104). The phone's window slides as the
+  // conversation grows, so a span anchors after the last seq it saw rather than
+  // at a list position.
+  const reasoning = useReasoningStore((state) => state.byAgent[agentId]?.spans);
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  useEffect(() => watchReasoning(agentId, () => eventsRef.current), [agentId]);
+  const rows = useMemo(() => {
+    const spans = reasoning?.map((span) => ({ ...span, anchor: slotAfter(events, span.anchor) }));
+    return nestActivities(withReasoning(markBackgrounded(events), spans));
+  }, [events, reasoning]);
+  const choices = useTurnChoices(agentId);
+  const listRef = useRef<HTMLDivElement>(null);
+  const trackFocus = useFocusReturn(listRef);
   // The server derives both from the whole session, so they hold when the
   // request or the reply falls before the window.
   const pendingEvent = transcript.data?.pending_permission;
@@ -294,19 +347,9 @@ export function AgentScreen({ agentId }: { agentId: string }) {
             ) : (
               <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
             ))}
-          <ol className="phone-transcript" aria-label="Conversation">
-            {groupTranscriptRows(markBackgrounded(events)).map((row) =>
-              row.kind === "tool-run" ? (
-                <li key={`run:${row.events[0].seq}`}>
-                  <ToolRun events={row.events} renderEvent={(event) => <EventRow key={`${event.seq}:${event.kind}`} event={event} onAnnotate={annotate} />} />
-                </li>
-              ) : (
-                <li key={`${row.event.seq}:${row.event.kind}`}>
-                  <EventRow event={row.event} onAnnotate={annotate} />
-                </li>
-              ),
-            )}
-          </ol>
+          <div className="phone-transcript" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
+            <TurnList agentId={agentId} events={rows} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
+          </div>
           <PhoneAnnotationForm agent={agent} />
           {heldText && (
             <div className="phone-card">

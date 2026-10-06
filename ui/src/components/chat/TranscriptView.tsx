@@ -15,8 +15,8 @@ import { NoticeRow } from "./renderers/NoticeRow";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
 import { ChildActivity } from "./renderers/ChildActivity";
 import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
-import { collectTasks, markBackgrounded, nestActivities, type ChildNode } from "./runtimeActivity";
-import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
+import { collectTasks, markBackgrounded, nestActivities, withReasoning, type ChildNode } from "./runtimeActivity";
+import { useReasoningStore } from "../../store/reasoningStore";
 import { projectTurns } from "./turnActivity";
 import { TurnList, useFocusReturn, useTurnChoices } from "./TurnList";
 import { AnnotationTray } from "./AnnotationTray";
@@ -246,26 +246,6 @@ function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, onOpe
 }
 
 type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "fork-boundary" | "annotation" | "notice" | "thinking" | "unknown";
-
-// withReasoning places each live reasoning span at its chronological slot as a
-// render-only row. It has no seq, so it is never annotated, and it never enters
-// the transcript store (FS-03.R57).
-export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] | undefined): TranscriptEvent[] {
-  if (!spans?.length) return events;
-  const row = (span: ReasoningSpan): TranscriptEvent => ({
-    kind: "reasoning",
-    activity_id: span.activityId,
-    message_id: `reasoning-${span.activityId ?? ""}-${span.spanId}`,
-    text: span.text,
-  });
-  const out: TranscriptEvent[] = [];
-  events.forEach((event, index) => {
-    for (const span of spans) if (span.anchor === index) out.push(row(span));
-    out.push(event);
-  });
-  for (const span of spans) if (span.anchor >= events.length) out.push(row(span));
-  return out;
-}
 
 
 function variantOf(event: TranscriptEvent): TranscriptVariant {

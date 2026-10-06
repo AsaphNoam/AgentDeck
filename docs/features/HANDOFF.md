@@ -40,10 +40,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    Archive), live-open thoughts with per-turn/scope collapse in `reasoningStore`, Files-tab Diff
    reveal opens the hiding turn, `turn-activity` contract hook. TS-08.R102 rewritten to key turns by
    their opening boundary seq. Focused UI tests and full `npm test` passed.
-2. **Next:** phone `remote/AgentScreen.tsx` consumes `TurnList` + nesting; wire live reasoning via
-   `remote/connection.ts` `runtime_activity` into `reasoningStore` with reconnect clearing (R104).
-3. Think Tank attempt activity reuses `TurnList` scoped by attempt (R104).
-4. Rendered real-binary fake-ACP journeys for A54–A58 (desktop floor/wide, dashboard pane, archive,
+2. **Done:** phone `remote/AgentScreen.tsx` renders `TurnList` with nested children and live
+   thoughts; `remote/connection.ts` admits `runtime_activity` for open conversations
+   (`watchReasoning`, seq anchors since the phone window slides) and clears on reopen.
+   `withReasoning` moved to `runtimeActivity.ts` so the phone bundle avoids `TranscriptView`.
+3. **Done:** Think Tank attempt activity renders through `TurnList` scoped `${attemptID}:`.
+4. **Next:** rendered real-binary fake-ACP journeys for A54–A58 (desktop floor/wide, dashboard pane, archive,
    390px phone; Core, Sky & Grove, Studio; reduced motion), then the TS-06 closure matrix with
    `make dist`, flip R73–R77/A54–A58/R100–R106 from planned, remove the ready-change file.
 

@@ -1,4 +1,5 @@
 import type { TranscriptEvent } from "../../api/types";
+import type { ReasoningSpan } from "../../store/reasoningStore";
 
 // The runtime-activity projection (TS-08.R59): the root conversation stays the
 // reading path, and each native child sits at its causal position as one
@@ -53,6 +54,26 @@ export function nestActivities(events: TranscriptEvent[]): TranscriptEvent[] {
     (owner ? owner.items : root).push(event);
   }
   return root;
+}
+
+// withReasoning places each live reasoning span at its chronological slot as a
+// render-only row. It has no seq, so it is never annotated, and it never enters
+// the transcript store (FS-03.R57). Desktop and phone both render through it.
+export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] | undefined): TranscriptEvent[] {
+  if (!spans?.length) return events;
+  const row = (span: ReasoningSpan): TranscriptEvent => ({
+    kind: "reasoning",
+    activity_id: span.activityId,
+    message_id: `reasoning-${span.turn ?? ""}-${span.activityId ?? ""}-${span.spanId}`,
+    text: span.text,
+  });
+  const out: TranscriptEvent[] = [];
+  events.forEach((event, index) => {
+    for (const span of spans) if (span.anchor === index) out.push(row(span));
+    out.push(event);
+  });
+  for (const span of spans) if (span.anchor >= events.length) out.push(row(span));
+  return out;
 }
 
 export type TaskState = "running" | "completed" | "failed" | "stopped";

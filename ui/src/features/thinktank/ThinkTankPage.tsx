@@ -23,6 +23,7 @@ import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMark
 import type { FileLink } from "../../components/chat/renderers/filePath";
 import { canAnnotate, eventDraft, eventRenderer, selectionWithin } from "../../components/chat/TranscriptView";
 import { markBackgrounded, nestActivities } from "../../components/chat/runtimeActivity";
+import { TurnList, useTurnChoices } from "../../components/chat/TurnList";
 import { useAutocomplete } from "../../components/chat/autocomplete";
 import { foldTranscript } from "../../store/transcriptStore";
 import { useAnnotationStore } from "../../store/annotationStore";
@@ -117,6 +118,9 @@ function Room({ room }: { room: ThinkTankDetail }) {
   };
 
   const byAttempt = useMemo(() => groupActivity(activity.data?.activity ?? []), [activity.data]);
+  // Attempt activity reads in the same quiet turns as chat, scoped per attempt;
+  // canonical contributions and synthesis are room entries, never hidden here (FS-03.R77).
+  const turnChoices = useTurnChoices(room.room_id);
   const status = roomStatus(room);
   const ended = room.phase === "ended";
   const originTitle = projects.data?.[room.origin_project]?.title ?? room.origin_project;
@@ -163,7 +167,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
       },
       onOpenFile: openFrom(attemptID),
     });
-    return render(nestActivities(markBackgrounded(foldTranscript(events))), [], 1);
+    return <TurnList agentId={agentID} events={nestActivities(markBackgrounded(foldTranscript(events)))} scope={`${attemptID}:`} choices={turnChoices} renderEvents={(list) => render(list, [], 1)} />;
   };
 
   const shownEntries = entries.data?.entries ?? [];

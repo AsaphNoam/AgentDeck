@@ -244,9 +244,28 @@ body {
   padding: 0;
 }
 
-.phone-transcript > li {
+.phone-message {
   min-width: 0;
   overflow-x: auto;
+}
+
+/* Turns and their opened activity keep the conversation's one rhythm
+   (FS-03.R77): the turn wrapper adds no box, and activity rows stack with the
+   same gap behind the shared quiet rule. */
+.phone-transcript > [data-ui="turn-activity"] {
+  display: contents;
+}
+
+.phone-transcript .turn-activity-toggle,
+.phone-transcript .turn-outcome {
+  margin: 0;
+}
+
+.phone-transcript .turn-activity-content {
+  display: grid;
+  gap: var(--ad-space-3);
+  margin: 0;
+  min-width: 0;
 }
 
 .phone-user {

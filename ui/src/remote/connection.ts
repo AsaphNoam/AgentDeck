@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import type { AgentState } from "../api/types";
+import type { AgentState, RuntimeActivity, TranscriptEvent } from "../api/types";
+import { openTurnKey } from "../components/chat/turnActivity";
 import { useAnnotationStore } from "../store/annotationStore";
+import { useReasoningStore } from "../store/reasoningStore";
 import { checkPaired, MacUnreachableError, PhoneAPIError } from "./api";
 
 // The phone's view of its link to the Mac (FS-20 §3). A plain EventSource with
@@ -79,6 +81,8 @@ export function connect() {
     window.clearTimeout(unreachableTimer);
     unreachableTimer = undefined;
     hydratingAgents = {};
+    // Live-only reasoning and its live choices have no seq to recover (TS-08.R103).
+    useReasoningStore.getState().clearAll();
     setLink("reconnecting");
   };
   source.onerror = () => {
@@ -121,12 +125,35 @@ export function connect() {
       return { agents };
     });
   });
+  source.addEventListener("runtime_activity", admitReasoning);
   source.addEventListener("new_message", (event) => {
     if (hydratingAgents) return;
     const id = parse(event)?.agent_id;
     if (!id) return;
     useConnection.setState((state) => ({ transcriptRev: { ...state.transcriptRev, [id]: (state.transcriptRev[id] ?? 0) + 1 } }));
   });
+}
+
+// Open conversations admit live reasoning, as the desktop's open agents do
+// (TS-08.R104). Each reads its current folded window on arrival.
+const openTranscripts = new Map<string, () => TranscriptEvent[]>();
+
+export function watchReasoning(agentId: string, read: () => TranscriptEvent[]): () => void {
+  openTranscripts.set(agentId, read);
+  return () => {
+    if (openTranscripts.get(agentId) === read) openTranscripts.delete(agentId);
+  };
+}
+
+// The phone's window slides as the conversation grows, so a span anchors after
+// the last seq the screen had seen rather than at a list position.
+function admitReasoning(event: Event) {
+  const activity = parse(event)?.data as RuntimeActivity | undefined;
+  const read = activity?.agent_id ? openTranscripts.get(activity.agent_id) : undefined;
+  if (!activity || !read) return;
+  const events = read();
+  const last = [...events].reverse().find((item) => typeof item.seq === "number")?.seq ?? 0;
+  useReasoningStore.getState().append(activity, Number(last), openTurnKey(events));
 }
 
 function parse(event: Event): { agent_id?: string; data?: unknown } | null {

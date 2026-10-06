@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -500,6 +500,6 @@ describe("AgentScreen diff annotations", () => {
     renderScreen();
     const conversation = await screen.findByRole("list", { name: "Conversation" });
     await waitFor(() => expect(conversation).toHaveTextContent("All tests pass now."));
-    expect(conversation.children).toHaveLength(2);
+    expect(within(conversation).getAllByRole("listitem")).toHaveLength(2);
   });
 });

@@ -186,3 +186,50 @@ it("keeps ui/src/remote out of the desktop bundle", () => {
   walk(src);
   expect(offenders).toEqual([]);
 });
+
+// Live reasoning reaches an open phone conversation through its own stream,
+// and completed turns read the same quiet way as on the desktop (FS-03.A54, A57; TS-08.R106).
+describe("phone conversation turns", () => {
+  const phoneAgent = { agent_id: "a1", name: "", role: "implementer", project: "my-app", backend: "claude", model: "m", interface: "chat", running: true, state: "busy", detail: "" };
+  const wire = (seq: number, type: string, data: Record<string, unknown>) => ({ agent_id: "a1", seq, type, ts: "", data });
+  let window_: Record<string, unknown>[] = [];
+  beforeEach(() => {
+    window_ = [
+      wire(1, "user_text", { text: "Fix it" }),
+      wire(2, "assistant_text", { delta: "Looking first." }),
+      wire(3, "tool_call", { tool_call_id: "t1", name: "Read" }),
+      wire(4, "assistant_text", { delta: "Fixed." }),
+      wire(5, "turn_end", { stop_reason: "end_turn" }),
+      wire(6, "user_text", { text: "Now test" }),
+    ];
+    server.use(
+      http.get("/api/sessions/a1/transcript", () => HttpResponse.json({ agent_id: "a1", events: window_, has_more: false })),
+      http.get("/api/sessions/a1/prompt", () => HttpResponse.json({ error: { code: "not_found", message: "none" } }, { status: 404 })),
+    );
+  });
+
+  it("collapses a completed turn, streams open live thoughts and drops them on reconnect", async () => {
+    window.history.replaceState(null, "", "/agent/a1");
+    renderApp();
+    const stream = await waitFor(() => FakeEventSource.last!);
+    act(() => {
+      stream.onopen?.();
+      stream.emit("state_update", { data: phoneAgent });
+      stream.emit("state_update", { agent_id: "__hydrated__", data: { hydrated: true } });
+    });
+    await screen.findByText("Fixed.");
+    expect(screen.queryByText("Looking first.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Show activity/ }));
+    expect(screen.getByText("Looking first.")).toBeInTheDocument();
+
+    act(() => stream.emit("runtime_activity", { agent_id: "a1", data: { agent_id: "a1", generation: "g1", span_id: "r1", kind: "reasoning_delta", delta: "Planning tests" } }));
+    const thought = await screen.findByRole("button", { name: /Thinking/ });
+    expect(thought).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Planning tests")).toBeInTheDocument();
+    // It belongs to the open turn, after the latest prompt.
+    expect(screen.getByText("Now test").compareDocumentPosition(thought) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    act(() => stream.onopen?.());
+    await waitFor(() => expect(screen.queryByText("Planning tests")).toBeNull());
+  });
+});

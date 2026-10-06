@@ -82,6 +82,25 @@ describe("ThinkTankPage", () => {
     window.getSelection()?.removeAllRanges();
   });
 
+  // FS-03.A57, TS-08.R104: attempt activity reuses quiet completed turns within
+  // its attempt, and the canonical contribution stays a visible room entry.
+  it("collapses a completed attempt turn without hiding the room contribution", async () => {
+    detail = { ...room(), phase: "ended", active: undefined };
+    const activity = [
+      { type: "assistant_text", data: { delta: "Drafting a cache plan." } },
+      { type: "tool_call", data: { tool_call_id: "c1", name: "Read" } },
+      { type: "assistant_text", data: { delta: "Final attempt answer." } },
+      { type: "turn_end", data: { stop_reason: "end_turn" } },
+    ].map((event, i) => ({ version: 1, room_id: "tt_fixture", seq: i+1, attempt_id: "tta_1", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: i+1, created_at: "2026-10-06T09:00:00Z", event }));
+    server.use(http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ activity, complete: true })));
+    renderRoom();
+    expect(await screen.findByText("LRU")).toBeTruthy();
+    expect(await screen.findByText("Final attempt answer.")).toBeTruthy();
+    expect(screen.queryByText("Drafting a cache plan.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Show activity/ }));
+    expect(screen.getByText("Drafting a cache plan.")).toBeTruthy();
+  });
+
   it.each(["discussion", "ended"])("keeps settled tools inspectable in %s while refusing stale approvals", async (phase) => {
     detail = { ...room(), phase, active: undefined };
     const activity = [

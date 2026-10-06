@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { TranscriptEvent } from "../../api/types";
 import { useReasoningStore } from "../../store/reasoningStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
-import { TranscriptView, withReasoning } from "./TranscriptView";
+import { TranscriptView } from "./TranscriptView";
+import { withReasoning } from "./runtimeActivity";
 
 afterEach(() => {
   cleanup();
