@@ -98,6 +98,15 @@ func newStore(t *testing.T) *state.Store {
 	return st
 }
 
+// TestServerKeepsLegacyProtocolRevision pins TS-04.R83: go-sdk 1.8.0 defaults to MCP 2026-07-28,
+// but the stateful server still negotiates the pre-bump revision with an SDK client.
+func TestServerKeepsLegacyProtocolRevision(t *testing.T) {
+	cs := connect(t, New(newStore(t), nil), "")
+	if got := cs.InitializeResult().ProtocolVersion; got != "2025-11-25" {
+		t.Fatalf("negotiated protocol = %q, want 2025-11-25", got)
+	}
+}
+
 // TestSendNudgeRoundTrip-free: the full send→check round-trip across two agents
 // over the real HTTP transport, proving identity-from-session and the store.
 func TestSendAndCheckRoundTrip(t *testing.T) {

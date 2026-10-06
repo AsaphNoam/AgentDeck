@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `refresh-provider-bundle-2026-10.md` (in progress; see **Active change**).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -20,7 +20,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `AsaphNoam/Chuck` and 404 until the rename; workarounds are `CHUCK_REPO=AsaphNoam/AgentDeck`
   and `chuck update --repo AsaphNoam/AgentDeck`. Renaming later fixes them without a new release.
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-  `refresh-provider-bundle-2026-10.md` is ready and waiting to start.
+  `refresh-provider-bundle-2026-10.md` is in progress.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -28,7 +28,19 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+[`refresh-provider-bundle-2026-10.md`](../ready-changes/refresh-provider-bundle-2026-10.md).
+Slices, each committed when verified:
+
+1. ~~go-sdk v1.8.0 (TS-04.R83)~~ done.
+2. Release pins, lockfile, regenerated `2.1.1` steering patch, assembly/installer/manifest fixtures
+   (TS-04.R79, TS-06.R32).
+3. Codex 2.x AIR decoder and fake re-derived (TS-04.R79/R62).
+4. Session notices end to end (TS-04.R80, TS-08.R86, FS-03.A49).
+5. Steer-backgrounded tool (TS-04.R81, FS-03.A48).
+6. Model-policy refusals (TS-04.R82, FS-09.A48).
+7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
+
+Next: slice 2.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

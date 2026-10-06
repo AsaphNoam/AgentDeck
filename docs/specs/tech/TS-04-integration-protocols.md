@@ -736,12 +736,14 @@ application read the effective model from the returned or next live option list 
 request. A mismatch between requested and effective model is reported as a rejection, never stored
 as the requested model, and never retried with another model.
 
-**R83 `(planned)` — The internal MCP server uses go-sdk 1.8.0 without changing its protocol.**
+**R83 — The internal MCP server uses go-sdk 1.8.0 without changing its protocol.**
 Bump `github.com/modelcontextprotocol/go-sdk` to v1.8.0 for its session-leak, close-deadlock and
 input-size fixes. The server keeps its current stateful streamable HTTP mode and negotiated MCP
 revision; it does not enable stateless mode, serve MCP `2026-07-28`, declare `outputSchema` (R31's
 deferral stands), or set any `MCPGODEBUG` compatibility flag. Existing token, origin and hook
-checks must pass unchanged under the new SDK defaults.
+checks must pass unchanged under the new SDK defaults. The SDK serves `2026-07-28` only in
+stateless mode, so no version restriction is configured; `TestServerKeepsLegacyProtocolRevision`
+guards the negotiated revision (shipped 2026-10-06).
 
 One builder formats at most 15 whole messages and at most 64 KiB of serialized UTF-8 mail-section
 content, including attribution and the overflow notice. Use existing 8,000-byte body/200-byte subject

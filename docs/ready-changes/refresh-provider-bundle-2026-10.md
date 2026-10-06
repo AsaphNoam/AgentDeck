@@ -1,6 +1,6 @@
 # Refresh the provider bundle and adopt new adapter features
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct request on 2026-10-05 to check the bundled Claude/Codex adapters, CLIs and ACP
 against upstream, pick up useful features, and recheck the paused internal-actions-without-MCP gate.
 **Relevant requirements:** FS-03.R67–R68/A48–A49; FS-09.R79/A48; FS-17 §6 transport recheck;
