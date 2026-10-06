@@ -1084,6 +1084,99 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   failure/pending/ended states, keyboard focus and retained judge results. DOM tests do not close
   visual parity or contrast.
 
+- **R100 (planned) — Turn activity extends the shared transcript presentation.** FS-03.R73–R77
+  extend the existing normalized `foldTranscript`/`appendRenderedEvent`, `nestActivities`,
+  `groupTranscriptRows`/`ToolRun` and event-renderer seams; add one shared pure turn projection
+  over supplied normalized events rather than a second transcript reducer. Partition root turns
+  at root `turn_end`, never child `turn_end`, permission waits, `busy=false` alone or an in-turn
+  `user_text` (Steer). Preserve sequence/activity identity and original event nodes. Session/backend
+  boundaries fence incomplete history without claiming success; an unclosed tail remains partial
+  with its original content and actionable approvals. Render one **Show activity** trigger for a
+  proven completed root turn with hideable content, at its first activity position. The trigger
+  controls all hideable segments of that turn in place; leave visible user/Steer/response/status
+  nodes at their causal positions rather than moving or duplicating them into a summary.
+  This supersedes R39's uninterrupted-only scope at the completed-turn level and R59's default
+  collapsed thinking clause; both existing shared ownership and presentation-only constraints stand.
+- **R101 (planned) — Visible response selection is structural and conservative.** For each
+  completed root turn, select its last normalized root `assistant_text` passage as the visible
+  response and hide earlier root assistant passages in activity. Consume the shared fold's merged
+  passage unchanged: ephemeral thought insertion, task updates and renderer rerenders cannot
+  split or concatenate durable assistant text differently. No regex, prose classifier, provider
+  name/version inference, new channel, synthetic final event or API payload rewrite is introduced.
+  Child assistant text stays in its attributed child scope. Calls/results/related diffs and
+  completed child detail remain causally inspectable through the existing renderers inside activity.
+  Root errors, terminal reasons and unresolved root/child approval controls remain outside hidden
+  segments. Active background work continues through `collectTasks`/`BackgroundTaskList` with
+  existing runtime authority and tool-output ownership; neither root collapse nor child disconnect
+  fabricates its terminal state. Room attempt rendering scopes keys and boundaries by attempt;
+  FS-21's canonical contributions/synthesis are not assistant-text activity to hide.
+- **R102 (planned) — Collapse state is local, bounded and transition-owned.** Each mounted
+  transcript owns choices keyed by source agent, stable first durable root-event sequence for the
+  turn, and optional child activity scope; a turn with only a root terminal event uses that
+  `turn_end` sequence. Before any durable root event, use a mounted-source active-turn cursor
+  fenced by generation and observed root boundaries, then adopt the first durable key without
+  losing a manual choice. Optimistic input does not become a durable identity;
+  reconcile it before adopting a key, without resetting a live manual choice when the durable
+  replacement arrives. Component rerenders/refetches preserve stable choices. Root/child reasoning
+  starts open for a new active turn; manual close applies to later spans in that scope/turn and can
+  be explicitly reopened. On first observing its root terminal boundary, that turn's activity and
+  nested thought/tool disclosure choices reset closed once. Subsequent replay, task updates and
+  later turn endings cannot reset a manually reopened completed turn. A child terminal outcome
+  means normalized terminal `activity_state` (completed/failed/stopped/disconnected), not a child
+  `turn_end`; it closes thought/tool detail while retaining the attributed outcome in parent activity;
+  a root terminal boundary closes all remaining detail. Permission pause is not terminal.
+  Store only user overrides and observed-transition identities, with at most 256 turn records per
+  mounted source and no copies of transcript text; evict oldest completed overrides first. Drop
+  records for absent turns, source change, unmount, deletion, reconnect or runtime-generation change.
+  No localStorage/sessionStorage, server setting, database migration or account preference is added.
+- **R103 (planned) — Ephemeral thoughts have a stable presentation turn association.** Keep
+  TS-01.R35/TS-04.R63's runtime notification and reasoning retention unchanged. At live reasoning
+  admission, associate each span with its root turn's presentation key and optional child scope
+  only when current active-turn lifecycle and event ordering establish ownership, using the
+  generation-fenced root boundary cursor; retain its anchor and existing 50-span/
+  64,000-character limits. A later root turn cannot reuse a span across its boundary even if the
+  provider repeats a span id. Do not attach a late delta to a completed turn or create a historical
+  thought placeholder when ownership is unknown. An ambiguously owned notification may remain
+  in the bounded live-only display but never be backfilled into a completed turn's activity.
+  SSE reconnect/generation change still clears thoughts and live choices.
+  Thought association and live manual choices are per mounted source;
+  route mounts hydrate only currently available reasoning for a demonstrably active turn.
+  Reasoning stays outside durable events, API reads, search, annotations and clone/context history.
+- **R104 (planned) — All chat entries consume one turn contract.** Full agent chat, dashboard
+  pane and Archive use the shared projection and existing `TranscriptView` renderer. The phone
+  `remote/AgentScreen.tsx` retains its phone composition/permission actions but consumes the same
+  projection and disclosure state policy; wire its live reasoning through the existing authenticated
+  remote `/api/events` feed and shared bounded reasoning store: `remote/connection.ts` currently
+  handles `new_message`, so add a `runtime_activity` handler and clear reasoning/live choices on
+  its reconnect/generation boundaries, with the same limits as desktop. Do not introduce a phone-only
+  final/turn classifier or new transport. Retained Think Tank attempt activity reuses the turn
+  projection within its existing source-agent/attempt boundary without changing room message
+  publication, retention or live reasoning availability. Empty/non-chat activity and unknown
+  legacy events remain visible under their existing renderer behavior, not silently discarded.
+- **R105 (planned) — The disclosure uses Chuck's existing presentation construction.** Add
+  a documented `turn-activity` hook with `trigger`/`content` slots and `collapsed`/`expanded` states
+  to the versioned contract during implementation; use ordinary subdued text, chevron, semantic
+  tokens and existing disclosure/button construction. Each shared turn control exposes its expanded
+  state and controls the in-place content regions by stable accessible ids. The open control names
+  the close action (**Hide activity**); no activity yields no empty trigger. Completed tool/child/
+  thought inspection stays nested and compact with existing capped ancestry. No skin branching,
+  new token family, motion dependency or layout animation is required. Preserve bottom-follow;
+  when reading older content, anchor on the nearest surviving visible event/control through
+  automatic collapse. Focus within hidden content returns to its controlling disclosure. Reuse
+  this construction at narrow pane/phone widths and in Core, Sky & Grove and Studio; revealed
+  messages retain their original annotation/copy/file targets and supported read-only restrictions.
+- **R106 (planned) — Closure proves lifecycle and rendered long-chat behavior.** FS-03.A54–A58
+  require independently authored interleaved root/child transcripts and real runtime terminal
+  scenarios, including manual choices during later deltas, terminal-only/tool-only/no-terminal
+  history, optimistic input reconciliation, in-turn Steer, newer-turn completion after old activity
+  is reopened, bounded-state eviction, desktop/remote reconnect/generation reset and active
+  background controls. Phone tests prove live reasoning admission, bounded rendering and reset
+  through its real remote connection path rather than assuming desktop SSE wiring covers it.
+  Add focused projection/component tests and rendered fake-ACP desktop/dashboard/archive/phone
+  journeys through the working tree's real binary. Run applicable TS-06 closure checks after the
+  final implementation edit, including the presentation contract/style audit and embed generation;
+  never hand-edit dist. No credentialed provider smoke is added solely for this display change.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

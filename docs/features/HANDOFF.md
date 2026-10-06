@@ -126,6 +126,14 @@ None open.
 
 ## Changelog
 
+- **2026-10-06 — Design: quiet completed chat turns.** Human confirmed one per-turn activity
+  disclosure and unchanged ephemeral thought retention. Ready change `quiet-completed-chat-turns.md`
+  is Waiting to start: FS-03.R73–R77/A54–A58 and TS-08.R100–R106 cover open live thoughts,
+  respected manual choices, automatic terminal collapse, last-passage compatibility, actionable
+  attention/background status and shared desktop/dashboard/archive/phone behavior. No protocol,
+  durable-history or retention change; rendered long-chat acceptance remains an implementation
+  gate. No product code changed in this design unit; the provider refresh stays active.
+
 - **2026-10-06 — Design: Think Tank workspace and live controls.** Human confirmed the scope
   and required the room composer to match standard Chuck chat input. Ready change
   `think-tank-workspace-and-live-controls.md` is Waiting to start. FS-21.R43–R51/A33–A37,
