@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** Think Tanks review fixes (TT-01–TT-13).
 - **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
   GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
   manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
@@ -55,7 +55,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+Think Tanks fix plan: runtime terminal/child ownership (delegated); durable command replay and
+cursor validation (delegated); retained activity/file inspection and bounds (delegated); lifecycle
+exit settlement, setup launch claims and final eligibility (parent integration). Each slice adds
+focused regression evidence; integrate and run the shared closure matrix before closing this unit.
+Runtime ownership is verified: full runtime suite and focused race tests pass; both ownership
+regressions fail against pre-fix overlays. Integrated Think Tank state/server tests pass, including
+Stop/archive/deletion and final admission/setup fences. UI retention/bounds tests are being finalized.
+
+Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
 ./internal/server -run TestThinkTankWireFixture`. Room screenshots: `(cd ui && node
 scripts/room-render.mjs <outDir> live|ended)`.
@@ -262,6 +270,11 @@ selectors were checked; no separate findings on those surfaces. No product code 
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Think Tank runtime ownership checkpoint (INV §1/§5/§11/§15).** Terminal
+  completion holds the turn gate through its sink and uses the completing turn's immutable id;
+  child scopes freeze origin ownership. Full runtime and focused race tests pass; pre-fix overlays
+  fail both regressions. Lifecycle, replay and retained-activity fixes remain in active integration.
 
 - **2026-10-06 — Review: Think Tanks.** Reviewed through `60ba960`; recorded twelve Must-fix
   findings covering Stop/completion/child ownership, setup/admission/project guards, command replay,

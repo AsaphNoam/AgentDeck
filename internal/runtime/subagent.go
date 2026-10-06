@@ -38,6 +38,7 @@ type ActivityStateData struct {
 type activityScope struct {
 	ActivityID       string
 	ParentActivityID string
+	TurnID           string
 }
 
 // activityIDFor derives a stable, bounded Chuck id from the provider's
@@ -135,6 +136,10 @@ func (c *ChatRuntime) onSubagentUpdate(as *agentState, params json.RawMessage) b
 		}
 		scope := activityScope{ActivityID: activityIDFor(u.SubagentSessionID), ParentActivityID: parent.ActivityID}
 		as.mu.Lock()
+		scope.TurnID = parent.TurnID
+		if parent.ActivityID == "" {
+			scope.TurnID = as.execTurnID
+		}
 		_, known := as.children[u.SubagentSessionID]
 		full := len(as.children) >= maxChildren
 		if !known && !full {

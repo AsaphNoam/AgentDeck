@@ -786,17 +786,17 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 			}
 			c.clearInlineMail(as.agentID, deliveryKey)
 			td := as.lastContext().turnEnd("error")
-			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
+			as.settleTurnContext(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			c.finishTurn(as, td)
+			nextText, nextTurnID := c.finishTurn(as, turnID, td)
 			c.runReservedHeld(as, nextText, nextTurnID)
 			return
 		}
 		td, hasPct := mapPromptResult(res)
 		c.settleInlineMail(as, deliveryKey, res)
-		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
+		as.settleTurnContext(&td, hasPct)
 
-		c.finishTurn(as, td)
+		nextText, nextTurnID := c.finishTurn(as, turnID, td)
 		c.runReservedHeld(as, nextText, nextTurnID)
 	}()
 
@@ -918,43 +918,22 @@ func (c *ChatRuntime) clearInlineMail(agentID, deliveryKey string) {
 // the activation turn end here, so cancel and normal completion cannot grow
 // divergent delivery paths (FS-03.R49, INV §2). The crash path deliberately does
 // not: its held message has no next turn to run in and dies with the agent.
-func (c *ChatRuntime) finishTurn(as *agentState, td TurnEndData) {
+func (c *ChatRuntime) finishTurn(as *agentState, turnID string, td TurnEndData) (string, string) {
 	c.applyTurnEndStatus(as, td)
-	c.emit(as, EvTurnEnd, td)
+	// Keep the gate until terminal subscribers have settled this owner. A racing
+	// Send cannot start a successor before the room completion callback returns.
+	c.emitIn(as, activityScope{TurnID: turnID}, EvTurnEnd, td)
 	as.mu.Lock()
 	as.execTurnID = ""
+	nextText, nextTurnID := as.reserveHeldSuccessorLocked()
 	as.mu.Unlock()
-	c.deliverHeld(as)
+	return nextText, nextTurnID
 }
 
 func (as *agentState) setExecTurn(turnID string) {
 	as.mu.Lock()
 	as.execTurnID = turnID
 	as.mu.Unlock()
-}
-
-// deliverHeld runs the agent's held follow-up as the next turn. Taking the
-// message and claiming the gate is one critical section, so a message can never
-// be both delivered here and sent by a racing caller (INV §5). A cancelled turn
-// reaches this the same way a completed one does, which is what makes cancel
-// "stop that, do this instead" rather than a discard (FS-03.R49).
-func (c *ChatRuntime) deliverHeld(as *agentState) {
-	as.mu.Lock()
-	if as.held.Text == "" || as.stopped {
-		as.mu.Unlock()
-		return
-	}
-	turnID, claimed := as.claimTurnLocked()
-	if !claimed {
-		// Another turn already owns the gate; the message stays held and goes out
-		// when that turn ends instead of being dropped.
-		as.mu.Unlock()
-		return
-	}
-	text := as.held.Text
-	as.held = heldMessage{}
-	as.mu.Unlock()
-	c.runReservedHeld(as, text, turnID)
 }
 
 // reserveHeldSuccessorLocked settles the current gate and, when a follow-up is
@@ -992,7 +971,7 @@ func (as *agentState) reserveHeldSuccessorLocked() (string, string) {
 	return text, as.nextTurnIDLocked()
 }
 
-func (as *agentState) settleAndReserveHeld(td *TurnEndData, hasPct bool) (string, string) {
+func (as *agentState) settleTurnContext(td *TurnEndData, hasPct bool) {
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	as.cancelEscalated = false
@@ -1001,7 +980,6 @@ func (as *agentState) settleAndReserveHeld(td *TurnEndData, hasPct bool) (string
 	} else {
 		td.ContextPct, td.ContextCounts = as.context.pct, as.context.counts
 	}
-	return as.reserveHeldSuccessorLocked()
 }
 
 func (c *ChatRuntime) runReservedHeld(as *agentState, text, turnID string) {
@@ -1433,16 +1411,16 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			}
 			c.clearInlineMail(as.agentID, deliveryKey)
 			td := as.lastContext().turnEnd("error")
-			nextText, nextTurnID := as.settleAndReserveHeld(&td, false)
+			as.settleTurnContext(&td, false)
 			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
-			c.finishTurn(as, td)
+			nextText, nextTurnID := c.finishTurn(as, turnID, td)
 			c.runReservedHeld(as, nextText, nextTurnID)
 			return
 		}
 		td, hasPct := mapPromptResult(res)
 		c.settleInlineMail(as, deliveryKey, res)
-		nextText, nextTurnID := as.settleAndReserveHeld(&td, hasPct)
-		c.finishTurn(as, td)
+		as.settleTurnContext(&td, hasPct)
+		nextText, nextTurnID := c.finishTurn(as, turnID, td)
 		c.runReservedHeld(as, nextText, nextTurnID)
 	}()
 	return true, nil
@@ -1742,8 +1720,12 @@ func (c *ChatRuntime) emitIn(as *agentState, scope activityScope, typ string, da
 	}
 	as.mu.Lock()
 	as.seq++
+	turnID := as.execTurnID
+	if scope.ActivityID != "" || scope.TurnID != "" {
+		turnID = scope.TurnID
+	}
 	ev := Event{
-		AgentID: as.agentID, Generation: as.generation, TurnID: as.execTurnID,
+		AgentID: as.agentID, Generation: as.generation, TurnID: turnID,
 		Seq:  as.seq,
 		Type: typ,
 		Data: raw,
