@@ -126,12 +126,15 @@ None open.
 
 ## Changelog
 
-- **2026-10-06 — Design intake: pipeline Think Tank stages and task collapse.** Recorded the
-  three requested items in `docs/ideas.md` under Ideas being defined. Product scope is awaiting
-  confirmation: judge synthesis completes a stage directly, fresh same-project participants,
-  retained room/output history, and per-parent descendant collapse in Tasks. Shared-workspace
-  warning contrast is included without changing its consent behavior. No ready change or product
-  code; resume feature-side confirmation before technical design.
+- **2026-10-06 — Design: Think Tank pipeline stages and task collapse.** Human confirmed the
+  scope; ready change `pipeline-think-tank-stages-and-task-collapse.md` is Waiting to start.
+  FS-14.R81–R86/A48–A52, FS-21.R41–R42/A31–A32 and FS-16.R46–R48/A30–A32 cover fresh same-project
+  rooms, required judge synthesis as direct stage output, retained history/recovery/scoped Stop,
+  readable shared-workspace consent and parent-level collapse. TS-09.R51–R56, TS-14.R19–R21,
+  TS-10.R38 and TS-08.R92–R95 reuse room execution and task result authority, add durable managed
+  stage binding and session collapse choices. Independent read-only seam/review pass resolved output,
+  state and acceptance-retry contracts. All new requirements remain planned; no product code changed
+  in this design unit and the active provider-refresh change stays active.
 
 - **2026-10-06 — Design: UI polish batch.** Ready change `ui-polish-fields-icons-labels.md`
   (FS-02.R66–R70, TS-08.R88–R91): auto-grow textareas, icon Send/Cancel/Collapse, expanded card

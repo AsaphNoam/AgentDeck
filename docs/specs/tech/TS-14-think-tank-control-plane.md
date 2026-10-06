@@ -1,6 +1,6 @@
 # TS-14 — Think Tank control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state/`, `internal/server/`, `internal/runtime/`, `internal/messaging/`, `ui/src/features/`
 **Absorbed:** —
 
@@ -157,6 +157,37 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   `operating-chuck` knowledge together. Turn-specific room data stays outside frozen launch config.
   Implementation closure follows TS-06.R5 and §4's focused matrix; fake peers cannot satisfy
   credentialed provider acceptance.
+
+- **R19 (planned)** — Pipeline room creation reuses R2's normalized setup/reservation and ordinary
+  launch composition with every member/judge new and project fixed to the run. A shared transactional
+  create helper accepts trusted pipeline origin plus bounded immutable stage context; standalone
+  create cannot set that origin. Persist goal/objective, declared inputs/output contract and run/stage
+  attribution as room-owned context before launch, so run deletion does not erase what participants
+  received. The ordinary bounded room goal names the stage; the full run goal/objective appear in
+  this stage context and the room's visible goal area, rather than being clipped into R17's goal
+  field. Extend the existing paged room-context read with an attributed `stage_context` section
+  using R7/R17's byte limits, UTF-8 continuation and read receipts; every participant and judge reads
+  it before submitting. Keep stage data outside frozen provider/system prompts. Origin provides
+  provenance and recovery linkage, not private-transcript or cross-project authority.
+- **R20 (planned)** — A pipeline origin adds the run/stage-open check to setup claims, room
+  activation admission, resume/retry and judge reservation, atomically with the relevant state claim.
+  Shared state methods behind every existing room mutation (including End, messages and annotations)
+  enforce the relevant origin/closure guard; stale actions return the existing typed conflict without
+  changing the run. After stage completion, room messages remain closed, while ordinary retained
+  inspection and selected-agent/New-task annotation follow-up remain available outside run ownership.
+  No room HTTP End/Resume/Retry can reopen a stopped pipeline. Pipeline Stop is a distinct durable
+  closure request from normal End: suppress future work, retain committed history and queued input,
+  abandon unstarted slots/judge, cancel only the captured room-owned turn, then release its ownership.
+  Unpublished cancelled contributions are not invented or charged; retain failed activity honestly.
+  TS-09.R54 owns convergence before run stop. R13's standalone End/completion behavior is preserved.
+- **R21 (planned)** — A successful finalized judge contribution remains canonical room data;
+  TS-09.R53 consumes its immutable entry through the task result authority after commit. Stage output
+  acceptance is independently idempotent and recoverable if a post-commit kick fails; it does not
+  rerun the judge. Required synthesis output limits are returned in pipeline judge context and
+  enforced before staging. Failure/retry preserves discussion and previous judge attempts, and
+  pipeline pin checks join guarded room deletion in its transaction. Read/hydration exposes pipeline
+  origin and current recovery state; all room projections retain existing privacy/activity scope.
+  No new MCP action, provider feature, direct-action transport or remote room route is needed.
 
 ## 3. Interfaces & data shapes
 

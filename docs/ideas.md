@@ -34,35 +34,6 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Pipeline Think Tank stages and collapsible task levels.** Human request, 2026-10-06:
-  allow a pipeline stage to be a Think Tank whose judge output becomes the stage output; fix the
-  unreadable shared-workspace confirmation during pipeline start; and collapse task descendants
-  so a stage row can stand alone. Owners: FS-14, FS-21, FS-16; existing presentation rules FS-12
-  and TS-08 govern contrast. No product code or technical design yet.
-  Proposed scope awaiting confirmation:
-  - A template can select a Think Tank stage, with participant roles, finite contribution ceilings,
-    departure settings, optional independent openings, and a required fresh end-only judge.
-    Run setup assigns participant/judge runtimes. Create fresh participants in the run's project;
-    existing/cross-project agents remain available to standalone rooms only.
-  - Supply the stage objective and bound prior-stage inputs to the room. Completed judge synthesis
-    is the stage's declared text output and completes that stage automatically, without a second
-    standing-owner decision. Success means synthesis was produced, not that participants agreed
-    or the recommendation passed a quality check. Judge failure holds the stage for explicit
-    repair/retry. Existing stage gates still apply after completion.
-  - Keep the room and judge output linked from run history, durably retained alongside existing
-    room/task records. Stop/restart must respect existing run closure and room recovery; stopping
-    pipeline-owned room work must not cancel unrelated private work.
-  - Restore readable warning text, conflict labels and confirmation controls across all three skins,
-    preserving the existing explicit shared-workspace acknowledgement and start semantics.
-    Source hypothesis: `.pipeline-warning` combines a technical background with inherited text;
-    rendered reproduction remains owed during implementation.
-  - In Tasks, give each parent task a separate descendant disclosure, usable at every delegation
-    level; collapsing a stage leaves its own row, descendant count and attention summary visible.
-    Initially expand levels; retain user choices during refresh/navigation in the current session.
-    Task-detail expansion remains separate. Dependencies are not parentage, and a task stays
-    reachable once even when dependency links cross a collapsed branch.
-  Awaiting human confirmation of completion authority, fresh same-project room configuration,
-  retention/lifecycle scope, and initial/session collapse behavior before planned FS and TS work.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

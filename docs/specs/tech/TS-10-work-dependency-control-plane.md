@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -372,6 +372,29 @@ parallel copy of them.
   without automatic inbox or intervention-history transfer. It inherits only
   that coordinator's delegated scope under TS-05.R22. Neither operation changes the standing stage
   assignee, accepted reports, or immutable parent lineage. A cancelled/closed stage refuses it.
+
+- **R38 (planned)** — FS-16.R48 adds a pipeline-managed `think_tank` task target, created only
+  by the stage transaction and bound to exactly one room. Public task-create validation rejects
+  that target; it has no assigned provider identity, execution handle or ordinary task-budget claim.
+  Project setup/active discussion/closing/judge as `running`; paused or private-work waiting as
+  `waiting`; setup/participant/judge failure as `interrupted` with bounded `attention_reason`.
+  Published synthesis pending acceptance is `waiting` with acceptance status, or `interrupted`
+  after persistent acceptance failure. No unfinished state has an outcome. Resume/retry restores
+  the applicable phase without task admission; accepted output makes it `finished/success` with
+  `outcome_source=think_tank`, and Stop makes it `finished/cancelled` after owned closure intent.
+  Room/task/run phase projection shares one helper and post-commit invalidation; room-phase changes
+  cannot overwrite an accepted terminal result. Ordinary
+  agent dispatch, task report, Retry/Re-arm/person-result paths refuse or skip this managed target.
+  TS-09.R53's trusted room result branch alone writes success using the common transaction; shared
+  pipeline Stop records cancellation and waits for room release under TS-09.R54, without fabricating
+  a task runtime release. Shared result arms, output retention and lineage retain their normal
+  semantics. An ordinary task created during a bound room-owned turn inherits that stage task as
+  parent and its run/stage/attempt lineage, derived from the authoritative room attempt and captured
+  caller generation/turn in the same creation transaction. Enforce existing same-project and closure
+  rules; a private turn or mere retained membership grants no inherited run ownership. Such tasks
+  join existing descendant cleanup, not a second room task graph. Add this closed target/source
+  variant to task wire shapes, UI parsing/status/actions,
+  fixtures, migrations and validation together; source room/entry is provenance, never caller authority.
 
 ## 3. Interfaces & data shapes
 

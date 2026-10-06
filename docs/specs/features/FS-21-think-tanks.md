@@ -1,6 +1,6 @@
 # FS-21 — Think tanks
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state/think_tank*.go`, `internal/server/think_tank*.go`,
 `internal/messaging/think_tank_tools.go`, `ui/src/features/thinktank/` · **Journeys:** —
 **Absorbed:** —
@@ -219,6 +219,17 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   applicable. Live goal/membership editing, autonomous agent room creation,
   configurable full-file snapshots, export, and new phone room UI are outside this change.
 
+- **R41 (planned)** — A pipeline-owned room under FS-14.R81–R84 uses the same attributed
+  discussion, fresh end-only judge and explicit failure recovery as a standalone room. Its origin
+  identifies the run/stage and all new agents use that run's project. The room page links to its
+  run and exposes its phase and recovery controls. Stage context is durable shared room data,
+  available to every participant and judge; it is not copied private provider history.
+- **R42 (planned)** — Pipeline Stop overrides R25/R32's normal non-stopping behavior only for
+  the room's owned execution. It suppresses future setup/participant/judge work, preserves already
+  committed contributions, and never cancels unrelated private turns. A pipeline-pinned room cannot
+  be deleted while retained run history needs it. Run deletion removes only the pin. Standalone
+  room creation, manual End, private follow-up, retention and eligible deletion are unchanged.
+
 ## 3. States & transitions
 
 The core phase distinction from R4–R6, R13 and R20 is optional independent openings → shared
@@ -410,6 +421,16 @@ completion; R37 defines partial opening publication and pending input on End.
   provider histories and normal agent conversations remain intact. Separately delete before a
   pending judge starts and verify no delayed judge activation. Cancel confirmation and change
   nothing. *Verified by:* room delete/lifecycle integration tests and a rendered deletion journey.
+
+- **A31 (planned)** (R41) — A pipeline-created room shows attributed stage inputs, same-project
+  fresh participants and required fresh judge, with links in both directions. A failed judge is
+  retried without participant discussion reopening; published synthesis supplies FS-14.A48's
+  output. *Verify:* server/state integration tests and FS-14.A50's rendered journey.
+- **A32 (planned)** (R42) — Pipeline Stop during a room turn cancels that turn and fences later
+  launches, while a participant's unrelated private turn is untouched. Retained run history pins
+  the room; deleting the terminal run preserves history and releases the pin. Standalone End still
+  finishes the active turn normally and does not stop agents. *Verify:* lifecycle/race tests under
+  FS-14.A49 and the existing standalone End regression coverage.
 
 ## 6. Deviations & open decisions
 

@@ -40,14 +40,14 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | Chuck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Core, Sky & Grove and Studio share creative-workspace composition and polish; Studio acceptance is closed |
 | FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Current | Annotate and assign: select diff lines/transcript events/files, instruct, route to an agent or new task; Think Tank room sources |
-| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail browser acceptance pending |
+| FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; planned Think Tank stages and readable workspace consent |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
-| FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks, armed starts, lineage and scoped repair; project-grouped work-in-motion view |
+| FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Partial | Durable tasks, armed starts, lineage and scoped repair; planned descendant collapse and room-backed stage tasks |
 | FS-17 | [features/FS-17-agent-tool-results.md](features/FS-17-agent-tool-results.md) | Partial | Agent-facing action contract: shipped MCP retry/result behavior and planned direct command delivery |
 | FS-18 | [features/FS-18-agent-facing-knowledge.md](features/FS-18-agent-facing-knowledge.md) | Partial | Shared operating skill, progressive references, exact prompt migration, and planned lean personas with standing context and native-prompt preservation |
 | FS-19 | [features/FS-19-worktree-projects.md](features/FS-19-worktree-projects.md) | Current | Worktree projects: fork a repo-backed project into an isolated owned Git worktree, base-branch and setup-command settings, disposable-checkout recovery, conservative cleanup |
 | FS-20 | [features/FS-20-mobile-remote-control.md](features/FS-20-mobile-remote-control.md) | Partial | Mobile remote control: tailnet-only reachability, desktop-initiated phone pairing, phone web app (planned desktop-flow dashboard, project pages, agent management), attention notifications, keep-awake |
-| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Current | Independent cross-project agent deliberation, durable group-chat workspace with normal features and participant cards, optional independent openings, per-agent ceilings and optional end-only judge synthesis |
+| FS-21 | [features/FS-21-think-tanks.md](features/FS-21-think-tanks.md) | Partial | Independent cross-project agent deliberation, durable room history, per-agent ceilings and end-only judge synthesis; planned pipeline-owned rooms |
 
 ### Technical specs
 
@@ -61,12 +61,12 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Partial | Build tags, release runtime, action-client packaging, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
 | TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Partial | Presentation contracts, built-in skins and shared layout/control polish with state-paced badges |
-| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Current | Ordered pipeline progression over durable stage tasks with clean legacy reset |
-| TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task lineage, scoped work management, and same-task wait/continuation |
+| TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Ordered pipeline progression over durable stage tasks; planned room-backed stage execution and synthesis acceptance |
+| TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Partial | Durable task lineage, scoped work management, same-task wait/continuation and planned managed room targets |
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional skill delivery, planned shared standing context and four-role seeding, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | TS-13 | [tech/TS-13-remote-control.md](tech/TS-13-remote-control.md) | Current | Embedded Tailscale node, tailnet listener guard and allowlist, phone pairing and device credentials, Web Push, keep-awake, phone web-app entry, desktop-flow phone dashboard, and agent management |
-| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Current | Canonical SQLite rooms, normal-session activation/turn ownership, committed read checkpoints, explicit publication, rich retention and UI/MCP contracts |
+| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Partial | Canonical SQLite rooms, explicit publication and retained activity; planned pipeline origin/context and closure fencing |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

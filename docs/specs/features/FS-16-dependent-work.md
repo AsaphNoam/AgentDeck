@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -326,6 +326,32 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   control with an explicit project and the existing project-wide release semantics; a signal wait
   can link to that control without firing it. No new authoring API, graph editor, creator-grouping
   mode, scheduling behavior, permission, retention policy or phone flow is introduced.
+
+- **R46 (planned)** — In Tasks, every parent with retained delegated descendants has a separate
+  **Collapse tasks / Expand tasks** disclosure at any delegation level. Collapsing a stage leaves
+  its own row visible and hides its descendants, without collapsing task details or changing work.
+  The parent shows the hidden-task count, unfinished count and attention/cleanup summary; new hidden
+  attention stays visible there. Expanding restores descendants and their existing nested choices.
+  All levels initially expand. Choices survive refresh and route navigation in the current browser
+  session, keyed by project/task identity; they do not alter execution or server state.
+- **R47 (planned)** — Collapse follows recorded parent-task lineage, never dependency edges,
+  visual indentation or shared creator/run identity. A task remains reachable exactly once even
+  when prerequisites cross a collapsed branch: visible boundary links identify the hidden source
+  and offer revealing its ancestor path. Missing parents and invalid lineage do not silently hide
+  work. A task under active inspection or mutation stays visible until that interaction finishes;
+  collapsing its ancestor preserves detail drafts and returns focus to the disclosure when eligible.
+- **R48 (planned)** — A Think Tank pipeline stage is represented by one room-backed stage task,
+  whose execution and result source are labelled **Think Tank**. It has no synthetic assigned agent
+  and no ordinary task launch slot. FS-14.R83's published judge synthesis supplies its host-recorded
+  success and named output; Stop supplies cancellation. Only the pipeline creates this task kind.
+  Person/agent task creation and generic result, Retry, Re-arm and delete controls cannot bypass its
+  pipeline/room authority. The task links to its room and run, and retains ordinary result/lineage
+  visibility. Tasks created during its room-owned turns are recorded stage descendants and follow
+  existing stage cleanup/project boundaries; private work is not attributed by membership alone.
+  Setup/discussion/judging show room execution; a room pause/private-work wait shows waiting,
+  and explicit failure shows interrupted/needs attention. Completed synthesis awaiting acceptance
+  shows FS-14.R86's output-acceptance state and recovery. No task success appears before that
+  acceptance. This specializes R2–R4/R7/R16/R22 only for the room-backed stage; ordinary tasks are unchanged.
 
 ## 3. States & transitions
 
@@ -653,6 +679,20 @@ Each names the verification that demonstrates it.
   viewport in Core, Sky & Grove and Studio, checking long names, non-color state labels, bounded
   indentation, focus retention and no page-level horizontal overflow. Implementation records the
   incumbent and resulting views; this design does not claim rendered acceptance.
+
+- **A30 (planned)** (R46–R47) — Collapse a pipeline stage with coordinator → worker → reviewer
+  descendants, independently collapse a nested parent, refresh and navigate away/back, then expand
+  the stage. The stage remains visible, counts/attention update and nested choices/detail drafts
+  survive. Collapse never changes tasks or hides a pending mutation. *Verify:* projection/component
+  tests and a rendered keyboard/mouse journey in all appearances at 1024px and a wider desktop.
+- **A31 (planned)** (R47) — Exercise dependency joins/cross-branch links, unavailable parents,
+  invalid lineage, same-name tasks across projects and group membership changes. Each task remains
+  reachable once; revealing a hidden prerequisite expands only its ancestor path. *Verify:* bounded
+  projection fixtures and interaction tests, with representative cases in A30's rendered journey.
+- **A32 (planned)** (R48) — A room-backed stage appears once in Tasks with its true execution
+  source, room/run links and published result. No standing-agent activation or task-runtime slot is
+  consumed; ordinary create/report/repair cannot impersonate that authority. *Verify:* serialized
+  task HTTP/MCP refusal tests, Go-produced UI fixture and FS-14.A48's integration journey.
 
 ## 6. Deviations & open decisions
 

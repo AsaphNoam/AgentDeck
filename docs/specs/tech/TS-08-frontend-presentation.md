@@ -1006,6 +1006,38 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   status labels switch to it; option `value`s and keys stay ids. FS-02.R70 filters `archived`
   projects from the Tasks page's all-projects list and filter only, leaving an explicit focus as is.
 
+- **R92 (planned)** — FS-16.R46–R47 extend the existing `taskWork.ts` projection/Tasks rows with
+  parent-lineage child indexing and a pure visible-row projection; never derive descendants from
+  `WorkRow.depth` or prerequisite topology. Preserve R84's dependency ordering/group membership.
+  Build descendant counts/state summaries with bounded iterative traversal and visited guards,
+  without enumerating graph paths or fetching hidden tasks. Missing/cyclic lineage renders visible
+  with an unavailable relationship rather than losing rows. Retain one row per project/task;
+  boundary prerequisite links reveal the recorded ancestor path. Inspection/mutation pins and their
+  ancestor paths override hiding until released. Descendant toggles are separate sibling Buttons
+  with accessible expanded state, counts, keyboard focus and controls identity, never nested inside
+  the existing detail button. After permitted hiding, focus moves to the controlling visible parent.
+- **R93 (planned)** — Collapse choices belong to a feature-owned sessionStorage map keyed by
+  project/task identity, shared across Tasks route mounts in that tab. Store only collapsed ids;
+  absent ids expand. Bound to 5,000 choices, evict least-recently changed on overflow, prune only
+  from authoritative complete project reads/deletion, and tolerate storage errors by retaining
+  in-memory session behavior. Refetch/group changes do not reset nested choices or detail drafts;
+  filter changes do not interpret unloaded tasks as deleted. Session end removes choices naturally.
+  Reuse existing task CSS, semantic tokens, badges and disclosures in all appearances, with instant
+  state changes and capped visual indentation. No motion/library, server setting or graph canvas.
+- **R94 (planned)** — FS-14.R85 repairs `.pipeline-warning` through the existing paired semantic
+  technical background/text tokens, with explicit text treatment for children and normal shared
+  button states. `RunStartForm` currently inherits text on a technical background (`pipelines.css`);
+  verify this source hypothesis in the actual modal/inline surfaces in all appearances. Do not change
+  acknowledgement handlers, warning content or form state. Browser contrast/focus/pending-state
+  acceptance is FS-14.A51; DOM tests alone cannot close it.
+- **R95 (planned)** — Think Tank template controls extend the stage editor and Setup → Review
+  runtime summary/customization; preserve draft state, exact-proposal values and invalid-field focus.
+  Run/Tasks rows name Think Tank execution and link to the existing full room route; room headers
+  link back to the run. Current room phase, judge output source and valid room recovery lead rather
+  than a synthetic standing-agent link. Use the current room UI/renderers and shared hooks; extend
+  the presentation contract for any new public slots in all three skins. Rendered closure exercises
+  FS-14.A50–A51 and FS-16.A30, with no phone room workspace added.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract
