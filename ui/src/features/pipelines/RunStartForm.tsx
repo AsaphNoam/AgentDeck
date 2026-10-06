@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBackends, useConfig, useProjects } from "../../api/config";
@@ -264,7 +265,7 @@ export function RunStartForm({
           {Object.entries(projects.data ?? {}).filter(([, item]) => !item.archived).map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
         </select></label>
       </div>
-      <label className="form-field" data-field="goal"><span>Run goal</span><textarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>
+      <label className="form-field" data-field="goal"><span>Run goal</span><AutoGrowTextarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>
 
       {template && template.inputs.length > 0 && <div className="pipeline-subsection">
         <h3>Named inputs</h3>
@@ -272,7 +273,7 @@ export function RunStartForm({
           {template.inputs.map((input) => <label className={input.required && !inputs[input.name]?.trim() ? "form-field pipeline-field-missing" : "form-field"} data-field={`inputs.${input.name}`} key={input.name}>
             <span>{input.name}{input.required ? " · required" : ""}</span>
             <small>{input.description}</small>
-            <textarea rows={2} value={inputs[input.name] ?? ""} onChange={(event) => { edit(); setInputs((current) => ({ ...current, [input.name]: event.target.value })); }} />
+            <AutoGrowTextarea rows={2} value={inputs[input.name] ?? ""} onChange={(event) => { edit(); setInputs((current) => ({ ...current, [input.name]: event.target.value })); }} />
           </label>)}
         </div>
       </div>}

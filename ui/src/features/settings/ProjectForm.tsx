@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { BrowseDirectoryButton, ProjectColorPicker } from "../../components/ui";
+import { AutoGrowTextarea, BrowseDirectoryButton, ProjectColorPicker } from "../../components/ui";
 import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../lib/projectColors";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 
@@ -168,7 +168,7 @@ export function ProjectForm({
       </div>
       <div className="form-field">
         <label>Context prompt</label>
-        <textarea {...register("context_prompt")} rows={3} placeholder="Optional project context…" />
+        <AutoGrowTextarea {...register("context_prompt")} rows={3} placeholder="Optional project context…" />
       </div>
       <div className="form-field">
         <label>Base branch</label>

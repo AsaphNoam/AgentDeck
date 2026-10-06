@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useNavigate } from "react-router-dom";
@@ -96,7 +97,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
             <form className="config-form" onSubmit={(event) => { event.preventDefault(); submit(); }}>
               <div className="form-field">
                 <label htmlFor="think-tank-goal">Goal</label>
-                <textarea id="think-tank-goal" value={goal} maxLength={MAX_GOAL} rows={3} onChange={(e) => { setGoal(e.target.value); setCommandID(newCommandID()); }} placeholder="What should the participants work out?" />
+                <AutoGrowTextarea id="think-tank-goal" value={goal} maxLength={MAX_GOAL} rows={3} onChange={(e) => { setGoal(e.target.value); setCommandID(newCommandID()); }} placeholder="What should the participants work out?" />
               </div>
               <fieldset className="think-tank-setup-participants">
                 <legend>Participants, in speaking order</legend>

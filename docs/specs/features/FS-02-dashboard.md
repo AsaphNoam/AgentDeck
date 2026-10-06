@@ -283,7 +283,7 @@ normal agents/cards in their own projects; a room is not inserted as a synthetic
 card. Archived projects offer no Think Tank creation action. Existing agent creation, grouping and
 card navigation behavior remain unchanged.
 
-**R66** (planned) — Every multi-line text field in Chuck (chat and Think Tank composers, forms,
+**R66** — Every multi-line text field in Chuck (chat and Think Tank composers, forms,
 annotation trays) has no manual resize handle. It starts at its current minimum height and grows and
 shrinks with its content so every line is visible without inner scrolling. The agent chat and Think
 Tank composers stop growing at about 40% of the window height and scroll inside beyond that; every

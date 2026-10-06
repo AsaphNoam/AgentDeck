@@ -987,7 +987,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   drafts and origin labels; no new styling framework, decorative motion or phone room surface.
   Rendered validation is owed at implementation, not inferred from existing screenshots.
 
-- **R88** (planned) — One shared `AutoGrowTextarea` in `ui/src/components/ui` owns FS-02.R66: it
+- **R88** — One shared `AutoGrowTextarea` in `ui/src/components/ui` owns FS-02.R66: it
   sets height from `scrollHeight` on value change and resize, accepts an optional max height
   (composers pass `40vh`, overflow scroll beyond it), and every `<textarea>` in `ui/src` uses it
   (INV §2). The global `textarea` rule changes `resize: vertical` to `resize: none`. CSS

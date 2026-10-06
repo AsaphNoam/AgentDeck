@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useState } from "react";
 import { newCommandID, useThinkTankAnnotations, type RoomAnnotationWire } from "../../api/thinkTanks";
 import type { AnnotationDraft } from "../../api/types";
@@ -81,13 +82,13 @@ export function RoomAnnotationTray({ room }: { room: ThinkTankDetail }) {
                 <button type="button" className="annotation-link" onClick={() => remove(sourceId, index)} disabled={send.isPending}>Remove</button>
               </div>
               <blockquote>{draft.excerpt}</blockquote>
-              <label>Instruction<textarea value={draft.instruction} maxLength={2000} onChange={(event) => updateInstruction(sourceId, index, event.target.value)} disabled={send.isPending} /></label>
+              <label>Instruction<AutoGrowTextarea value={draft.instruction} maxLength={2000} onChange={(event) => updateInstruction(sourceId, index, event.target.value)} disabled={send.isPending} /></label>
             </li>
           ))}
         </ol>
         <label className="annotation-overall">
           Overall instruction (optional)
-          <textarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={send.isPending} />
+          <AutoGrowTextarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={send.isPending} />
         </label>
       </div>
       <footer className="annotation-tray-footer">

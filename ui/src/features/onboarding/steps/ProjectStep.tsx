@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { configErrorMessage, useCreateProject } from "../../../api/config";
-import { BrowseDirectoryButton, ProjectColorPicker } from "../../../components/ui";
+import { AutoGrowTextarea, BrowseDirectoryButton, ProjectColorPicker } from "../../../components/ui";
 import { DEFAULT_PROJECT_COLOR, type ProjectColor } from "../../../lib/projectColors";
 
 interface ProjectStepProps {
@@ -101,7 +101,7 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
 
       <div className="form-field">
         <label>Context prompt (optional)</label>
-        <textarea
+        <AutoGrowTextarea
           value={context}
           onChange={(e) => setContext(e.target.value)}
           placeholder="Brief description of this project…"

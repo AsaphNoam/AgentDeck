@@ -215,7 +215,7 @@ textarea:focus {
 
 textarea {
   line-height: 1.5;
-  resize: vertical;
+  resize: none;
 }
 
 input[type="checkbox"],

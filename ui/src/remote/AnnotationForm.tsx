@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../components/ui";
 import { useEffect, useRef, useState } from "react";
 import { launchAgent, sendAnnotations } from "../api/client";
 import type { AgentState, AnnotationDraft } from "../api/types";
@@ -88,7 +89,7 @@ export function PhoneAnnotationForm({ agent }: { agent: AgentState }) {
             <pre className="phone-pre">{draft.excerpt}</pre>
             <label className="phone-field">
               Instruction
-              <textarea
+              <AutoGrowTextarea
                 rows={3}
                 maxLength={2000}
                 value={draft.instruction}

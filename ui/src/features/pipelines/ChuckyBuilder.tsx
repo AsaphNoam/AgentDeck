@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { launchAgent, sendPrompt } from "../../api/client";
@@ -164,7 +165,7 @@ export function ChuckyBuilder({
           {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
         </select></label>
       </div>
-      <label className="form-field"><span>Describe the pipeline</span><textarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>
+      <label className="form-field"><span>Describe the pipeline</span><AutoGrowTextarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>
       {error && <p className="form-error">{error}</p>}
       <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch Chucky builder"}</button></div>
     </div>}

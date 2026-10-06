@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -84,7 +85,7 @@ export function RoleForm({ initial, onSubmit, onCancel, submitting, error }: Rol
       </div>
       <div className="form-field">
         <label>System prompt</label>
-        <textarea {...register("system_prompt")} rows={5} placeholder="Optional system prompt..." />
+        <AutoGrowTextarea {...register("system_prompt")} rows={5} placeholder="Optional system prompt..." />
       </div>
       <div className="form-field">
         <label>Skip permissions</label>

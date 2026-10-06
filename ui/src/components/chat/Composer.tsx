@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../ui";
 import { useEffect, useRef, useState } from "react";
 import { cancelTurn, sendPrompt, steerPrompt } from "../../api/client";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
@@ -170,8 +171,9 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
   return (
     <form className="composer" data-ui="composer" data-variant={variant} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <div className="composer-input">
-        <textarea
+        <AutoGrowTextarea
           ref={textareaRef}
+          maxHeight="40vh"
           value={text}
           onChange={(event) => {
             const next = event.target.value;

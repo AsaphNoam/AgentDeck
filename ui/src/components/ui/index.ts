@@ -1,3 +1,4 @@
+export { AutoGrowTextarea } from "./AutoGrowTextarea";
 export { Badge } from "./Badge";
 export { BrowseDirectoryButton } from "./BrowseDirectoryButton";
 export { Button, IconButton } from "./Button";

@@ -16,7 +16,7 @@ import {
 } from "../../api/thinkTanks";
 import { useProjects } from "../../api/config";
 import type { AnnotationDraft, FileContent, TranscriptEvent } from "../../api/types";
-import { Badge, Button, ConfirmDialog, PageHeader } from "../../components/ui";
+import { AutoGrowTextarea, Badge, Button, ConfirmDialog, PageHeader } from "../../components/ui";
 import { AnnotationContextMenu, type AnnotationMenuState } from "../../components/chat/AnnotationContextMenu";
 import { FileViewer } from "../../components/chat/FileViewer";
 import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMarkdown";
@@ -453,9 +453,10 @@ function RoomComposer({ room }: { room: ThinkTankDetail }) {
     <form className="think-tank-composer" data-ui="composer" onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <label htmlFor="think-tank-message">Message the room</label>
       <div className="composer-input">
-        <textarea
+        <AutoGrowTextarea
           id="think-tank-message"
           ref={textareaRef}
+          maxHeight="40vh"
           value={text}
           disabled={ended || send.isPending}
           placeholder={ended ? "The discussion has ended. Annotate an entry to follow up with an agent." : "Shared with every participant between turns. Type @ or # for a participant's files or commands."}

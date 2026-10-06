@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import { Button } from "../../components/ui";
+import { AutoGrowTextarea, Button } from "../../components/ui";
 import { useBackends, useConfig, useRoles } from "../../api/config";
 import {
   useCreateTask,
@@ -261,7 +261,7 @@ export function RecordResultForm({ task, onError }: { task: Task; onError: (mess
     >
       <label>Result<select aria-label="Result outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}><option value="success">Success</option><option value="failure">Failure</option><option value="blocked">Blocked</option></select></label>
       <label>Summary<input aria-label="Result summary" value={summary} onChange={(e) => setSummary(e.target.value)} required /></label>
-      <label>Details<textarea aria-label="Result details" value={details} onChange={(e) => setDetails(e.target.value)} /></label>
+      <label>Details<AutoGrowTextarea aria-label="Result details" value={details} onChange={(e) => setDetails(e.target.value)} /></label>
       <Button size="small" type="submit" busy={record.isPending}>Record result</Button>
     </form>
   );
@@ -362,7 +362,7 @@ export function CreateTaskForm({ projects, initialProject }: { projects: string[
       </label>
       <label>
         Instruction
-        <textarea value={instruction} onChange={(e) => setInstruction(e.target.value)} required />
+        <AutoGrowTextarea value={instruction} onChange={(e) => setInstruction(e.target.value)} required />
       </label>
       <label>Target<select value={targetKind} onChange={(e) => setTargetKind(e.target.value as "launch" | "agent")}><option value="launch">Launch a new agent</option><option value="agent">Use an existing agent</option></select></label>
       {targetKind === "agent" ? <label>Existing agent<select value={targetAgentID} onChange={(e) => setTargetAgentID(e.target.value)} required><option value="">Choose an agent</option>{Object.values(agents).filter((agent) => agent.project === project && agent.interface === "chat" && !agent.archived).map((agent) => <option key={agent.agent_id} value={agent.agent_id}>{agent.name}</option>)}</select></label> : <>
@@ -384,7 +384,7 @@ export function CreateTaskForm({ projects, initialProject }: { projects: string[
           <label>Wait for signal (optional)<input value={signal} onChange={(e) => setSignal(e.target.value)} placeholder="ci-green" /></label>
           <label>Context reference ID<input value={contextRefID} onChange={(e) => setContextRefID(e.target.value)} placeholder="cx_…" /></label>
           <label>Context label<input value={contextLabel} onChange={(e) => setContextLabel(e.target.value)} /></label>
-          <label>Context description<textarea value={contextDescription} onChange={(e) => setContextDescription(e.target.value)} /></label>
+          <label>Context description<AutoGrowTextarea value={contextDescription} onChange={(e) => setContextDescription(e.target.value)} /></label>
         </div>
       </details>
       {validationError && <p className="form-error" role="alert">{validationError}</p>}

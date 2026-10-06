@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../components/ui";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -380,7 +381,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
             >
               <label className="phone-field">
                 {agent.state === "waiting_input" && !pending ? "Reply" : "Message"}
-                <textarea rows={3} value={text} onChange={(event) => setText(event.target.value)} />
+                <AutoGrowTextarea rows={3} value={text} onChange={(event) => setText(event.target.value)} />
               </label>
               {error && <p className="phone-error">{error}</p>}
               {notice && <p className="phone-meta">{notice}</p>}

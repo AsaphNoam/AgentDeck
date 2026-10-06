@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../ui";
 import { useState } from "react";
 import { sendAnnotations } from "../../api/client";
 import type { AnnotationDraft } from "../../api/types";
@@ -89,7 +90,7 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
         </ol>
         <label className="annotation-overall">
           Overall instruction (optional)
-          <textarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={sending} />
+          <AutoGrowTextarea value={overall} maxLength={2000} onChange={(event) => setOverall(sourceId, event.target.value)} disabled={sending} />
         </label>
       </div>
       <footer className="annotation-tray-footer">
@@ -127,7 +128,7 @@ function AnnotationDraftRow({ draft, index, sourceId, onRemove, onUpdate, disabl
           rather than bold text sharing a line with a control (FS-13.R22). */}
       <div className="annotation-draft-head"><h3 className="annotation-draft-anchor">{anchor}</h3><button type="button" className="annotation-link" onClick={() => onRemove(sourceId, index)} disabled={disabled}>Remove</button></div>
       <blockquote>{draft.excerpt}</blockquote>
-      <label>Instruction<textarea value={draft.instruction} maxLength={2000} onChange={(event) => onUpdate(sourceId, index, event.target.value)} disabled={disabled} /></label>
+      <label>Instruction<AutoGrowTextarea value={draft.instruction} maxLength={2000} onChange={(event) => onUpdate(sourceId, index, event.target.value)} disabled={disabled} /></label>
     </li>
   );
 }

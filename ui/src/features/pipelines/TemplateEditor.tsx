@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRoles } from "../../api/config";
@@ -230,7 +231,7 @@ export function TemplateEditor({
                 <label className="form-field"><span>Stage id</span><input value={stage.id} onChange={(event) => mutate((next) => { next.stages[stageIndex].id = event.target.value; })} /></label>
                 <label className="form-field"><span>Title</span><input value={stage.title} onChange={(event) => mutate((next) => { next.stages[stageIndex].title = event.target.value; })} /></label>
               </div>
-              <label className="form-field"><span>Stage objective</span><textarea rows={4} value={stage.objective ?? ""} onChange={(event) => mutate((next) => { next.stages[stageIndex].objective = event.target.value; })} /></label>
+              <label className="form-field"><span>Stage objective</span><AutoGrowTextarea rows={4} value={stage.objective ?? ""} onChange={(event) => mutate((next) => { next.stages[stageIndex].objective = event.target.value; })} /></label>
               <fieldset className="pipeline-coordination"><legend>Coordination</legend><label className="pipeline-check"><input type="radio" checked={stage.coordination === "standing"} onChange={() => mutate((next) => { next.stages[stageIndex].coordination = "standing"; next.stages[stageIndex].dedicated_role = ""; })} /> Standing owner</label><label className="pipeline-check"><input type="radio" checked={stage.coordination === "dedicated"} onChange={() => mutate((next) => { next.stages[stageIndex].coordination = "dedicated"; })} /> Dedicated coordinator</label>{stage.coordination === "dedicated" && <label className="form-field"><span>Coordinator role</span><select value={stage.dedicated_role} onChange={(event) => mutate((next) => { next.stages[stageIndex].dedicated_role = event.target.value; })}>{Object.entries(roles.data ?? {}).map(([roleID, role]) => <option key={roleID} value={roleID}>{role.title} ({roleID})</option>)}<option value="">Select role</option></select></label>}</fieldset>
               <label className="pipeline-check"><input type="checkbox" checked={stage.approval_after_success} onChange={(event) => mutate((next) => { next.stages[stageIndex].approval_after_success = event.target.checked; })} /> Require approval after success</label>
 

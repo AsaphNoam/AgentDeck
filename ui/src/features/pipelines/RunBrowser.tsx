@@ -1,3 +1,4 @@
+import { AutoGrowTextarea } from "../../components/ui";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -124,7 +125,7 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
           {!terminal && data.controls.stop.eligible && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
           {terminal && <button type="button" className="btn-danger" disabled={busy} onClick={() => deleteRun.mutate(run.run_id, { onSuccess: onDeleted, onError: (reason) => setError(messageOf(reason)) })}>Delete run record</button>}
         </div>
-        {continuationRequired && <label className="form-field pipeline-continuation"><span>New input for this stage</span><textarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
+        {continuationRequired && <label className="form-field pipeline-continuation"><span>New input for this stage</span><AutoGrowTextarea rows={3} value={continuation} onChange={(event) => setContinuation(event.target.value)} /></label>}
         {error && <p className="form-error">{error}</p>}
       </section>
 

@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `ui-polish-fields-icons-labels` (see below).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -26,8 +26,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   design commits) was reviewed and stays open for BU-01 below. TS-04.R81's linked-task derivation
   was confirmed against both pinned adapters; no separate backgrounded-marker decoder is needed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
-  Quiet completed chat turns (`2cf6cfa`, `7680213` and the closure commit after them) is
-  available. Review notes: TS-08.R102 now keys a turn by its opening boundary seq (no key
+  Quiet completed chat turns (`2cf6cfa^..36f055a`) was reviewed and stays open for QT-01–QT-03
+  below. Review notes: TS-08.R102 now keys a turn by its opening boundary seq (no key
   adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
   automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
   through `phone-render.mjs`, not a paired device.
@@ -36,7 +36,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+[`ui-polish-fields-icons-labels`](../ready-changes/ui-polish-fields-icons-labels.md) — in progress.
+
+- Done: shared `AutoGrowTextarea` (`ui/src/components/ui`) replaces every textarea, with a
+  source-scan guard in its test; composers pass `maxHeight="40vh"`; global `resize: none`.
+- Next slices: icons (`icons.tsx`) for Send/Cancel/Collapse/Collapse all; expanded card header
+  reorder; shared duplicate-gated label helper lifted from `NewAgentModal.displayLabel`; Tasks page
+  skips archived projects.
+- Owed at closure: rendered composer/expanded-card screenshots per skin and one settings form
+  (FS-02.A48–A50), then remove `(planned)` from A48–A52 and the change file.
 
 Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
 -scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411
@@ -101,6 +109,42 @@ None.
 
 ## Review findings
 
+### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
+
+**Unit:** `2cf6cfa^..36f055a`.
+
+- **Must fix** — **QT-01 (INV §1/§11): Reasoning admitted before hydration is backfilled into old history.**
+  `ui/src/api/sse.ts:189–193` admits a delta even while the first transcript fetch is pending,
+  using an empty or unreconciled window for its anchor and turn key.
+  `ui/src/components/chat/runtimeActivity.ts:62–75` then inserts that span solely by list index;
+  the stored turn key only participates in its message id. Opening a running conversation with
+  earlier completed turns can therefore hide its current thought inside the first completed turn
+  when REST hydration arrives. Leaving and reopening a source also retains old reasoning while
+  `registerOpenAgent` discards its transcript. This violates TS-08.R103's proven ownership and
+  no historical backfill rules. A temporary projection probe confirmed a delta admitted at
+  anchor 0 before hydration lands in the old completed turn, absent from the current turn.
+  Gate association on a reconciled active boundary and validate ownership when inserting spans;
+  add a real SSE-path test with delayed initial hydration and source reopen. Fix complexity: medium.
+- **Must fix** — **QT-02 (INV §1): Child completion does not close opened tool detail.**
+  `ui/src/components/chat/renderers/ChildActivity.tsx:25–45` retains an explicit open choice
+  through a terminal child state and only changes the thought context's `live` flag. Nested
+  `toolRun.tsx:28–36` and `renderers/ToolCall.tsx:4–16` retain their open state. Open a child's
+  tool run/arguments while it executes, then receive `activity_state=completed` before root
+  completion: tool detail stays expanded, violating TS-08.R102. Reset nested disclosure choices
+  once at the child's terminal transition and test completed/failed/stopped/disconnected with
+  the root still live, preserving later manual reopening. Fix complexity: trivial/easy.
+- **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
+  `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
+  for the second turn, swallows the wait error, and never asserts that the second turn completed.
+  Its expanded-activity PASS ignores the computed thoughts/tools/child checks. Lines 200–219
+  report Archive/dashboard success from navigation alone; the agent is not archived and no
+  transcript/disclosure assertion establishes those surfaces. The script also never exercises
+  keyboard operation, focus during automatic collapse or reading above the tail, although
+  FS-03.A58/TS-08.R106 require rendered proof and closure marks them shipped. Wait for a new
+  terminal seq, fail missing content/surfaces, and run the specified keyboard/focus/scroll
+  scenarios with receipts; keep unverified acceptance gates live until then. The phone transcript
+  render fallback is documented and is not itself a defect. Fix complexity: medium.
+
 ### 2026-10 provider bundle refresh — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
 **Unit:** `7c95fa9^..2f39c3f`, excluding interleaved design commits.
@@ -133,6 +177,17 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Review: quiet completed chat turns.** Three must-fix findings (QT-01–QT-03);
+  unit stays open. Shared boundary keys, conservative final-passage selection, visible approvals,
+  outcomes/background controls and phone/attempt projection wiring otherwise match the specs.
+  Opening-boundary identity and visible notices are sound local choices; native scroll anchoring
+  still needs the required rendered proof. Invariant sweep: 1, 2, 8, 10, 11, 13, 16 and 17
+  reviewed; 3, 4, 5, 6, 7, 9, 12, 14 and 15 have no applicable changed surface.
+  All 117 focused UI tests passed; a temporary reasoning ownership probe confirmed QT-01.
+  Stylelint and all 40 script tests passed, but the presentation audit failed on concurrently
+  added `AutoGrowTextarea.tsx` inline styles outside this unit. Preserved concurrent work;
+  this review changes only the handoff and does not rerun or claim the rendered acceptance gates.
 
 - **2026-10-06 — Work: quiet completed chat turns.** Shared turn projection and `TurnList` across
   full chat, dashboard pane, Archive, phone and Think Tank attempt activity; live thoughts start

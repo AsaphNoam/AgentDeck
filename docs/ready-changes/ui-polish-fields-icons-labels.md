@@ -1,6 +1,6 @@
 # UI polish: auto-grow fields, icon actions, plain labels
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Human request of 2026-10-06 (five small UI items), merged with the `docs/ideas.md` entry
 "Finish hiding raw ids in UI labels" (pipeline template select always rendered `title (id)`).
 **Relevant requirements:** FS-02.R66–R70, FS-02.A48–A52, TS-08.R88–R91, INV §2, INV §13
