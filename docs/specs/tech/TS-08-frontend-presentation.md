@@ -985,6 +985,27 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   drafts and origin labels; no new styling framework, decorative motion or phone room surface.
   Rendered validation is owed at implementation, not inferred from existing screenshots.
 
+- **R88** (planned) — One shared `AutoGrowTextarea` in `ui/src/components/ui` owns FS-02.R66: it
+  sets height from `scrollHeight` on value change and resize, accepts an optional max height
+  (composers pass `40vh`, overflow scroll beyond it), and every `<textarea>` in `ui/src` uses it
+  (INV §2). The global `textarea` rule changes `resize: vertical` to `resize: none`. CSS
+  `field-sizing: content` is not relied on because Safari support is not guaranteed for the shipped
+  WebKit targets.
+
+- **R89** (planned) — FS-02.R67 icons are inline SVG components in `ui/src/components/ui/icons.tsx`
+  using `currentColor`; no icon dependency is added. Icon buttons carry `aria-label` and `title`,
+  keep existing classes/data-slots, and every new className has a selector (INV §13).
+
+- **R90** (planned) — FS-02.R68 moves the state badge and Collapse out of
+  `.agent-card-header-actions` into the header row's trailing slot; the context meter renders as a
+  sibling row below `.agent-card-top`. Collapsed cards are unchanged.
+
+- **R91** (planned) — FS-02.R69 labels come from one shared helper, lifted from
+  `NewAgentModal`'s `displayLabel`, that returns the readable name and appends `(id)` only for
+  duplicate names within the list (INV §2). All `name (id)` renders identified in selectors and
+  status labels switch to it; option `value`s and keys stay ids. FS-02.R70 filters `archived`
+  projects from the Tasks page's all-projects list and filter only, leaving an explicit focus as is.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

@@ -168,6 +168,11 @@ and §17: no new applicable surface. Steer during a room turn reaching the contr
 
 ## Changelog
 
+- **2026-10-06 — Design: UI polish batch.** Ready change `ui-polish-fields-icons-labels.md`
+  (FS-02.R66–R70, TS-08.R88–R91): auto-grow textareas, icon Send/Cancel/Collapse, expanded card
+  header order, duplicate-gated plain labels, archived projects hidden on Tasks. Absorbs the
+  "Finish hiding raw ids" idea.
+
 - **2026-10-06 — Review: Think Tanks second pass.** Human-requested behind-the-scenes review of
   `46379da..539ab11`: context delivery verified sound; one Must fix (silent resume-failure retry
   loop) and seven Worth fixing (resume-window stop, serial worker, quadratic capture cap,

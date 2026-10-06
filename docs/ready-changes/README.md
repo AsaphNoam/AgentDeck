@@ -64,6 +64,9 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
   Claude ACP 0.85.1 and Codex ACP 2.1.1/Codex 0.159.3 plus go-sdk 1.8.0; show agent notices,
   steer-backgrounded tools and truthful model-policy refusals.
 
+- [`ui-polish-fields-icons-labels.md`](ui-polish-fields-icons-labels.md) — auto-grow text fields,
+  icon actions, card header order, plain labels, and archived projects hidden on Tasks.
+
 ## Paused changes
 
 - [`migrate-internal-actions-from-mcp.md`](migrate-internal-actions-from-mcp.md) — replace only

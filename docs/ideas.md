@@ -47,12 +47,6 @@ the relevant feature and technical specifications; it does not change product co
   provider's automatic mode for Claude. Specify scope, persistence, provider mapping, whether a
   running session can change policy safely, and how this relates to frozen role/global
   `skip_permissions` and per-request Approve/Deny.
-- **Finish hiding raw ids in UI labels.** Most selectors now use readable names, but remaining
-  runtime, project, role, and template surfaces still need one cross-product rule: show the stable
-  id only for duplicate names or an explicit detail surface, while keeping values and keys
-  identity-safe. Example: the pipeline template select always renders `title (id)`
-  (`ui/src/features/pipelines/RunStartForm.tsx`), unlike the duplicate-gated task/run labels
-  (FS-16).
 - **Edit a sent message, or split a conversation at an earlier one.** From the 2026-08-10 play
   session: like Codex, editing the most recent message edits it in place, and editing an older one
   forks the conversation from that point; a separate request asked for an explicit split action.

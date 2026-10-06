@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -282,6 +282,31 @@ beside **New agent**, opening the separate room workspace defined by FS-21.R27. 
 normal agents/cards in their own projects; a room is not inserted as a synthetic provider-agent
 card. Archived projects offer no Think Tank creation action. Existing agent creation, grouping and
 card navigation behavior remain unchanged.
+
+**R66** (planned) — Every multi-line text field in Chuck (chat and Think Tank composers, forms,
+annotation trays) has no manual resize handle. It starts at its current minimum height and grows and
+shrinks with its content so every line is visible without inner scrolling. The agent chat and Think
+Tank composers stop growing at about 40% of the window height and scroll inside beyond that; every
+other field grows without a cap.
+
+**R67** (planned) — The chat composer's Send and Cancel actions and the agent card's Collapse and
+the grid's Collapse all actions are icon buttons (send arrow, stop square, chevron) with an
+accessible name and hover tooltip equal to the former text. Steer and Withdraw queued remain text.
+Keyboard submission and every action's behavior are unchanged.
+
+**R68** (planned) — An expanded agent card on a scoped project dashboard places its state badge and
+Collapse control at the top right of the header row beside the agent identity; the context meter
+occupies its own full-width row below that header.
+
+**R69** (planned) — Chuck labels models, backends/providers, projects, roles, pipeline templates and
+pipeline runs by their readable name alone, without a parenthesised id or provider string (for
+example `Claude Sonnet`, not `Claude Sonnet (sonnet)`). A parenthesised id is added only when two
+entries in the same list share a readable name. Status suffixes such as `(archived)` become a small
+**archived** tag beside the name. Selected values, stored data and the API stay keyed by id.
+
+**R70** (planned) — The Tasks page's all-projects view and its project filter omit archived
+projects. Their tasks are not changed. A Tasks route or saved focus naming an archived project
+still shows that project's tasks.
 
 
 **R60.** A project card whose project is active and repo-backed (its expanded `cwd`
@@ -824,6 +849,29 @@ picker and launches with the route project's id; the general modal continues to 
   action. Verify ordinary agent creation and participant cards in their original projects still
   work, without adding a synthetic room-agent card. *Verified by:* scoped dashboard component
   tests and the FS-21.A17 rendered journey, using normal full conversation-page navigation.
+
+- **A48** (R66) (planned) — Typing ten lines into a form textarea grows it to show all ten with no
+  scrollbar, deleting them shrinks it back, and no resize grip renders; a long chat composer draft
+  stops at about 40% of the window and scrolls. *Verify:* shared auto-grow component test plus a
+  real-browser check of the composer and one settings form.
+
+- **A49** (R67) (planned) — The composer renders Send and, while busy, Cancel as icon buttons whose
+  accessible names are **Send** and **Cancel**; Enter still sends; card Collapse and Collapse all
+  are icon buttons named **Collapse** and **Collapse all**. *Verify:* `Composer.test.tsx`,
+  `CardGrid.test.tsx` role/name queries and a rendered screenshot in each skin.
+
+- **A50** (R68) (planned) — An expanded scoped-dashboard card shows badge and Collapse right-aligned
+  on the identity row and the context meter on the row beneath. *Verify:* rendered screenshot and a
+  `AgentCard.test.tsx` DOM-order check.
+
+- **A51** (R69) (planned) — Model, backend, project, role, template and run selectors render
+  `Claude Sonnet`, not `Claude Sonnet (sonnet)`; two entries with the same name both show their id;
+  an archived agent shows an **archived** tag. Submitted values are unchanged ids. *Verify:* shared
+  label-helper tests and selector component tests (`RunStartForm`, `ChatPanel`, `TemplateEditor`).
+
+- **A52** (R70) (planned) — With one active and one archived project, the Tasks page lists only the
+  active project's section and filter option; opening the archived project's Tasks focus still
+  shows its tasks. *Verify:* `TasksPage.test.tsx`.
 
 ## 6. Deviations & open decisions
 
