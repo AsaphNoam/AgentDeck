@@ -1,6 +1,6 @@
 # TS-14 — Think Tank control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state/`, `internal/server/`, `internal/runtime/`, `internal/messaging/`, `ui/src/features/`
 **Absorbed:** —
 
@@ -8,22 +8,22 @@
 
 FS-21's approved independent-session deliberation over a SQLite-owned append-only room artifact.
 The selected boundary is explicit agent publication through the existing MCP gateway, ordinary
-host activations, and REST/SSE for the UI. Everything below is planned and unshipped.
+host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the deviations.
 
 ## 2. Design & constraints
 
-- **R1** (planned) — One server-owned Think Tank service progresses rooms over existing lifecycle
+- **R1** — One server-owned Think Tank service progresses rooms over existing lifecycle
   and runtime services. `internal/state` is the sole SQLite writer of rooms, membership, attempts,
   published entries, queued input and retained activity. No synthetic provider agent, separate
   process, repository artifact, agent-written canonical file or expiring-mail conversation is added.
-- **R2** (planned) — Each room selects one opportunity and owns at most one active attempt,
+- **R2** — Each room selects one opportunity and owns at most one active attempt,
   including closing/judge work. Participants keep ordinary identities and provider histories.
   Use `server.launchAgent` with its existing `launchOptions.AgentID/Generation` reservations and
   full composition/registration/rollback for new participants and the fresh judge; use ordinary
   resume for stopped agents. Persist setup intent/reserved identities before launch effects.
   Partial setup retains created normal agents and exposes the failed slot; explicit retry does not
   silently duplicate them. Discussion starts only after setup is complete.
-- **R3** (planned) — Add `think_tank` to the closed activation registry and bounded executor.
+- **R3** — Add `think_tank` to the closed activation registry and bounded executor.
   Its fixed instruction names the room tools; goal, peer messages, role instructions and allowance
   are pulled as data, not persisted in role/session prompts. Use `Registry.StartActivation` under
   the shared server lifecycle claim. Its `before(turnID)` callback atomically verifies room revision,
@@ -31,13 +31,13 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   concrete generation/turn id, context head and ordinary messaging-budget reset before the provider
   frame. Pending activation is keyed by its room attempt, not unread status. Busy/private/assigned
   work holds the same speaker; room dispatch never uses human `SendPromptOrHold`.
-- **R4** (planned) — Extend common runtime emission with the actual executing turn id, separate
+- **R4** — Extend common runtime emission with the actual executing turn id, separate
   from the reserved-successor counter. Pass the original id through terminal emission before
   starting held/Steer successors. Source generation/turn ownership travels internally with normalized
   events and live notices and is saved in room snapshots. Child activity inherits its original
   ownership when announced. Never infer source from current counters, registry generation or time.
   Unowned legacy/terminal activity is not guessed into a room. No ACP wire extension is required.
-- **R5** (planned) — Each immutable attempt owns a random turn token, participant/role, generation,
+- **R5** — Each immutable attempt owns a random turn token, participant/role, generation,
   runtime turn id, phase and frozen context head. `submit_think_tank_turn` stages one terminal intent:
   `reply`, authorized `leave` with optional message, or `decline_closing`. Judge reply kind is
   server-derived. Reply requires nonblank text; leave accepts omitted text and decline accepts none.
@@ -45,7 +45,7 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   submissions do not mutate state. A staged receipt does not promise publication or charge allowance.
   A completed authorized departure charges one turn even without a message; declining the sole
   closing opportunity charges none and does not advance the member's read checkpoint.
-- **R6** (planned) — Matching successful provider completion finalizes that intent through the
+- **R6** — Matching successful provider completion finalizes that intent through the
   common event/completion seam. Match attempt, token/activation ownership, source generation and
   captured executing runtime turn id, never the mutable current registry state. One state
   transaction seals ownership, publishes the contribution
@@ -54,7 +54,7 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   the room actor. Missing submission, cancellation, error, truncation, lost completion or capture
   failure holds for explicit intervention, without charging or automatically retrying. Assistant
   output is never silently substituted for an absent staged reply.
-- **R7** (planned) — Read checkpoints are per-member rows. Turn admission freezes the published
+- **R7** — Read checkpoints are per-member rows. Turn admission freezes the published
   conversation head. Bounded ordered reads record contiguous delivered progress for that attempt,
   not the committed checkpoint; submission requires delivery of its full new conversation view.
   Successful finalization alone advances to that watermark, never latest seq or its own reply seq.
@@ -62,18 +62,18 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   duplicate input without skipping interleaved annotations. Older/detail reads remain explicit.
   A delivery checkpoint does not prove model memory; identify known native context rebuilds and
   permit paged reconstruction without rewriting private history.
-- **R8** (planned) — Independent openings use the same single-floor seam but withhold completed
+- **R8** — Independent openings use the same single-floor seam but withhold completed
   answer/activity in durable staging. Successful opening completion charges one turn without
   offering other opening bodies. One transaction publishes all completed openings in configured
   order at the barrier, followed by queued user input. Manual End publishes completed openings as
   a partial set, records missing ones and undiscussed input, then ends participation. Failed openings
   do not replay completed peers. Ordinary same-user/provider context isolation is not enlarged.
-- **R9** (planned) — Room messages and Room annotations are durable ordered boundary inputs.
+- **R9** — Room messages and Room annotations are durable ordered boundary inputs.
   Publish source annotation before selected-agent/new-agent delivery. Reuse transactional ordinary
   mail insertion and the existing normal launch/delivery seam for New task. Room/entry/file anchors
   are distinct from provider transcript seq. Stable command/receipt identities distinguish a retry
   from a new send; cancellation/failure preserves drafts and cannot silently duplicate delivery.
-- **R10** (planned) — Copy matching normalized room-turn activity into room-owned storage as it
+- **R10** — Copy matching normalized room-turn activity into room-owned storage as it
   arrives, including source seq, generation/turn/child scope and frozen actor/project/cwd provenance.
   Private user/Steer prompts and unrelated turns are excluded. Tool/diff/result/permission payloads
   survive source deletion; failed attempts retain identified activity without a false contribution.
@@ -84,30 +84,30 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   This preserves ordinary private provider transcripts and exposes each room action's occurrence
   and outcome without importing incidental private data. Storage failure prevents final publication. Late
   child activity keeps origin ownership and cannot create a turn or charge allowance.
-- **R11** (planned) — Agent room actions use token-bound MCP identity, the authoritative tool
+- **R11** — Agent room actions use token-bound MCP identity, the authoritative tool
   registry, shared result/error classification and registry-derived approval exemptions. Caller,
   speaker and role are server-derived; a room id/turn token cannot grant nonmember access. No agent
   room action creates, edits membership, manually ends or deletes rooms. Registration and revocation
   stay on generation-scoped teardown. REST stays under `localOnly` and TS-05.R3; room routes do not
   enter the phone allowlist. Shared content is data, not provider/system instruction authority.
-- **R12** (planned) — Room history has no cascading agent/project foreign keys. Explicit room
+- **R12** — Room history has no cascading agent/project foreign keys. Explicit room
   deletion removes only room-owned data. Capture readable identity and source cwd/path context before
   dispatch; deleted sources become intelligible tombstones, never same-name replacements. A room
   file route reuses the local bounded regular UTF-8 reader and absolute/relative semantics against
   retained source context, including typed failures and file annotation capture. Viewing does not
   archive unselected file contents.
-- **R13** (planned) — Pause/End are durable requests, settled after active room work; End suppresses
+- **R13** — Pause/End are durable requests, settled after active room work; End suppresses
   future participant/closing work and does not cancel private activity. Discussion-ended and judge
   state are independent. Launch the configured fresh judge only after final discussion/input
   publication, for one completed synthesis. Failure supports explicit configuration repair/retry
   without reopening discussion. Room completion/deletion stops neither participants nor judge.
-- **R14** (planned) — Startup holds unfinished rooms and fences uncertain attempts. Read, idle,
+- **R14** — Startup holds unfinished rooms and fences uncertain attempts. Read, idle,
   sweep, startup and duplicate callbacks never replay an attempted provider effect. Explicit retry
   creates a new attempt/token; restored eligibility plus explicit resume can admit unattempted
   work. Old generations/turn ids/tokens cannot finish a later attempt. Delete only paused/ended
   rooms with no active attempt; atomically revoke pending room activations/work, including an
   unstarted judge. Stale reads fail and delayed producers cannot launch or recreate deleted rooms.
-- **R15** (planned) — UI uses a full room route, project creation/list entry and distinct Archive
+- **R15** — UI uses a full room route, project creation/list entry and distinct Archive
   room entries without changing legacy agent Archive payloads. Reuse scoped `foldTranscript`/
   `appendRenderedEvent`, `groupTranscriptRows`/`ToolRun`, content renderers and annotation helpers;
   equal tool ids from different actors/attempts never merge. Render contributions as attributed
@@ -115,12 +115,12 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   original source under an atomic generation/turn guard; stale activity is read-only. Participant
   links reach ordinary cards/conversations; normal agent views identify room work. Use existing
   presentation contracts and all three appearances, without a new renderer or design framework.
-- **R16** (planned) — After durable commit, emit versioned `think_tank_update` summaries.
+- **R16** — After durable commit, emit versioned `think_tank_update` summaries.
   `think_tank_activity` carries bounded owned live activity/notices. Hydration/reconnect uses atomic
   snapshot/subscription plus bounded REST refill; revision/entry gaps refetch rather than guess.
   Browser windows/drafts are bounded and reset on room change/deletion. SSE is notification, not
   authoritative history, and blind openings are not offered through either room stream before publication.
-- **R17** (planned) — Initial bounds: requests 256 KiB; submitted reply/input UTF-8 text 64 KiB;
+- **R17** — Initial bounds: requests 256 KiB; submitted reply/input UTF-8 text 64 KiB;
   nonblank goal 8,000 runes; participants 2–32 and individual limits 1–1,000; agent conversation
   pages 32 KiB entry/activity text with continuation and separately bounded goal/metadata;
   REST activity windows 500 records/1 MiB; executor batches 32.
@@ -129,7 +129,7 @@ host activations, and REST/SSE for the UI. Everything below is planned and unshi
   and explicit truncation markers for bounded display payloads. Never silently truncate a submitted
   contribution. Enforce before allocation/expansion, return typed refusals and preserve drafts.
   These bound work/memory and completed contributions, not spend across manual retries.
-- **R18** (planned) — §3 is the closed initial interface inventory. Update shared result/approval
+- **R18** — §3 is the closed initial interface inventory. Update shared result/approval
   contracts, producer-derived action lists, independent Go↔UI fixtures and progressive embedded
   `operating-chuck` knowledge together. Turn-specific room data stays outside frozen launch config.
   Implementation closure follows TS-06.R5 and §4's focused matrix; fake peers cannot satisfy
@@ -205,6 +205,20 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
 - No provider bump, ACP multi-party identity, MCP resource/template adoption, direct-action
   migration, background judge, new sandbox or broad coordination framework is required. The
   paused FS-17.R20 direct-transport gate stays closed. Normal private provider context remains normal.
+- Shipped shape (2026-10-06). The room's durable opportunity is its own state: the `think_tank`
+  activation kind writes no `activations` row; the room attempt committed in `before(turnID)` is the
+  attempt record. One server worker (`server/think_tanks.go`) serializes progression on a 5s sweep
+  plus kicks. Executing turn ownership is `runtime.Event.TurnID`, cleared after the terminal
+  emission. Capture copies tool, diff, permission, error and child-activity records only; assistant
+  prose, prompts and reasoning are not copied, and child activity emitted after the owning turn's
+  terminal event carries no turn id and is not captured. Room-source annotations publish an
+  attributed text batch whose anchors are server-resolved (`/annotations` with target room or
+  agent); agent delivery reuses annotation mail after recording the batch. Pause/resume/end are
+  idempotent and carry no expected revision; create, messages and annotations carry command ids.
+  Retry targets are `setup`, `turn` and `judge`; a judge retry always launches a fresh judge.
+  Settled attempt activity renders read-only in the browser; live permission actions use the
+  ordinary per-agent decision endpoint, which already refuses a settled tool call.
+- R18's credentialed Claude/Codex checks and the real-binary rendered journey remain owed.
 
 ## 6. Traceability
 

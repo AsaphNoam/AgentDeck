@@ -495,7 +495,7 @@ auto-rewrite or new upstream capability is part of this requirement. FS-09.A30�
 projection and consumers; existing protocol-schema and ordered session-configuration tests remain
 the protection for the unchanged runtime boundary.
 
-**R37** (planned) — Think Tanks use TS-14's server-owned service over `internal/state`, the existing
+**R37** — Think Tanks use TS-14's server-owned service over `internal/state`, the existing
 launch/resume/lifecycle helpers, and a third registered activation kind, `think_tank`. The service
 owns room progression; normal runtimes own independent provider sessions. Extend shared turn
 ownership/completion and guarded source actions rather than adding a second launch path, runtime,

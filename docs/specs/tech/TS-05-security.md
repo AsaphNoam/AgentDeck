@@ -248,7 +248,7 @@ sensitive-context sharing is a practical problem.
   (TS-13.R6), and device management, pairing issuance, and every configuration route stay
   loopback-only.
 
-**R25** (planned) — Room MCP access requires recorded membership and the caller's generation-bound
+**R25** — Room MCP access requires recorded membership and the caller's generation-bound
 identity; contribution additionally requires the current attempt/floor and authorized disposition.
 Room ids, cursors, tokens and claimed actor ids never confer another member's authority. Human
 room routes retain R1–R3 and stay outside the remote allowlist. TS-14.R10's shared public projector

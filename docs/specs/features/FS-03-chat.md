@@ -553,7 +553,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   message text keeps rendering them as text; Chuck does not reinterpret message text as notices.
 
 
-- **R69** (planned) — While a normal agent's active turn belongs to a Think Tank, its individual
+- **R69** — While a normal agent's active turn belongs to a Think Tank, its individual
   conversation view identifies that room/turn so ordinary Send and Steer remain understandable.
   Normal Steer retains R50's capability, delivery, fallback and refusal behavior under FS-21.R33.
   Its instruction remains in the agent's private conversation, while the resulting room contribution
@@ -561,7 +561,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   not automatically pause the room under FS-21.R28. This does not merge the room with the provider
   conversation or add a shared provider identity.
 
-- **R70** (planned) — `read_think_tank` and `submit_think_tank_turn` join R40–R41's own-action
+- **R70** — `read_think_tank` and `submit_think_tank_turn` join R40–R41's own-action
   approval exemption and recorded activity through the authoritative registry. Their membership,
   floor and disposition permissions are enforced server-side under FS-21.R38. The other tool
   families and their chosen permission policy remain unchanged; R40's listed inventory grows by
@@ -946,14 +946,14 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   runtime tests, transcript replay tests, `ChatPanel` and phone-render component tests.
 
 
-- **A50** (planned; R48–R50, R69) — Open the individual conversation for a participant currently
+- **A50** (R48–R50, R69) — Open the individual conversation for a participant currently
   taking a room turn, observe its Think Tank identification, then exercise normal Send and
   supported Steer separately. Send stays queued behind the current turn; Steer retains its existing
   immediate/fallback behavior and private transcript record. The shared room records only the room
   contribution and does not import the private instruction as shared user input. *Verified by:*
   agent composer/room fake-provider integration tests and FS-21.A23's rendered steering journey.
 
-- **A51** (planned; R40–R41, R70) — With ordinary approval policy, invoke both room tools and an
+- **A51** (R40–R41, R70) — With ordinary approval policy, invoke both room tools and an
   ordinary gated tool in the same room turn. Room actions proceed without human approval and are
   recorded; the ordinary tool still waits for its usual approval. A nonmember or stale contribution
   is refused server-side without bypassing authority. *Verified by:* runtime permission/MCP room
@@ -961,7 +961,8 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ## 6. Deviations & open decisions
 
-- R69–R70/A50–A51 are planned in `docs/ready-changes/think-tanks.md`; ordinary Send/Steer behavior
+- R69–R70/A50–A51 shipped 2026-10-06 (`features/thinktank/RoomTurnNotice.tsx`, registry-derived
+  approvals for the two room tools); ordinary Send/Steer behavior
   remains unchanged, with room-turn identification and registry-backed room actions added.
 
 - **Transcript-load failure is silent in the panel.** The initial `getTranscript` rejection is

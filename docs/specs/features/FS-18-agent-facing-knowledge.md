@@ -204,7 +204,7 @@ prompt snapshots on resume must be verified and any delayed adoption recorded ho
 discarding conversation history or claiming a changed effective prompt merely because a request
 was sent.
 
-**R19** (planned) — Agents receive Think Tank operating judgment through the same verified shared
+**R19** — Agents receive Think Tank operating judgment through the same verified shared
 skill, with `references/think-tanks.md` linked for that job. This extends R5's three-file inventory;
 it does not make every agent load every reference. Explain room authority versus private sessions,
 explicit contribution/leave, incremental reads, ceilings rather than quotas, independent openings,
@@ -341,7 +341,7 @@ developer-instruction composition without a base-prompt replacement. *Verify by*
 contract and runtime parameter tests plus a credentialed fresh/resume provider check, recording
 any native snapshot limitation rather than claiming delivery from model self-report alone.
 
-**A15** (planned; R1, R3–R6, R19) — Verify the new progressively linked reference in embedded,
+**A15** (R1, R3–R6, R19) — Verify the new progressively linked reference in embedded,
 installed and overlay package inventories, readable on fresh/resumed normal sessions. Exercise a
 room participant and end-only judge without persona-specific mechanics: each reads through room
 tools and explicitly stages its own contribution, preserves ceilings and unresolved objections,

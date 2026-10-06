@@ -158,7 +158,7 @@ remain supported.
   implementation; no direct-action product code ships from this specification while the gate is
   unmet.
 
-- **R21** (planned) — The two room tools in TS-14 join R1–R8's shared MCP result contract and the
+- **R21** — The two room tools in TS-14 join R1–R8's shared MCP result contract and the
   producer-derived tool/approval inventory. Classify `room_not_found`, `room_forbidden`,
   `stale_room_turn`, `leave_forbidden`, `closing_only` and `room_reply_conflict` as `never`;
   `room_read_incomplete` is `after_change` with the remaining read continuation; storage failures
@@ -257,7 +257,7 @@ Each names the verification that demonstrates it.
   material execution regression is hidden. *Verify:* checked-in measurement fixture and the A9 live
   gate.
 
-- **A12** (planned; R1–R8, R21) — Exercise successful read/staging and every room handler refusal
+- **A12** (R1–R8, R21) — Exercise successful read/staging and every room handler refusal
   using real registered MCP tools. Assert matching text/structured results, stable class, safe repair
   fields and the authoritative approval catalog; repeat foreign/stale/conflicting submissions and
   verify no mutation. *Verified by:* messaging contract and room authorization integration tests.

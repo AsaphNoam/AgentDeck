@@ -28,10 +28,10 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 |----|------|--------|--------|
 | FS-00 | [features/FS-00-product-overview.md](features/FS-00-product-overview.md) | Current | Product summary, goals/non-goals, core concepts, orchestration planes, glossary |
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Partial | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
-| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications that open the agent conversation, project creation and planned Think Tank entry point |
+| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, task groups, notifications that open the agent conversation, project creation and the Think Tank entry point |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat panel, tool calls/diffs, permission prompts, transcript view, header runtime picker, composer file/skill mentions, browser-local drafts, queued follow-up and steering |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Current | Roles/projects/backends CRUD, settings/onboarding, exact seed-prompt migration, and planned four-role consolidation preserving legacy configuration |
-| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Partial | Session archive, full-text search, resume from archive, file/command tracking and planned Think Tank discovery |
+| FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking and Think Tank discovery |
 | FS-06 | [features/FS-06-coordination.md](features/FS-06-coordination.md) | Current | Agent mail with waking/deferred delivery and bounded inline content |
 | FS-07 | [features/FS-07-terminal.md](features/FS-07-terminal.md) | Partial | Terminal interface, drivers (xterm/tmux/iTerm2), terminal-agent boundaries |
 | FS-08 | [features/FS-08-federation.md](features/FS-08-federation.md) | Partial | Claude/Codex configuration federation: sources, binding modes, effective view |
@@ -39,7 +39,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | FS-10 | [features/FS-10-macos-installation.md](features/FS-10-macos-installation.md) | Partial | macOS installation, guided provider setup, application updates/rollback and installed-versus-bundled update ownership |
 | FS-11 | [features/FS-11-project-resources.md](features/FS-11-project-resources.md) | Current | Chuck-owned, project-scoped shared resources outside repositories |
 | FS-12 | [features/FS-12-application-interface.md](features/FS-12-application-interface.md) | Current | Core, Sky & Grove and Studio share creative-workspace composition and polish; Studio acceptance is closed |
-| FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Partial | Annotate and assign: select diff lines/transcript events/files, instruct, route to an agent or new task; planned Think Tank room sources |
+| FS-13 | [features/FS-13-annotate-assign.md](features/FS-13-annotate-assign.md) | Current | Annotate and assign: select diff lines/transcript events/files, instruct, route to an agent or new task; Think Tank room sources |
 | FS-14 | [features/FS-14-configurable-pipelines.md](features/FS-14-configurable-pipelines.md) | Partial | Standing orchestration, durable stage tasks, managed coordinators and automatic cleanup; run detail browser acceptance pending |
 | FS-15 | [features/FS-15-context-links.md](features/FS-15-context-links.md) | Current | Target-neutral durable context references, direct grants, personal discovery state, and bounded pull retrieval |
 | FS-16 | [features/FS-16-dependent-work.md](features/FS-16-dependent-work.md) | Current | Durable tasks, armed starts, lineage and scoped repair; project-grouped work-in-motion view |
@@ -66,7 +66,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional skill delivery, planned shared standing context and four-role seeding, and planned direct-action discovery |
 | TS-12 | [tech/TS-12-worktree-lifecycle.md](tech/TS-12-worktree-lifecycle.md) | Current | Git execution boundary, worktree ownership persistence, fork orchestration, checkout recreation and consented deletion, worktree API surface |
 | TS-13 | [tech/TS-13-remote-control.md](tech/TS-13-remote-control.md) | Current | Embedded Tailscale node, tailnet listener guard and allowlist, phone pairing and device credentials, Web Push, keep-awake, phone web-app entry, desktop-flow phone dashboard, and agent management |
-| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Partial | Canonical SQLite rooms, normal-session activation/turn ownership, committed read checkpoints, explicit publication, rich retention and UI/MCP contracts |
+| TS-14 | [tech/TS-14-think-tank-control-plane.md](tech/TS-14-think-tank-control-plane.md) | Current | Canonical SQLite rooms, normal-session activation/turn ownership, committed read checkpoints, explicit publication, rich retention and UI/MCP contracts |
 | INV | [../features/INVARIANTS.md](../features/INVARIANTS.md) | Current | Bug-class constraint catalog (path kept stable for hooks/history) |
 
 Related, non-spec: [`../ideas.md`](../ideas.md) (new ideas and known things to improve — not

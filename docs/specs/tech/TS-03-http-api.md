@@ -761,7 +761,7 @@ existing best-effort save contract. Bundle availability derives from the actual 
 the presence of arbitrary npm dependencies. The phone gains neither this editable field nor a
 mode mutation route; its existing effective runtime capability fields remain available.
 
-**R55** (planned) — TS-14 §3 owns the closed `/api/think-tanks` REST and `think_tank_update` /
+**R55** — TS-14 §3 owns the closed `/api/think-tanks` REST and `think_tank_update` /
 `think_tank_activity` SSE inventory. Versioned bounded pages use standard structured errors,
 array collections, stable command receipts and revision checks. Source-file routes resolve opaque
 retained source ids through the existing local file reader. Reconnect refills committed room state;

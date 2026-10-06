@@ -975,7 +975,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   family or dependency. Component tests cover each severity, unknown→`info`, replay order and the
   backgrounded state (FS-03.A48–A49).
 
-- **R87** (planned) — The Think Tank page composes existing conversation/content, participant-card,
+- **R87** — The Think Tank page composes existing conversation/content, participant-card,
   file/command, permission and annotation seams under TS-14.R15–R16. Source unions distinguish
   room anchors from agent transcript anchors; renderer/tool grouping is actor/attempt-scoped.
   Add the route and stable room hooks to the presentation contract and all appearances together.

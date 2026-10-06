@@ -1045,7 +1045,7 @@ dependency produces bounded unavailability guidance. Prefer updating the one man
 to adding historical shims; do not fork an adapter per provider version, emulate missing features,
 or add background compatibility discovery. TS-06.R31 bounds verification and expansion.
 
-**R84** (planned) — Register `read_think_tank` and `submit_think_tank_turn` in the existing MCP
+**R84** — Register `read_think_tank` and `submit_think_tank_turn` in the existing MCP
 gateway with token-derived identity, shared FS-17 result/refusal helpers and registry-derived
 approval exemptions. TS-14 §3 owns their shapes; no output schema, new ACP capability or provider
 bump is required. The `think_tank` activation uses `StartActivation`'s guarded before callback.

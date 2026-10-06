@@ -1,6 +1,6 @@
 # FS-13 — Annotate and assign
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/chat/`, `ui/src/features/archive/`, `internal/server/`, `internal/runtime/`, `internal/state/` · **Journeys:** J13
 **Absorbed:** —
 
@@ -181,7 +181,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   target through the existing prompt or mail delivery; the file itself is never reread and
   unselected content is never persisted.
 
-- **R26** (planned) — Think Tank room contributions, displayed diffs and loaded conversation
+- **R26** — Think Tank room contributions, displayed diffs and loaded conversation
   files are annotation sources under FS-21.R26. The familiar selection, excerpt/instruction bounds,
   point-in-time capture and bounded browser-local tray behavior apply, with drafts scoped to the
   room source. Captures identify the actual room entry and originating participant/project when
@@ -190,7 +190,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   room-source sends record the annotation in the canonical room history before delivery; failure
   preserves the tray. R27 defines room delivery targets and completed-room behavior; this does
   not change R1–R25's ordinary agent-session contract.
-- **R27** (planned) — A room-source batch can target Room, a selected agent, or New task under
+- **R27** — A room-source batch can target Room, a selected agent, or New task under
   FS-21.R30. Room delivery is shared user input between participant turns, preserving correct source
   attribution rather than privately prompting all participants. Selected-agent delivery uses the
   normal recipient availability and annotation delivery contract. New task retains R9's meaning:
@@ -265,14 +265,14 @@ Each acceptance item names its delivered verification.
   file-viewer/tray/store tests, annotation endpoint and formatter compatibility tests, transcript
   live/replay tests, and journey J13 with a mixed transcript/file batch.
 
-- **A17** (planned; R26) — Annotate a Think Tank message, a displayed diff selection, and a loaded
+- **A17** (R26) — Annotate a Think Tank message, a displayed diff selection, and a loaded
   file excerpt from participants in different projects, including identical relative paths. Reload
   with drafts pending, then exercise failed and successful delivery. Verify preserved excerpts,
   distinct source attribution, bounded drafts, failure preservation, and a canonical room annotation
   recorded before successful delivery. Ordinary agent-session annotation checks continue to pass.
   *Verified by:* room annotation integration/component tests and the FS-21.A15 rendered journey;
   A18 additionally covers target routing and completed-room cases.
-- **A18** (planned; R26–R27) — Send room-source batches to Room, a selected agent, and New task.
+- **A18** (R26–R27) — Send room-source batches to Room, a selected agent, and New task.
   Verify that Room input is shared at a participant-turn boundary, selected-agent delivery reaches
   the chosen normal session, and New task creates a new normal agent with the batch as its initial
   work. Cancel the new-agent flow and preserve the tray. Complete the room and repeat selected-agent
@@ -282,8 +282,8 @@ Each acceptance item names its delivered verification.
 
 ## 6. Deviations & open decisions
 
-- R26–R27/A17–A18 are planned in `docs/ready-changes/think-tanks.md`; FS-21.R35/R39 and TS-14
-  govern boundary input and retained room sources. No room annotation behavior has shipped.
+- R26–R27/A17–A18 shipped 2026-10-06 (`ui/src/features/thinktank/RoomAnnotationTray.tsx`,
+  `internal/server/think_tank_annotations.go`); FS-21.R35/R39 and TS-14 govern boundary input and retained room sources.
 
 - The numeric limits in R2, R3, and R4 are initial values and may be tuned only through a
   spec-first update.

@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -277,7 +277,7 @@ render a project picker, and its submission always sends that project id. The un
 modal and prefilled launches outside a scoped dashboard retain their existing project selection
 behavior.
 
-**R65** (planned) — An active scoped project dashboard offers a **Think Tank** creation action
+**R65** — An active scoped project dashboard offers a **Think Tank** creation action
 beside **New agent**, opening the separate room workspace defined by FS-21.R27. Participants remain
 normal agents/cards in their own projects; a room is not inserted as a synthetic provider-agent
 card. Archived projects offer no Think Tank creation action. Existing agent creation, grouping and
@@ -819,7 +819,7 @@ picker and launches with the route project's id; the general modal continues to 
   *Verify:* `NotificationCenter.test.tsx` and `sse.test.ts` (stubbed `Notification` click), plus a
   real-browser check of the toast path and a manual macOS desktop-notification click.
 
-- **A47** (planned; R65) — In a non-archived scoped project, use the Think Tank action beside
+- **A47** (R65) — In a non-archived scoped project, use the Think Tank action beside
   New agent to reach the separate room creation/workspace flow; an archived project offers no such
   action. Verify ordinary agent creation and participant cards in their original projects still
   work, without adding a synthetic room-agent card. *Verified by:* scoped dashboard component
@@ -827,8 +827,8 @@ picker and launches with the route project's id; the general modal continues to 
 
 ## 6. Deviations & open decisions
 
-- R65/A47 are planned in `docs/ready-changes/think-tanks.md`; FS-21 governs room creation and
-  the confirmed conversation-page behavior. No room entry point has shipped.
+- R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
+  creation and the conversation-page behavior.
 
 - **Immediate clone UI.** Clone launches immediately with no confirmation, and a disappeared process
   is surfaced as `done` rather than `error` (R11, R16, A11); reversing either requires an explicit

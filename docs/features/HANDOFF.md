@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tanks.md` (in progress; see **Active change**).
+- **Active change:** none.
 - **Release:** `v0.9.0` is tagged at `ae93666` and published; the macOS release workflow passed. The
   GitHub Release carries the 293,150,597-byte `darwin-arm64` archive, `install.sh`, and a `0.9.0`
   manifest matching that size. Linux CI then failed `TestPublishedRootSelectsTheBundledProviders`:
@@ -17,7 +17,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and the phone desktop flow. The operator package and README already matched the range.
   Credentialed Claude/Codex gates remain owed.
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
-- **Review units:** `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
+- **Review units:** `think-tanks` (2026-10-06, `46379da`..HEAD: SQLite room authority, guarded
+  `think_tank` activation with executing turn ids, MCP room tools, REST/SSE, activity capture and
+  projector, room-source annotations, room UI/Archive/project entry, operating-chuck reference;
+  FS-21, TS-14 and adjacent FS-02.R65, FS-03.R69–R70, FS-05.R39, FS-13.R26–R27, FS-17.R21,
+  FS-18.R19, TS-01.R37, TS-02.R42, TS-03.R55, TS-04.R84, TS-05.R25, TS-08.R87, TS-11.R19) is
+  available for review. Reviewer notes: progression is one worker on a 5s sweep plus kicks;
+  child activity after a turn's terminal event is not captured (TS-14 §5); FS-21.R35 autocomplete
+  stays planned.
+  `use-installed-provider-clis` (2026-10-04, `4d1e9cc^`..`6c5c52f`: shared provider
   resolver, Installed default/explicit AgentDeck bundle, release wrapper, typed recovery,
   provider_runtimes + Refresh provider, Settings/New Agent UI, docs; FS-09.R68/R70–R77,
   FS-10.R21/R23–R24, TS-03.R52–R54, TS-04.R71–R77, TS-06.R30) was reviewed 2026-10-04 and its
@@ -46,40 +54,18 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-`think-tanks.md` — in progress (started 2026-10-06). FS-21 over TS-14; all items stay `(planned)`
-until their slice ships. Slices (each closes with focused tests, handoff update and commit):
-
-1. **State** — done 2026-10-06 (`internal/state/think_tank{s,_turns}.go`, schema v36; tests
-   `go test ./internal/state -run ThinkTank`, both variants and `-race` passed). Seam map and
-   slice notes: `docs/plans/think-tanks.md`.
-2. **Room engine** — done 2026-10-06: `runtime.Event.TurnID` (executing turn, R4), `think_tank`
-   activation kind, `server/think_tanks.go` single progression worker (5s sweep + kick), setup and
-   judge launches, eligibility holds, `finishThinkTankTurn` from the turn-end sink;
-   `think_tank_update` publisher in `server/think_tank_wire.go`. Tests: `go test ./internal/server
-   -run TestThinkTank` (fake ACP `hold_turn`; test acts as the agent's tool calls) and runtime
-   `TestEventsCarryTheExecutingTurnAcrossAHeldSuccessor`; server/runtime/state suites passed.
-3. **MCP tools** — done 2026-10-06: `messaging/think_tank_tools.go` (FS-17.R21 codes in
-   `toolresult`, typed state sentinels, guidance per R16; approvals derive from `ToolNames`).
-   `go test ./internal/messaging` passed. Owed at closure: FS-03.R40's enumerated tool list and the
-   redacted activity projector (moves to slice 5).
-4. **REST/SSE** — done 2026-10-06: `server/think_tank_handlers.go` (create/list/detail/entries,
-   messages/annotations, pause/resume/end, retry setup|turn|judge, delete; phone-denied),
-   `think_tank_wire.go` (versioned summary/detail/entry, live member state, next speaker + wait
-   reason). UI fixture `ui/src/features/thinktank/fixtures/room.json`, regenerate with
-   `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test ./internal/server -run TestThinkTankWireFixture`.
-5. **Activity capture** — done 2026-10-06: `server/think_tank_capture.go` (sink-ordered capture
-   keyed by agent+generation+turn, Chuck-tool receipt projector, storage failure fails the turn,
-   live `think_tank_activity` SSE except unpublished openings), `think_tank_activity_handlers.go`
-   (activity/files/commands/source file), state `think_tank_activity.go`, MCP `view=activity`;
-   engine abandons an attempt whose frame never went out. Setup+judge engine test passes.
-6. **UI** (next) — project button and setup, room page, Archive entries, annotations/file route, agent-view
-   room-turn identification.
-7. **Knowledge/docs + closure matrix**, rendered and credentialed gates recorded as owed.
-
-Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
--run TestTaskWireFixture`.
+None. Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
+-run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
+./internal/server -run TestThinkTankWireFixture`. Room screenshots: `(cd ui && node
+scripts/room-render.mjs <outDir> live|ended)`.
 
 ## Acceptance gates still owed
+
+- FS-21 / TS-06.R33 (Think Tanks): the real-binary fake-ACP rendered journey (creation →
+  discussion → annotation/private follow-up → End/judge → retained Archive at 1024px and wider in
+  Core, Sky & Grove and Studio) and the bounded credentialed Claude/Codex smoke (room-tool
+  read/submit, an ordinary approval/denial, private Send/Steer, native resume, end-only judge).
+  Stubbed-data renders of live and ended rooms in all three appearances passed 2026-10-06.
 
 - FS-10.R25/A14, TS-02.R41: one supervised cutover rehearsal on a disposable copy of the real
   AgentDeck home, following `docs/chuck-cutover.md`, with a receipt. Before the first Chuck release
@@ -143,6 +129,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Work: Think Tanks implemented.** SQLite rooms with guarded single-floor turns,
+  staged explicit contributions, committed read checkpoints, openings barrier, closing turn,
+  pause/End, setup/judge launches, restart fencing; executing turn ids on runtime events; MCP
+  `read_think_tank`/`submit_think_tank_turn`; REST/SSE; redacted activity capture; room-source
+  annotations; room page, project entry, Archive list, agent room-turn notice; operating-chuck
+  reference. Closure matrix (both Go variants, focused `-race`, UI tests/build, spec check) passed.
+  Rendered real-binary and credentialed gates are owed.
 
 - **2026-10-06 — Design: Think Tanks ready to implement.** Human confirmed the remaining feature
   defaults and SQLite plus explicit room tools. FS-21.R34–R40/A24–A30 and TS-14.R1–R18 close
