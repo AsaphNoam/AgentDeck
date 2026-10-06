@@ -182,6 +182,27 @@ describe("AgentScreen", () => {
     expect(screen.getByText(/second-result/)).toBeInTheDocument();
   });
 
+  it("replays notices as compact rows in their original order (FS-03.A49)", async () => {
+    live = {
+      agent_id: "a1",
+      events: [
+        { agent_id: "a1", seq: 20, type: "assistant_text", ts: "", data: { text: "Before." } },
+        { agent_id: "a1", seq: 21, type: "notice", ts: "", data: { severity: "warning", title: "Usage limit", description: "90% used." } },
+        { agent_id: "a1", seq: 22, type: "notice", ts: "", data: { severity: "mystery", title: "Hook failed" } },
+        { agent_id: "a1", seq: 23, type: "assistant_text", ts: "", data: { text: "After." } },
+      ],
+      has_more: false,
+      pending_permission: null,
+      latest_assistant: "After.",
+    };
+    renderScreen();
+    const notes = await screen.findAllByRole("note");
+    expect(notes.map((note) => note.textContent)).toEqual(["warningUsage limit90% used.", "infoHook failed"]);
+    const conversation = screen.getByRole("list", { name: "Conversation" }).textContent ?? "";
+    expect(conversation.indexOf("Before.")).toBeLessThan(conversation.indexOf("Usage limit"));
+    expect(conversation.indexOf("Hook failed")).toBeLessThan(conversation.indexOf("After."));
+  });
+
   it("loads earlier windows on request and keeps them contiguous with the live one", async () => {
     live = {
       agent_id: "a1",

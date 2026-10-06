@@ -442,3 +442,29 @@ describe("TranscriptView mixed annotation tray (J13)", () => {
     expect(useAnnotationStore.getState().bySource.a1).toHaveLength(1);
   });
 });
+
+// FS-03.A49, TS-08.R86: notices render as compact rows in their original order,
+// with unknown severity read as info, through the same fold as replay.
+describe("TranscriptView notices", () => {
+  it("renders each severity as a compact row between the surrounding messages", () => {
+    const raw = [
+      { agent_id: "a1", seq: 1, type: "assistant_text", ts: "", data: { delta: "Before." } },
+      { agent_id: "a1", seq: 2, type: "notice", ts: "", data: { severity: "info", title: "Context compacted" } },
+      { agent_id: "a1", seq: 3, type: "notice", ts: "", data: { severity: "warning", title: "Usage limit", description: "90% used." } },
+      { agent_id: "a1", seq: 4, type: "notice", ts: "", data: { severity: "error", title: "Hook failed" } },
+      { agent_id: "a1", seq: 5, type: "assistant_text", ts: "", data: { delta: "After." } },
+    ];
+    const { container } = renderTranscript(false, foldTranscript(raw));
+    const variants = [...container.querySelectorAll('[data-slot="event"]')].map((node) => node.getAttribute("data-variant"));
+    expect(variants).toEqual(["assistant", "notice", "notice", "notice", "assistant"]);
+    const notes = screen.getAllByRole("note");
+    expect(notes.map((note) => note.textContent)).toEqual([
+      "infoContext compacted",
+      "warningUsage limit90% used.",
+      "infoHook failed",
+    ]);
+    expect(within(notes[1]).getByText("warning").closest('[data-ui="badge"]')).toHaveAttribute("data-variant", "warning");
+    expect(within(notes[0]).getByText("info").closest('[data-ui="badge"]')).toHaveAttribute("data-variant", "neutral");
+    expect(container.querySelector('[data-variant="notice"] .message')).toBeNull();
+  });
+});

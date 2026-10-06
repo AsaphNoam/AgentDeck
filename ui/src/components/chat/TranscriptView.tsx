@@ -11,6 +11,7 @@ import { ToolResult } from "./renderers/ToolResult";
 import { groupTranscriptRows, kindOf, ToolRun } from "./toolRun";
 import { TurnError } from "./renderers/TurnError";
 import { AnnotationCard } from "./renderers/AnnotationCard";
+import { NoticeRow } from "./renderers/NoticeRow";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
 import { ChildActivity } from "./renderers/ChildActivity";
 import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
@@ -228,7 +229,7 @@ function TranscriptEventFrame({ agentId, event, onAnnotate, onContextMenu, onOpe
   );
 }
 
-type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "fork-boundary" | "annotation" | "thinking" | "unknown";
+type TranscriptVariant = "assistant" | "user" | "tool-call" | "tool-result" | "diff" | "permission" | "error" | "turn" | "backend-switch" | "fork-boundary" | "annotation" | "notice" | "thinking" | "unknown";
 
 // withReasoning places each live reasoning span at its chronological slot as a
 // render-only row. It has no seq, so it is never annotated, and it never enters
@@ -264,6 +265,7 @@ function variantOf(event: TranscriptEvent): TranscriptVariant {
   if (kind === "backend_switch") return "backend-switch";
   if (kind === "fork_boundary") return "fork-boundary";
   if (kind === "annotation") return "annotation";
+  if (kind === "notice") return "notice";
   if (kind === "reasoning") return "thinking";
   return "unknown";
 }
@@ -286,6 +288,7 @@ function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: s
   if (kind === "tool_result") return <ToolResult event={event} />;
   if (kind === "error") return <TurnError event={event} />;
   if (kind === "annotation") return <AnnotationCard event={event} />;
+  if (kind === "notice") return <NoticeRow event={event} />;
   if (kind === "reasoning") return <ThinkingDisclosure text={String(event.text ?? "")} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
   if (kind === "backend_switch") {

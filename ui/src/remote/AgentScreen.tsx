@@ -24,6 +24,7 @@ import { useAnnotationStore } from "../store/annotationStore";
 import { foldTranscript, normalizeEvent } from "../store/transcriptStore";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
+import { NoticeRow } from "../components/chat/renderers/NoticeRow";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
@@ -120,6 +121,8 @@ function EventRow({ event, onAnnotate }: { event: TranscriptEvent; onAnnotate: (
       return event.resolved ? <p className="phone-meta">{String(event.name ?? "Permission")} · {String(event.resolved)}</p> : null;
     case "error":
       return <p className="phone-error">{String(event.message ?? event.text ?? "The turn failed.")}</p>;
+    case "notice":
+      return <NoticeRow event={event} />;
     default:
       return null;
   }

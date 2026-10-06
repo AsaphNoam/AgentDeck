@@ -716,7 +716,7 @@ system-prompt, executable-resolution and steering request contracts unchanged (i
 2026-10-05). Chuck does not adopt Codex's `_meta.mcpStartupAwaitTimeoutMs`, read-only access
 preset, or either adapter's initialize-only ACP v2 surface in this baseline.
 
-**R80 `(planned)` — Session notices are an opt-in, bounded update kind.** Initialize advertises
+**R80 — Session notices are an opt-in, bounded update kind.** (shipped 2026-10-06) Initialize advertises
 ACP's unstable `clientCapabilities.session.notices` capability using the exact key and shape of the
 pinned adapters and the `@agentclientprotocol/sdk` schema Claude 0.85.1 pins (1.6.0; notices exist
 since 1.5.0): a non-null object, `{}`. A `notice` `session/update` decodes to
@@ -724,8 +724,9 @@ since 1.5.0): a non-null object, `{}`. A `notice` `session/update` decodes to
 runes (INV §8), maps an unknown or absent severity to `info`, and becomes one durable transcript
 event of a distinct `notice` kind replayed by the existing transcript paths (TS-02) and phone
 projection (TS-13). It never changes agent state,
-unread counts, notifications or search agent-text. Malformed notices are dropped with a bounded
-diagnostic. Withdrawing the capability restores the adapter's message-text fallback with no data
+unread counts, notifications or search agent-text: it projects as metadata (`transcript.ProjectEvent`)
+and the UI card preview skips it on both live and replay paths. An untitled notice is dropped with a
+content-free warning; an undecodable frame is dropped like any other update. Withdrawing the capability restores the adapter's message-text fallback with no data
 change, so the unstable ACP surface remains reversible.
 
 **R81 `(planned)` — A steer-backgrounded tool joins the existing background-task contract.** When
@@ -1101,7 +1102,7 @@ Send/Steer semantics stay intact. The paused direct-transport migration is not a
 - Context usage (R25): Claude's `usage_update` payload
   `{sessionUpdate:"usage_update",used:<tokens>,size:<context-window>}` becomes the live
   `context_pct`; prompt-result token accounting is not interpreted as a percentage.
-- Session notices (R80, planned): initialize adds `clientCapabilities.session.notices` in the pinned
+- Session notices (R80): initialize adds `clientCapabilities.session.notices` in the pinned
   schema's shape; the `notice` `session/update` (`severity`, `title`, optional `description`)
   becomes a durable `notice` transcript event `{severity:"info"|"warning", title, description?}`.
 - Activation bridge (R27): one code-owned text block in `session/prompt`; no ACP/MCP notification

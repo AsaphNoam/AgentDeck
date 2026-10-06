@@ -30,7 +30,9 @@ var offered = clientOffer{Subagents: true, AsyncTasks: true, FileChangeReports: 
 
 // clientCapabilitiesFor builds the initialize `clientCapabilities` object.
 func clientCapabilitiesFor(o clientOffer) map[string]any {
-	caps := map[string]any{}
+	// Notices are offered unconditionally: Chuck always renders them, and an
+	// adapter without the capability keeps its message-text fallback (TS-04.R80).
+	caps := map[string]any{"session": map[string]any{"notices": map[string]any{}}}
 	if o.Subagents {
 		caps["subagents"] = map[string]any{}
 	}

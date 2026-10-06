@@ -35,10 +35,9 @@ Slices, each committed when verified:
 2–3. ~~Release pins, patch, fixtures; AIR re-derivation (TS-04.R79)~~ done. Assembly proofs were
    reproduced locally from the lockfile (`npm ci`, hashes, zero-fuzz patch, one Codex). AIR shapes
    Chuck decodes did not change, so no decoder change was needed (recorded in R79).
-4. Session notices end to end (TS-04.R80, TS-08.R86, FS-03.A49). Offer
-   `clientCapabilities.session.notices: {}` in `capabilities.go`; decode `notice` in
-   `acpmap.go mapSessionUpdate`; `EvNotice` in `event.go` + `AllEventTypes`; `transcript/project.go`
-   metadata disposition; UI row in `TranscriptView.tsx` and phone `remote/AgentScreen.tsx`.
+4. ~~Session notices (TS-04.R80, FS-03.R68/A49)~~ done: fake `notice_flow` scenario
+   (`FAKEACP_NO_NOTICES` = adapter fallback), `notices_test.go`, shared `NoticeRow`. TS-08.R86 stays
+   planned until slice 5 adds its backgrounded half.
 5. Backgrounded tool (TS-04.R81, FS-03.A48): the real marker is
    `_meta.jetbrains.air.asyncTasks.backgrounded` on `tool_call_update` (fake `task_flow` already
    emits it; runtime ignores it today). Tasks already arrive via `async_task_spawned`; the work is
@@ -49,7 +48,7 @@ Slices, each committed when verified:
    `currentValue`; confirm the reason surfaces, then add tests.
 7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
 
-Next: slice 4.
+Next: slice 5.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

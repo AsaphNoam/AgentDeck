@@ -206,6 +206,8 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       // the server's lastAssistantPreview.
       if (event.activity_id) return state;
       const kind = kindOf(event);
+      // A runtime notice is advisory, not a reply, and must not split one (FS-03.R68).
+      if (kind === "notice") return state;
       const nextKinds = { ...state.previewKindByAgent, [agentId]: kind };
       if (kind !== "assistant_text") return { previewKindByAgent: nextKinds };
       const delta = String(textOf(event));
@@ -252,6 +254,9 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
         folded = markResolved(folded, String(current.tool_call_id ?? ""), current.resolved as PermissionResolution);
       }
       let preview = "";
+      // Notices never enter the preview, matching updatePreview (FS-03.R68).
+      const replies = folded.filter((event) => kindOf(event) !== "notice");
+      const lastReply = replies[replies.length - 1];
       for (let i = folded.length - 1; i >= 0; i--) {
         if (kindOf(folded[i]) === "assistant_text") {
           preview = clipPreview(String(textOf(folded[i])).trim(), 120);
@@ -264,7 +269,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
         byAgent: { ...state.byAgent, [agentId]: folded },
         rawByAgent,
         previewByAgent: { ...state.previewByAgent, [agentId]: preview },
-        previewKindByAgent: { ...state.previewKindByAgent, [agentId]: kindOf(folded[folded.length - 1] ?? {}) },
+        previewKindByAgent: { ...state.previewKindByAgent, [agentId]: kindOf(lastReply ?? {}) },
       };
     }),
   resolvePermission: (agentId, toolCallId, decision) =>

@@ -558,6 +558,24 @@
   width: 80px;
 }
 
+.notice-row {
+  align-items: baseline;
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-1) 0;
+}
+
+.notice-title {
+  color: var(--ad-text-primary);
+}
+
+.notice-description {
+  color: var(--ad-text-secondary);
+}
+
 .turn-end {
   border-top-style: dashed;
   margin: var(--ad-space-4) 0;

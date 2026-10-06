@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"encoding/json"
+	"log/slog"
+	"strings"
 
 	"github.com/AsaphNoam/Chuck/internal/state"
 	"github.com/AsaphNoam/Chuck/internal/strutil"
@@ -13,6 +15,12 @@ const (
 	maxCommandEntries = 256
 	maxCommandName    = 256
 	maxCommandText    = 2000
+)
+
+// Bounds on a decoded notice (TS-04.R80, INV §8).
+const (
+	maxNoticeTitle       = 256
+	maxNoticeDescription = 2000
 )
 
 type acpSessionConfigOption struct {
@@ -283,6 +291,10 @@ type acpUpdate struct {
 	// usage_update: the current context usage and its window size.
 	Used *int64 `json:"used"`
 	Size *int64 `json:"size"`
+
+	// notice: severity and an optional description; Title is shared above.
+	Severity    string  `json:"severity"`
+	Description *string `json:"description"`
 }
 
 // acpContentBlock is a single content item (text or diff). Tool-call content is
@@ -458,6 +470,26 @@ func mapSessionUpdate(params json.RawMessage) []mappedEvent {
 			}
 		}
 		return evs
+
+	case "notice":
+		title := strings.TrimSpace(u.Title)
+		if title == "" {
+			slog.Warn("runtime: notice without a title dropped")
+			return nil
+		}
+		severity := "info"
+		if u.Severity == "warning" {
+			severity = "warning"
+		}
+		var description string
+		if u.Description != nil {
+			description = strutil.ClipRunes(strings.TrimSpace(*u.Description), maxNoticeDescription)
+		}
+		return []mappedEvent{{Type: EvNotice, Data: NoticeData{
+			Severity:    severity,
+			Title:       strutil.ClipRunes(title, maxNoticeTitle),
+			Description: description,
+		}}}
 
 	default:
 		// agent_thought_chunk, plan, and any unrecognized kind: dropped this phase.

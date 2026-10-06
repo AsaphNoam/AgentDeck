@@ -543,7 +543,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   status, output and targeted Stop. The steered message joins the turn as R50 describes. Chuck does
   not cancel, retry or re-run the tool itself, and a runtime that aborts the tool instead keeps
   today's behavior. This adds no new control.
-- **R68** `(planned)` — **Agent notices appear as compact transcript rows.** A runtime advisory
+- **R68** — **Agent notices appear as compact transcript rows.** A runtime advisory
   notice — for example a warning about configuration, quota or a degraded feature — renders in the
   transcript as one compact row with its severity (`info` or `warning`; anything else reads as
   `info`), a short title and optional description, visually distinct from agent messages. Notices
@@ -993,7 +993,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   works on a second backgrounded command; Chuck sends no cancel. A runtime that aborts the tool on
   Steer renders exactly as today. *Verify by* fake ACP runtime tests, `ChatPanel` component tests,
   and the credentialed Claude steer in the TS-06.R31 smoke.
-- **A49** `(planned)` (R68) — A fake runtime's `info`, `warning` and unknown-severity notices
+- **A49** (R68) — A fake runtime's `info`, `warning` and unknown-severity notices
   render as compact rows (unknown as `info`) between the surrounding messages, survive reload,
   archive and phone replay in order, and change no agent state, unread or notification count; a
   runtime without notice support still shows its advisory as message text. *Verify by* fake ACP

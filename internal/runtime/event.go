@@ -25,6 +25,9 @@ const (
 	EvError              = "error"
 	EvBackendSwitch      = "backend_switch"
 	EvAnnotation         = "annotation"
+	// EvNotice is a runtime advisory row (TS-04.R80): durable and replayed, but
+	// never agent text, status, or a notification.
+	EvNotice = "notice"
 	// Native child-session lifecycle (TS-02.R35). The scope rides on the
 	// envelope; the payload names the child and its state.
 	EvActivityStarted = "activity_started"
@@ -139,6 +142,13 @@ type BackendSwitchData struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 	At   string `json:"at"`
+}
+
+// NoticeData is a bounded runtime advisory. Severity is "info" or "warning".
+type NoticeData struct {
+	Severity    string `json:"severity"`
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
 }
 
 // AnnotationData is a point-in-time capture that a dashboard user has assigned
@@ -275,4 +285,5 @@ var AllEventTypes = []string{
 	EvBackgroundTaskState,
 	EvForkBoundary,
 	EvFileReport,
+	EvNotice,
 }

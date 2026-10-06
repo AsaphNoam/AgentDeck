@@ -48,6 +48,30 @@ describe("card preview clipping", () => {
   });
 });
 
+// FS-03.A49: a notice is not a reply. Live and replay paths both leave the
+// preview and its kind on the agent's text, and a notice never splits it.
+describe("notices and the card preview", () => {
+  const notice = { agent_id: "a_n", type: "notice", ts: "t", data: { severity: "warning", title: "Usage limit" } };
+
+  it("live notices neither replace nor split the streamed reply", () => {
+    const store = useTranscriptStore.getState();
+    store.updatePreview("a_n", { agent_id: "a_n", seq: 1, type: "assistant_text", ts: "t", data: { delta: "Hel" } });
+    store.updatePreview("a_n", { ...notice, seq: 2 });
+    store.updatePreview("a_n", { agent_id: "a_n", seq: 3, type: "assistant_text", ts: "t", data: { delta: "lo" } });
+    expect(useTranscriptStore.getState().previewByAgent.a_n).toBe("Hello");
+    expect(useTranscriptStore.getState().previewKindByAgent.a_n).toBe("assistant_text");
+  });
+
+  it("a replayed trailing notice keeps the reply's preview kind", () => {
+    useTranscriptStore.getState().setTranscript("a_n", [
+      { agent_id: "a_n", seq: 1, type: "assistant_text", ts: "t", data: { delta: "Done." } },
+      { ...notice, seq: 2 },
+    ]);
+    expect(useTranscriptStore.getState().previewByAgent.a_n).toBe("Done.");
+    expect(useTranscriptStore.getState().previewKindByAgent.a_n).toBe("assistant_text");
+  });
+});
+
 describe("transcriptStore", () => {
   it("concatenates assistant text deltas with the same message_id", () => {
     useTranscriptStore.getState().appendMessage("a_1", {

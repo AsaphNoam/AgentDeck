@@ -95,6 +95,10 @@ var (
 
 	cancelOnce sync.Once
 	cancelCh   = make(chan struct{})
+
+	// noticesOffered mirrors claude-agent-acp 0.85.1's clientSupportsNotices:
+	// `clientCapabilities.session.notices` must be a non-null, non-array object.
+	noticesOffered atomic.Bool
 )
 
 func main() {
@@ -135,6 +139,16 @@ func handle(msg *rpcMessage) {
 		if os.Getenv("FAKEACP_INIT_HANG") != "" {
 			time.Sleep(10 * time.Minute)
 		}
+		var initParams struct {
+			ClientCapabilities struct {
+				Session struct {
+					Notices json.RawMessage `json:"notices"`
+				} `json:"session"`
+			} `json:"clientCapabilities"`
+		}
+		_ = json.Unmarshal(msg.Params, &initParams)
+		notices := bytes.TrimSpace(initParams.ClientCapabilities.Session.Notices)
+		noticesOffered.Store(len(notices) > 0 && notices[0] == '{' && os.Getenv("FAKEACP_NO_NOTICES") == "")
 		ver := 1
 		if v := os.Getenv("FAKEACP_PROTO_VERSION"); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
@@ -608,6 +622,18 @@ func runScenario(name string) string {
 		emitChunk("The dev server keeps running in the background; the parser fix is next.")
 		return "end_turn"
 
+	case "notice_flow":
+		// claude-agent-acp 0.85.1 noticeUpdate / noticeOrTranscriptUpdate shapes
+		// (session-notices.js): a notice when offered, bold-label text otherwise.
+		emitChunk("Before.")
+		emitNotice("info", "Context compacted", nil)
+		desc := "Five-hour limit at 90%."
+		emitNotice("warning", "Usage limit approaching", &desc)
+		emitNotice("error", "Hook failed", nil)
+		emitUpdate(map[string]any{"sessionUpdate": "notice", "severity": "info", "title": "  "})
+		emitChunk("After.")
+		return "end_turn"
+
 	case "task_flow":
 		// codex-acp 2.1 background terminals (CodexBackgroundTerminalTasks):
 		// the tool call is marked backgrounded, then the task is announced under
@@ -853,6 +879,24 @@ func emitLoadHistory() {
 			"content":       []any{map[string]any{"type": "content", "content": map[string]any{"type": "text", "text": "old file body"}}},
 		})
 	}
+}
+
+func emitNotice(severity, title string, description *string) {
+	if !noticesOffered.Load() {
+		text := "**" + title + "**"
+		if description != nil {
+			text += ": " + *description
+		}
+		emitChunk(text)
+		return
+	}
+	update := map[string]any{"sessionUpdate": "notice", "severity": severity, "title": title}
+	if description != nil {
+		update["description"] = *description
+	} else {
+		update["description"] = nil
+	}
+	emitUpdate(update)
 }
 
 func emitChunk(text string) {

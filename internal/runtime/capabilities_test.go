@@ -41,11 +41,11 @@ func TestNegotiateCapabilitiesIsBilateral(t *testing.T) {
 }
 
 func TestClientCapabilitiesOfferOnlyImplementedSurfaces(t *testing.T) {
-	if got, _ := json.Marshal(clientCapabilitiesFor(clientOffer{})); string(got) != `{}` {
+	if got, _ := json.Marshal(clientCapabilitiesFor(clientOffer{})); string(got) != `{"session":{"notices":{}}}` {
 		t.Fatalf("empty offer = %s", got)
 	}
 	got, _ := json.Marshal(clientCapabilitiesFor(clientOffer{Subagents: true, AsyncTasks: true, FileChangeReports: true}))
-	want := `{"_meta":{"jetbrains":{"air":{"capabilities":["asyncTasks","agentFileChangeReport"],"version":1}}},"subagents":{}}`
+	want := `{"_meta":{"jetbrains":{"air":{"capabilities":["asyncTasks","agentFileChangeReport"],"version":1}}},"session":{"notices":{}},"subagents":{}}`
 	if string(got) != want {
 		t.Fatalf("full offer = %s, want %s", got, want)
 	}

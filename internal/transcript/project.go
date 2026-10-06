@@ -187,10 +187,11 @@ func ProjectEvent(ev runtime.Event) (Projection, error) {
 			)
 		}
 		p.Parts = append(p.Parts, Part{Kind: PartAnnotationOverall, Text: d.OverallInstruction, Indexed: true})
-	case runtime.EvSessionMeta, runtime.EvBackendSwitch, runtime.EvActivityStarted, runtime.EvActivityState, runtime.EvBackgroundTaskState, runtime.EvForkBoundary, runtime.EvFileReport:
+	case runtime.EvSessionMeta, runtime.EvBackendSwitch, runtime.EvActivityStarted, runtime.EvActivityState, runtime.EvBackgroundTaskState, runtime.EvForkBoundary, runtime.EvFileReport, runtime.EvNotice:
 		// Deliberately content-free: a launch/resume snapshot, a cross-backend
 		// hand-off marker and child lifecycle records describe the conversation
-		// rather than belonging to it (TS-02.R35).
+		// rather than belonging to it (TS-02.R35). A runtime notice is advisory,
+		// never agent text for search or pulled context (TS-04.R80).
 		p.Disposition = DispositionMetadata
 	default:
 		p.Disposition = DispositionUnknown
