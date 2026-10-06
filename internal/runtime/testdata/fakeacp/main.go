@@ -99,6 +99,9 @@ var (
 	// noticesOffered mirrors claude-agent-acp 0.85.1's clientSupportsNotices:
 	// `clientCapabilities.session.notices` must be a non-null, non-array object.
 	noticesOffered atomic.Bool
+
+	steerOnce sync.Once
+	steeredCh = make(chan struct{})
 )
 
 func main() {
@@ -126,6 +129,9 @@ func main() {
 func handle(msg *rpcMessage) {
 	if msg.ID == nil { // notification
 		if msg.Method == "session/cancel" {
+			if logPath := os.Getenv("FAKEACP_CANCEL_LOG"); logPath != "" {
+				_ = os.WriteFile(logPath, msg.Params, 0o600)
+			}
 			cancelOnce.Do(func() { close(cancelCh) })
 		}
 		return
@@ -172,9 +178,15 @@ func handle(msg *rpcMessage) {
 				"resume": map[string]any{}, "list": map[string]any{}, "close": map[string]any{}, "delete": map[string]any{},
 				"fork": map[string]any{}, "additionalDirectories": map[string]any{}, "subagents": map[string]any{},
 			}}
-			res["_meta"] = map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{
+			// Merged beside any steering advertisement, as both adapters send them.
+			meta, _ := res["_meta"].(map[string]any)
+			if meta == nil {
+				meta = map[string]any{}
+			}
+			meta["jetbrains"] = map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{
 				"sessionFailure", "diffPatch", "agentFileChangeReport", "nativeSubagentSessions", "asyncTasks", "recommendedValue", "rawInputRendering", "planContentDelta",
-			}}}}
+			}}}
+			res["_meta"] = meta
 		}
 		respond(*msg.ID, res)
 	case "session/new":
@@ -293,11 +305,12 @@ func handle(msg *rpcMessage) {
 			AsyncTaskID string `json:"asyncTaskId"`
 		}
 		_ = json.Unmarshal(msg.Params, &p)
-		if os.Getenv("FAKEACP_TASK_STOP") == "refuse" || p.AsyncTaskID != "task_1" {
+		toolCallID := map[string]string{"task_1": "tc_bg", "task_2": "tc_bg2"}[p.AsyncTaskID]
+		if os.Getenv("FAKEACP_TASK_STOP") == "refuse" || toolCallID == "" {
 			respond(*msg.ID, map[string]any{"stopped": false})
 			return
 		}
-		emitUpdateIn(p.SessionID, map[string]any{"sessionUpdate": "async_task_state_update", "asyncTaskId": p.AsyncTaskID, "state": "stopped", "toolCallId": "tc_bg"})
+		emitUpdateIn(p.SessionID, map[string]any{"sessionUpdate": "async_task_state_update", "asyncTaskId": p.AsyncTaskID, "state": "stopped", "toolCallId": toolCallID})
 		respond(*msg.ID, map[string]any{"stopped": true})
 	case "_session/steering":
 		// The adapter owns the injected-vs-new-turn choice and reports it; the
@@ -354,6 +367,7 @@ func handle(msg *rpcMessage) {
 			respondErr(*msg.ID, -32602, "unsupported steering input")
 			return
 		}
+		steerOnce.Do(func() { close(steeredCh) })
 		respond(*msg.ID, map[string]any{"outcome": outcome})
 	case "session/prompt":
 		id := *msg.ID
@@ -620,6 +634,35 @@ func runScenario(name string) string {
 		emitUpdate(map[string]any{"sessionUpdate": "tool_call", "toolCallId": "tc_bg", "name": "exec_command", "title": "npm run dev", "kind": "execute", "rawInput": map[string]any{"command": "npm run dev"}})
 		emitUpdate(map[string]any{"sessionUpdate": "async_task_spawned", "asyncTaskId": "task_1", "name": "npm run dev", "taskType": "shell", "canStop": true, "toolCallId": "tc_bg"})
 		emitChunk("The dev server keeps running in the background; the parser fix is next.")
+		return "end_turn"
+
+	case "steer_backgrounds_tool":
+		// claude-agent-acp 0.85.1 with CLI 2.1.286: a steer moves the running
+		// Bash call to the background instead of aborting it. The tool result
+		// carries the AIR marker (tool-calls/background.js) and the task is
+		// announced with the same toolCallId (async-tasks.js).
+		backgrounded := map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "asyncTasks": map[string]any{"backgrounded": true}}}}
+		started := func(id, command string) {
+			emitUpdate(map[string]any{"sessionUpdate": "tool_call", "toolCallId": id, "name": "Bash", "title": command, "kind": "execute", "status": "in_progress", "rawInput": map[string]any{"command": command}})
+		}
+		moved := func(id, task, command string) {
+			emitUpdate(map[string]any{"sessionUpdate": "tool_call_update", "toolCallId": id, "status": "completed", "_meta": backgrounded,
+				"content": []any{map[string]any{"type": "content", "content": map[string]any{"type": "text", "text": "Command running in background with ID: " + task}}}})
+			emitUpdate(map[string]any{"sessionUpdate": "async_task_spawned", "asyncTaskId": task, "name": command, "taskType": "local_bash", "canStop": true, "toolCallId": id})
+		}
+		started("tc_bg", "npm run build")
+		select {
+		case <-steeredCh:
+		case <-cancelCh:
+			return "cancelled"
+		case <-time.After(10 * time.Second):
+			return "end_turn"
+		}
+		moved("tc_bg", "task_1", "npm run build")
+		emitChunk("Noted; checking the other file while the build runs.")
+		emitUpdate(map[string]any{"sessionUpdate": "async_task_state_update", "asyncTaskId": "task_1", "state": "completed", "toolCallId": "tc_bg"})
+		started("tc_bg2", "npm run dev")
+		moved("tc_bg2", "task_2", "npm run dev")
 		return "end_turn"
 
 	case "notice_flow":

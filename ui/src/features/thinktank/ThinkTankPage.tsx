@@ -22,7 +22,7 @@ import { FileViewer } from "../../components/chat/FileViewer";
 import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMarkdown";
 import type { FileLink } from "../../components/chat/renderers/filePath";
 import { canAnnotate, eventDraft, eventRenderer, selectionWithin } from "../../components/chat/TranscriptView";
-import { nestActivities } from "../../components/chat/runtimeActivity";
+import { markBackgrounded, nestActivities } from "../../components/chat/runtimeActivity";
 import { useAutocomplete } from "../../components/chat/autocomplete";
 import { foldTranscript } from "../../store/transcriptStore";
 import { useAnnotationStore } from "../../store/annotationStore";
@@ -163,7 +163,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
       },
       onOpenFile: openFrom(attemptID),
     });
-    return render(nestActivities(foldTranscript(events)), [], 1);
+    return render(nestActivities(markBackgrounded(foldTranscript(events))), [], 1);
   };
 
   const shownEntries = entries.data?.entries ?? [];

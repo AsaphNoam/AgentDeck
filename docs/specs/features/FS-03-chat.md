@@ -536,7 +536,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   **used / total tokens** figure beside its existing percentage. When raw counts are unavailable it
   retains the percentage-only label. This changes neither the runtime controls nor transcript and
   archive retention.
-- **R67** `(planned)` — **A steer during a running tool can background that tool.** When the
+- **R67** — **A steer during a running tool can background that tool.** When the
   runtime reports that a Steer moved the in-flight foreground tool call (for example a command or
   subagent) to the background instead of aborting it, the tool call stays in the transcript, is
   marked as continuing in the background, and appears as an R59 background task with the same
@@ -987,12 +987,13 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   card show the same exact used/total token reading and rounded percentage from one live state
   update; a percentage-only state keeps the existing label on both surfaces. *Verify:*
   `ChatPanel`, `AgentCard`, and shared `ContextBar` component tests.
-- **A48** `(planned)` (R67, R59, R50) — Against a fake runtime that backgrounds a running command
+- **A48** (R67, R59, R50) — Against a fake runtime that backgrounds a running command
   on Steer, the steered message appears in the turn, the command's tool call shows as continuing in
   the background, its background task row reaches `completed` with its output, and targeted Stop
   works on a second backgrounded command; Chuck sends no cancel. A runtime that aborts the tool on
-  Steer renders exactly as today. *Verify by* fake ACP runtime tests, `ChatPanel` component tests,
-  and the credentialed Claude steer in the TS-06.R31 smoke.
+  Steer renders exactly as today. *Verify by* fake ACP runtime tests
+  (`TestSteerThatBackgroundsTheRunningTool`), transcript and phone component tests, and the
+  credentialed Claude steer in the TS-06.R31 smoke (owed).
 - **A49** (R68) — A fake runtime's `info`, `warning` and unknown-severity notices
   render as compact rows (unknown as `info`) between the surrounding messages, survive reload,
   archive and phone replay in order, and change no agent state, unread or notification count; a

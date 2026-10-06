@@ -15,7 +15,7 @@ import { NoticeRow } from "./renderers/NoticeRow";
 import { ThinkingDisclosure } from "./renderers/ThinkingDisclosure";
 import { ChildActivity } from "./renderers/ChildActivity";
 import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
-import { collectTasks, nestActivities, type ChildNode } from "./runtimeActivity";
+import { collectTasks, markBackgrounded, nestActivities, type ChildNode } from "./runtimeActivity";
 import { useReasoningStore, type ReasoningSpan } from "../../store/reasoningStore";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
@@ -107,7 +107,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         />
       )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll}>
-        {renderEvents(nestActivities(withReasoning(events, reasoning)), [], 1)}
+        {renderEvents(nestActivities(withReasoning(markBackgrounded(events), reasoning)), [], 1)}
         <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
         {busy && (
           <div className="transcript-pending" aria-live="polite">

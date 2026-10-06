@@ -729,14 +729,18 @@ and the UI card preview skips it on both live and replay paths. An untitled noti
 content-free warning; an undecodable frame is dropped like any other update. Withdrawing the capability restores the adapter's message-text fallback with no data
 change, so the unstable ACP surface remains reversible.
 
-**R81 `(planned)` — A steer-backgrounded tool joins the existing background-task contract.** When
-an advertised background-task runtime (R62 `asyncTasks`) marks an in-flight tool call as
-backgrounded — in response to Steer or otherwise (the AIR marker
-`_meta.jetbrains.air.asyncTasks.backgrounded: true` on `tool_call_update`, sent by Claude 0.85.1
-with CLI 2.1.286 and by Codex 2.1.1) — the mapper updates that tool call and opens or updates the
-matching FS-03.R59 background task through the same normalized events used for commands started
-in the background. No Chuck cancel is issued, and the steer outcome reported to the person is unchanged.
-Without the advertisement or marker, today's steer behavior and rendering stay exact.
+**R81 — A steer-backgrounded tool joins the existing background-task contract.** (shipped
+2026-10-06) When an advertised background-task runtime (R62 `asyncTasks`) moves an in-flight tool
+call to the background — in response to Steer or otherwise — it announces the task with
+`async_task_spawned.toolCallId` naming that call, which the existing R62 mapper already turns into
+the FS-03.R59 background-task events. Both pinned adapters gate that announcement and the AIR
+marker `_meta.jetbrains.air.asyncTasks.backgrounded: true` on `tool_call_update` behind the same
+`asyncTasks` offer, so the marker carries no fact the task link lacks; Chuck does not decode it
+separately. The tool call keeps its own events (Claude completes it with a "running in background"
+result), and the shared UI projection derives its backgrounded state from the linked task
+(TS-08.R86). No Chuck cancel is issued, and the steer outcome reported to the person is unchanged.
+Without the advertisement, today's steer behavior and rendering stay exact. The fake's
+`steer_backgrounds_tool` scenario reproduces the inspected 0.85.1 sequence.
 
 **R82 `(planned)` — Provider model policy refusals keep the active runtime truthful.** Launch and
 `session/set_config_option` model application treat an adapter error (including Claude's

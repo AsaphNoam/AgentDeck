@@ -965,14 +965,16 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Projection fixtures cover branches/joins, mixed edge types, missing records, cleanup and duplicate
   names; wire fixtures include Go-produced waiting/lineage shapes. Rendered acceptance follows
   FS-16.A27–A29 before the planned tags are removed (INV §2/§7/§8/§10/§11/§13/§16/§17).
-- **R86** `(planned)` — **Notices and steer-backgrounded tools reuse the transcript fold.** Register
+- **R86** — **Notices and steer-backgrounded tools reuse the transcript fold.** Register
   TS-04.R80's `notice` event in the shared `foldTranscript` / `appendRenderedEvent` seam so live,
   reload, archive and phone render one identical compact row: an existing badge carrying the
   severity label (`info` neutral, `warning` the existing warning tone), the title, and the optional
   description as secondary text, with no bubble, avatar or motion, styled with existing tokens in
-  every skin. A tool call marked backgrounded by TS-04.R81 keeps its row and adds a textual
-  "continues in background" state linked to its existing background-task row; no new component
-  family or dependency. Component tests cover each severity, unknown→`info`, replay order and the
+  every skin (`NoticeRow`). A tool call TS-04.R81 links to a background task keeps its row and
+  adds a textual "Continues in background" state (or "Ran in background" once the task settles),
+  derived by the one `markBackgrounded` projection that the desktop transcript, Think Tank activity
+  and phone conversation share; the desktop task row names the same tool. No new component
+  family or dependency. Live notices never enter the card preview. Component tests cover each severity, unknown→`info`, replay order and the
   backgrounded state (FS-03.A48–A49).
 
 - **R87** — The Think Tank page composes existing conversation/content, participant-card,

@@ -28,6 +28,7 @@ import { NoticeRow } from "../components/chat/renderers/NoticeRow";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
+import { markBackgrounded } from "../components/chat/runtimeActivity";
 import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection } from "./connection";
 import { getRuntimeOptions } from "./api";
@@ -294,7 +295,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
               <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
             ))}
           <ol className="phone-transcript" aria-label="Conversation">
-            {groupTranscriptRows(events).map((row) =>
+            {groupTranscriptRows(markBackgrounded(events)).map((row) =>
               row.kind === "tool-run" ? (
                 <li key={`run:${row.events[0].seq}`}>
                   <ToolRun events={row.events} renderEvent={(event) => <EventRow key={`${event.seq}:${event.kind}`} event={event} onAnnotate={annotate} />} />

@@ -38,17 +38,16 @@ Slices, each committed when verified:
 4. ~~Session notices (TS-04.R80, FS-03.R68/A49)~~ done: fake `notice_flow` scenario
    (`FAKEACP_NO_NOTICES` = adapter fallback), `notices_test.go`, shared `NoticeRow`. TS-08.R86 stays
    planned until slice 5 adds its backgrounded half.
-5. Backgrounded tool (TS-04.R81, FS-03.A48): the real marker is
-   `_meta.jetbrains.air.asyncTasks.backgrounded` on `tool_call_update` (fake `task_flow` already
-   emits it; runtime ignores it today). Tasks already arrive via `async_task_spawned`; the work is
-   flagging the tool row and linking it to the task row (`runtimeActivity.ts`, `toolRun.tsx`).
+5. ~~Backgrounded tool (TS-04.R81, FS-03.R67/A48, TS-08.R86)~~ done with no Go mapper change:
+   the UI derives the state from the task's linked `tool_call_id` (`markBackgrounded`). Review
+   note: R81 was revised from "decode the marker" to this; the reviewer should confirm it.
 6. Model-policy refusals (TS-04.R82, FS-09.A48). Claude 0.85.1: a `set_config_option` veto is a
    JSON-RPC `-32603` with `data.details` = the hook text; a `session/new` veto succeeds on the SDK
    default model. `applyRequiredOption`/`setConfigOption` (`chat.go` ~2470–2530) already read back
    `currentValue`; confirm the reason surfaces, then add tests.
 7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
 
-Next: slice 5.
+Next: slice 6.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

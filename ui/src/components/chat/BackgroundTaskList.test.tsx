@@ -92,3 +92,35 @@ describe("background tasks (FS-03.A41)", () => {
     expect(rows()[0]).toBe("stopped:Ended with the previous sessionnpm run dev");
   });
 });
+
+// FS-03.A48, TS-08.R86: a command a steer moved to the background keeps its
+// tool row, which says it continues there and, once done, that it ran there; a
+// tool without a linked task renders exactly as before.
+describe("steer-backgrounded tool calls (FS-03.A48)", () => {
+  const steered = [
+    wire(1, "tool_call", { tool_call_id: "tc_bg", name: "Bash", title: "npm run build", args: { command: "npm run build" } }),
+    wire(2, "tool_result", { tool_call_id: "tc_bg", status: "completed", content: "Command running in background with ID: task_1" }),
+    wire(3, "background_task_state", { task_id: "task_1", tool_call_id: "tc_bg", name: "npm run build", state: "running", can_stop: true }),
+    wire(4, "assistant_text", { delta: "Noted." }),
+    wire(5, "tool_call", { tool_call_id: "tc_plain", name: "Read", args: { path: "a.go" } }),
+  ];
+
+  function openRuns() {
+    for (const toggle of screen.getAllByRole("button", { name: /^Ran \d tools?$/ })) fireEvent.click(toggle);
+  }
+
+  it("marks the steered tool as continuing in the background and leaves others alone", () => {
+    renderTranscript(steered);
+    openRuns();
+    const calls = [...document.querySelectorAll("[data-ui='tool-call']")];
+    expect(calls[0]).toHaveTextContent("Continues in background");
+    expect(calls[1]).not.toHaveTextContent("background");
+    expect(rows()).toEqual(["running:Runningnpm run buildStop"]);
+  });
+
+  it("reads as ran in background once the task settles", () => {
+    renderTranscript([...steered, wire(6, "background_task_state", { task_id: "task_1", tool_call_id: "tc_bg", state: "completed" })]);
+    openRuns();
+    expect(document.querySelector("[data-ui='tool-call']")).toHaveTextContent("Ran in background");
+  });
+});

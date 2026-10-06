@@ -203,6 +203,22 @@ describe("AgentScreen", () => {
     expect(conversation.indexOf("Hook failed")).toBeLessThan(conversation.indexOf("After."));
   });
 
+  it("shows a steer-backgrounded command as continuing in the background (FS-03.A48)", async () => {
+    live = {
+      agent_id: "a1",
+      events: [
+        { agent_id: "a1", seq: 30, type: "tool_call", ts: "", data: { tool_call_id: "tc_bg", name: "Bash", args: { command: "npm run build" } } },
+        { agent_id: "a1", seq: 31, type: "background_task_state", ts: "", data: { task_id: "task_1", tool_call_id: "tc_bg", name: "npm run build", state: "running" } },
+      ],
+      has_more: false,
+      pending_permission: null,
+      latest_assistant: "",
+    };
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Ran 1 tool" }));
+    expect(await screen.findByText("Continues in background")).toBeInTheDocument();
+  });
+
   it("loads earlier windows on request and keeps them contiguous with the live one", async () => {
     live = {
       agent_id: "a1",

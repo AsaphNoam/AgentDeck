@@ -107,6 +107,24 @@ export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
   return [...tasks.values()];
 }
 
+// markBackgrounded gives each tool call the latest state of the background
+// task its runtime linked to it, so a command that moved to the background
+// (including on Steer) reads as continuing there rather than finished. Desktop
+// and phone both render through it (FS-03.R67, TS-08.R86, INV §2).
+export function markBackgrounded(events: TranscriptEvent[]): TranscriptEvent[] {
+  const states = new Map<string, string>();
+  for (const event of events) {
+    if (kindOf(event) === "background_task_state" && event.tool_call_id && TASK_STATES.has(String(event.state))) {
+      states.set(String(event.tool_call_id), String(event.state));
+    }
+  }
+  if (states.size === 0) return events;
+  return events.map((event) => {
+    const state = kindOf(event) === "tool_call" ? states.get(String(event.tool_call_id ?? "")) : undefined;
+    return state ? { ...event, background_state: state } : event;
+  });
+}
+
 // hasPendingPermission keeps a child open while it waits on the person.
 export function hasPendingPermission(node: ChildNode): boolean {
   return node.items.some((event) =>
