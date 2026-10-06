@@ -12,6 +12,9 @@
 }
 
 .think-tank-goal {
+  /* A goal is a sentence, not a headline: keep long goals readable. */
+  font-size: 0.7em;
+  line-height: 1.2;
   display: block;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -29,7 +32,7 @@
   align-items: start;
   display: grid;
   gap: var(--ad-space-6);
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
 }
 
 .think-tank-discussion {
@@ -330,7 +333,7 @@
   gap: var(--ad-space-2);
 }
 
-@media (width < 1100px) {
+@media (width < 900px) {
   .think-tank-body {
     grid-template-columns: minmax(0, 1fr);
   }
