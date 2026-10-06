@@ -994,13 +994,13 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   `field-sizing: content` is not relied on because Safari support is not guaranteed for the shipped
   WebKit targets.
 
-- **R89** (planned) — FS-02.R67 icons are inline SVG components in `ui/src/components/ui/icons.tsx`
+- **R89** — FS-02.R67 icons are inline SVG components in `ui/src/components/ui/icons.tsx`
   using `currentColor`; no icon dependency is added. Icon buttons carry `aria-label` and `title`,
   keep existing classes/data-slots, and every new className has a selector (INV §13).
 
-- **R90** (planned) — FS-02.R68 moves the state badge and Collapse out of
-  `.agent-card-header-actions` into the header row's trailing slot; the context meter renders as a
-  sibling row below `.agent-card-top`. Collapsed cards are unchanged.
+- **R90** — FS-02.R68 leaves only the state badge and Collapse in `.agent-card-header-actions`,
+  the expanded header row's trailing grid column; the context meter renders as the sibling row
+  `.agent-card-context` below `.agent-card-top`. Collapsed cards are unchanged.
 
 - **R91** (planned) — FS-02.R69 labels come from one shared helper, lifted from
   `NewAgentModal`'s `displayLabel`, that returns the readable name and appends `(id)` only for

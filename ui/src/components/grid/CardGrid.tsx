@@ -17,7 +17,8 @@ import { ThinkTankSetupDialog } from "../../features/thinktank/ThinkTankSetupDia
 import { useProjects } from "../../api/config";
 import { useTasks } from "../../api/tasks";
 import { needsAttention } from "../../features/tasks/taskWork";
-import { Button, ConfirmDialog, PageHeader } from "../ui";
+import { Button, ConfirmDialog, IconButton, PageHeader } from "../ui";
+import { CollapseAllIcon } from "../ui/icons";
 
 // projectID scopes which agents the grid shows; fixedProject locks New Agent to a
 // launch target and hides its project picker. They are separate because a scoped
@@ -268,7 +269,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         className="grid-toolbar"
         eyebrow="Live operations"
         title={projectTitle ?? "Agents"}
-        actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <Button type="button" onClick={collapseAll}>Collapse all</Button>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button>{thinkTankAction}<DensityControl /></>}
+        actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <IconButton type="button" aria-label="Collapse all" title="Collapse all" onClick={collapseAll}><CollapseAllIcon /></IconButton>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button>{thinkTankAction}<DensityControl /></>}
         data-slot="header"
       />
       <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => setRefusedDrop(false)}>

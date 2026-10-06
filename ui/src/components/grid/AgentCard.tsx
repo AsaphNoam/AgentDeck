@@ -6,7 +6,8 @@ import type { AgentState } from "../../api/types";
 import { ContextBar } from "./ContextBar";
 import { StateBadge } from "./StateBadge";
 import { useUiStore } from "../../store/uiStore";
-import { Button } from "../ui";
+import { IconButton } from "../ui";
+import { CollapseIcon } from "../ui/icons";
 
 export function AgentCard({ agent, lastLine, projectColor, projectTitle, showProject = true, expanded = false, onToggle, onUse, children }: { agent: AgentState; lastLine?: string; projectColor?: [number, number, number]; projectTitle?: string; showProject?: boolean; expanded?: boolean; onToggle?: () => void; onUse?: () => void; children?: ReactNode }) {
   const navigate = useNavigate();
@@ -69,22 +70,26 @@ export function AgentCard({ agent, lastLine, projectColor, projectTitle, showPro
         ) : <strong data-slot="identity">{agent.name}</strong>}
         {expanded ? (
           <div className="agent-card-header-actions">
-            <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} compact /></div>
             <StateBadge state={agent.state} />
-            <Button
+            <IconButton
               data-slot="collapse-control"
               size="small"
               type="button"
+              aria-label="Collapse"
+              title="Collapse"
               onClick={(event) => {
                 event.stopPropagation();
                 onToggle?.();
               }}
             >
-              Collapse
-            </Button>
+              <CollapseIcon />
+            </IconButton>
           </div>
         ) : <StateBadge state={agent.state} />}
       </div>
+      {/* The meter's label can carry the exact used/total figure, so it takes its own row
+          below the identity/badge/Collapse header (FS-02.R68, TS-08.R90). */}
+      {expanded && <div className="agent-card-context" data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} compact /></div>}
       {expanded ? children : <>
       <p className="agent-subtitle" data-slot="metadata">{showProject ? `${agent.role} · ${projectLabel}` : agent.role}</p>
       <span className="model-pill">{runtimeIdentity}</span>

@@ -335,6 +335,13 @@ describe("Composer queued follow-up and steering", () => {
     // Send stays present on a busy agent; Cancel is still offered beside it.
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    // FS-02.A49 — both are icon buttons whose tooltip repeats the former text.
+    for (const name of ["Send", "Cancel"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toHaveAttribute("title", name);
+      expect(button.querySelector("svg")).not.toBeNull();
+      expect(button.textContent).toBe("");
+    }
   });
 
   it("does not echo a message when an idle-looking submit is held by the server", async () => {

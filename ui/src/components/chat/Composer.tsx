@@ -1,4 +1,5 @@
 import { AutoGrowTextarea } from "../ui";
+import { SendIcon, StopIcon } from "../ui/icons";
 import { useEffect, useRef, useState } from "react";
 import { cancelTurn, sendPrompt, steerPrompt } from "../../api/client";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
@@ -191,7 +192,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
           the live session advertises it, and never as a disabled control where it
           does not (FS-03.R50, FS-09.R26). */}
       <div className="composer-actions">
-        <button type="submit">Send</button>
+        <button type="submit" className="composer-icon" aria-label="Send" title="Send"><SendIcon /></button>
         {busy && steerable && (
           <button type="button" className="composer-steer" disabled={steering} onClick={() => void steer()}>Steer</button>
         )}
@@ -201,14 +202,16 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
         {busy && (
           <button
             type="button"
-            className="composer-cancel"
+            className="composer-cancel composer-icon"
+            aria-label="Cancel"
+            title="Cancel"
             onClick={() => {
               setError(null);
               setNotice(null);
               cancelTurn(agentId).catch(() => setError("Failed to cancel — the turn may have already finished."));
             }}
           >
-            Cancel
+            <StopIcon />
           </button>
         )}
       </div>

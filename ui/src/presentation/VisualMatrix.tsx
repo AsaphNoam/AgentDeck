@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Button, PageHeader, ProjectColorPicker, Surface } from "../components/ui";
+import { Badge, Button, IconButton, PageHeader, ProjectColorPicker, Surface } from "../components/ui";
+import { CollapseIcon } from "../components/ui/icons";
 import { ContextBar } from "../components/grid/ContextBar";
 import { StateBadge } from "../components/grid/StateBadge";
 import { EmptyState } from "../components/grid/EmptyState";
@@ -176,11 +177,11 @@ export function VisualMatrix() {
                 <span className="model-pill" data-slot="metadata">anthropic-extended-thinking-partner · claude-opus-4-fixture-long-runtime-identity-string · effort: maximum-reasoning-depth</span>
               </div>
               <div className="agent-card-header-actions">
-                <div data-slot="context"><ContextBar value={0.74} used={153482} size={200000} compact /></div>
                 <StateBadge state={liveState === "stopped" ? "busy" : liveState} />
-                <Button data-slot="collapse-control" size="small">Collapse</Button>
+                <IconButton data-slot="collapse-control" size="small" aria-label="Collapse" title="Collapse"><CollapseIcon /></IconButton>
               </div>
             </div>
+            <div className="agent-card-context" data-slot="context"><ContextBar value={0.74} used={153482} size={200000} compact /></div>
             <div className="dashboard-chat-pane" data-slot="chat-pane">
               <div className="transcript-wrap">
                 <div className="transcript-view" data-ui="transcript" data-slot="list">

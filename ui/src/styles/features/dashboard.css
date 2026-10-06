@@ -130,7 +130,7 @@
 .agent-card[data-variant="expanded"] {
   cursor: default;
   height: 640px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   overflow-anchor: none;
   padding-bottom: 0;
@@ -142,8 +142,9 @@
 }
 
 .agent-card[data-variant="expanded"] .agent-card-top {
+  align-items: start;
   cursor: pointer;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .agent-card-name-link {
@@ -159,23 +160,18 @@
   -webkit-line-clamp: 3;
 }
 
+/* Badge and Collapse sit top-right beside the identity (FS-02.R68). */
 .agent-card-header-actions {
   align-items: center;
   display: flex;
-  flex-wrap: wrap;
   gap: var(--ad-space-2);
   justify-content: flex-end;
-  width: 100%;
-  padding-bottom: var(--ad-space-3);
 }
 
 /* The meter's label can carry the exact used/total figure (TS-08.R81), so the
-   meter takes its own full-width row below the state badge and Collapse rather
-   than letting the no-wrap label run under them. */
-.agent-card-header-actions > [data-slot="context"] {
-  flex: 1 0 100%;
-  margin-bottom: var(--ad-space-3);
-  order: 1;
+   meter takes its own full-width row below the header. */
+.agent-card-context {
+  padding-bottom: var(--ad-space-3);
 }
 
 /* The expanded card's header "content side" (name + quiet runtime metadata,

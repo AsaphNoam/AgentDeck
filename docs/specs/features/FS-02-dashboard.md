@@ -289,12 +289,12 @@ shrinks with its content so every line is visible without inner scrolling. The a
 Tank composers stop growing at about 40% of the window height and scroll inside beyond that; every
 other field grows without a cap.
 
-**R67** (planned) — The chat composer's Send and Cancel actions and the agent card's Collapse and
+**R67** — The chat composer's Send and Cancel actions and the agent card's Collapse and
 the grid's Collapse all actions are icon buttons (send arrow, stop square, chevron) with an
 accessible name and hover tooltip equal to the former text. Steer and Withdraw queued remain text.
 Keyboard submission and every action's behavior are unchanged.
 
-**R68** (planned) — An expanded agent card on a scoped project dashboard places its state badge and
+**R68** — An expanded agent card on a scoped project dashboard places its state badge and
 Collapse control at the top right of the header row beside the agent identity; the context meter
 occupies its own full-width row below that header.
 

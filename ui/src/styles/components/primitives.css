@@ -69,6 +69,16 @@ button:disabled {
   padding: var(--ad-space-2);
 }
 
+.ad-button-icon [data-slot="label"] {
+  display: inline-grid;
+  place-items: center;
+}
+
+.ad-icon {
+  display: block;
+  flex-shrink: 0;
+}
+
 .ad-button-small,
 .btn-sm {
   font-size: 0.75rem;

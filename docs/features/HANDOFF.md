@@ -38,11 +38,12 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 [`ui-polish-fields-icons-labels`](../ready-changes/ui-polish-fields-icons-labels.md) — in progress.
 
+- Done: icon Send/Cancel/Collapse/Collapse all (`ui/src/components/ui/icons.tsx`) and the
+  expanded card header reorder (`.agent-card-context` row).
 - Done: shared `AutoGrowTextarea` (`ui/src/components/ui`) replaces every textarea, with a
   source-scan guard in its test; composers pass `maxHeight="40vh"`; global `resize: none`.
-- Next slices: icons (`icons.tsx`) for Send/Cancel/Collapse/Collapse all; expanded card header
-  reorder; shared duplicate-gated label helper lifted from `NewAgentModal.displayLabel`; Tasks page
-  skips archived projects.
+- Next slices: shared duplicate-gated label helper lifted from `NewAgentModal.displayLabel`; Tasks
+  page skips archived projects.
 - Owed at closure: rendered composer/expanded-card screenshots per skin and one settings form
   (FS-02.A48–A50), then remove `(planned)` from A48–A52 and the change file.
 

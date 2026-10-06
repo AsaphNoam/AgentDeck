@@ -165,6 +165,9 @@ describe("CardGrid", () => {
     renderWithQuery(<CardGrid projectID="my-app" />);
 
     expect(await screen.findAllByLabelText(/Composer a_/)).toHaveLength(2);
+    // FS-02.A49 — Collapse all is an icon button named by its label and tooltip.
+    expect(screen.getByRole("button", { name: "Collapse all" })).toHaveAttribute("title", "Collapse all");
+    expect(screen.getByRole("button", { name: "Collapse all" }).querySelector("svg")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
 
     expect(screen.queryByLabelText(/Composer a_/)).not.toBeInTheDocument();

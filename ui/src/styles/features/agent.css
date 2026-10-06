@@ -1040,6 +1040,15 @@
   background: var(--ad-surface-raised);
 }
 
+/* Send and Cancel are icons (FS-02.R67); their names live in aria-label/title. */
+.composer .composer-icon {
+  display: inline-grid;
+  min-height: 40px;
+  min-width: 40px;
+  padding: var(--ad-space-2);
+  place-items: center;
+}
+
 .composer-error,
 .composer-notice {
   grid-column: 1 / -1;

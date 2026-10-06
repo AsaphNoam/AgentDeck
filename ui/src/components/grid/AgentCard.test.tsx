@@ -118,6 +118,16 @@ describe("AgentCard", () => {
     fireEvent.contextMenu(screen.getByText("Send"));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     const collapse = screen.getByRole("button", { name: "Collapse" });
+    expect(collapse).toHaveAttribute("title", "Collapse");
+    expect(collapse.querySelector("svg")).not.toBeNull();
+    // FS-02.A50 — badge and Collapse share the identity header row; the context
+    // meter is the next row below it.
+    const header = screen.getByText("idle").closest('[data-slot="header"]')!;
+    expect(header).toContainElement(collapse);
+    expect(header).toContainElement(screen.getByRole("link", { name: "Atlas" }));
+    const meter = screen.getByLabelText("72% context used");
+    expect(header).not.toContainElement(meter);
+    expect(header.nextElementSibling).toContainElement(meter);
     fireEvent.click(collapse);
     expect(toggle).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByText("idle").closest('[data-slot="header"]')!);
