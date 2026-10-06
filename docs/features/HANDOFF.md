@@ -132,7 +132,9 @@ None.
   tool run/arguments while it executes, then receive `activity_state=completed` before root
   completion: tool detail stays expanded, violating TS-08.R102. Reset nested disclosure choices
   once at the child's terminal transition and test completed/failed/stopped/disconnected with
-  the root still live, preserving later manual reopening. Fix complexity: trivial/easy.
+  the root still live, preserving later manual reopening. A temporary component probe confirmed
+  the opened tool run remains expanded after child completion; the probe was removed.
+  Fix complexity: trivial/easy.
 - **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
   `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
   for the second turn, swallows the wait error, and never asserts that the second turn completed.
@@ -184,7 +186,9 @@ None.
   Opening-boundary identity and visible notices are sound local choices; native scroll anchoring
   still needs the required rendered proof. Invariant sweep: 1, 2, 8, 10, 11, 13, 16 and 17
   reviewed; 3, 4, 5, 6, 7, 9, 12, 14 and 15 have no applicable changed surface.
-  All 117 focused UI tests passed; a temporary reasoning ownership probe confirmed QT-01.
+  All 117 focused UI tests passed; temporary projection/component probes confirmed QT-01 and
+  QT-02 and were removed. The concurrent field-polish commit also captured the initial review
+  record; this review's final verification receipt is a separate handoff-only commit.
   Stylelint and all 40 script tests passed, but the presentation audit failed on concurrently
   added `AutoGrowTextarea.tsx` inline styles outside this unit. Preserved concurrent work;
   this review changes only the handoff and does not rerun or claim the rendered acceptance gates.
