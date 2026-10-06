@@ -14,16 +14,16 @@ NODE_VERSION="${NODE_VERSION:-22.22.0}"
 # the private runtime input reproducible; changing it is a deliberate release
 # dependency update and requires refreshing the matching Node archive.
 NODE_SHA256="5ed4db0fcf1eaf84d91ad12462631d73bf4576c1377e192d222e48026a902640"
-CLAUDE_ACP_VERSION="0.75.1"
-CODEX_ACP_VERSION="1.12.0"
+CLAUDE_ACP_VERSION="0.85.1"
+CODEX_ACP_VERSION="2.1.1"
 CODEX_ACP_COMPONENT_VERSION="${CODEX_ACP_VERSION}+chuck.1"
-CODEX_ACP_SOURCE_SHA256="f45a64dc3a994556ebdb688dc8d59b86945a9b2f940a3e3e545739dd265a7cc5"
-CODEX_ACP_PATCHED_SHA256="a4d3ee81aacfca79e048341423467738991d9b384cdc75eacac4521aee71ae03"
+CODEX_ACP_SOURCE_SHA256="4b76310393d756a0f111687cd9df899720f36f7c59b1eb1d86429484034ff91b"
+CODEX_ACP_PATCHED_SHA256="8424ea6e64c8b7e20f1ab325eaf8f8a033c7f24a161c663d7c42695a9c5363d9"
 # The Codex CLI is a direct runtime dependency, not just codex-acp's transitive
 # one: its platform binary is the single managed Codex a backend can explicitly
 # select as the Chuck bundle (TS-06.R30). Keep in step with
 # scripts/release/package.json.
-CODEX_CLI_VERSION="0.154.0"
+CODEX_CLI_VERSION="0.159.3"
 # Bundled native providers inside the managed runtime root; the same paths the
 # resolver selects and release layout verification requires.
 CLAUDE_NATIVE="node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude"
@@ -67,7 +67,7 @@ cp scripts/release/package.json scripts/release/package-lock.json "$stage/runtim
 
 # Codex ACP advertises steering but its idle branch starts a detached turn.
 # Keep Chuck's no-consumption fallback explicit and version-locked until an
-# upstream release provides the same request-level contract (TS-04.R51/R61).
+# upstream release provides the same request-level contract (TS-04.R51/R79).
 codex_acp_source="$stage/runtime/node_modules/@agentclientprotocol/codex-acp/dist/index.js"
 codex_acp_sum="$(shasum -a 256 "$codex_acp_source" | awk '{print $1}')"
 [ "$codex_acp_sum" = "$CODEX_ACP_SOURCE_SHA256" ] \

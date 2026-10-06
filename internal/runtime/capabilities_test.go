@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// codex112Init is the reviewed codex-acp 1.12.0 initialize advertisement.
-const codex112Init = `{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"fork":{},"additionalDirectories":{},"subagents":{}}},"_meta":{"steering":{"supported":true},"jetbrains":{"air":{"version":1,"capabilities":["sessionFailure","agentFileChangeReport","nativeSubagentSessions","asyncTasks","recommendedValue"]}}}}`
+// codex211Init is the reviewed codex-acp 2.1.1 initialize advertisement to an AIR client.
+const codex211Init = `{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"mcpCapabilities":{"acp":false,"http":true,"sse":false},"sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"fork":{},"additionalDirectories":{},"subagents":{}}},"_meta":{"steering":{"supported":true},"jetbrains":{"air":{"version":1,"goal":{"version":1,"controlMethod":"_session/goal","actions":["set","pause","resume","clear"]},"capabilities":["sessionFailure","diffPatch","agentFileChangeReport","nativeSubagentSessions","asyncTasks","recommendedValue","rawInputRendering","planContentDelta"]}}}}`
 
 func TestNegotiateCapabilitiesIsBilateral(t *testing.T) {
 	all := clientOffer{Subagents: true, AsyncTasks: true, FileChangeReports: true}
@@ -20,9 +20,9 @@ func TestNegotiateCapabilitiesIsBilateral(t *testing.T) {
 		offer clientOffer
 		want  SessionCapabilities
 	}{
-		{"full advertisement and offer", codex112Init, all, full},
+		{"full advertisement and offer", codex211Init, all, full},
 		// Fork needs no client offer; everything else is off until Chuck offers it.
-		{"no client offer", codex112Init, clientOffer{}, SessionCapabilities{Fork: true}},
+		{"no client offer", codex211Init, clientOffer{}, SessionCapabilities{Fork: true}},
 		{"absent advertisement", `{"protocolVersion":1,"agentCapabilities":{}}`, all, SessionCapabilities{}},
 		{"malformed response", `not json`, all, SessionCapabilities{}},
 		{"wrong-typed fork", `{"agentCapabilities":{"sessionCapabilities":{"fork":true}}}`, all, SessionCapabilities{}},
@@ -80,7 +80,7 @@ func TestStartNegotiatesCapabilitiesFromInitialize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("lookup: %v", err)
 	}
-	if got, want := as.capabilities(), negotiateCapabilities(json.RawMessage(codex112Init), offered); got != want || !got.Fork {
+	if got, want := as.capabilities(), negotiateCapabilities(json.RawMessage(codex211Init), offered); got != want || !got.Fork {
 		t.Fatalf("session capabilities = %+v, want %+v", got, want)
 	}
 }

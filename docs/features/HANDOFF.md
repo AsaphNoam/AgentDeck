@@ -32,15 +32,24 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 Slices, each committed when verified:
 
 1. ~~go-sdk v1.8.0 (TS-04.R83)~~ done.
-2. Release pins, lockfile, regenerated `2.1.1` steering patch, assembly/installer/manifest fixtures
-   (TS-04.R79, TS-06.R32).
-3. Codex 2.x AIR decoder and fake re-derived (TS-04.R79/R62).
-4. Session notices end to end (TS-04.R80, TS-08.R86, FS-03.A49).
-5. Steer-backgrounded tool (TS-04.R81, FS-03.A48).
-6. Model-policy refusals (TS-04.R82, FS-09.A48).
+2–3. ~~Release pins, patch, fixtures; AIR re-derivation (TS-04.R79)~~ done. Assembly proofs were
+   reproduced locally from the lockfile (`npm ci`, hashes, zero-fuzz patch, one Codex). AIR shapes
+   Chuck decodes did not change, so no decoder change was needed (recorded in R79).
+4. Session notices end to end (TS-04.R80, TS-08.R86, FS-03.A49). Offer
+   `clientCapabilities.session.notices: {}` in `capabilities.go`; decode `notice` in
+   `acpmap.go mapSessionUpdate`; `EvNotice` in `event.go` + `AllEventTypes`; `transcript/project.go`
+   metadata disposition; UI row in `TranscriptView.tsx` and phone `remote/AgentScreen.tsx`.
+5. Backgrounded tool (TS-04.R81, FS-03.A48): the real marker is
+   `_meta.jetbrains.air.asyncTasks.backgrounded` on `tool_call_update` (fake `task_flow` already
+   emits it; runtime ignores it today). Tasks already arrive via `async_task_spawned`; the work is
+   flagging the tool row and linking it to the task row (`runtimeActivity.ts`, `toolRun.tsx`).
+6. Model-policy refusals (TS-04.R82, FS-09.A48). Claude 0.85.1: a `set_config_option` veto is a
+   JSON-RPC `-32603` with `data.details` = the hook text; a `session/new` veto succeeds on the SDK
+   default model. `applyRequiredOption`/`setConfigOption` (`chat.go` ~2470–2530) already read back
+   `currentValue`; confirm the reason surfaces, then add tests.
 7. Closure matrix, `(planned)` tags removed, smokes recorded or owed.
 
-Next: slice 2.
+Next: slice 4.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
@@ -66,7 +75,7 @@ scripts/room-render.mjs <outDir> live|ended)`.
   pinned Claude and Codex providers have not been run; no qualitative receipt exists yet.
 - FS-18.A13: the credentialed fresh and resumed Claude chat check of native-preset adoption is
   owed. Automated coverage proves only the sent shape against pinned
-  `claude-agent-acp` 0.75.1 (`scripts/release/node_modules/.../dist/acp-agent.js` forwards an
+  `claude-agent-acp` 0.85.1 (`scripts/release/node_modules/.../dist/acp-agent.js` forwards an
   object `_meta.systemPrompt` as a preset append; a string replaces the preset).
 
 - FS-20.A1/A5/A6/A8: real tailnet, Android, iPhone, and `pmset -g assertions` checks. The iPhone
@@ -86,7 +95,7 @@ scripts/room-render.mjs <outDir> live|ended)`.
   probes run first in release CI. Claude Installed fresh launch at `claude-opus-5-5` passed live
   2026-10-05 (adapter 0.75.1/SDK 0.3.257, Claude Code 2.1.282, macOS, the user's existing login); the
   Bundle still refuses it with Claude Code 2.1.257's version error, as designed.
-- TS-06.R26: the credentialed Codex 1.12.0 receipt gating FS-03.A41/A42 and FS-01.A20.
+- TS-06.R26/R32: the credentialed Codex 2.1.1 receipt gating FS-03.A41/A42 and FS-01.A20.
 - FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove
   with Codex capabilities.
 

@@ -151,7 +151,7 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_INIT_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, msg.Params, 0o600)
 		}
-		// The reviewed codex-acp 1.12.0 advertisement (CodexAcpServer.initialize):
+		// The reviewed codex-acp 2.1.1 advertisement (CodexAcpServer.initialize):
 		// canonical session capabilities plus the AIR extension list.
 		if os.Getenv("FAKEACP_CAPS") != "" {
 			res["agentCapabilities"] = map[string]any{"loadSession": true, "sessionCapabilities": map[string]any{
@@ -159,7 +159,7 @@ func handle(msg *rpcMessage) {
 				"fork": map[string]any{}, "additionalDirectories": map[string]any{}, "subagents": map[string]any{},
 			}}
 			res["_meta"] = map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{
-				"sessionFailure", "agentFileChangeReport", "nativeSubagentSessions", "asyncTasks", "recommendedValue",
+				"sessionFailure", "diffPatch", "agentFileChangeReport", "nativeSubagentSessions", "asyncTasks", "recommendedValue", "rawInputRendering", "planContentDelta",
 			}}}}
 		}
 		respond(*msg.ID, res)
@@ -609,7 +609,7 @@ func runScenario(name string) string {
 		return "end_turn"
 
 	case "task_flow":
-		// codex-acp 1.12 background terminals (CodexBackgroundTerminalTasks):
+		// codex-acp 2.1 background terminals (CodexBackgroundTerminalTasks):
 		// the tool call is marked backgrounded, then the task is announced under
 		// its owning session. A child reuses the root's raw task id, and the
 		// root announcement repeats as a replayed duplicate (FS-03.A41).

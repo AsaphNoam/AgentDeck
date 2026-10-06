@@ -94,7 +94,7 @@ func TestClaudeSessionNewParamsUseMetaOptions(t *testing.T) {
 }
 
 // FS-18.A13, TS-04.R69: Claude new and load both send the object shape the
-// pinned claude-agent-acp 0.75.1 forwards as a native-preset append; a string
+// pinned claude-agent-acp 0.85.1 forwards as a native-preset append; a string
 // there replaces Claude Code's coding instructions. The expected wire JSON is
 // written out here rather than taken from the builder (INV §17).
 func TestClaudeSessionParamsAppendToNativePreset(t *testing.T) {

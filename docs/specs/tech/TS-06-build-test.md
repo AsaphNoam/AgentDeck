@@ -169,6 +169,7 @@ documentation move together. Assembly still proves one installed Codex package, 
 unpatched adapter bundle, applies the version-named no-consumption steering patch with zero fuzz,
 hashes the complete patched output, and reports the component as `1.12.0+chuck.1`. A source
 comparison test proves the patch is still semantically required instead of assuming its old offset.
+R32 moved these pins to `2.1.1`/`0.159.3` on 2026-10-06; its owed receipt now runs against them.
 
 Automated contract fixtures exercise canonical and absent capability advertisements; root/nested
 reasoning; native child lifecycle and legacy fallback; background task reconstruction, targeted stop
