@@ -15,9 +15,9 @@ import (
 // attempt's retained activity, or a file from a retained participant source is
 // the anchor; attribution is resolved here from room-owned rows, never taken
 // from the client. Room delivery is shared input held for the turn boundary.
-// Selected-agent delivery (including an agent New task just launched) records
-// the batch in room history first, then delivers it as ordinary annotation
-// mail, so a failed send leaves the browser tray for retry (INV §15).
+// Selected-agent delivery (including an agent New task just launched) commits
+// room history and ordinary annotation mail together, so a failed send leaves
+// the browser tray for retry and a lost response cannot duplicate mail (INV §15).
 
 type thinkTankAnnotationIn struct {
 	// Anchor is entry, activity or file.
@@ -203,19 +203,15 @@ func (s *Server) handleThinkTankAnnotation(w http.ResponseWriter, r *http.Reques
 		}
 		context["recipient"] = target.Name
 		raw, _ := json.Marshal(context)
-		input, updated, err := s.stateStore.AddThinkTankRecord(roomID, req.CommandID, body, string(raw))
+		input, updated, err := s.stateStore.AddThinkTankAnnotationMail(roomID, req.CommandID, body, string(raw), state.Message{
+			FromAgent: "user", FromAddress: "user@dashboard", FromName: "Dashboard user",
+			ToAgent: target.AgentID, Subject: "Think Tank annotations",
+		})
 		if err != nil {
 			s.writeThinkTankError(w, err)
 			return
 		}
 		s.publishThinkTankUpdate(updated)
-		if _, err := s.stateStore.InsertMessage(state.Message{
-			FromAgent: "user", FromAddress: "user@dashboard", FromName: "Dashboard user",
-			ToAgent: target.AgentID, Subject: "Think Tank annotations", Body: body,
-		}); err != nil {
-			writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-			return
-		}
 		select {
 		case s.activationCh <- target.AgentID:
 		default:

@@ -132,16 +132,11 @@ func (s *Server) handleCreateThinkTank(w http.ResponseWriter, r *http.Request) {
 				writeAPIError(w, ae)
 				return
 			}
-			id, err := s.stateStore.NewAgentID()
-			if err != nil {
-				writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-				return
-			}
 			name := strings.TrimSpace(p.New.Name)
 			if name == "" {
 				name = "New agent"
 			}
-			m.AgentID, m.AgentName, m.Project, m.SetupConfig = id, name, p.New.Project, config
+			m.AgentName, m.Project, m.SetupConfig = name, p.New.Project, config
 		default:
 			writeAPIError(w, apiError(runtime.CodeValidation, "each participant names an existing agent or new agent settings"))
 			return

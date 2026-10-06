@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -34,9 +35,11 @@ const (
 	ThinkTankMemberDeparted  = "departed"
 	ThinkTankMemberExhausted = "exhausted"
 
-	ThinkTankSetupReady   = "ready"
-	ThinkTankSetupPending = "pending"
-	ThinkTankSetupFailed  = "failed"
+	ThinkTankSetupReady     = "ready"
+	ThinkTankSetupPending   = "pending"
+	ThinkTankSetupLaunching = "launching"
+	ThinkTankSetupAbandoned = "abandoned"
+	ThinkTankSetupFailed    = "failed"
 
 	ThinkTankTurnOpening    = "opening"
 	ThinkTankTurnDiscussion = "discussion"
@@ -374,10 +377,10 @@ func validateThinkTankCreate(c ThinkTankCreate) error {
 	}
 	seen := map[string]bool{}
 	for _, m := range c.Members {
-		if m.AgentID == "" {
+		if m.AgentID == "" && m.SetupConfig == "" {
 			return thinkTankInvalid("participant agent id is required")
 		}
-		if seen[m.AgentID] {
+		if m.AgentID != "" && seen[m.AgentID] {
 			return thinkTankInvalid("participant %s appears twice", m.AgentID)
 		}
 		seen[m.AgentID] = true
@@ -395,11 +398,25 @@ func sameThinkTankCreate(room ThinkTank, members []ThinkTankMember, c ThinkTankC
 	}
 	for i, m := range members {
 		w := c.Members[i]
-		if m.AgentID != w.AgentID || m.Cap != w.Cap || m.MayLeave != w.MayLeave || m.SetupConfig != w.SetupConfig {
+		if (w.SetupConfig == "" && m.AgentID != w.AgentID) || m.Cap != w.Cap || m.MayLeave != w.MayLeave || m.SetupConfig != w.SetupConfig {
 			return false
 		}
 	}
 	return true
+}
+
+func thinkTankCreateIntent(c ThinkTankCreate) string {
+	members := make([]ThinkTankMember, len(c.Members))
+	for i, m := range c.Members {
+		id := m.AgentID
+		if m.SetupConfig != "" {
+			id = ""
+		}
+		members[i] = ThinkTankMember{AgentID: id, Cap: m.Cap, MayLeave: m.MayLeave, SetupConfig: m.SetupConfig}
+	}
+	c.Members = members
+	raw, _ := json.Marshal(c)
+	return string(raw)
 }
 
 // CreateThinkTank persists setup intent and reserved identities before any
@@ -414,19 +431,43 @@ func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
 		return ThinkTankDetail{}, fmt.Errorf("state: begin create think tank: %w", err)
 	}
 	defer tx.Rollback()
-	var existing string
-	err = tx.QueryRow(`SELECT room_id FROM think_tanks WHERE command_id = ?`, c.CommandID).Scan(&existing)
+	intent := thinkTankCreateIntent(c)
+	var existing, savedIntent string
+	err = tx.QueryRow(`SELECT room_id, create_intent FROM think_tanks WHERE command_id = ?`, c.CommandID).Scan(&existing, &savedIntent)
 	if err == nil {
 		d, err := readThinkTankDetail(tx, existing)
 		if err != nil {
 			return ThinkTankDetail{}, err
 		}
-		if !sameThinkTankCreate(d.Room, participantsOf(d.Members), c) {
+		if (savedIntent != "" && savedIntent != intent) || (savedIntent == "" && !sameThinkTankCreate(d.Room, participantsOf(d.Members), c)) {
 			return ThinkTankDetail{}, thinkTankConflict("command id reused for a different room")
 		}
 		return d, nil
 	} else if !errors.Is(err, sql.ErrNoRows) {
 		return ThinkTankDetail{}, fmt.Errorf("state: read think tank command: %w", err)
+	}
+	c.Members = append([]ThinkTankMember{}, c.Members...)
+	reserved := map[string]bool{}
+	for _, m := range c.Members {
+		reserved[m.AgentID] = true
+	}
+	for i := range c.Members {
+		if c.Members[i].AgentID != "" {
+			continue
+		}
+		for tries := 0; tries < 10; tries++ {
+			id, err := newAgentID(tx)
+			if err != nil {
+				return ThinkTankDetail{}, err
+			}
+			if !reserved[id] {
+				c.Members[i].AgentID, reserved[id] = id, true
+				break
+			}
+		}
+		if c.Members[i].AgentID == "" {
+			return ThinkTankDetail{}, fmt.Errorf("state: could not reserve unique participant id")
+		}
 	}
 	roomID, err := newThinkTankID("tt_", 8)
 	if err != nil {
@@ -448,10 +489,10 @@ func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
 	now := formatTime(timeNow())
 	if _, err := tx.Exec(`
 INSERT INTO think_tanks(room_id, command_id, goal, origin_project, openings, phase, control,
-  judge_config, judge_status, created_at, updated_at)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  judge_config, judge_status, created_at, updated_at, create_intent)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		roomID, c.CommandID, c.Goal, c.OriginProject, c.Openings, phase, ThinkTankRunning,
-		c.JudgeConfig, judgeStatus, now, now); err != nil {
+		c.JudgeConfig, judgeStatus, now, now, intent); err != nil {
 		return ThinkTankDetail{}, fmt.Errorf("state: insert think tank: %w", err)
 	}
 	for i, m := range c.Members {
@@ -756,6 +797,25 @@ func bumpThinkTankTx(tx *sql.Tx, roomID string) error {
 	return nil
 }
 
+// ClaimThinkTankMemberSetup fences setup launch effects against Pause/End/Delete.
+// Delete refuses the claimed slot until its ordinary launch outcome commits.
+func (s *Store) ClaimThinkTankMemberSetup(roomID, agentID string) (ThinkTankDetail, error) {
+	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		if d.Room.Phase != ThinkTankPhaseSetup || d.Room.Control != ThinkTankRunning || d.Room.Hold != "" {
+			return thinkTankConflict("room setup is no longer runnable")
+		}
+		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ? WHERE room_id = ? AND agent_id = ? AND role = ? AND setup_state = ?`,
+			ThinkTankSetupLaunching, roomID, agentID, ThinkTankRoleParticipant, ThinkTankSetupPending)
+		if err != nil {
+			return fmt.Errorf("state: claim think tank setup: %w", err)
+		}
+		if n, err := res.RowsAffected(); err != nil || n != 1 {
+			return thinkTankConflict("participant is not pending setup")
+		}
+		return nil
+	})
+}
+
 // MarkThinkTankMemberSetup records a reserved new participant's launch
 // outcome. When every participant is ready, the room leaves setup. A failed
 // slot keeps the room in setup with a hold naming it; retry relaunches only
@@ -768,7 +828,7 @@ func (s *Store) MarkThinkTankMemberSetup(roomID, agentID, name, launchErr string
 		}
 		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?,
   agent_name = CASE WHEN ? = '' THEN agent_name ELSE ? END
-WHERE room_id = ? AND agent_id = ? AND setup_state != 'ready'`, state, launchErr, name, name, roomID, agentID)
+WHERE room_id = ? AND agent_id = ? AND setup_state IN ('pending', 'launching', 'failed')`, state, launchErr, name, name, roomID, agentID)
 		if err != nil {
 			return fmt.Errorf("state: mark think tank setup: %w", err)
 		}
@@ -900,6 +960,10 @@ func (s *Store) EndThinkTank(roomID string) (ThinkTankDetail, error) {
 // (FS-21.R37). The judge becomes ready when configured.
 func endThinkTankTx(tx *sql.Tx, d ThinkTankDetail, reason string) error {
 	roomID := d.Room.RoomID
+	if _, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ? WHERE room_id = ? AND role = ? AND setup_state IN ('pending', 'failed')`,
+		ThinkTankSetupAbandoned, roomID, ThinkTankRoleParticipant); err != nil {
+		return fmt.Errorf("state: abandon think tank setup: %w", err)
+	}
 	if d.Room.Phase == ThinkTankPhaseOpenings {
 		if err := publishOpeningsTx(tx, d, true); err != nil {
 			return err
@@ -1219,6 +1283,11 @@ func (s *Store) DeleteThinkTank(roomID string) error {
 	}
 	if d.Room.JudgeStatus == ThinkTankJudgeLaunching {
 		return thinkTankConflict("the judge is starting")
+	}
+	for _, m := range d.Members {
+		if m.SetupState == ThinkTankSetupLaunching {
+			return thinkTankConflict("a participant is starting")
+		}
 	}
 	if _, err := tx.Exec(`DELETE FROM think_tanks WHERE room_id = ?`, roomID); err != nil {
 		return fmt.Errorf("state: delete think tank: %w", err)

@@ -112,7 +112,7 @@ func (s *Server) thinkTankIneligible(agentID string) string {
 		return "a participant was deleted. End the discussion to keep its history."
 	}
 	if err != nil {
-		return ""
+		return "A participant's identity cannot be read. Retry after restoring it, or end the discussion."
 	}
 	switch {
 	case agent.Archived:
@@ -120,7 +120,11 @@ func (s *Server) thinkTankIneligible(agentID string) string {
 	case agent.Interface != "chat":
 		return agent.Name + " is no longer a chat agent. Switch it back and resume, or end the discussion."
 	}
-	if ae := s.projectArchiveGate(agent.Project, "project is archived"); ae != nil && ae.Code != runtime.CodeInternal {
+	project, err := s.configStore.ReadProject(agent.Project)
+	if err != nil {
+		return agent.Name + "'s project is missing or unreadable. Restore it and resume, or end the discussion."
+	}
+	if project.Archived {
 		return agent.Name + "'s project is archived. Unarchive it and resume, or end the discussion."
 	}
 	return ""
@@ -140,6 +144,12 @@ func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail
 	}
 	var begun *state.ThinkTankAttempt
 	begin := func(turnID string) error {
+		if reason := s.thinkTankIneligible(agentID); reason != "" {
+			if held, err := s.stateStore.SetThinkTankHold(d.Room.RoomID, reason); err == nil {
+				s.publishThinkTankUpdate(held)
+			}
+			return errors.New(reason)
+		}
 		a, err := s.stateStore.BeginThinkTankAttempt(state.ThinkTankBegin{
 			RoomID: d.Room.RoomID, Revision: d.Room.Revision, AgentID: agentID, Turn: next.Turn,
 			Generation: s.registry.Generation(agentID), TurnID: turnID,
@@ -171,6 +181,14 @@ func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail
 			return false
 		}
 		defer s.releaseLifecycle(agentID)
+		agent, err := s.stateStore.ReadAgent(agentID)
+		if err != nil {
+			return false
+		}
+		if ae := s.acquireAgentStart(agent.Project, agentID); ae != nil {
+			return false
+		}
+		defer s.releaseAgentStart(agent.Project, agentID)
 		started, err := s.registry.StartActivation(ctx, agentID, state.ActivationKindThinkTank, begin)
 		if err != nil {
 			s.log.Debug("start think tank turn", "room", d.Room.RoomID, "agent", agentID, "err", err)
@@ -211,6 +229,9 @@ func (s *Server) launchThinkTankSetup(ctx context.Context, d state.ThinkTankDeta
 		if m.Role != state.ThinkTankRoleParticipant || m.SetupState != state.ThinkTankSetupPending {
 			continue
 		}
+		if _, err := s.stateStore.ClaimThinkTankMemberSetup(d.Room.RoomID, m.AgentID); err != nil {
+			return
+		}
 		name, launchErr := s.launchReservedThinkTankAgent(ctx, m.AgentID, m.SetupConfig)
 		updated, err := s.stateStore.MarkThinkTankMemberSetup(d.Room.RoomID, m.AgentID, name, launchErr)
 		if err != nil {
@@ -220,6 +241,26 @@ func (s *Server) launchThinkTankSetup(ctx context.Context, d state.ThinkTankDeta
 		s.publishThinkTankUpdate(updated)
 		if launchErr != "" {
 			return
+		}
+	}
+	s.kickThinkTanks()
+}
+
+// Requested Stop suppresses turn_end. Settle only attempts owned by the exiting
+// generation, releasing capture and allowance-free intervention on every exit.
+func (s *Server) interruptThinkTankOnExit(agentID, generation, cause string) {
+	attempts, err := s.stateStore.RunningThinkTankAttempts(agentID, generation)
+	if err != nil {
+		s.log.Warn("read exiting think tank attempts", "agent", agentID, "err", err)
+		return
+	}
+	for _, a := range attempts {
+		s.endThinkTankCapture(agentID, generation, a.TurnID)
+		f, err := s.stateStore.FailThinkTankAttempt(agentID, generation, a.TurnID, "The agent stopped ("+cause+"). Retry explicitly, or end the discussion.")
+		if err == nil {
+			s.publishThinkTankUpdate(f.Detail)
+		} else if !errors.Is(err, state.ErrNotFound) {
+			s.log.Warn("settle exiting think tank attempt", "agent", agentID, "err", err)
 		}
 	}
 	s.kickThinkTanks()

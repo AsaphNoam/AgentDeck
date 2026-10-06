@@ -169,6 +169,15 @@ func handle(msg *rpcMessage) {
 		if dump := os.Getenv("FAKEACP_NEW_DUMP"); dump != "" {
 			_ = os.WriteFile(dump, decodeSessionRequest(msg.Params, newSessionMembers), 0o600)
 		}
+		if hold := os.Getenv("FAKEACP_NEW_HOLD_FILE"); hold != "" {
+			deadline := time.Now().Add(15 * time.Second)
+			for time.Now().Before(deadline) {
+				if _, err := os.Stat(hold); err == nil {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
 		// The real adapters publish an available_commands_update right after a
 		// session is created. Emit it BEFORE the response so the runtime's ordered
 		// read loop has stored the snapshot by the time session/new returns.

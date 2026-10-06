@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -81,6 +82,27 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 // ListThinkTankActivity returns visible activity after afterSeq. Activity of
 // an opening still withheld behind the barrier is not offered (TS-14.R16).
 func (s *Store) ListThinkTankActivity(roomID string, afterSeq int64, limit int) ([]ThinkTankActivity, error) {
+	return s.listThinkTankActivity(roomID, afterSeq, limit)
+}
+
+// ThinkTankActivityWindowStart identifies the newest visible window without
+// loading all of its payloads. The returned sequence is excluded by List.
+func (s *Store) ThinkTankActivityWindowStart(roomID string, limit int) (int64, bool, error) {
+	var after int64
+	err := s.db.QueryRow(`SELECT v.seq FROM think_tank_activity v
+JOIN think_tank_attempts a ON a.attempt_id = v.attempt_id
+WHERE v.room_id = ? AND NOT (a.turn = 'opening' AND a.state != 'finalized')
+ORDER BY v.seq DESC LIMIT 1 OFFSET ?`, roomID, limit).Scan(&after)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("state: recent think tank window: %w", err)
+	}
+	return after, true, nil
+}
+
+func (s *Store) listThinkTankActivity(roomID string, afterSeq int64, limit int) ([]ThinkTankActivity, error) {
 	rows, err := s.db.Query(`
 SELECT v.room_id, v.seq, v.attempt_id, v.agent_id, v.agent_name, v.project, v.cwd, v.generation, v.turn_id,
   v.source_seq, v.payload, v.truncated, v.created_at
@@ -139,17 +161,18 @@ ORDER BY created_at DESC LIMIT 1`, callerAgentID, ThinkTankAttemptRunning).Scan(
 // ThinkTankSource is one participant workspace context recorded with room
 // activity. Its id is an opaque room-owned reference (TS-14 §3).
 type ThinkTankSource struct {
-	SourceID  string
-	AgentID   string
-	AgentName string
-	Project   string
-	Cwd       string
+	SourceID   string
+	AgentID    string
+	AgentName  string
+	Project    string
+	Cwd        string
+	AttemptIDs []string
 }
 
 // ThinkTankSources lists the distinct recorded workspace contexts.
 func (s *Store) ThinkTankSources(roomID string) ([]ThinkTankSource, error) {
 	rows, err := s.db.Query(`
-SELECT MIN(seq), agent_id, agent_name, project, cwd FROM think_tank_activity
+SELECT MIN(seq), agent_id, agent_name, project, cwd, GROUP_CONCAT(DISTINCT attempt_id) FROM think_tank_activity
 WHERE room_id = ? GROUP BY agent_id, cwd ORDER BY MIN(seq)`, roomID)
 	if err != nil {
 		return nil, fmt.Errorf("state: list think tank sources: %w", err)
@@ -158,11 +181,13 @@ WHERE room_id = ? GROUP BY agent_id, cwd ORDER BY MIN(seq)`, roomID)
 	for rows.Next() {
 		var src ThinkTankSource
 		var seq int64
-		if err := rows.Scan(&seq, &src.AgentID, &src.AgentName, &src.Project, &src.Cwd); err != nil {
+		var attempts string
+		if err := rows.Scan(&seq, &src.AgentID, &src.AgentName, &src.Project, &src.Cwd, &attempts); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("state: scan think tank source: %w", err)
 		}
 		src.SourceID = fmt.Sprintf("src_%d", seq)
+		src.AttemptIDs = strings.Split(attempts, ",")
 		out = append(out, src)
 	}
 	if err := rows.Err(); err != nil {

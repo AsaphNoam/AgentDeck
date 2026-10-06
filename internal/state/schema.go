@@ -612,4 +612,8 @@ ALTER TABLE sessions ADD COLUMN last_context_size INTEGER;
 		version: 36,
 		apply:   migrateThinkTanks,
 	},
+	{
+		version: 37,
+		sql:     `ALTER TABLE think_tanks ADD COLUMN create_intent TEXT NOT NULL DEFAULT '';`,
+	},
 }

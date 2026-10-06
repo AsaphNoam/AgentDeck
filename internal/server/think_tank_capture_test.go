@@ -100,7 +100,7 @@ func TestThinkTankCaptureProjectsRoomActivity(t *testing.T) {
 		Activity []thinkTankActivityWire `json:"activity"`
 	}
 	_ = json.Unmarshal(act.Body.Bytes(), &page)
-	if len(page.Activity) != 6 || page.Activity[0].AgentName != "a_one" || page.Activity[0].SourceSeq != 2 {
+	if len(page.Activity) != 8 || page.Activity[0].AgentName != "a_one" || page.Activity[1].SourceSeq != 2 {
 		t.Fatalf("activity rows = %+v", page.Activity)
 	}
 
@@ -128,6 +128,93 @@ func TestThinkTankCaptureProjectsRoomActivity(t *testing.T) {
 	}
 	if again := doJSON(t, h, http.MethodGet, base+"/activity", ""); !strings.Contains(again.Body.String(), "go test ./...") {
 		t.Fatal("retained activity lost with its agent")
+	}
+}
+
+// TS-14.R12/R17: first-record clipping preserves progress and a contribution
+// with no tools keeps its workspace after its agent is deleted.
+func TestThinkTankActivityFirstRecordBoundAndSource(t *testing.T) {
+	srv, h := roomRESTServer(t)
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two")).Body.Bytes(), &room)
+	cwd := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cwd, "notes.md"), []byte("retained workspace"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	a := beginCapturedTurn(t, srv, room.RoomID, "a_one", "t1", cwd)
+	base := "/api/think-tanks/" + room.RoomID
+	var files struct {
+		Sources []thinkTankSourceWire `json:"sources"`
+	}
+	_ = json.Unmarshal(doJSON(t, h, http.MethodGet, base+"/files", "").Body.Bytes(), &files)
+	if len(files.Sources) != 1 || len(files.Sources[0].AttemptIDs) != 1 || files.Sources[0].AttemptIDs[0] != a.AttemptID {
+		t.Fatalf("sources = %+v", files)
+	}
+	if _, err := srv.stateStore.DB().Exec(`DELETE FROM sessions WHERE agent_id = 'a_one'`); err != nil {
+		t.Fatal(err)
+	}
+	if got := doJSON(t, h, http.MethodGet, base+"/sources/"+files.Sources[0].SourceID+"/file?path=notes.md", ""); got.Code != 200 || !strings.Contains(got.Body.String(), "retained workspace") {
+		t.Fatalf("retained file = %s", got.Body.String())
+	}
+	annotation, _ := json.Marshal(map[string]any{"command_id": "retained-file", "target": map[string]string{"kind": "room"}, "annotations": []map[string]any{{"anchor": "file", "source_id": files.Sources[0].SourceID, "path": "notes.md", "excerpt": "retained workspace", "instruction": "Check this"}}})
+	if got := doJSON(t, h, http.MethodPost, base+"/annotations", string(annotation)); got.Code != 200 {
+		t.Fatalf("retained annotation: %d %s", got.Code, got.Body.String())
+	}
+	payload, _ := json.Marshal(map[string]any{"type": "tool_result", "data": map[string]any{"content": strings.Repeat("x", 2<<20)}})
+	big, err := srv.stateStore.AppendThinkTankActivity(state.ThinkTankActivity{RoomID: room.RoomID, AttemptID: a.AttemptID, AgentID: "a_one", Cwd: cwd, Payload: string(payload)}, runtime.EvToolResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	small, err := srv.stateStore.AppendThinkTankActivity(state.ThinkTankActivity{RoomID: room.RoomID, AttemptID: a.AttemptID, AgentID: "a_one", Cwd: cwd, Payload: `{"type":"diff","data":{"path":"later.md"}}`}, runtime.EvDiff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := doJSON(t, h, http.MethodGet, base+"/activity?after=1", "")
+	if response.Body.Len() > thinkTankActivityBytes {
+		t.Fatalf("response bytes = %d", response.Body.Len())
+	}
+	var page struct {
+		Activity []thinkTankActivityWire `json:"activity"`
+		Complete bool                    `json:"complete"`
+	}
+	_ = json.Unmarshal(response.Body.Bytes(), &page)
+	if len(page.Activity) != 2 || !page.Activity[0].Truncated || page.Activity[0].Seq != big.Seq || page.Activity[1].Seq != small.Seq || !page.Complete {
+		t.Fatalf("page = %+v", page)
+	}
+}
+
+// TS-14.R16/R17: projections use recent records and identify omitted history.
+func TestThinkTankRecentProjectionsExposeClipping(t *testing.T) {
+	srv, h := roomRESTServer(t)
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two")).Body.Bytes(), &room)
+	a := beginCapturedTurn(t, srv, room.RoomID, "a_one", "t1", t.TempDir())
+	tx, err := srv.stateStore.DB().Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	for seq := 2; seq <= thinkTankScanLimit+4; seq++ {
+		payload := `{"type":"session_meta"}`
+		if seq == thinkTankScanLimit+3 {
+			payload = `{"type":"diff","data":{"path":"recent.md"}}`
+		}
+		if seq == thinkTankScanLimit+4 {
+			payload = `{"type":"tool_call","data":{"tool_call_id":"late","args":{"command":"recent command"}}}`
+		}
+		_, err = tx.Exec(`INSERT INTO think_tank_activity(room_id,seq,attempt_id,agent_id,agent_name,project,cwd,generation,turn_id,source_seq,payload,truncated,created_at) VALUES(?,?,?,'a_one','A','alpha','','g1','t1',0,?,0,'2026-10-06T09:00:00Z')`, room.RoomID, seq, a.AttemptID, payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	for route, late := range map[string]string{"files": "recent.md", "commands": "recent command"} {
+		response := doJSON(t, h, http.MethodGet, "/api/think-tanks/"+room.RoomID+"/"+route, "")
+		if !strings.Contains(response.Body.String(), late) || !strings.Contains(response.Body.String(), `"clipped":true`) {
+			t.Fatalf("%s = %s", route, response.Body.String())
+		}
 	}
 }
 
@@ -160,6 +247,10 @@ func TestThinkTankAnnotationDestinations(t *testing.T) {
 	}
 	if rec := doJSON(t, h, http.MethodPost, base+"/annotations", batch("a3", `{"kind":"agent","agent_id":"a_two"}`)); rec.Code != http.StatusOK {
 		t.Fatalf("agent annotation after end = %d %s", rec.Code, rec.Body.String())
+	}
+	// A lost response can be retried after mail has already been accepted.
+	if rec := doJSON(t, h, http.MethodPost, base+"/annotations", batch("a3", `{"kind":"agent","agent_id":"a_two"}`)); rec.Code != http.StatusOK {
+		t.Fatalf("agent annotation replay = %d %s", rec.Code, rec.Body.String())
 	}
 	entries, _ := srv.stateStore.ListThinkTankEntries(room.RoomID, 0, 10)
 	if len(entries) != 3 || entries[1].Kind != state.ThinkTankEntryAnnotation ||

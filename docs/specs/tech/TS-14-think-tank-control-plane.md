@@ -23,6 +23,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   resume for stopped agents. Persist setup intent/reserved identities before launch effects.
   Partial setup retains created normal agents and exposes the failed slot; explicit retry does not
   silently duplicate them. Discussion starts only after setup is complete.
+  Each pending setup slot claims durable `launching` state before ordinary launch; Pause/End
+  prevent later claims, End abandons unstarted slots, and deletion refuses an in-flight claim.
 - **R3** — Add `think_tank` to the closed activation registry and bounded executor.
   Its fixed instruction names the room tools; goal, peer messages, role instructions and allowance
   are pulled as data, not persisted in role/session prompts. Use `Registry.StartActivation` under
@@ -31,6 +33,9 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   concrete generation/turn id, context head and ordinary messaging-budget reset before the provider
   frame. Pending activation is keyed by its room attempt, not unread status. Busy/private/assigned
   work holds the same speaker; room dispatch never uses human `SendPromptOrHold`.
+  Running-agent admission holds the existing agent/project archive start lease through the
+  provider frame and rechecks live project and agent eligibility in `before`. Room attempts and
+  task reservations mutually exclude each other in SQLite; missing/unreadable projects hold.
 - **R4** — Extend common runtime emission with the actual executing turn id, separate
   from the reserved-successor counter. Pass the original id through terminal emission before
   starting held/Steer successors. Source generation/turn ownership travels internally with normalized
@@ -62,6 +67,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   duplicate input without skipping interleaved annotations. Older/detail reads remain explicit.
   A delivery checkpoint does not prove model memory; identify known native context rebuilds and
   permit paged reconstruction without rewriting private history.
+  Continuation binds caller and attempt identity as well as room/view/head; invalid entry
+  positions, out-of-range offsets and offsets inside a UTF-8 rune return the typed cursor refusal.
 - **R8** — Independent openings use the same single-floor seam but withhold completed
   answer/activity in durable staging. Successful opening completion charges one turn without
   offering other opening bodies. One transaction publishes all completed openings in configured
@@ -73,6 +80,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   mail insertion and the existing normal launch/delivery seam for New task. Room/entry/file anchors
   are distinct from provider transcript seq. Stable command/receipt identities distinguish a retry
   from a new send; cancellation/failure preserves drafts and cannot silently duplicate delivery.
+  Selected-agent annotation history, ordinary mail and its pending activation commit in one
+  SQLite transaction; exact command replay creates no second delivery.
 - **R10** — Copy matching normalized room-turn activity into room-owned storage as it
   arrives, including source seq, generation/turn/child scope and frozen actor/project/cwd provenance.
   Private user/Steer prompts and unrelated turns are excluded. Tool/diff/result/permission payloads
@@ -96,6 +105,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   file route reuses the local bounded regular UTF-8 reader and absolute/relative semantics against
   retained source context, including typed failures and file annotation capture. Viewing does not
   archive unselected file contents.
+  Source references retain their attempt-to-workspace association; direct contribution and diff
+  links resolve those references independently of opening Files, including after agent deletion.
 - **R13** — Pause/End are durable requests, settled after active room work; End suppresses
   future participant/closing work and does not cancel private activity. Discussion-ended and judge
   state are independent. Launch the configured fresh judge only after final discussion/input
@@ -107,6 +118,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   work. Old generations/turn ids/tokens cannot finish a later attempt. Delete only paused/ended
   rooms with no active attempt; atomically revoke pending room activations/work, including an
   unstarted judge. Stale reads fail and delayed producers cannot launch or recreate deleted rooms.
+  Generation-scoped agent exit fails and releases its running room attempts and capture, including
+  requested Stop paths without a terminal event; no contribution allowance is charged.
 - **R15** — UI uses a full room route, project creation/list entry and distinct Archive
   room entries without changing legacy agent Archive payloads. Reuse scoped `foldTranscript`/
   `appendRenderedEvent`, `groupTranscriptRows`/`ToolRun`, content renderers and annotation helpers;
@@ -115,18 +128,25 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   original source under an atomic generation/turn guard; stale activity is read-only. Participant
   links reach ordinary cards/conversations; normal agent views identify room work. Use existing
   presentation contracts and all three appearances, without a new renderer or design framework.
+  Read-only settled activity keeps disclosure, copy, file viewing and annotation controls usable;
+  only stale source mutations are refused.
 - **R16** — After durable commit, emit versioned `think_tank_update` summaries.
   `think_tank_activity` carries bounded owned live activity/notices. Hydration/reconnect uses atomic
   snapshot/subscription plus bounded REST refill; revision/entry gaps refetch rather than guess.
   Browser windows/drafts are bounded and reset on room change/deletion. SSE is notification, not
   authoritative history, and blind openings are not offered through either room stream before publication.
+  Entry and activity windows retain the newest 5,000 records with explicit clipping notices.
+  Files/Commands inspect the newest 10,000 visible activity records and report clipping; retained
+  earlier records remain accessible through sequence-based REST windows.
 - **R17** — Initial bounds: requests 256 KiB; submitted reply/input UTF-8 text 64 KiB;
   nonblank goal 8,000 runes; participants 2–32 and individual limits 1–1,000; agent conversation
   pages 32 KiB entry/activity text with continuation and separately bounded goal/metadata;
   REST activity windows 500 records/1 MiB; executor batches 32.
   Capture caps are 8 MiB per normalized record (the existing transcript-record ceiling) and 64 MiB
   per attempt. Preserve identity/anchors
-  and explicit truncation markers for bounded display payloads. Never silently truncate a submitted
+  and explicit truncation markers for bounded display payloads. REST byte limits include encoded
+  record metadata; an oversized first record becomes an explicit bounded display marker with the
+  same sequence/attempt anchor so pagination progresses. Never silently truncate a submitted
   contribution. Enforce before allocation/expansion, return typed refusals and preserve drafts.
   These bound work/memory and completed contributions, not spend across manual retries.
 - **R18** — §3 is the closed initial interface inventory. Update shared result/approval
@@ -143,6 +163,8 @@ retained room source. `POST /{id}/{messages,annotations,pause,resume,retry,end}`
 human action; `DELETE /{id}` is guarded room deletion. Mutations carry stable command identity and
 expected revision where state-dependent; exact replay returns the original acknowledgement.
 Responses use versioned room types and standard structured errors; all collections are arrays.
+Creation stores immutable normalized request intent separately from repairable judge settings;
+replay reuses original reserved participant identities before any new identity is allocated.
 Source ids are opaque immutable room-owned references, distinct from room/provider sequences.
 Retry identifies the failed setup slot or participant/judge attempt; only judge launch-setting repair
 is accepted after discussion starts. No retry edits goal/membership or replays a completed effect.
@@ -210,14 +232,16 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
   attempt record. One server worker (`server/think_tanks.go`) serializes progression on a 5s sweep
   plus kicks. Executing turn ownership is `runtime.Event.TurnID`, cleared after the terminal
   emission. Capture copies tool, diff, permission, error and child-activity records only; assistant
-  prose, prompts and reasoning are not copied, and child activity emitted after the owning turn's
-  terminal event carries no turn id and is not captured. Room-source annotations publish an
+  prose, prompts and reasoning are not copied. Child scopes freeze their original generation/turn;
+  late child records keep that identity and are refused once its capture has settled, including
+  while a later room turn is active. Room-source annotations publish an
   attributed text batch whose anchors are server-resolved (`/annotations` with target room or
   agent); agent delivery reuses annotation mail after recording the batch. Pause/resume/end are
   idempotent and carry no expected revision; create, messages and annotations carry command ids.
   Retry targets are `setup`, `turn` and `judge`; a judge retry always launches a fresh judge.
-  Settled attempt activity renders read-only in the browser; live permission actions use the
-  ordinary per-agent decision endpoint, which already refuses a settled tool call.
+  Settled attempt activity retains inspection and annotation controls; unresolved retained approvals
+  render cancelled and cannot send a stale decision. Live permission actions use the ordinary
+  per-agent decision endpoint, which already refuses a settled tool call.
 - R18's credentialed Claude/Codex checks and the real-binary rendered journey remain owed.
 
 ## 6. Traceability
@@ -227,7 +251,7 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
   Shared extensions: TS-01.R37, TS-02.R42, TS-03.R55, TS-04.R84, TS-05.R25, TS-06.R33,
   TS-08.R87 and TS-11.R19. Existing task/pipeline semantics stay in TS-09/TS-10.
 - Verified lifecycle/activation: `server/launch.go` (`launchAgent`, `launchOptions`),
-  `runtime/{runtime,activation_kinds,chat}.go` (`StartActivation`, `settleAndReserveHeld`,
+  `runtime/{runtime,activation_kinds,chat}.go` (`StartActivation`, `settleTurnContext`,
   `finishTurn`, `emitIn`), `server/messaging_loops.go`, `server/task_dispatcher.go` (`dispatchTurnEnd`).
 - Verified data/action: `state/activations.go`, `messaging/messaging.go` (`addTool`, `ToolNames`),
   registry-derived approvals in `server/launch.go`, `server/fileread.go`, `runtime/activity.go`,

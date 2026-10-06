@@ -11,6 +11,7 @@ import { thinkTankDetailSchema } from "../../schemas/thinkTank";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import fixture from "./fixtures/room.json";
+import { fetchAllActivity } from "../../api/thinkTanks";
 
 // The room comes from the Go-encoded fixture (internal/server/
 // think_tank_handlers_test.go), so the page is tested against the real wire
@@ -62,6 +63,62 @@ afterEach(() => {
 afterAll(() => server.close());
 
 describe("ThinkTankPage", () => {
+  it("opens a deleted participant's retained source directly and annotates its file", async () => {
+    const entry = { ...fixture.entries[0], agent_id: "a_gone", body: "[notes](notes.md)", attempt_id: "tta_deleted" };
+    server.use(
+      http.get("/api/think-tanks/tt_fixture/entries", () => HttpResponse.json({ entries: [entry], complete: true })),
+      http.get("/api/think-tanks/tt_fixture/files", () => HttpResponse.json({ sources: [{ source_id: "src_23", agent_id: "a_gone", agent_name: "Gone", project: "alpha", attempt_ids: ["tta_deleted"] }], files: [] })),
+      http.get("/api/think-tanks/tt_fixture/sources/src_23/file", () => HttpResponse.json({ agent_id: "a_gone", path: "notes.md", content: "retained text", language: "text", size: 13, line_count: 1, truncated: false, mod_time: "2026-10-06T09:00:00Z" })),
+    );
+    const view = renderRoom();
+    fireEvent.click(await screen.findByRole("button", { name: "notes" }));
+    await screen.findByText("retained text");
+    const body = view.container.querySelector(".file-viewer-body")!;
+    const range = document.createRange(); range.selectNodeContents(body.querySelector('[data-file-line="1"]')!.lastElementChild!);
+    window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(range);
+    fireEvent.contextMenu(body);
+    fireEvent.click(await screen.findByText("Annotate selection"));
+    expect(Object.values(useAnnotationStore.getState().bySource).flat()).toEqual(expect.arrayContaining([expect.objectContaining({ room_anchor: "file", source_id: "src_23", path: "notes.md" })]));
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it.each(["discussion", "ended"])("keeps settled tools inspectable in %s while refusing stale approvals", async (phase) => {
+    detail = { ...room(), phase, active: undefined };
+    const activity = [
+      { type: "tool_call", data: { tool_call_id: "c1", name: "Bash", args: { command: "inspect me" } } },
+      { type: "tool_result", data: { tool_call_id: "c1", content: "x".repeat(650)+"tail", status: "completed" } },
+      { type: "permission_request", data: { tool_call_id: "old", name: "Stale permission", reason: "Old turn" } },
+      { type: "diff", data: { path: "notes.md", old_text: "old", new_text: "new" } },
+    ].map((event, i) => ({ version: 1, room_id: "tt_fixture", seq: i+1, attempt_id: "tta_1", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: i+1, created_at: "2026-10-06T09:00:00Z", event }));
+    server.use(http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ activity, complete: true })));
+    renderRoom();
+    fireEvent.click(await screen.findByRole("button", { name: "Ran 1 tool" }));
+    fireEvent.click(screen.getByRole("button", { name: /Tool call: Bash/ }));
+    expect(screen.getByText(/inspect me/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+    expect(screen.getByText(/tail$/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.getByText("Cancelled")).toBeTruthy();
+    const diff = document.querySelector('[data-variant="diff"]')!;
+    fireEvent.contextMenu(diff);
+    fireEvent.click(await screen.findByText("Annotate whole event"));
+    expect(Object.values(useAnnotationStore.getState().bySource).flat()).toEqual(expect.arrayContaining([expect.objectContaining({ room_anchor: "activity", seq: 4 })]));
+  });
+
+  it("exposes the bounded activity window and retains its newest rows", async () => {
+    server.use(http.get("/api/think-tanks/tt_fixture/activity", ({ request }) => {
+      const after = Number(new URL(request.url).searchParams.get("after"));
+      const count = Math.min(500, 5002-after);
+      return HttpResponse.json({ complete: after+count===5002, activity: Array.from({ length: count }, (_,i) => ({ version: 1, room_id: "tt_fixture", seq: after+i+1, attempt_id: "tta_1", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: after+i+1, created_at: "2026-10-06T09:00:00Z" })) });
+    }));
+    const result = await fetchAllActivity("tt_fixture", new AbortController().signal);
+    expect(result.clipped).toBe(true);
+    expect(result.activity).toHaveLength(5000);
+    expect(result.activity[0].seq).toBe(3);
+    expect(result.activity.at(-1)?.seq).toBe(5002);
+    renderRoom();
+    expect(await screen.findByText(/Showing the newest 5,000 activity records/)).toBeTruthy();
+  });
   // FS-21.A1, A16, A17, TS-08.R87: goal and phase lead, contributions are
   // attributed, live participants link to their own conversation and a
   // deleted one keeps attribution without a link.
@@ -114,6 +171,11 @@ describe("ThinkTankPage", () => {
 
 describe("roomStatus", () => {
   const base = thinkTankDetailSchema.parse(fixture.room);
+  it.each(["launching", "abandoned"])("accepts the durable setup state %s", (setup_state) => {
+    const wire = room();
+    wire.members[0].setup_state = setup_state;
+    expect(thinkTankDetailSchema.parse(wire).members[0].setup_state).toBe(setup_state);
+  });
   // FS-21.R18, R28, R19: the current-action line names its reason.
   it("names pending pause, private-work waits and holds", () => {
     expect(roomStatus({ ...base, control: "pause_requested", active: { attempt_id: "a", agent_id: "a_one", turn: "discussion", state: "running", failure: "", started_at: "" } }).text)

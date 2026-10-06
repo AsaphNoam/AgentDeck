@@ -1340,12 +1340,13 @@ UPDATE tasks
 SET state = ?, assigned_agent_id = ?, assigned_generation = ?, runtime_claim = ?,
   start_attempt_id = ?, start_claimed_at = ?, revision = revision + 1, updated_at = ?
 WHERE task_id = ? AND state = ?
+  AND NOT EXISTS (SELECT 1 FROM think_tank_attempts WHERE agent_id = ? AND state = 'running')
   AND (? = ? OR (
     SELECT COUNT(*) FROM tasks AS live
     WHERE live.runtime_claim IN (?, ?) AND live.state IN (?, ?)) < ?)`+taskRunOpenClause,
 		TaskStarting, reservation.AgentID, reservation.Generation, reservation.Claim,
 		reservation.AttemptID, stamp, stamp,
-		taskID, TaskReady,
+		taskID, TaskReady, reservation.AgentID,
 		reservation.Claim, ClaimBorrowed,
 		ClaimCreated, ClaimWoke, TaskStarting, TaskRunning, budget)
 	if isUniqueViolation(err) {

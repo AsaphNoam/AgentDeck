@@ -61,7 +61,9 @@ exit settlement, setup launch claims and final eligibility (parent integration).
 focused regression evidence; integrate and run the shared closure matrix before closing this unit.
 Runtime ownership is verified: full runtime suite and focused race tests pass; both ownership
 regressions fail against pre-fix overlays. Integrated Think Tank state/server tests pass, including
-Stop/archive/deletion and final admission/setup fences. UI retention/bounds tests are being finalized.
+Stop/archive/deletion and final admission/setup fences. All TT-01–TT-13 fixes are implemented;
+focused server/state tests, room UI tests and TypeScript pass. Both Go variants, full UI/style
+checks, focused race checks and embedded build are the remaining closure pass, currently running.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
@@ -270,6 +272,12 @@ selectors were checked; no separate findings on those surfaces. No product code 
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-06 — Think Tank fix integration checkpoint (INV §1/§2/§4/§5/§7/§8/§10/§11/§15/§16/§17).**
+  Exit settles attempts without charging; setup claims fence deletion and final admission shares
+  archive/task guards. Annotation mail and create replay are durable/idempotent; cursors validate
+  origin and UTF-8 positions. Retained file sources, settled inspection and explicit bounded
+  recent activity windows are wired. Focused tests pass; final closure checks are running.
 
 - **2026-10-06 — Think Tank runtime ownership checkpoint (INV §1/§5/§11/§15).** Terminal
   completion holds the turn gate through its sink and uses the completing turn's immutable id;

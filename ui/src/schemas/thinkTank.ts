@@ -15,7 +15,7 @@ export const thinkTankMemberSchema = z.object({
   completed: z.number(),
   may_leave: z.boolean(),
   state: z.enum(["active", "departed", "exhausted"]),
-  setup_state: z.enum(["ready", "pending", "failed"]),
+  setup_state: z.enum(["ready", "pending", "failed", "launching", "abandoned"]),
   setup_error: z.string().optional().default(""),
   exists: z.boolean(),
   archived: z.boolean().optional().default(false),
@@ -125,6 +125,7 @@ export const thinkTankSourceSchema = z.object({
   agent_id: z.string(),
   agent_name: z.string(),
   project: z.string(),
+  attempt_ids: z.array(z.string()).optional().default([]),
 });
 
 export type ThinkTankMember = z.output<typeof thinkTankMemberSchema>;

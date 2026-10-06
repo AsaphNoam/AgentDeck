@@ -78,7 +78,8 @@ export function roomStatus(room: ThinkTankDetail): RoomStatus {
 
 export function memberState(room: ThinkTankDetail, m: ThinkTankMember): string {
   if (m.setup_state === "failed") return "Launch failed";
-  if (m.setup_state === "pending") return "Launching";
+  if (m.setup_state === "pending" || m.setup_state === "launching") return "Launching";
+  if (m.setup_state === "abandoned") return "Launch skipped";
   if (room.active?.agent_id === m.agent_id) return m.role === "judge" ? "Writing synthesis" : "Speaking";
   if (m.role === "judge") return "Judge";
   if (m.state === "departed") return "Left";

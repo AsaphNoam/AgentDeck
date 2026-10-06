@@ -134,15 +134,16 @@ export function useThinkTankEntries(id: string | undefined) {
   });
 }
 
-async function fetchAllActivity(id: string, signal: AbortSignal): Promise<ThinkTankActivity[]> {
+export async function fetchAllActivity(id: string, signal: AbortSignal): Promise<{ activity: ThinkTankActivity[]; clipped: boolean }> {
   let after = 0;
   let out: ThinkTankActivity[] = [];
+  let clipped = false;
   for (;;) {
     const page = await request(roomURL(id, `/activity?after=${after}`),
       z.object({ activity: z.array(thinkTankActivitySchema), complete: z.boolean() }), { signal });
     out = out.concat(page.activity);
-    if (out.length > THINK_TANK_ACTIVITY_WINDOW) out = out.slice(-THINK_TANK_ACTIVITY_WINDOW);
-    if (page.complete || page.activity.length === 0) return out;
+    if (out.length > THINK_TANK_ACTIVITY_WINDOW) { out = out.slice(-THINK_TANK_ACTIVITY_WINDOW); clipped = true; }
+    if (page.complete || page.activity.length === 0) return { activity: out, clipped };
     after = page.activity[page.activity.length - 1].seq;
   }
 }
@@ -178,7 +179,7 @@ export function useThinkTankFiles(id: string | undefined, enabled: boolean) {
     queryKey: THINK_TANK_KEYS.files(id ?? ""),
     enabled: Boolean(id) && enabled,
     queryFn: ({ signal }) => request(roomURL(id ?? "", "/files"),
-      z.object({ sources: z.array(thinkTankSourceSchema), files: z.array(thinkTankFileSchema) }), { signal }),
+      z.object({ sources: z.array(thinkTankSourceSchema), files: z.array(thinkTankFileSchema), clipped: z.boolean().optional().default(false) }), { signal }),
   });
 }
 
@@ -187,7 +188,7 @@ export function useThinkTankCommands(id: string | undefined, enabled: boolean) {
     queryKey: THINK_TANK_KEYS.commands(id ?? ""),
     enabled: Boolean(id) && enabled,
     queryFn: ({ signal }) => request(roomURL(id ?? "", "/commands"),
-      z.object({ sources: z.array(thinkTankSourceSchema), commands: z.array(thinkTankCommandSchema) }), { signal }),
+      z.object({ sources: z.array(thinkTankSourceSchema), commands: z.array(thinkTankCommandSchema), clipped: z.boolean().optional().default(false) }), { signal }),
   });
 }
 

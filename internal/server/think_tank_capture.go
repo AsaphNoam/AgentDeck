@@ -41,11 +41,20 @@ func (s *Server) beginThinkTankCapture(agentID string, a state.ThinkTankAttempt,
 		cwd = snap.Cwd
 	}
 	s.thinkTankCaptureMu.Lock()
-	s.thinkTankCaptures[agentID] = &thinkTankCapture{
+	c := &thinkTankCapture{
 		roomID: a.RoomID, attemptID: a.AttemptID, generation: a.Generation, turnID: a.TurnID,
 		agentName: name, project: project, cwd: cwd, opening: a.Turn == state.ThinkTankTurnOpening,
 		internal: map[string]bool{},
 	}
+	// Retain the attempt workspace even when its contribution has no tools.
+	// The shared renderer omits session_meta, but file links can resolve its source.
+	_, err := s.stateStore.AppendThinkTankActivity(state.ThinkTankActivity{
+		RoomID: a.RoomID, AttemptID: a.AttemptID, AgentID: agentID, AgentName: name,
+		Project: project, Cwd: cwd, Generation: a.Generation, TurnID: a.TurnID,
+		Payload: `{"type":"session_meta"}`,
+	}, runtime.EvSessionMeta)
+	c.failed = err != nil
+	s.thinkTankCaptures[agentID] = c
 	s.thinkTankCaptureMu.Unlock()
 }
 

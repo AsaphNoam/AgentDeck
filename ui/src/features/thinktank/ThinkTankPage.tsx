@@ -69,7 +69,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
   const entries = useThinkTankEntries(id);
   const activity = useThinkTankActivity(id);
   const [panel, setPanel] = useState<"" | "files" | "commands">("");
-  const files = useThinkTankFiles(id, panel === "files");
+  const files = useThinkTankFiles(id, true);
   const commands = useThinkTankCommands(id, panel === "commands");
   const control = useThinkTankControl(id);
   const retry = useThinkTankRetry(id);
@@ -104,15 +104,19 @@ function Room({ room }: { room: ThinkTankDetail }) {
 
   // A participant's links open from that participant's retained workspace, so
   // equal relative paths in different workspaces never collide (FS-21.R26).
-  const sourceFor = (agentID: string) => (files.data?.sources ?? []).find((s) => s.agent_id === agentID)?.source_id ?? `agent:${agentID}`;
-  const openFrom = (agentID: string) => (link: FileLink | null) => setFile(link, sourceFor(agentID));
+  const sourceFor = (attemptID: string) => (files.data?.sources ?? []).find((s) => s.attempt_ids.includes(attemptID))?.source_id;
+  const openFrom = (attemptID: string) => (link: FileLink | null) => {
+    const source = sourceFor(attemptID);
+    if (!source) { pushError("The retained workspace source is unavailable. Try again after the room finishes loading."); return; }
+    setFile(link, source);
+  };
 
   const act = (run: () => Promise<unknown>) => {
     setActionError("");
     run().catch((err: unknown) => setActionError(err instanceof Error ? err.message : "That action failed."));
   };
 
-  const byAttempt = useMemo(() => groupActivity(activity.data ?? []), [activity.data]);
+  const byAttempt = useMemo(() => groupActivity(activity.data?.activity ?? []), [activity.data]);
   const status = roomStatus(room);
   const ended = room.phase === "ended";
   const originTitle = projects.data?.[room.origin_project]?.title ?? room.origin_project;
@@ -139,7 +143,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
     });
   };
 
-  const renderActivity = (agentID: string, events: TranscriptEvent[]) => {
+  const renderActivity = (agentID: string, events: TranscriptEvent[], attemptID: string) => {
     const toRoomDraft = (draft: AnnotationDraft): AnnotationDraft => ({ ...draft, room_anchor: "activity" } as AnnotationDraft);
     const render = eventRenderer({
       agentId: agentID,
@@ -157,7 +161,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           annotate: () => addAnnotation(sourceKey, toRoomDraft(draft)),
         });
       },
-      onOpenFile: openFrom(agentID),
+      onOpenFile: openFrom(attemptID),
     });
     return render(nestActivities(foldTranscript(events)), [], 1);
   };
@@ -192,6 +196,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
               <li className="think-tank-empty">{room.phase === "openings" ? "Openings stay hidden until every participant has answered." : "No contributions yet."}</li>
             )}
             {entries.data?.clipped && <li className="think-tank-empty">Showing the newest part of a long discussion.</li>}
+            {activity.data?.clipped && <li className="think-tank-empty">Showing the newest 5,000 activity records. Earlier activity remains in retained room history.</li>}
             {shownEntries.map((entry) => (
               <li key={entry.seq}>
                 <article
@@ -211,7 +216,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                   </header>
                   {entry.body && (
                     <div className="think-tank-entry-body">
-                      <SanitizedMarkdown text={entry.body} onOpenFile={entry.agent_id ? openFrom(entry.agent_id) : undefined} />
+                      <SanitizedMarkdown text={entry.body} onOpenFile={entry.attempt_id ? openFrom(entry.attempt_id) : undefined} />
                     </div>
                   )}
                 </article>
@@ -281,6 +286,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           {panel === "files" && (
             <section className="think-tank-panel" data-slot="files">
               <h2>Files</h2>
+              {files.data?.clipped && <p>Files from the newest 10,000 activity records are shown. Earlier changes remain in retained room history.</p>}
               {(files.data?.files ?? []).length === 0 && <p>No files changed in room turns.</p>}
               <ul>
                 {(files.data?.files ?? []).map((f) => (
@@ -295,6 +301,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           {panel === "commands" && (
             <section className="think-tank-panel" data-slot="commands">
               <h2>Commands</h2>
+              {commands.data?.clipped && <p>Commands from the newest 10,000 activity records are shown. Earlier commands remain in retained room history.</p>}
               {(commands.data?.commands ?? []).length === 0 && <p>No commands ran in room turns.</p>}
               <ul>
                 {(commands.data?.commands ?? []).map((c) => (
@@ -377,28 +384,29 @@ function AttemptActivity({ label, live, events, render }: {
   label: string;
   live: boolean;
   events: ThinkTankActivity[];
-  render: (agentID: string, events: TranscriptEvent[]) => React.ReactNode;
+  render: (agentID: string, events: TranscriptEvent[], attemptID: string) => React.ReactNode;
 }) {
   const pending = live && events.some((row) => row.event?.type === "permission_request")
     && !events.some((row) => row.event?.type === "permission_resolved");
   const transcript: TranscriptEvent[] = events
     .filter((row) => row.event)
-    .map((row) => ({ ...row.event, seq: row.seq, agent_id: row.agent_id } as TranscriptEvent));
+    .map((row) => ({ ...row.event, seq: row.seq, agent_id: row.agent_id,
+      ...(!live && row.event?.type === "permission_request" ? { data: { ...(row.event.data as object), resolved: "cancelled" } } : {}),
+    } as TranscriptEvent));
   const tools = events.filter((row) => row.event?.type === "tool_call").length;
   return (
     <details className="think-tank-activity" data-slot="activity" data-state={live ? "live" : "settled"} open={pending || undefined}>
       <summary>{label}{tools > 0 ? ` · ${tools} tool ${tools === 1 ? "call" : "calls"}` : ""}</summary>
-      <fieldset className="think-tank-activity-body" disabled={!live}>
-        {render(events[0].agent_id, transcript)}
+      <fieldset className="think-tank-activity-body">
+        {events.some((row) => row.truncated) && <p>Some activity details exceed the display limit. Their retained sequence anchors are preserved.</p>}
+        {render(events[0].agent_id, transcript, events[0].attempt_id)}
       </fieldset>
     </details>
   );
 }
 
 async function loadSourceFile(roomID: string, sourceID: string, path: string): Promise<FileContent> {
-  const url = sourceID.startsWith("agent:")
-    ? `/api/sessions/${encodeURIComponent(sourceID.slice(6))}/file?path=${encodeURIComponent(path)}`
-    : sourceFileURL(roomID, sourceID, path);
+  const url = sourceFileURL(roomID, sourceID, path);
   const response = await fetch(url);
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error((body as { error?: { message?: string } }).error?.message ?? "That file could not be read.");

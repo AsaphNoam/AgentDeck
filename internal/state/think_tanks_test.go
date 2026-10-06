@@ -83,6 +83,100 @@ func ttEntries(t *testing.T, st *Store, roomID string) []ThinkTankEntry {
 	return e
 }
 
+func TestThinkTankAnnotationMailIsAtomicAndReplayed(t *testing.T) {
+	st, _ := newTestStore(t)
+	d := ttCreate(t, st, false, ttMember("a", 2), ttMember("b", 2))
+	if err := st.WriteAgent(Agent{AgentID: "b", Name: "B", Interface: "chat", CreatedAt: timeNow()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.Exec(`CREATE TRIGGER refuse_annotation_mail BEFORE INSERT ON messages BEGIN SELECT RAISE(ABORT, 'mail unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+	mail := Message{FromAgent: "user", ToAgent: "b", Subject: "Think Tank annotations"}
+	if _, _, err := st.AddThinkTankAnnotationMail(d.Room.RoomID, "annotation", "instruction", "target:b", mail); err == nil {
+		t.Fatal("mail failure accepted")
+	}
+	if entries := ttEntries(t, st, d.Room.RoomID); len(entries) != 0 {
+		t.Fatalf("failed mail published room history: %+v", entries)
+	}
+	var inputs int
+	if err := st.db.QueryRow(`SELECT COUNT(*) FROM think_tank_inputs WHERE room_id = ?`, d.Room.RoomID).Scan(&inputs); err != nil || inputs != 0 {
+		t.Fatalf("failed mail retained input: %d %v", inputs, err)
+	}
+	if _, err := st.db.Exec(`DROP TRIGGER refuse_annotation_mail`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.Exec(`CREATE TRIGGER refuse_annotation_wake BEFORE INSERT ON activations BEGIN SELECT RAISE(ABORT, 'wake unavailable'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.AddThinkTankAnnotationMail(d.Room.RoomID, "annotation", "instruction", "target:b", mail); err == nil {
+		t.Fatal("wake failure accepted")
+	}
+	if messages, err := st.ListMessages("b", false, 10); err != nil || len(messages) != 0 || len(ttEntries(t, st, d.Room.RoomID)) != 0 {
+		t.Fatalf("wake failure retained mail/history: %+v %v", messages, err)
+	}
+	if _, err := st.db.Exec(`DROP TRIGGER refuse_annotation_wake`); err != nil {
+		t.Fatal(err)
+	}
+	first, _, err := st.AddThinkTankAnnotationMail(d.Room.RoomID, "annotation", "instruction", "target:b", mail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Replaying after successful commit models a response lost to the caller.
+	second, _, err := st.AddThinkTankAnnotationMail(d.Room.RoomID, "annotation", "instruction", "target:b", mail)
+	if err != nil || first.InputID != second.InputID || first.EntrySeq != second.EntrySeq {
+		t.Fatalf("replay: %+v %v", second, err)
+	}
+	messages, err := st.ListMessages("b", false, 10)
+	if err != nil || len(messages) != 1 || messages[0].Body != "instruction" || !messages[0].Wake {
+		t.Fatalf("mail: %+v %v", messages, err)
+	}
+	if len(ttEntries(t, st, d.Room.RoomID)) != 1 {
+		t.Fatal("replay duplicated room history")
+	}
+	if wake, err := st.PendingActivations(ActivationKindMail, "b", 10); err != nil || len(wake) != 1 {
+		t.Fatalf("wake receipt: %+v %v", wake, err)
+	}
+}
+
+func TestThinkTankReadRejectsMalformedAndForeignContinuations(t *testing.T) {
+	st, _ := newTestStore(t)
+	room := ttCreate(t, st, false, ttMember("a", 3), ttMember("b", 3)).Room.RoomID
+	if _, _, err := st.AddThinkTankInput(room, "text", ThinkTankEntryUser, "aéz", ""); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := st.ReadThinkTank(room)
+	a, err := st.BeginThinkTankAttempt(ThinkTankBegin{RoomID: room, Revision: d.Room.Revision, AgentID: "a", Turn: ThinkTankTurnDiscussion, Generation: "g", TurnID: "t"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := thinkTankCursor{room: room, view: ThinkTankViewContext, head: a.Head, seq: 1, caller: "a", attempt: a.AttemptID}
+	for name, change := range map[string]func(*thinkTankCursor){
+		"past end":       func(c *thinkTankCursor) { c.off = 999 },
+		"mid rune":       func(c *thinkTankCursor) { c.off = 2 },
+		"at end":         func(c *thinkTankCursor) { c.off = 4 },
+		"past head":      func(c *thinkTankCursor) { c.seq = c.head + 1 },
+		"foreign caller": func(c *thinkTankCursor) { c.caller = "b" },
+		"old attempt":    func(c *thinkTankCursor) { c.attempt = "old" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := base
+			change(&c)
+			if _, err := st.ReadThinkTankPage(ThinkTankReadRequest{CallerAgentID: "a", Cursor: c.encode()}); !errors.Is(err, ErrThinkTankCursor) {
+				t.Fatalf("cursor refusal: %v", err)
+			}
+			var delivered, offset int
+			if err := st.db.QueryRow(`SELECT delivered_to, delivered_at FROM think_tank_attempts WHERE attempt_id = ?`, a.AttemptID).Scan(&delivered, &offset); err != nil || delivered != 0 || offset != 0 {
+				t.Fatalf("invalid cursor advanced delivery: %d %d %v", delivered, offset, err)
+			}
+		})
+	}
+	base.off = 1
+	if p, err := st.ReadThinkTankPage(ThinkTankReadRequest{CallerAgentID: "a", Cursor: base.encode()}); err != nil || len(p.Items) != 1 || p.Items[0].Entry.Body != "éz" {
+		t.Fatalf("valid rune boundary: %+v %v", p, err)
+	}
+}
+
 func TestThinkTankCreateValidatesAndReplays(t *testing.T) {
 	st, _ := newTestStore(t)
 	bad := []ThinkTankCreate{
@@ -112,6 +206,27 @@ func TestThinkTankCreateValidatesAndReplays(t *testing.T) {
 	}
 	if first.Room.Phase != ThinkTankPhaseDiscussion || first.Room.JudgeStatus != ThinkTankJudgeNone {
 		t.Fatalf("defaults: phase=%s judge=%q", first.Room.Phase, first.Room.JudgeStatus)
+	}
+}
+
+func TestThinkTankCreateReplayUsesImmutableIntent(t *testing.T) {
+	st, _ := newTestStore(t)
+	c := ThinkTankCreate{CommandID: "immutable", Goal: "g", OriginProject: "p", JudgeConfig: "original judge",
+		Members: []ThinkTankMember{ttMember("a", 2), {Cap: 3, MayLeave: true, SetupConfig: "new participant"}}}
+	first, err := st.CreateThinkTank(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.Exec(`UPDATE think_tanks SET judge_config = 'repaired judge' WHERE room_id = ?`, first.Room.RoomID); err != nil {
+		t.Fatal(err)
+	}
+	again, err := st.CreateThinkTank(c)
+	if err != nil || again.Room.RoomID != first.Room.RoomID || again.Members[1].AgentID != first.Members[1].AgentID {
+		t.Fatalf("replay after judge repair: %+v %v", again, err)
+	}
+	c.Members[1].SetupConfig = "different participant"
+	if _, err := st.CreateThinkTank(c); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("changed new participant intent accepted: %v", err)
 	}
 }
 

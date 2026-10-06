@@ -33,24 +33,36 @@ func (s *Server) handleThinkTankActivity(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	out := []thinkTankActivityWire{}
-	bytes := 0
+	bytes := 100 // envelope and separators
 	complete := true
 	for i, a := range rows {
-		if i == thinkTankActivityPage || (len(out) > 0 && bytes+len(a.Payload) > thinkTankActivityBytes) {
+		item := thinkTankActivityFor(a)
+		encoded, _ := json.Marshal(item)
+		if len(encoded)+100 > thinkTankActivityBytes {
+			var event struct {
+				Type string `json:"type"`
+			}
+			_ = json.Unmarshal([]byte(a.Payload), &event)
+			item.Truncated = true
+			item.Event, _ = json.Marshal(map[string]any{"type": event.Type, "truncated": true})
+			encoded, _ = json.Marshal(item)
+		}
+		if i == thinkTankActivityPage || bytes+len(encoded)+1 > thinkTankActivityBytes {
 			complete = false
 			break
 		}
-		bytes += len(a.Payload)
-		out = append(out, thinkTankActivityFor(a))
+		bytes += len(encoded) + 1
+		out = append(out, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "activity": out, "complete": complete})
 }
 
 type thinkTankSourceWire struct {
-	SourceID  string `json:"source_id"`
-	AgentID   string `json:"agent_id"`
-	AgentName string `json:"agent_name"`
-	Project   string `json:"project"`
+	SourceID   string   `json:"source_id"`
+	AgentID    string   `json:"agent_id"`
+	AgentName  string   `json:"agent_name"`
+	Project    string   `json:"project"`
+	AttemptIDs []string `json:"attempt_ids"`
 }
 
 type thinkTankFileWire struct {
@@ -73,22 +85,25 @@ type thinkTankCommandWire struct {
 
 // scanThinkTankActivity reads visible retained activity in bounded batches and
 // resolves each record's opaque source id.
-func (s *Server) scanThinkTankActivity(roomID string, visit func(state.ThinkTankActivity, string, map[string]any)) ([]thinkTankSourceWire, error) {
+func (s *Server) scanThinkTankActivity(roomID string, visit func(state.ThinkTankActivity, string, map[string]any)) ([]thinkTankSourceWire, bool, error) {
 	sources, err := s.stateStore.ThinkTankSources(roomID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	sourceOf := map[string]string{}
 	out := []thinkTankSourceWire{}
 	for _, src := range sources {
 		sourceOf[src.AgentID+"\x00"+src.Cwd] = src.SourceID
-		out = append(out, thinkTankSourceWire{SourceID: src.SourceID, AgentID: src.AgentID, AgentName: src.AgentName, Project: src.Project})
+		out = append(out, thinkTankSourceWire{SourceID: src.SourceID, AgentID: src.AgentID, AgentName: src.AgentName, Project: src.Project, AttemptIDs: src.AttemptIDs})
 	}
-	var after int64
+	after, clipped, err := s.stateStore.ThinkTankActivityWindowStart(roomID, thinkTankScanLimit)
+	if err != nil {
+		return nil, false, err
+	}
 	for read := 0; read < thinkTankScanLimit; {
-		rows, err := s.stateStore.ListThinkTankActivity(roomID, after, thinkTankActivityPage)
+		rows, err := s.stateStore.ListThinkTankActivity(roomID, after, min(thinkTankActivityPage, thinkTankScanLimit-read))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, a := range rows {
 			var ev map[string]any
@@ -102,7 +117,7 @@ func (s *Server) scanThinkTankActivity(roomID string, visit func(state.ThinkTank
 			break
 		}
 	}
-	return out, nil
+	return out, clipped, nil
 }
 
 func eventData(ev map[string]any) map[string]any {
@@ -118,7 +133,7 @@ func (s *Server) handleThinkTankFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	files := []thinkTankFileWire{}
 	index := map[string]int{}
-	sources, err := s.scanThinkTankActivity(roomID, func(a state.ThinkTankActivity, source string, ev map[string]any) {
+	sources, clipped, err := s.scanThinkTankActivity(roomID, func(a state.ThinkTankActivity, source string, ev map[string]any) {
 		if ev["type"] != runtime.EvDiff {
 			return
 		}
@@ -139,7 +154,7 @@ func (s *Server) handleThinkTankFiles(w http.ResponseWriter, r *http.Request) {
 		s.writeThinkTankError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "sources": sources, "files": files})
+	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "sources": sources, "files": files, "clipped": clipped})
 }
 
 func (s *Server) handleThinkTankCommands(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +165,7 @@ func (s *Server) handleThinkTankCommands(w http.ResponseWriter, r *http.Request)
 	}
 	commands := []thinkTankCommandWire{}
 	index := map[string]int{}
-	sources, err := s.scanThinkTankActivity(roomID, func(a state.ThinkTankActivity, source string, ev map[string]any) {
+	sources, clipped, err := s.scanThinkTankActivity(roomID, func(a state.ThinkTankActivity, source string, ev map[string]any) {
 		d := eventData(ev)
 		id, _ := d["tool_call_id"].(string)
 		switch ev["type"] {
@@ -173,7 +188,7 @@ func (s *Server) handleThinkTankCommands(w http.ResponseWriter, r *http.Request)
 		s.writeThinkTankError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "sources": sources, "commands": commands})
+	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "sources": sources, "commands": commands, "clipped": clipped})
 }
 
 // handleThinkTankSourceFile opens a file from a retained participant source

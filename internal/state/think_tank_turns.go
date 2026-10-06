@@ -45,6 +45,14 @@ func (s *Store) BeginThinkTankAttempt(b ThinkTankBegin) (ThinkTankAttempt, error
 	if b.Generation == "" || b.TurnID == "" {
 		return ThinkTankAttempt{}, thinkTankInvalid("generation and turn id are required")
 	}
+	var assigned int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = ? AND state IN (?, ?, ?)`,
+		b.AgentID, TaskStarting, TaskRunning, TaskWaiting).Scan(&assigned); err != nil {
+		return ThinkTankAttempt{}, fmt.Errorf("state: check think tank task assignment: %w", err)
+	}
+	if assigned != 0 {
+		return ThinkTankAttempt{}, thinkTankConflict("the participant has assigned work")
+	}
 	var checkpoint int64
 	for _, m := range d.Members {
 		if m.AgentID == b.AgentID {
@@ -202,6 +210,23 @@ func (s *Store) FailThinkTankAttempt(agentID, generation, turnID, reason string)
 		reason = "The room turn did not complete."
 	}
 	return s.finishThinkTankAttempt(agentID, generation, turnID, reason)
+}
+
+func (s *Store) RunningThinkTankAttempts(agentID, generation string) ([]ThinkTankAttempt, error) {
+	rows, err := s.db.Query(`SELECT `+thinkTankAttemptColumns+` FROM think_tank_attempts WHERE agent_id = ? AND generation = ? AND state = ?`, agentID, generation, ThinkTankAttemptRunning)
+	if err != nil {
+		return nil, fmt.Errorf("state: read exiting room attempts: %w", err)
+	}
+	defer rows.Close()
+	attempts := []ThinkTankAttempt{}
+	for rows.Next() {
+		a, err := scanThinkTankAttempt(rows)
+		if err != nil {
+			return nil, err
+		}
+		attempts = append(attempts, a)
+	}
+	return attempts, rows.Err()
 }
 
 func (s *Store) finishThinkTankAttempt(agentID, generation, turnID, failure string) (ThinkTankFinish, error) {
@@ -365,7 +390,7 @@ func applyThinkTankBoundaryTx(tx *sql.Tx, roomID string) error {
 // held for the boundary (FS-21.R35). An exact CommandID replay returns the
 // original input; ended discussion refuses Room delivery (R30).
 func (s *Store) AddThinkTankInput(roomID, commandID, kind, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
-	return s.addThinkTankInput(roomID, commandID, kind, body, context, false)
+	return s.addThinkTankInput(roomID, commandID, kind, body, context, false, nil)
 }
 
 // AddThinkTankRecord records a room-source annotation delivered to a selected
@@ -373,10 +398,22 @@ func (s *Store) AddThinkTankInput(roomID, commandID, kind, body, context string)
 // delivery happens; it is not shared input held for a turn boundary
 // (FS-13.R26, FS-21.R30).
 func (s *Store) AddThinkTankRecord(roomID, commandID, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
-	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true)
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true, nil)
 }
 
-func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string, record bool) (ThinkTankInput, ThinkTankDetail, error) {
+// AddThinkTankAnnotationMail commits the room record, recipient mail and wake
+// receipt together. Exact command replay leaves all three unchanged.
+func (s *Store) AddThinkTankAnnotationMail(roomID, commandID, body, context string, mail Message) (ThinkTankInput, ThinkTankDetail, error) {
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true, func(tx *sql.Tx) error {
+		mail.Body, mail.Wake, mail.DeliveredVia = body, true, DeliveryPending
+		if _, err := insertMessageTx(tx, mail); err != nil {
+			return err
+		}
+		return EnsurePendingMailActivationTx(tx, mail.ToAgent)
+	})
+}
+
+func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string, record bool, effect func(*sql.Tx) error) (ThinkTankInput, ThinkTankDetail, error) {
 	if kind != ThinkTankEntryUser && kind != ThinkTankEntryAnnotation {
 		return ThinkTankInput{}, ThinkTankDetail{}, thinkTankInvalid("unknown input kind %q", kind)
 	}
@@ -422,8 +459,13 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, id, roomID, commandID, kind, body, context, format
 				return err
 			}
 			input.EntrySeq = seq
-			_, err = tx.Exec(`UPDATE think_tank_inputs SET entry_seq = ? WHERE input_id = ?`, seq, id)
-			return err
+			if _, err = tx.Exec(`UPDATE think_tank_inputs SET entry_seq = ? WHERE input_id = ?`, seq, id); err != nil {
+				return err
+			}
+			if effect != nil {
+				return effect(tx)
+			}
+			return nil
 		}
 		if d.Active == nil && d.Room.Phase != ThinkTankPhaseOpenings && d.Room.Phase != ThinkTankPhaseSetup {
 			if err := publishPendingInputsTx(tx, roomID); err != nil {
@@ -542,6 +584,10 @@ func (s *Store) RecoverThinkTanks() error {
 		return fmt.Errorf("state: iterate running think tank attempts: %w", err)
 	}
 	rows.Close()
+	if _, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ? WHERE role = ? AND setup_state = ?`,
+		ThinkTankSetupFailed, "Chuck restarted while this participant was starting.", ThinkTankRoleParticipant, ThinkTankSetupLaunching); err != nil {
+		return fmt.Errorf("state: fence think tank setup launch: %w", err)
+	}
 	for _, a := range running {
 		if _, err := finishThinkTankAttemptTx(tx, a, "Chuck restarted during this turn; it was not replayed."); err != nil {
 			return err
@@ -604,13 +650,14 @@ type ThinkTankReadPage struct {
 }
 
 type thinkTankCursor struct {
-	room, view string
-	head, seq  int64
-	off        int
+	room, view      string
+	caller, attempt string
+	head, seq       int64
+	off             int
 }
 
 func (c thinkTankCursor) encode() string {
-	raw := fmt.Sprintf("1|%s|%s|%d|%d|%d", c.room, c.view, c.head, c.seq, c.off)
+	raw := fmt.Sprintf("2|%s|%s|%d|%d|%d|%s|%s", c.room, c.view, c.head, c.seq, c.off, c.caller, c.attempt)
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
@@ -620,10 +667,10 @@ func decodeThinkTankCursor(s string) (thinkTankCursor, error) {
 		return thinkTankCursor{}, ErrThinkTankCursor
 	}
 	parts := strings.Split(string(raw), "|")
-	if len(parts) != 6 || parts[0] != "1" {
+	if len(parts) != 8 || parts[0] != "2" {
 		return thinkTankCursor{}, ErrThinkTankCursor
 	}
-	c := thinkTankCursor{room: parts[1], view: parts[2]}
+	c := thinkTankCursor{room: parts[1], view: parts[2], caller: parts[6], attempt: parts[7]}
 	var e1, e2, e3 error
 	c.head, e1 = strconv.ParseInt(parts[3], 10, 64)
 	c.seq, e2 = strconv.ParseInt(parts[4], 10, 64)
@@ -687,14 +734,28 @@ WHERE room_id = ? AND agent_id = ? ORDER BY ord LIMIT 1`, roomID, req.CallerAgen
 			from, head = current.Checkpoint, current.Head
 		}
 	}
-	pos := thinkTankCursor{room: roomID, view: view, head: head, seq: from + 1}
+	pos := thinkTankCursor{room: roomID, view: view, head: head, seq: from + 1, caller: req.CallerAgentID}
+	if current != nil {
+		pos.attempt = current.AttemptID
+	}
 	first := req.Cursor == ""
 	if !first {
 		c, err := decodeThinkTankCursor(req.Cursor)
 		if err != nil {
 			return ThinkTankReadPage{}, err
 		}
-		if c.room != roomID || c.view != view || c.head != head || c.seq <= from {
+		if c.room != roomID || c.view != view || c.head != head || c.seq <= from || c.seq > head ||
+			c.caller != pos.caller || c.attempt != pos.attempt {
+			return ThinkTankReadPage{}, ErrThinkTankCursor
+		}
+		var body string
+		if err := tx.QueryRow(`SELECT body FROM think_tank_entries WHERE room_id = ? AND seq = ?`, roomID, c.seq).Scan(&body); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ThinkTankReadPage{}, ErrThinkTankCursor
+			}
+			return ThinkTankReadPage{}, err
+		}
+		if c.off > len(body) || (c.off > 0 && (c.off == len(body) || !utf8.RuneStart(body[c.off]))) {
 			return ThinkTankReadPage{}, ErrThinkTankCursor
 		}
 		pos = c
@@ -755,7 +816,9 @@ WHERE room_id = ? AND agent_id = ? ORDER BY ord LIMIT 1`, roomID, req.CallerAgen
 	}
 	page.Complete = seq > head
 	if !page.Complete {
-		page.NextCursor = thinkTankCursor{room: roomID, view: view, head: head, seq: seq, off: off}.encode()
+		next := pos
+		next.seq, next.off = seq, off
+		page.NextCursor = next.encode()
 	}
 	if current != nil && view == ThinkTankViewContext {
 		// Delivery is contiguous only when this page began at or before the

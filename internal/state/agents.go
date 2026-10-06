@@ -11,8 +11,12 @@ import (
 var randRead = rand.Read
 
 // NewAgentID generates "a_" + 6 lowercase hex chars and retries collisions
-// against the agents table up to 10 times.
+// against existing agents and room-reserved identities up to 10 times.
 func (s *Store) NewAgentID() (string, error) {
+	return newAgentID(s.db)
+}
+
+func newAgentID(q thinkTankQueryer) (string, error) {
 	for i := 0; i < 10; i++ {
 		var b [3]byte
 		if _, err := randRead(b[:]); err != nil {
@@ -20,7 +24,7 @@ func (s *Store) NewAgentID() (string, error) {
 		}
 		id := "a_" + hex.EncodeToString(b[:])
 		var exists int
-		err := s.db.QueryRow(`SELECT 1 FROM agents WHERE agent_id = ?`, id).Scan(&exists)
+		err := q.QueryRow(`SELECT 1 FROM agents WHERE agent_id = ? UNION ALL SELECT 1 FROM think_tank_members WHERE agent_id = ? LIMIT 1`, id, id).Scan(&exists)
 		if errors.Is(err, sql.ErrNoRows) {
 			return id, nil
 		}

@@ -372,7 +372,9 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 			if ev.Type == runtime.EvTurnEnd {
 				generation := registry.Generation(ev.AgentID)
 				go s.dispatchTurnEnd(ev.AgentID, generation)
-				go s.finishThinkTankTurn(ev)
+				// Seal room authority before the runtime releases this turn to a
+				// private/held successor (TS-14.R6).
+				s.finishThinkTankTurn(ev)
 			}
 		})
 	}
@@ -406,6 +408,7 @@ func (s *Server) handleAgentExit(agentID, generation, cause string) {
 		s.teardownAgentRegistration(agentID)
 	}
 	s.interruptTaskOnExit(agentID, generation, cause)
+	s.interruptThinkTankOnExit(agentID, generation, cause)
 	s.clearPermissionTools(agentID, generation)
 	if s.pipelineMgr != nil {
 		s.pipelineMgr.ClearPermissionAttention(agentID, generation)

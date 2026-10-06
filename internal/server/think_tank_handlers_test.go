@@ -91,6 +91,39 @@ func TestThinkTankCreateOverREST(t *testing.T) {
 	}
 }
 
+func TestThinkTankCreateReplaysReservedParticipants(t *testing.T) {
+	for _, participants := range []string{
+		`{"agent_id":"a_one","limit":2},{"new":{"name":"New","project":"alpha","backend":"claude"},"limit":3}`,
+		`{"new":{"name":"First","project":"alpha","backend":"claude"},"limit":2},{"new":{"name":"Second","project":"beta","backend":"claude"},"limit":3}`,
+	} {
+		t.Run(participants, func(t *testing.T) {
+			_, h := roomRESTServer(t)
+			body := `{"command_id":"new-command","goal":"Choose","origin_project":"alpha","participants":[` + participants + `]}`
+			first := doJSON(t, h, http.MethodPost, "/api/think-tanks", body)
+			if first.Code != http.StatusCreated {
+				t.Fatalf("create: %d %s", first.Code, first.Body.String())
+			}
+			var room thinkTankDetailWire
+			_ = json.Unmarshal(first.Body.Bytes(), &room)
+			second := doJSON(t, h, http.MethodPost, "/api/think-tanks", body)
+			var replay thinkTankDetailWire
+			_ = json.Unmarshal(second.Body.Bytes(), &replay)
+			if second.Code != http.StatusCreated || replay.RoomID != room.RoomID || len(replay.Members) != 2 {
+				t.Fatalf("replay: %d %s", second.Code, second.Body.String())
+			}
+			for i := range room.Members {
+				if replay.Members[i].AgentID != room.Members[i].AgentID {
+					t.Fatal("replay replaced reserved identity")
+				}
+			}
+			changed := strings.Replace(body, `"goal":"Choose"`, `"goal":"Different"`, 1)
+			if got := doJSON(t, h, http.MethodPost, "/api/think-tanks", changed); got.Code != http.StatusConflict {
+				t.Fatalf("changed intent: %d %s", got.Code, got.Body.String())
+			}
+		})
+	}
+}
+
 // FS-21.A9, A30: shared input, pause/resume/end and guarded deletion over
 // REST; deletion leaves participant agents intact.
 func TestThinkTankControlsOverREST(t *testing.T) {
