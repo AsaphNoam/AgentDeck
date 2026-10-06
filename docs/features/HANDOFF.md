@@ -63,7 +63,13 @@ Runtime ownership is verified: full runtime suite and focused race tests pass; b
 regressions fail against pre-fix overlays. Integrated Think Tank state/server tests pass, including
 Stop/archive/deletion and final admission/setup fences. All TT-01–TT-13 fixes are implemented;
 focused server/state tests, room UI tests and TypeScript pass. Both Go variants, full UI/style
-checks, focused race checks and embedded build are the remaining closure pass, currently running.
+checks, focused race checks and embedded build are the remaining closure pass. UI/style (625 tests),
+embedded build and focused race checks in both Go variants pass. Full untagged Go closure exposed
+`TestPromptRouteHoldsInsteadOfConflicting` assumed durable idle meant the gate was free. TS-03.R38
+requires actual admission authority instead; the test now probes that seam without sending a
+provider frame, retains its sent assertion, and passes 20 repetitions. Both full Go variants
+are rerunning. Stubbed live/ended
+room renders at 1024/1440 in all appearances pass; the real-binary journey remains owed.
 
 Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
 -run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test

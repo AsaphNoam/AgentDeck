@@ -231,12 +231,13 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
   activation kind writes no `activations` row; the room attempt committed in `before(turnID)` is the
   attempt record. One server worker (`server/think_tanks.go`) serializes progression on a 5s sweep
   plus kicks. Executing turn ownership is `runtime.Event.TurnID`, cleared after the terminal
-  emission. Capture copies tool, diff, permission, error and child-activity records only; assistant
+  emission. Admission retains a hidden `session_meta` workspace-source marker so contribution
+  file links work even without tool activity. Capture copies tool, diff, permission, error and child-activity records; assistant
   prose, prompts and reasoning are not copied. Child scopes freeze their original generation/turn;
   late child records keep that identity and are refused once its capture has settled, including
   while a later room turn is active. Room-source annotations publish an
   attributed text batch whose anchors are server-resolved (`/annotations` with target room or
-  agent); agent delivery reuses annotation mail after recording the batch. Pause/resume/end are
+  agent); selected-agent delivery commits annotation mail and the batch atomically. Pause/resume/end are
   idempotent and carry no expected revision; create, messages and annotations carry command ids.
   Retry targets are `setup`, `turn` and `judge`; a judge retry always launches a fresh judge.
   Settled attempt activity retains inspection and annotation controls; unresolved retained approvals

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/AsaphNoam/Chuck/internal/config"
+	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
 // busyChatServer launches one chat agent on the hold_turn scenario and leaves a
@@ -146,6 +148,21 @@ func TestPromptRouteHoldsInsteadOfConflicting(t *testing.T) {
 	}
 	release()
 	waitStatus(t, srv, id, "idle")
+	// Idle commits before terminal observers settle (TT-02). Prove the actual
+	// admission boundary is free instead of inferring readiness from status:
+	// refusing inside before releases the claimed gate without a provider frame.
+	ready := errors.New("test: turn admission is ready")
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		_, err := srv.registry.StartActivation(context.Background(), id, state.ActivationKindThinkTank, func(string) error { return ready })
+		if errors.Is(err, ready) {
+			break
+		}
+		if err != nil || time.Now().After(deadline) {
+			t.Fatalf("turn admission never became ready: %v", err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
 	resp, body = post(t, ts.URL+"/api/sessions/"+id+"/prompt", map[string]string{"text": "now"})
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("prompt to an idle agent = %d: %s", resp.StatusCode, body)
