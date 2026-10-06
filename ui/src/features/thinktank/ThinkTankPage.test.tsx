@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { http, HttpResponse } from "msw";
@@ -11,7 +11,7 @@ import { thinkTankDetailSchema } from "../../schemas/thinkTank";
 import { useAgentStore } from "../../store/agentStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import fixture from "./fixtures/room.json";
-import { fetchAllActivity } from "../../api/thinkTanks";
+import { THINK_TANK_KEYS, fetchAllActivity, noteThinkTankActivity, useThinkTankActivity } from "../../api/thinkTanks";
 
 // The room comes from the Go-encoded fixture (internal/server/
 // think_tank_handlers_test.go), so the page is tested against the real wire
@@ -103,6 +103,30 @@ describe("ThinkTankPage", () => {
     fireEvent.contextMenu(diff);
     fireEvent.click(await screen.findByText("Annotate whole event"));
     expect(Object.values(useAnnotationStore.getState().bySource).flat()).toEqual(expect.arrayContaining([expect.objectContaining({ room_anchor: "activity", seq: 4 })]));
+  });
+
+  // TT2-05, TS-14.R16: a live activity event refills after the cached tail;
+  // a room update still walks the whole window.
+  it("refills live activity from the cached tail", async () => {
+    let total = 2;
+    const afters: number[] = [];
+    const record = (seq: number) => ({ version: 1, room_id: "tt_fixture", seq, attempt_id: "tta_1", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: seq, created_at: "2026-10-06T09:00:00Z" });
+    server.use(http.get("/api/think-tanks/tt_fixture/activity", ({ request }) => {
+      const after = Number(new URL(request.url).searchParams.get("after"));
+      afters.push(after);
+      return HttpResponse.json({ complete: true, activity: Array.from({ length: total - after }, (_, i) => record(after + i + 1)) });
+    }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useThinkTankActivity("tt_fixture"), {
+      wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await waitFor(() => expect(result.current.data?.activity).toHaveLength(2));
+    total = 3;
+    noteThinkTankActivity(client, "tt_fixture");
+    await waitFor(() => expect(result.current.data?.activity.map((a) => a.seq)).toEqual([1, 2, 3]));
+    expect(afters).toEqual([0, 2]);
+    await client.invalidateQueries({ queryKey: THINK_TANK_KEYS.room("tt_fixture") });
+    await waitFor(() => expect(afters).toEqual([0, 2, 0]));
   });
 
   it("exposes the bounded activity window and retains its newest rows", async () => {

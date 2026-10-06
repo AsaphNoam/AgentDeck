@@ -71,8 +71,14 @@ type Server struct {
 	// taskStartSlots bounds task starts in flight across dispatch passes. The
 	// budget bounds runtimes; this bounds workers (TS-10.R3, R17).
 	taskStartSlots chan struct{}
-	// thinkTankKick nudges the single Think Tank progression worker.
+	// thinkTankKick nudges the Think Tank progression dispatcher.
 	thinkTankKick chan struct{}
+	// thinkTankSlots bounds rooms progressing at once; thinkTankRooms keeps
+	// each room serial, and thinkTankMissed re-kicks after a skipped room.
+	thinkTankSlots  chan struct{}
+	thinkTankRoomMu sync.Mutex
+	thinkTankRooms  map[string]struct{}
+	thinkTankMissed bool
 	// thinkTankCaptures maps an agent to its running room attempt capture.
 	thinkTankCaptureMu sync.Mutex
 	thinkTankCaptures  map[string]*thinkTankCapture
@@ -294,6 +300,8 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		activationSlots:           make(chan struct{}, messaging.ActivationBatch),
 		taskStartSlots:            make(chan struct{}, taskDispatchBatch),
 		thinkTankKick:             make(chan struct{}, 1),
+		thinkTankSlots:            make(chan struct{}, thinkTankProgressBatch),
+		thinkTankRooms:            map[string]struct{}{},
 		thinkTankCaptures:         map[string]*thinkTankCapture{},
 		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,

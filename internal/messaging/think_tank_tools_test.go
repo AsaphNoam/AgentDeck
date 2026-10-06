@@ -129,3 +129,45 @@ func TestThinkTankToolsOverMCP(t *testing.T) {
 		t.Fatalf("member activity read = %v", obj)
 	}
 }
+
+// TT2-06, FS-21.R31: the judge's first page carries no participant turn
+// ceiling, so its framing is only the synthesis guidance.
+func TestThinkTankJudgeReadOmitsTurnCeiling(t *testing.T) {
+	store := newStore(t)
+	srv := New(store, nil)
+	srv.Register("tok-j", "j")
+	j := connect(t, srv, "tok-j")
+	d, err := store.CreateThinkTank(state.ThinkTankCreate{CommandID: "c", Goal: "Pick storage", OriginProject: "p",
+		JudgeConfig: `{"role":"impl","project":"p"}`, Members: []state.ThinkTankMember{
+			{AgentID: "a", AgentName: "Ari", Project: "p", Cap: 1}, {AgentID: "b", AgentName: "Bea", Project: "p", Cap: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := d.Room.RoomID
+	if _, err := store.EndThinkTank(room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ReserveThinkTankJudge(room, "j", "Judge", "p"); err != nil {
+		t.Fatal(err)
+	}
+	d, err = store.MarkThinkTankJudgeLaunched(room, "Judge", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.BeginThinkTankAttempt(state.ThinkTankBegin{RoomID: room, Revision: d.Room.Revision,
+		AgentID: "j", Turn: state.ThinkTankTurnJudge, Generation: "g", TurnID: "t1"}); err != nil {
+		t.Fatal(err)
+	}
+	obj, isErr := callRoomTool(t, j, "read_think_tank", map[string]any{})
+	if isErr || obj["role"] != state.ThinkTankRoleJudge || obj["goal"] != "Pick storage" {
+		t.Fatalf("judge read = %v", obj)
+	}
+	for _, key := range []string{"turn_limit", "turns_completed", "turns_remaining", "may_leave"} {
+		if _, ok := obj[key]; ok {
+			t.Fatalf("judge read carries %s: %v", key, obj)
+		}
+	}
+	if guidance, _ := obj["guidance"].(string); !strings.Contains(guidance, "Discussion has ended") {
+		t.Fatalf("guidance = %q", guidance)
+	}
+}

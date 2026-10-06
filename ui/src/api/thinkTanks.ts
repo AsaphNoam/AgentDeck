@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   thinkTankActivitySchema,
@@ -134,10 +134,35 @@ export function useThinkTankEntries(id: string | undefined) {
   });
 }
 
-export async function fetchAllActivity(id: string, signal: AbortSignal): Promise<{ activity: ThinkTankActivity[]; clipped: boolean }> {
-  let after = 0;
-  let out: ThinkTankActivity[] = [];
-  let clipped = false;
+type ActivityWindow = { activity: ThinkTankActivity[]; clipped: boolean };
+
+/** A live activity event refills only the records after the cached tail;
+ *  every other refetch (room update, reconnect, or a walk that never
+ *  finished) walks the whole window, because publishing a blind opening
+ *  reveals records older than that tail (TS-14.R16, INV §16). */
+const activityTailRooms = new Set<string>();
+const activityWalkRooms = new Set<string>();
+
+export function noteThinkTankActivity(qc: QueryClient, id: string) {
+  if (qc.getQueryData(THINK_TANK_KEYS.activity(id))) activityTailRooms.add(id);
+  void qc.invalidateQueries({ queryKey: THINK_TANK_KEYS.activity(id) });
+}
+
+async function fetchActivity(qc: QueryClient, id: string, signal: AbortSignal): Promise<ActivityWindow> {
+  const cached = qc.getQueryData<ActivityWindow>(THINK_TANK_KEYS.activity(id));
+  if (activityTailRooms.delete(id) && cached && !activityWalkRooms.has(id)) {
+    return fetchAllActivity(id, signal, cached);
+  }
+  activityWalkRooms.add(id);
+  const result = await fetchAllActivity(id, signal);
+  activityWalkRooms.delete(id);
+  return result;
+}
+
+export async function fetchAllActivity(id: string, signal: AbortSignal, from?: ActivityWindow): Promise<ActivityWindow> {
+  let out: ThinkTankActivity[] = from?.activity ?? [];
+  let after = out.length ? out[out.length - 1].seq : 0;
+  let clipped = from?.clipped ?? false;
   for (;;) {
     const page = await request(roomURL(id, `/activity?after=${after}`),
       z.object({ activity: z.array(thinkTankActivitySchema), complete: z.boolean() }), { signal });
@@ -149,10 +174,11 @@ export async function fetchAllActivity(id: string, signal: AbortSignal): Promise
 }
 
 export function useThinkTankActivity(id: string | undefined) {
+  const qc = useQueryClient();
   return useQuery({
     queryKey: THINK_TANK_KEYS.activity(id ?? ""),
     enabled: Boolean(id),
-    queryFn: ({ signal }) => fetchAllActivity(id ?? "", signal),
+    queryFn: ({ signal }) => fetchActivity(qc, id ?? "", signal),
   });
 }
 

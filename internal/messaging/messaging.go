@@ -286,7 +286,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	}, s.handleRevokeContextGrant)
 	addTool(s, &mcp.Tool{
 		Name:        "read_think_tank",
-		Description: "Read a Think Tank room you belong to: its goal, your role and remaining turn ceiling, and the attributed discussion in bounded pages. During your turn the default view is what is new for you; follow next_cursor until complete to get your turn_token and read_receipt.",
+		Description: "Read a Think Tank room you belong to: its goal, your role and any remaining turn ceiling, and the attributed discussion in bounded pages. During your turn the default view is what is new for you; follow next_cursor until complete to get your turn_token and read_receipt.",
 	}, s.handleReadThinkTank)
 	addTool(s, &mcp.Tool{
 		Name:        "submit_think_tank_turn",

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -263,4 +264,76 @@ func TestThinkTankEngineHoldsIneligibleSpeaker(t *testing.T) {
 	if !strings.Contains(d.Room.Hold, "archived") || promptCount(t, promptLog) != 0 {
 		t.Fatalf("hold = %q prompts = %d", d.Room.Hold, promptCount(t, promptLog))
 	}
+}
+
+func stopForRoom(t *testing.T, srv *Server, id string) {
+	t.Helper()
+	if rec := doJSON(t, srv.routes(), http.MethodPost, "/api/sessions/"+id+"/stop", `{}`); rec.Code != http.StatusOK {
+		t.Fatalf("stop: %d %s", rec.Code, rec.Body.String())
+	}
+	waitRunning(t, srv, id, false)
+}
+
+// TT2-01, FS-21.R37: a stopped speaker whose resume fails before the room
+// attempt begins holds the room with a reason after one attempt, instead of
+// relaunching on every sweep.
+func TestThinkTankResumeFailureHoldsRoomOnce(t *testing.T) {
+	srv, promptLog, ids, _ := thinkTankTestServer(t)
+	agents := strings.Split(ids, ",")
+	room := createTestRoom(t, srv, agents, 2)
+	stopForRoom(t, srv, agents[0])
+	count := filepath.Join(t.TempDir(), "launches")
+	script := filepath.Join(t.TempDir(), "failing-acp")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho x >> '"+count+"'\nexit 1\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	srv.registry.Chat().SetCommand(script)
+
+	srv.progressThinkTanks(context.Background())
+	d := waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return d.Room.Hold != "" })
+	if !strings.Contains(d.Room.Hold, "could not start") || d.Active != nil {
+		t.Fatalf("hold = %q active = %+v", d.Room.Hold, d.Active)
+	}
+	srv.progressThinkTanks(context.Background())
+	srv.progressThinkTanks(context.Background())
+	raw, _ := os.ReadFile(count)
+	if n := strings.Count(string(raw), "x"); n != 1 {
+		t.Fatalf("resume launches = %d, want one", n)
+	}
+	if promptCount(t, promptLog) != 0 {
+		t.Fatal("a held room sent a turn")
+	}
+}
+
+// TT2-02: a room that moves while its stopped speaker resumes leaves the
+// resumed agent running idle; the next sweep admits it on the running branch.
+func TestThinkTankRoomChangeDuringResumeKeepsAgentRunning(t *testing.T) {
+	srv, promptLog, ids, _ := thinkTankTestServer(t)
+	agents := strings.Split(ids, ",")
+	room := createTestRoom(t, srv, agents, 2)
+	stopForRoom(t, srv, agents[0])
+	d, err := srv.stateStore.ReadThinkTank(room)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, ok := state.NextThinkTankOpportunity(d)
+	if !ok || next.AgentID != agents[0] {
+		t.Fatalf("next = %+v %v", next, ok)
+	}
+	// The selection's revision goes stale, as a room message mid-resume does.
+	if _, _, err := srv.stateStore.AddThinkTankRecord(room, "note", "context", ""); err != nil {
+		t.Fatal(err)
+	}
+	if srv.startThinkTankTurn(context.Background(), d, next) {
+		t.Fatal("a stale selection was admitted")
+	}
+	if _, err := srv.stateStore.ReadRunning(agents[0]); err != nil {
+		t.Fatalf("resumed agent was stopped: %v", err)
+	}
+	if cur, _ := srv.stateStore.ReadThinkTank(room); cur.Room.Hold != "" {
+		t.Fatalf("room held: %q", cur.Room.Hold)
+	}
+	srv.progressThinkTanks(context.Background())
+	waitActiveAttempt(t, srv, room, agents[0])
+	waitPrompts(t, promptLog, 1)
 }

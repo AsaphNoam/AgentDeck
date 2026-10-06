@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/AsaphNoam/Chuck/internal/runtime"
@@ -13,11 +14,15 @@ import (
 // The Think Tank engine progresses rooms over the ordinary lifecycle and
 // runtime services (TS-14.R1–R3). Rooms are durable in state; this loop only
 // selects each room's one admissible opportunity and starts it as a guarded
-// think_tank activation. One worker serializes progression, so a room never
-// races itself to admit two turns; the state's revision check and one-running
-// index are the authority either way.
+// think_tank activation. Each room progresses on its own bounded goroutine, so
+// a slow launch or resume in one room does not delay another (INV §16), and a
+// per-room claim keeps a room from racing itself to admit two turns; the
+// state's revision check and one-running index are the authority either way.
 
-const thinkTankSweepInterval = 5 * time.Second
+const (
+	thinkTankSweepInterval = 5 * time.Second
+	thinkTankProgressBatch = 4
+)
 
 func (s *Server) kickThinkTanks() {
 	select {
@@ -42,23 +47,70 @@ func (s *Server) startThinkTanks(ctx context.Context) error {
 			case <-ticker.C:
 			case <-s.thinkTankKick:
 			}
-			s.progressThinkTanks(ctx)
+			s.dispatchThinkTanks(ctx)
 		}
 	}()
 	return nil
 }
 
+// progressThinkTanks runs one dispatch pass and waits for it.
 func (s *Server) progressThinkTanks(ctx context.Context) {
+	s.dispatchThinkTanks(ctx).Wait()
+}
+
+// dispatchThinkTanks starts progression for each active room not already in
+// flight, at most thinkTankProgressBatch at once. A room skipped because it
+// is in flight or no slot is free is retried when a slot is released.
+func (s *Server) dispatchThinkTanks(ctx context.Context) *sync.WaitGroup {
+	var wg sync.WaitGroup
 	ids, err := s.stateStore.ListActiveThinkTankRooms()
 	if err != nil {
 		s.log.Debug("list think tanks", "err", err)
-		return
+		return &wg
 	}
 	for _, id := range ids {
 		if ctx.Err() != nil {
-			return
+			break
 		}
-		s.progressThinkTank(ctx, id)
+		if !s.claimThinkTankRoom(id) {
+			continue
+		}
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			defer s.releaseThinkTankRoom(id)
+			s.progressThinkTank(ctx, id)
+		}(id)
+	}
+	return &wg
+}
+
+func (s *Server) claimThinkTankRoom(roomID string) bool {
+	s.thinkTankRoomMu.Lock()
+	defer s.thinkTankRoomMu.Unlock()
+	if _, busy := s.thinkTankRooms[roomID]; busy {
+		s.thinkTankMissed = true
+		return false
+	}
+	select {
+	case s.thinkTankSlots <- struct{}{}:
+	default:
+		s.thinkTankMissed = true
+		return false
+	}
+	s.thinkTankRooms[roomID] = struct{}{}
+	return true
+}
+
+func (s *Server) releaseThinkTankRoom(roomID string) {
+	s.thinkTankRoomMu.Lock()
+	delete(s.thinkTankRooms, roomID)
+	<-s.thinkTankSlots
+	missed := s.thinkTankMissed
+	s.thinkTankMissed = false
+	s.thinkTankRoomMu.Unlock()
+	if missed {
+		s.kickThinkTanks()
 	}
 }
 
@@ -200,22 +252,52 @@ func (s *Server) startThinkTankTurn(ctx context.Context, d state.ThinkTankDetail
 	} else if !errors.Is(err, state.ErrNotFound) {
 		return false
 	}
-	if _, ok, ae := s.wakeCandidate(agentID); ae != nil || !ok {
+	// A stopped speaker that cannot be resumed holds the room with a reason
+	// instead of being retried by every sweep (FS-21.R37, TS-14.R6). A lost
+	// resume race or an archival in progress is transient and left to the next
+	// sweep, where eligibility names the lasting reason.
+	who := member.AgentName
+	if next.Turn == state.ThinkTankTurnJudge {
+		who = "The judge"
+	} else if who == "" {
+		who = "A participant"
+	}
+	hold := func(reason string) {
+		if held, err := s.stateStore.SetThinkTankHold(d.Room.RoomID, reason); err == nil {
+			s.publishThinkTankUpdate(held)
+		}
+	}
+	if _, ok, ae := s.wakeCandidate(agentID); ae != nil {
+		hold(who + " could not start: " + ae.Message + ". Resume it manually, or end the discussion.")
+		return false
+	} else if !ok {
+		if _, err := s.stateStore.ReadRunning(agentID); errors.Is(err, state.ErrNotFound) {
+			hold(who + " has no saved session to resume. Resume it manually, or end the discussion.")
+		}
 		return false
 	}
 	started := false
-	ae := s.resumeSessionWithHooks(ctx, agentID, resumeOverride{}, func() error { return nil }, func() error {
+	ae := s.resumeSessionWithHooks(ctx, agentID, resumeOverride{}, nil, func() error {
 		var err error
 		started, err = s.registry.StartActivation(ctx, agentID, state.ActivationKindThinkTank, begin)
-		if err == nil && !started {
-			err = errors.New("think tank turn did not start")
+		// Not admitted — the gate was busy or the room moved during the
+		// resume — leaves the resumed agent running idle; the next sweep takes
+		// the running branch instead of stopping it.
+		if !started && begun == nil && (err == nil || errors.Is(err, state.ErrThinkTankConflict)) {
+			return nil
 		}
 		return err
 	})
 	if ae != nil {
 		s.log.Debug("resume for think tank turn", "room", d.Room.RoomID, "agent", agentID, "err", ae.Message)
-		if !started {
+		switch {
+		case started:
+		case begun != nil:
 			abandon(errors.New(ae.Message))
+		case ae.Code != runtime.CodeConflict && ae.Code != runtime.CodeAgentArchiving && ae.Code != runtime.CodeProjectArchiving:
+			if s.thinkTankIneligible(agentID) == "" {
+				hold(who + " could not start: " + ae.Message + ". Resume it manually, or end the discussion.")
+			}
 		}
 	}
 	return started
@@ -338,8 +420,17 @@ func (s *Server) finishThinkTankTurn(ev runtime.Event) {
 	}
 	if err != nil {
 		// A store failure leaves the attempt running, which holds the room; it
-		// is never published from assistant output instead (R6, R10).
+		// is never published from assistant output instead (R6, R10). Say so in
+		// the room: stopping the speaker fences the attempt.
 		s.log.Warn("finish think tank turn", "agent", ev.AgentID, "err", err)
+		attempts, _ := s.stateStore.RunningThinkTankAttempts(ev.AgentID, ev.Generation)
+		for _, a := range attempts {
+			if a.TurnID == ev.TurnID {
+				if held, err := s.stateStore.SetThinkTankHold(a.RoomID, "The turn's result could not be saved. Stop the speaker to recover, then resume or end the discussion."); err == nil {
+					s.publishThinkTankUpdate(held)
+				}
+			}
+		}
 		return
 	}
 	s.publishThinkTankUpdate(finish.Detail)

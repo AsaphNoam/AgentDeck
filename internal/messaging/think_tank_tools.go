@@ -78,10 +78,13 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 	}
 	if page.First {
 		result["goal"] = page.Room.Goal
-		result["turn_limit"] = m.Cap
-		result["turns_completed"] = m.Completed
-		result["turns_remaining"] = max(m.Cap-m.Completed, 0)
-		result["may_leave"] = m.MayLeave
+		// The judge has no turn allowance; only participants get ceiling fields.
+		if m.Role != state.ThinkTankRoleJudge {
+			result["turn_limit"] = m.Cap
+			result["turns_completed"] = m.Completed
+			result["turns_remaining"] = max(m.Cap-m.Completed, 0)
+			result["may_leave"] = m.MayLeave
+		}
 		result["guidance"] = thinkTankGuidance(page)
 	}
 	if page.Attempt != nil {

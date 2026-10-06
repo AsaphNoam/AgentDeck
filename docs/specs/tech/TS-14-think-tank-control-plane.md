@@ -20,7 +20,10 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   including closing/judge work. Participants keep ordinary identities and provider histories.
   Use `server.launchAgent` with its existing `launchOptions.AgentID/Generation` reservations and
   full composition/registration/rollback for new participants and the fresh judge; use ordinary
-  resume for stopped agents. Persist setup intent/reserved identities before launch effects.
+  resume for stopped agents. A stopped speaker whose resume fails before its attempt commits holds
+  the room with a reason rather than being retried by each sweep; a lost resume race stays
+  transient, and a room that changed during the resume leaves the resumed agent running idle for
+  the next selection. Persist setup intent/reserved identities before launch effects.
   Partial setup retains created normal agents and exposes the failed slot; explicit retry does not
   silently duplicate them. Discussion starts only after setup is complete.
   Each pending setup slot claims durable `launching` state before ordinary launch; Pause/End
@@ -229,8 +232,10 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
   paused FS-17.R20 direct-transport gate stays closed. Normal private provider context remains normal.
 - Shipped shape (2026-10-06). The room's durable opportunity is its own state: the `think_tank`
   activation kind writes no `activations` row; the room attempt committed in `before(turnID)` is the
-  attempt record. One server worker (`server/think_tanks.go`) serializes progression on a 5s sweep
-  plus kicks. Executing turn ownership is `runtime.Event.TurnID`, cleared after the terminal
+  attempt record. A dispatcher (`server/think_tanks.go`) progresses each room on its own goroutine
+  on a 5s sweep plus kicks, at most four rooms at once, with a per-room claim keeping each room
+  serial; launches and resumes in one room do not delay another. The per-attempt activity budget is
+  a running UTF-8 byte total on the attempt row. The judge's read omits participant ceiling fields. Executing turn ownership is `runtime.Event.TurnID`, cleared after the terminal
   emission. Admission retains a hidden `session_meta` workspace-source marker so contribution
   file links work even without tool activity. Capture copies tool, diff, permission, error and child-activity records; assistant
   prose, prompts and reasoning are not copied. Child scopes freeze their original generation/turn;

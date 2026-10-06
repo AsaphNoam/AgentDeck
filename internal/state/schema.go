@@ -616,4 +616,14 @@ ALTER TABLE sessions ADD COLUMN last_context_size INTEGER;
 		version: 37,
 		sql:     `ALTER TABLE think_tanks ADD COLUMN create_intent TEXT NOT NULL DEFAULT '';`,
 	},
+	{
+		// A running byte total keeps the per-attempt activity cap O(1) per
+		// record (TS-14.R17); the room index serves detail reads and room
+		// deletion. Attempts running at upgrade are fenced by recovery.
+		version: 38,
+		sql: `
+ALTER TABLE think_tank_attempts ADD COLUMN activity_bytes INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_think_tank_attempts_room ON think_tank_attempts(room_id);
+`,
+	},
 }

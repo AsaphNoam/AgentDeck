@@ -654,3 +654,26 @@ func TestThinkTankSetupSlots(t *testing.T) {
 		t.Fatalf("relaunching a ready slot err = %v", err)
 	}
 }
+
+// TT2-04, TS-14.R17: the per-attempt activity budget counts bytes, so
+// multibyte payloads reach the cap at its byte size, not its character count.
+func TestThinkTankActivityBudgetCountsBytes(t *testing.T) {
+	st, _ := newTestStore(t)
+	room := ttCreate(t, st, false, ttMember("a", 2), ttMember("b", 2)).Room.RoomID
+	a, _, _ := ttTurn(t, st, room)
+	payload := `"` + strings.Repeat("é", 7<<20/2) + `"` // ~7 MiB, half as many characters
+	var truncated []int
+	for i := 0; i < 10; i++ {
+		rec, err := st.AppendThinkTankActivity(ThinkTankActivity{RoomID: room, AttemptID: a.AttemptID, AgentID: a.AgentID,
+			Generation: a.Generation, TurnID: a.TurnID, Payload: payload}, "tool_call")
+		if err != nil {
+			t.Fatalf("append %d: %v", i, err)
+		}
+		if rec.Truncated {
+			truncated = append(truncated, i)
+		}
+	}
+	if len(truncated) != 1 || truncated[0] != 9 {
+		t.Fatalf("truncated records = %v, want only the one past 64 MiB", truncated)
+	}
+}

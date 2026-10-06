@@ -3,7 +3,7 @@ import { QUERY_KEYS, queryClient } from "./config";
 import { REMOTE_QUERY_KEY } from "./remote";
 import { PIPELINE_QUERY_KEYS } from "./pipelines";
 import { TASK_QUERY_KEYS } from "./tasks";
-import { THINK_TANK_KEYS } from "./thinkTanks";
+import { THINK_TANK_KEYS, noteThinkTankActivity } from "./thinkTanks";
 import { thinkTankUpdateSchema } from "../schemas/thinkTank";
 import type { Config } from "../schemas/config";
 import type { AgentState, BusEvent, NotificationPayload, RuntimeActivity, TranscriptEvent } from "./types";
@@ -119,7 +119,7 @@ class SseClient {
 
   private onThinkTankActivity(event: MessageEvent<string>) {
     const parsed = thinkTankUpdateSchema.safeParse(parseBusData(event.data));
-    if (parsed.success) queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.activity(parsed.data.room_id) });
+    if (parsed.success) noteThinkTankActivity(queryClient, parsed.data.room_id);
   }
 
   registerOpenAgent(agentId: string) {

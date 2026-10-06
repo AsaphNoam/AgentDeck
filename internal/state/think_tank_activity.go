@@ -44,8 +44,9 @@ func (s *Store) AppendThinkTankActivity(a ThinkTankActivity, eventType string) (
 	}
 	defer tx.Rollback()
 	var state string
-	if err := tx.QueryRow(`SELECT state FROM think_tank_attempts WHERE attempt_id = ? AND room_id = ?`,
-		a.AttemptID, a.RoomID).Scan(&state); errors.Is(err, sql.ErrNoRows) {
+	var used int64
+	if err := tx.QueryRow(`SELECT state, activity_bytes FROM think_tank_attempts WHERE attempt_id = ? AND room_id = ?`,
+		a.AttemptID, a.RoomID).Scan(&state, &used); errors.Is(err, sql.ErrNoRows) {
 		return ThinkTankActivity{}, ErrThinkTankStale
 	} else if err != nil {
 		return ThinkTankActivity{}, fmt.Errorf("state: read think tank attempt: %w", err)
@@ -53,13 +54,12 @@ func (s *Store) AppendThinkTankActivity(a ThinkTankActivity, eventType string) (
 	if state != ThinkTankAttemptRunning {
 		return ThinkTankActivity{}, ErrThinkTankStale
 	}
-	var used int64
-	if err := tx.QueryRow(`SELECT COALESCE(SUM(LENGTH(payload)), 0) FROM think_tank_activity WHERE attempt_id = ?`,
-		a.AttemptID).Scan(&used); err != nil {
-		return ThinkTankActivity{}, fmt.Errorf("state: measure think tank activity: %w", err)
-	}
 	if len(a.Payload) > ThinkTankMaxActivityBytes || used+int64(len(a.Payload)) > ThinkTankMaxAttemptBytes {
 		a.Payload, a.Truncated = thinkTankTruncatedPayload(eventType), true
+	}
+	if _, err := tx.Exec(`UPDATE think_tank_attempts SET activity_bytes = activity_bytes + ? WHERE attempt_id = ?`,
+		len(a.Payload), a.AttemptID); err != nil {
+		return ThinkTankActivity{}, fmt.Errorf("state: count think tank activity: %w", err)
 	}
 	if err := tx.QueryRow(`SELECT COALESCE(MAX(seq), 0) + 1 FROM think_tank_activity WHERE room_id = ?`, a.RoomID).Scan(&a.Seq); err != nil {
 		return ThinkTankActivity{}, fmt.Errorf("state: next think tank activity seq: %w", err)
