@@ -125,14 +125,14 @@ func TestThinkTankOpeningFailurePauseAndRetry(t *testing.T) {
 	if err != nil || cur.Room.Hold == "" || len(ThinkTankOpeningOpportunities(cur)) != 0 {
 		t.Fatalf("resume readmitted the failure: hold=%q %v", cur.Room.Hold, err)
 	}
-	if _, err := st.RetryThinkTankOpening(room, a.AttemptID); !errors.Is(err, ErrThinkTankConflict) {
+	if _, err := st.RetryThinkTankOpening(room, a.AttemptID, ""); !errors.Is(err, ErrThinkTankConflict) {
 		t.Fatalf("retry of a completed opening = %v", err)
 	}
-	cur, err = st.RetryThinkTankOpening(room, b.AttemptID)
+	cur, err = st.RetryThinkTankOpening(room, b.AttemptID, "")
 	if err != nil || cur.Room.Hold != "" {
 		t.Fatalf("retry = hold %q %v", cur.Room.Hold, err)
 	}
-	if again, err := st.RetryThinkTankOpening(room, b.AttemptID); err != nil || again.Room.Revision != cur.Room.Revision {
+	if again, err := st.RetryThinkTankOpening(room, b.AttemptID, ""); err != nil || again.Room.Revision != cur.Room.Revision {
 		t.Fatalf("retry replay = %v", err)
 	}
 	next := ThinkTankOpeningOpportunities(cur)
@@ -161,7 +161,7 @@ func TestThinkTankOpeningEndAndAmbiguousRetry(t *testing.T) {
 	c, _ := ttOpen(t, st, room, "c", d.Room.Revision)
 	st.FailThinkTankAttempt("b", "g1", b.TurnID, "x")
 	st.FailThinkTankAttempt("c", "g1", c.TurnID, "y")
-	if _, err := st.RetryThinkTankOpening(room, ""); !errors.Is(err, ErrThinkTankConflict) {
+	if _, err := st.RetryThinkTankOpening(room, "", ""); !errors.Is(err, ErrThinkTankConflict) {
 		t.Fatalf("ambiguous retry = %v", err)
 	}
 	if _, err := st.EndThinkTank(room); err != nil {
@@ -178,8 +178,52 @@ func TestThinkTankOpeningEndAndAmbiguousRetry(t *testing.T) {
 	if f.Detail.Room.Phase != ThinkTankPhaseEnded || ttKinds(t, st, room) != "opening:a missing_opening:b missing_opening:c " {
 		t.Fatalf("partial end: %s %s", f.Detail.Room.Phase, ttKinds(t, st, room))
 	}
-	if _, err := st.RetryThinkTankOpening(room, b.AttemptID); !errors.Is(err, ErrThinkTankConflict) {
+	if _, err := st.RetryThinkTankOpening(room, b.AttemptID, ""); !errors.Is(err, ErrThinkTankConflict) {
 		t.Fatalf("retry after end = %v", err)
+	}
+}
+
+// TS-14.R23: an opening retry's command id binds to the attempt it retried.
+// Reusing it for another failed opening refuses; its exact replay still
+// acknowledges after the retried member fails again and after End.
+func TestThinkTankOpeningRetryCommandIdentity(t *testing.T) {
+	st, _ := newTestStore(t)
+	d := ttCreate(t, st, true, ttMember("a", 2), ttMember("b", 2))
+	room := d.Room.RoomID
+	a, _ := ttOpen(t, st, room, "a", d.Room.Revision)
+	b, _ := ttOpen(t, st, room, "b", d.Room.Revision)
+	st.FailThinkTankAttempt("a", "g1", a.TurnID, "x")
+	st.FailThinkTankAttempt("b", "g1", b.TurnID, "y")
+	if _, err := st.RetryThinkTankOpening(room, a.AttemptID, "cmd-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.RetryThinkTankOpening(room, b.AttemptID, "cmd-1"); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("command reuse for another opening = %v", err)
+	}
+	if cur := mustTT(t, st, room); len(unretriedThinkTankOpenings(cur)) != 1 {
+		t.Fatalf("conflicting reuse changed b: %+v", cur.Attempts)
+	}
+	if _, err := st.RetryThinkTankOpening(room, b.AttemptID, "cmd-2"); err != nil {
+		t.Fatal(err)
+	}
+	a2, _ := ttOpen(t, st, room, "a", 0)
+	st.FailThinkTankAttempt("a", "g1", a2.TurnID, "again")
+	for _, id := range []string{a.AttemptID, ""} {
+		if _, err := st.RetryThinkTankOpening(room, id, "cmd-1"); err != nil {
+			t.Fatalf("replay (%q) after a later failure = %v", id, err)
+		}
+	}
+	if cur := mustTT(t, st, room); len(unretriedThinkTankOpenings(cur)) != 1 {
+		t.Fatalf("replay retried a new failure: %+v", cur.Attempts)
+	}
+	if _, err := st.EndThinkTank(room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.RetryThinkTankOpening(room, a.AttemptID, "cmd-1"); err != nil {
+		t.Fatalf("replay after end = %v", err)
+	}
+	if _, err := st.RetryThinkTankOpening(room, a2.AttemptID, "cmd-3"); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("new retry after end = %v", err)
 	}
 }
 

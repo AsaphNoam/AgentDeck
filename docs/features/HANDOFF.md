@@ -111,15 +111,6 @@ None.
 
 **Unit:** `28d6c92^..9420115`.
 
-- **Must fix** — **TW-01 (INV §11/§15): Opening retry ignores command identity.**
-  `internal/server/think_tank_handlers.go:309–310,328` accepts `command_id` but passes only
-  `attempt_id` into `internal/state/think_tanks.go:1020–1079`. With two failed openings, retrying
-  A and then B using the same command id succeeds twice, instead of refusing conflicting reuse
-  under TS-14.R23. Attempt `retried` state prevents repeating the same attempt but does not bind
-  command intent. A temporary real-handler probe reproduced HTTP 200 for the conflicting second
-  retry. Bind room/command to opening intent atomically; preserve unambiguous legacy requests,
-  exact replay and paused recovery. Test same-command/different-attempt refusal and replay after
-  subsequent failure/phase changes. Fix complexity: medium.
 - **Must fix** — **TW-02 (INV §1/§10): An unavailable provider transcript hides a retained synthesis.**
   `ui/src/components/chat/thinkTankResults.tsx:17–28` only offers a positive-seq unanchored result
   when its seq lies inside the loaded event range. With an empty settled transcript, the range

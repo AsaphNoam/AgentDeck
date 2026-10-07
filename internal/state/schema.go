@@ -672,4 +672,13 @@ CREATE UNIQUE INDEX idx_think_tank_agent_running ON think_tank_attempts(agent_id
 		version: 43,
 		sql:     `CREATE INDEX idx_think_tank_members_agent ON think_tank_members(agent_id);`,
 	},
+	{
+		// An opening retry's command id binds to the attempt it retried, so
+		// replay is exact and reuse for another attempt refuses (TS-14.R23).
+		version: 44,
+		sql: `
+ALTER TABLE think_tank_attempts ADD COLUMN retry_command_id TEXT NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX idx_think_tank_retry_command ON think_tank_attempts(room_id, retry_command_id) WHERE retry_command_id != '';
+`,
+	},
 }

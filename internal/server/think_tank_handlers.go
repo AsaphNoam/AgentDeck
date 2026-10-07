@@ -304,8 +304,8 @@ type thinkTankRetryRequest struct {
 	Target string         `json:"target"`
 	Judge  *launchRequest `json:"judge,omitempty"`
 	// AttemptID names the failed opening a turn retry authorizes; replay of
-	// an already retried attempt is idempotent (TS-14.R23). CommandID is
-	// accepted for client symmetry; the attempt state carries idempotence.
+	// an already retried attempt is idempotent. CommandID binds to the
+	// attempt it retried; reuse for another attempt refuses (TS-14.R23).
 	AttemptID string `json:"attempt_id,omitempty"`
 	CommandID string `json:"command_id,omitempty"`
 }
@@ -325,7 +325,7 @@ func (s *Server) handleRetryThinkTank(w http.ResponseWriter, r *http.Request) {
 	case "setup":
 		d, err = s.stateStore.RetryThinkTankSetup(roomID)
 	case "turn":
-		d, err = s.stateStore.RetryThinkTankOpening(roomID, req.AttemptID)
+		d, err = s.stateStore.RetryThinkTankOpening(roomID, req.AttemptID, req.CommandID)
 	case "judge":
 		config := ""
 		if req.Judge != nil {

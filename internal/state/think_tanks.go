@@ -1015,10 +1015,25 @@ func unretriedOpeningHold(d ThinkTankDetail) string {
 // RetryThinkTankOpening authorizes one failed opening's next attempt. With
 // no attempt id, exactly one unretried failure must exist; otherwise the
 // retry is ambiguous. Retrying an already retried attempt is an exact replay.
+// A command id binds to the attempt it retried: its replay is exact even after
+// later failures or phase changes, and reuse for another attempt refuses.
 // A paused room stays paused; other unresolved failures keep the hold.
 // Without failed openings this is the ordinary turn retry (Resume).
-func (s *Store) RetryThinkTankOpening(roomID, attemptID string) (ThinkTankDetail, error) {
+func (s *Store) RetryThinkTankOpening(roomID, attemptID, commandID string) (ThinkTankDetail, error) {
 	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		if commandID != "" {
+			var bound string
+			err := tx.QueryRow(`SELECT attempt_id FROM think_tank_attempts WHERE room_id = ? AND retry_command_id = ?`,
+				roomID, commandID).Scan(&bound)
+			if err == nil {
+				if attemptID != "" && attemptID != bound {
+					return thinkTankConflict("command id reused for a different opening")
+				}
+				return errNoThinkTankChange
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("state: read think tank retry command: %w", err)
+			}
+		}
 		failed := unretriedThinkTankOpenings(d)
 		if attemptID == "" && len(failed) == 0 {
 			if d.Room.Control == ThinkTankEndRequested {
@@ -1057,7 +1072,8 @@ func (s *Store) RetryThinkTankOpening(roomID, attemptID string) (ThinkTankDetail
 		default:
 			target = &failed[0]
 		}
-		if _, err := tx.Exec(`UPDATE think_tank_attempts SET state = ? WHERE attempt_id = ?`, ThinkTankAttemptRetried, target.AttemptID); err != nil {
+		if _, err := tx.Exec(`UPDATE think_tank_attempts SET state = ?, retry_command_id = ? WHERE attempt_id = ?`,
+			ThinkTankAttemptRetried, commandID, target.AttemptID); err != nil {
 			return fmt.Errorf("state: retry think tank opening: %w", err)
 		}
 		after, err := readThinkTankDetail(tx, roomID)
