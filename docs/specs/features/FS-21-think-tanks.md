@@ -276,7 +276,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   new opening starts and let already-running openings finish. Failure retains completed hidden peers
   for explicit retry; End publishes the completed partial set and records missing answers. Restart
   fences every uncertain opening for explicit recovery, never replaying completed peers.
-- **R49 (planned)** — The operator can raise an individual participant's positive finite turn
+- **R49** — The operator can raise an individual participant's positive finite turn
   ceiling during open openings/discussion, whether running, paused or held. Show completed, maximum
   and remaining counts with the proposed higher value before Save; acknowledge the saved ceiling
   and update all room views. Increasing an exhausted member's ceiling restores its eligibility

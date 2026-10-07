@@ -179,6 +179,29 @@ describe("ThinkTankPage", () => {
     expect(screen.getByText("2 of 2 turns")).toBeTruthy();
   });
 
+  // FS-21.A36, R49: a refused increase keeps the draft and its command id;
+  // the saved increase sends the expected ceiling and acknowledges.
+  it("raises a participant's turn limit and keeps the draft on refusal", async () => {
+    const sent: { command_id: string; expected_limit: number; limit: number }[] = [];
+    server.use(http.post("/api/think-tanks/tt_fixture/participants/a_one/turn-limit", async ({ request }) => {
+      sent.push(await request.json() as (typeof sent)[number]);
+      if (sent.length === 1) return HttpResponse.json({ error: { code: "conflict", message: "busy database" } }, { status: 409 });
+      return HttpResponse.json(detail);
+    }));
+    renderRoom();
+    const raise = await screen.findAllByRole("button", { name: "Raise turn limit" });
+    fireEvent.click(raise[0]);
+    const input = screen.getByLabelText("New turn limit for Ari") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "6" } });
+    expect(screen.getByText("1 used · limit 3 → 6 · 5 left after saving")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("busy database")).toBeTruthy();
+    expect((screen.getByLabelText("New turn limit for Ari") as HTMLInputElement).value).toBe("6");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toMatchObject({ expected_limit: 3, limit: 6, command_id: sent[0].command_id });
+  });
+
   // FS-21.A9, R35: room messages go to the room with a stable command id.
   it("sends a room message and keeps controls available", async () => {
     renderRoom();

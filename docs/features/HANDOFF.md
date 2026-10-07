@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slice 1 of 6 done).
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–2 of 6 done).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -45,8 +45,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    card/Archive/chat cues finish with slice 6). Migration 39 `migrateThinkTankTitles`; explicit
    title kept in create intent with `omitempty` so pre-title replays still match; group applied in
    `launchReservedThinkTankAgent` (existing identities never regrouped).
-2. Live ceiling increase: `IncreaseThinkTankTurnLimit` state mutation + receipts table, REST
-   `POST /participants/{agent_id}/turn-limit` (FS-21.R49, TS-14.R24, A36).
+2. **Done** — live ceiling increase (FS-21.R49, TS-14.R24 shipped): `IncreaseThinkTankTurnLimit`,
+   migration 40 `think_tank_limit_commands` receipts, REST `.../participants/{agent_id}/turn-limit`,
+   `TurnLimitEditor` in the room roster. A36's rendered live-budget journey is owed with slice 6.
 3. Structured mentions on shared messages + context delivery (FS-21.R46 server half, TS-14.R25).
 4. Judge synthesis result projection + `GET /api/sessions/{id}/think-tank-results` + chat merge
    (FS-21.R50, TS-14.R26, A37).
@@ -174,6 +175,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: Think Tank workspace slice 2 (live turn limits).** Operators can raise a
+  participant's turn ceiling during openings/discussion (paused or held included); exhausted members
+  regain eligibility, nothing resumes or steers, replays are exact and stale/ended changes refuse.
+  State/server tests in both Go variants and room UI tests passed.
 
 - **2026-10-07 — Work: Think Tank workspace slice 1 (titles, title groups).** Rooms carry a fixed
   short title (legacy rows/API callers get a goal-derived fallback via migration 39); the room

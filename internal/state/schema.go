@@ -632,4 +632,21 @@ CREATE INDEX idx_think_tank_attempts_room ON think_tank_attempts(room_id);
 		version: 39,
 		apply:   migrateThinkTankTitles,
 	},
+	{
+		// Room-owned receipts for live ceiling increases, kept apart from
+		// shared message inputs: a budget change is not a contribution
+		// (TS-14.R24).
+		version: 40,
+		sql: `
+CREATE TABLE think_tank_limit_commands (
+  room_id    TEXT NOT NULL REFERENCES think_tanks(room_id) ON DELETE CASCADE,
+  command_id TEXT NOT NULL,
+  agent_id   TEXT NOT NULL,
+  expected   INTEGER NOT NULL,
+  turn_limit INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY(room_id, command_id)
+);
+`,
+	},
 }

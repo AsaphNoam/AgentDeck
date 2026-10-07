@@ -221,3 +221,26 @@ func TestThinkTankWireFixtureMatchesServerEncoding(t *testing.T) {
 		t.Fatalf("%s is stale; regenerate with CHUCK_UPDATE_THINK_TANK_FIXTURE=1", thinkTankWireFixturePath)
 	}
 }
+
+// FS-21.A36: a ceiling increase over REST returns the updated room, replays
+// its command and reports a stale expected ceiling as a conflict.
+func TestThinkTankTurnLimitOverREST(t *testing.T) {
+	_, h := roomRESTServer(t)
+	rec := doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two"))
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(rec.Body.Bytes(), &room)
+	url := "/api/think-tanks/" + room.RoomID + "/participants/a_one/turn-limit"
+	body := `{"command_id":"lim","expected_limit":2,"limit":5}`
+	for i := 0; i < 2; i++ {
+		got := doJSON(t, h, http.MethodPost, url, body)
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), `"limit":5`) {
+			t.Fatalf("increase %d = %d %s", i, got.Code, got.Body.String())
+		}
+	}
+	if got := doJSON(t, h, http.MethodPost, url, `{"command_id":"lim2","expected_limit":2,"limit":6}`); got.Code != http.StatusConflict {
+		t.Fatalf("stale = %d %s", got.Code, got.Body.String())
+	}
+	if got := doJSON(t, h, http.MethodPost, url, `{"command_id":"lim3","expected_limit":5,"limit":4}`); got.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("decrease = %d %s", got.Code, got.Body.String())
+	}
+}

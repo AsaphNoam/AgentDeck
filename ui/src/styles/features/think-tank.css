@@ -242,6 +242,26 @@
   font-size: 0.85rem;
 }
 
+.think-tank-limit {
+  display: grid;
+  font-size: 0.85rem;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-limit label {
+  display: grid;
+  gap: var(--ad-space-1);
+}
+
+.think-tank-limit input {
+  max-width: 8rem;
+}
+
+.think-tank-limit-actions {
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
 .think-tank-member[data-state="speaking"] {
   border-bottom-color: var(--ad-state-busy);
 }

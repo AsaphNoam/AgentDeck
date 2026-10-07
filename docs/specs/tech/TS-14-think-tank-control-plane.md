@@ -228,7 +228,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   without starting until Resume; preserve other unresolved failure holds. Partial-End/closing/ended
   retry refuses, preserving history. Unattempted eligible slots may proceed after explicit recovery,
   never completed/withheld peers. Existing unambiguous legacy retry shapes remain accepted.
-- **R24 (planned)** — Add an atomic state mutation for an absolute higher participant cap,
+- **R24** — Add an atomic state mutation for an absolute higher participant cap,
   exposed as `POST /api/think-tanks/{id}/participants/{agent_id}/turn-limit` with
   `{command_id, expected_limit, limit}`. Require 1–1,000, `limit > expected_limit`, a participant,
   phase openings/discussion, no End/closing/judge/run-closure authority and the applicable R20 guard.

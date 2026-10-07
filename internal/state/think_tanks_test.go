@@ -727,3 +727,66 @@ func TestThinkTankActivityBudgetCountsBytes(t *testing.T) {
 		t.Fatalf("truncated records = %v, want only the one past 64 MiB", truncated)
 	}
 }
+
+// FS-21.A36, TS-14.R24: a live ceiling increase restores an exhausted
+// member's eligibility without changing counters or control, replays exactly,
+// refuses stale or conflicting commands and closes with discussion.
+func TestThinkTankTurnLimitIncrease(t *testing.T) {
+	st, _ := newTestStore(t)
+	d := ttCreate(t, st, false, ttMember("a", 1), ttMember("b", 3), ttMember("c", 3))
+	room := d.Room.RoomID
+	a1, _, receipt := ttTurn(t, st, room)
+	ttSubmit(t, st, a1, receipt, ThinkTankReply, "A")
+	if _, err := st.PauseThinkTank(room); err != nil {
+		t.Fatal(err)
+	}
+	change := ThinkTankLimitChange{RoomID: room, AgentID: "a", CommandID: "lim-1", Expected: 1, Limit: 3}
+	got, err := st.IncreaseThinkTankTurnLimit(change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var a ThinkTankMember
+	for _, m := range got.Members {
+		if m.AgentID == "a" {
+			a = m
+		}
+	}
+	if a.Cap != 3 || a.Completed != 1 || a.State != ThinkTankMemberActive || got.Room.Control != ThinkTankPaused {
+		t.Fatalf("after increase: %+v control=%s", a, got.Room.Control)
+	}
+	if again, err := st.IncreaseThinkTankTurnLimit(change); err != nil || again.Room.Revision != got.Room.Revision {
+		t.Fatalf("replay = %v rev %d/%d", err, again.Room.Revision, got.Room.Revision)
+	}
+	conflicting := change
+	conflicting.Limit = 4
+	if _, err := st.IncreaseThinkTankTurnLimit(conflicting); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("conflicting reuse = %v", err)
+	}
+	stale := ThinkTankLimitChange{RoomID: room, AgentID: "a", CommandID: "lim-2", Expected: 1, Limit: 5}
+	if _, err := st.IncreaseThinkTankTurnLimit(stale); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("stale expected = %v", err)
+	}
+	for _, bad := range []ThinkTankLimitChange{
+		{RoomID: room, AgentID: "a", CommandID: "x", Expected: 3, Limit: 2},
+		{RoomID: room, AgentID: "a", CommandID: "x", Expected: 3, Limit: ThinkTankMaxTurnLimit + 1},
+		{RoomID: room, AgentID: "nobody", CommandID: "x", Expected: 3, Limit: 4},
+	} {
+		if _, err := st.IncreaseThinkTankTurnLimit(bad); !errors.Is(err, ErrThinkTankInvalid) {
+			t.Fatalf("%+v = %v, want invalid", bad, err)
+		}
+	}
+	if _, err := st.EndThinkTank(room); err != nil {
+		t.Fatal(err)
+	}
+	late := ThinkTankLimitChange{RoomID: room, AgentID: "b", CommandID: "lim-3", Expected: 3, Limit: 4}
+	if _, err := st.IncreaseThinkTankTurnLimit(late); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("ended room increase = %v", err)
+	}
+	if err := st.DeleteThinkTank(room); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := st.db.QueryRow(`SELECT COUNT(*) FROM think_tank_limit_commands`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("receipts after delete = %d %v", n, err)
+	}
+}

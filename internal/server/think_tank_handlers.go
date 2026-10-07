@@ -241,6 +241,32 @@ func (s *Server) handleThinkTankControl(action func(string) (state.ThinkTankDeta
 	}
 }
 
+type thinkTankTurnLimitRequest struct {
+	CommandID     string `json:"command_id"`
+	ExpectedLimit int    `json:"expected_limit"`
+	Limit         int    `json:"limit"`
+}
+
+// handleThinkTankTurnLimit raises one participant's ceiling. The saved change
+// is acknowledged before dispatch and never sends or steers (FS-21.R49).
+func (s *Server) handleThinkTankTurnLimit(w http.ResponseWriter, r *http.Request) {
+	var req thinkTankTurnLimitRequest
+	if !decodeThinkTankBody(w, r, &req) {
+		return
+	}
+	d, err := s.stateStore.IncreaseThinkTankTurnLimit(state.ThinkTankLimitChange{
+		RoomID: r.PathValue("id"), AgentID: r.PathValue("agent_id"), CommandID: req.CommandID,
+		Expected: req.ExpectedLimit, Limit: req.Limit,
+	})
+	if err != nil {
+		s.writeThinkTankError(w, err)
+		return
+	}
+	s.publishThinkTankUpdate(d)
+	s.kickThinkTanks()
+	writeJSON(w, http.StatusOK, s.thinkTankDetailWire(d))
+}
+
 type thinkTankRetryRequest struct {
 	// Target is setup (failed new-participant slots), turn (a failed or
 	// held participant turn) or judge (the failed final step).

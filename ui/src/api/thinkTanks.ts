@@ -248,6 +248,12 @@ export function useThinkTankRetry(id: string) {
     request(roomURL(id, "/retry"), thinkTankDetailSchema, post(input)));
 }
 
+export function useThinkTankTurnLimit(id: string) {
+  return useRoomMutation((input: { agent_id: string; command_id: string; expected_limit: number; limit: number }) =>
+    request(roomURL(id, `/participants/${encodeURIComponent(input.agent_id)}/turn-limit`), thinkTankDetailSchema,
+      post({ command_id: input.command_id, expected_limit: input.expected_limit, limit: input.limit })));
+}
+
 export function useThinkTankMessage(id: string) {
   return useRoomMutation((input: { command_id: string; body: string }) =>
     request(roomURL(id, "/messages"), z.object({ input_id: z.string() }).passthrough(), post(input)));

@@ -991,6 +991,78 @@ func (s *Store) ResumeThinkTank(roomID string) (ThinkTankDetail, error) {
 	})
 }
 
+// ThinkTankLimitChange raises one participant's turn ceiling to an absolute
+// higher value, guarded by the ceiling the operator saw (TS-14.R24).
+type ThinkTankLimitChange struct {
+	RoomID    string
+	AgentID   string
+	CommandID string
+	Expected  int
+	Limit     int
+}
+
+// IncreaseThinkTankTurnLimit raises a participant's ceiling while openings or
+// discussion are open. An exhausted member becomes eligible again; departure,
+// counters, control, holds and active attempts are untouched. Exact command
+// replay returns the current room; conflicting reuse or a stale expected
+// ceiling refuses (FS-21.R49).
+func (s *Store) IncreaseThinkTankTurnLimit(c ThinkTankLimitChange) (ThinkTankDetail, error) {
+	if strings.TrimSpace(c.CommandID) == "" {
+		return ThinkTankDetail{}, thinkTankInvalid("command id is required")
+	}
+	if c.Limit < 1 || c.Limit > ThinkTankMaxTurnLimit {
+		return ThinkTankDetail{}, thinkTankInvalid("turn limit must be 1 to %d", ThinkTankMaxTurnLimit)
+	}
+	if c.Limit <= c.Expected {
+		return ThinkTankDetail{}, thinkTankInvalid("the new turn limit must be higher than the current one")
+	}
+	return s.thinkTankTx(c.RoomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		var agent string
+		var expected, limit int
+		err := tx.QueryRow(`SELECT agent_id, expected, turn_limit FROM think_tank_limit_commands WHERE room_id = ? AND command_id = ?`,
+			c.RoomID, c.CommandID).Scan(&agent, &expected, &limit)
+		if err == nil {
+			if agent != c.AgentID || expected != c.Expected || limit != c.Limit {
+				return thinkTankConflict("command id reused for a different change")
+			}
+			return errNoThinkTankChange
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("state: read think tank limit command: %w", err)
+		}
+		if d.Room.Phase != ThinkTankPhaseOpenings && d.Room.Phase != ThinkTankPhaseDiscussion {
+			return thinkTankConflict("turn limits can only change while discussion is open")
+		}
+		if d.Room.Control == ThinkTankEndRequested {
+			return thinkTankConflict("discussion is ending")
+		}
+		var member *ThinkTankMember
+		for i := range d.Members {
+			if d.Members[i].AgentID == c.AgentID && d.Members[i].Role == ThinkTankRoleParticipant {
+				member = &d.Members[i]
+			}
+		}
+		if member == nil {
+			return thinkTankInvalid("%s is not a participant", c.AgentID)
+		}
+		if member.Cap != c.Expected {
+			return thinkTankConflict("the turn limit is now %d", member.Cap)
+		}
+		state := member.State
+		if state == ThinkTankMemberExhausted && member.Completed < c.Limit {
+			state = ThinkTankMemberActive
+		}
+		if _, err := tx.Exec(`UPDATE think_tank_members SET cap = ?, state = ? WHERE room_id = ? AND agent_id = ?`,
+			c.Limit, state, c.RoomID, c.AgentID); err != nil {
+			return fmt.Errorf("state: raise think tank turn limit: %w", err)
+		}
+		if _, err := tx.Exec(`INSERT INTO think_tank_limit_commands(room_id, command_id, agent_id, expected, turn_limit, created_at)
+VALUES(?, ?, ?, ?, ?, ?)`, c.RoomID, c.CommandID, c.AgentID, c.Expected, c.Limit, formatTime(timeNow())); err != nil {
+			return fmt.Errorf("state: record think tank limit command: %w", err)
+		}
+		return nil
+	})
+}
+
 func setThinkTankControlTx(tx *sql.Tx, roomID, control string) error {
 	if _, err := tx.Exec(`UPDATE think_tanks SET control = ? WHERE room_id = ?`, control, roomID); err != nil {
 		return fmt.Errorf("state: set think tank control: %w", err)

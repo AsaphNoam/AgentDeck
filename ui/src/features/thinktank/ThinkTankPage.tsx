@@ -43,6 +43,7 @@ import {
   roomTitle,
 } from "./roomText";
 import { RoomAnnotationTray } from "./RoomAnnotationTray";
+import { TurnLimitEditor } from "./TurnLimitEditor";
 
 /** ThinkTankPage is the room's full conversation page (FS-21.R27): goal and
  *  phase first, then the attributed discussion, then the current action and
@@ -289,6 +290,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                   {m.exists && m.archived && <span>Archived</span>}
                   {m.setup_error && <span className="form-error">{m.setup_error}</span>}
                 </div>
+                <TurnLimitEditor room={room} member={m} />
               </li>
             ))}
           </ul>
