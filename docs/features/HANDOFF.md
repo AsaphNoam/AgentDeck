@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished and available for review.
+- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished; review found TW-01–TW-06 below.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -23,8 +23,9 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
   (`32da712`, `eadab5a`) are reviewed and closed without findings.
-  **Available:** Think Tank workspace and live controls (`28d6c92^..9420115`), including the
-  earlier slices, recovered composer/mention/tint work and verification closure.
+  Think Tank workspace and live controls (`28d6c92^..9420115`), including the earlier slices,
+  recovered composer/mention/tint work and verification closure, was reviewed and stays open
+  for TW-01–TW-06 below.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
@@ -42,13 +43,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 None. The completed
 [`think-tank-workspace-and-live-controls.md`](../ready-changes/think-tank-workspace-and-live-controls.md)
-is available for independent review. All slices and automated/fake-provider closure are finished;
+was independently reviewed and has open findings TW-01–TW-06 below. All implementation slices and
+automated/fake-provider closure are finished;
 credentialed checks remain below. Evidence and reproduction commands:
 [`implementation-think-tank-workspace-2026-10-07.md`](../archive/reviews/implementation-think-tank-workspace-2026-10-07.md).
 
-Review notes: opening retry idempotence uses the attempt's `retried` state (`command_id` is accepted
-but unused); every room update invalidates mounted judge-results queries. No new runtime/driver or
-phone room interface was added. Pending pipeline-owned room work remains a separate waiting unit.
+Review outcomes: attempt-state opening retry does not satisfy the specified command identity
+contract (TW-01). Invalidating mounted judge-results queries on every room update matches
+TS-14.R26 and is accepted. No new runtime/driver or phone room interface was added. Pending
+pipeline-owned room work remains a separate waiting unit.
 
 ## Acceptance gates still owed
 
@@ -103,6 +106,63 @@ phone room interface was added. Pending pipeline-owned room work remains a separ
 None.
 
 ## Review findings
+
+### Think Tank workspace and live controls — **Fix model:** medium — Codex Terra or Claude Opus.
+
+**Unit:** `28d6c92^..9420115`.
+
+- **Must fix** — **TW-01 (INV §11/§15): Opening retry ignores command identity.**
+  `internal/server/think_tank_handlers.go:309–310,328` accepts `command_id` but passes only
+  `attempt_id` into `internal/state/think_tanks.go:1020–1079`. With two failed openings, retrying
+  A and then B using the same command id succeeds twice, instead of refusing conflicting reuse
+  under TS-14.R23. Attempt `retried` state prevents repeating the same attempt but does not bind
+  command intent. A temporary real-handler probe reproduced HTTP 200 for the conflicting second
+  retry. Bind room/command to opening intent atomically; preserve unambiguous legacy requests,
+  exact replay and paused recovery. Test same-command/different-attempt refusal and replay after
+  subsequent failure/phase changes. Fix complexity: medium.
+- **Must fix** — **TW-02 (INV §1/§10): An unavailable provider transcript hides a retained synthesis.**
+  `ui/src/components/chat/thinkTankResults.tsx:17–28` only offers a positive-seq unanchored result
+  when its seq lies inside the loaded event range. With an empty settled transcript, the range
+  is Infinity/−Infinity and the immutable result is omitted forever. A missing provider file
+  returns an empty transcript while the agent/result row can still exist; Archive fetch failure
+  also leaves empty events. This violates TS-14.R26/TS-08.R98's source-unavailable fallback.
+  A temporary projection probe returned zero rows for a retained result with an empty transcript.
+  Distinguish loading/window bounds from a settled unavailable source and show the exact result
+  with truthful framing; test empty/missing source and preserve waiting for an unloaded window.
+  Fix complexity: medium.
+- **Must fix** — **TW-03 (INV §2/§11): Legacy create replay does not compare the title.**
+  `internal/state/think_tanks.go:410–421,503–504` uses `sameThinkTankCreate` for rooms predating
+  migration 37's saved create intent. That fallback omits title, so a changed explicit title under
+  the same command id is accepted, contrary to TS-14.R22's normalized title/replay contract.
+  A temporary state probe with the legacy empty intent confirmed acceptance. Compare an explicit
+  normalized title while preserving title-less legacy replay; add a migrated-row replay test.
+  Fix complexity: trivial/easy.
+- **Worth fixing** — **TW-04 (INV §7/§8): Synthesis read failures have no visible feedback.**
+  `ui/src/components/chat/TranscriptView.tsx:91–92` uses only `results.data`. If the new results
+  endpoint fails on first load, live/Archive chat renders as though no synthesis exists; the
+  query's error never reaches the operator. Surface a results-unavailable message with retry
+  while preserving provider history and drafts; test a failed query followed by recovery.
+  Fix complexity: trivial/easy.
+- **Must fix** — **TW-05 (INV §10/§11/§16): Membership lists discard clipping feedback.**
+  `ui/src/api/thinkTanks.ts:144–149` strips the server's `clipped` field and returns only rooms;
+  `ui/src/features/thinktank/RoomTurnNotice.tsx:40–60` presents that list without a warning.
+  A long-lived participant with more than 200 rooms silently loses older memberships from its
+  Think Tank tab, violating TS-14.R27's explicit clipping feedback. Preserve/display the flag
+  and test a serialized clipped response; the bounded list need not become unbounded.
+  Fix complexity: trivial/easy.
+- **Must fix** — **TW-06 (INV §10): Ended cards omit the collective allowance summary.**
+  `ui/src/features/thinktank/RoomList.tsx:73–78` hides the total whenever phase is ended, although
+  FS-21.R44 requires the collective allowance alongside the retained per-member counts.
+  Project/Archive cards keep individual amounts and judge/completion state but lose the total.
+  Retain a truthful unused-ceiling summary on ended cards and test that state; judge status is
+  already correctly shown in `cardStatus` and needs no fix. Fix complexity: trivial/easy.
+
+Review verification: focused Think Tank state/server/MCP tests passed with `-race` in both Go
+variants; style/presentation checks (41 tests) and 60 affected UI tests passed. Three temporary
+probes reproduced TW-01–TW-03 and were removed. Product code/specs were not changed. The rendered
+harness assertions and credentialed-gate separation were reviewed; live-provider gates remain owed.
+Invariant sweep: §1–§3, §5, §7–§11 and §13–§17 apply and were checked; §4 (new registration artifacts),
+§6 (new runtime/interface) and §12 (external CLI invocation changes) have no applicable diff surface.
 
 ### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -160,6 +220,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Review: Think Tank workspace and live controls.** Found command-retry and legacy
+  title replay gaps, a missing-transcript synthesis defect, and smaller read-feedback, clipping and
+  ended-card summary gaps (TW-01–TW-06). Focused Go race checks passed both variants; affected UI
+  and presentation checks passed. The unit stays open; fix routing is medium.
 
 - **2026-10-07 — Work: completed interrupted Think Tank workspace UI and closure.** Anchored
   standard composer, shared participant picker/mentions, retained addressee cues and stable speech/
