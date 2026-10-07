@@ -37,7 +37,7 @@ function renderArchive(id: string) {
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-beforeEach(() => useTranscriptStore.setState({ byAgent: {}, pending: {} }));
+beforeEach(() => useTranscriptStore.setState({ byAgent: {}, pending: {}, settled: {} }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
@@ -106,5 +106,24 @@ describe("ArchiveAgentPage judge result", () => {
     const result = document.querySelector("[data-slot='result']")!;
     const end = document.querySelector("hr.turn-end")!;
     expect(result.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // TS-14.R26: an empty provider transcript (missing file) or a failed Archive
+  // read still shows the retained synthesis, framed as source-unavailable.
+  it.each([
+    ["an empty transcript", () => HttpResponse.json({ agent_id: "a_judge", events: [] })],
+    ["a failed transcript read", () => HttpResponse.json({ error: "gone" }, { status: 500 })],
+  ])("shows the synthesis after %s", async (_name, transcript) => {
+    server.use(
+      http.get("/api/sessions/a_judge/transcript", transcript),
+      http.get("/api/sessions/a_judge/think-tank-results", () => HttpResponse.json({
+        version: 1, complete: true,
+        results: [{ result_id: 1, room_id: "tt_1", room_title: "Cache choice", room_available: true, entry_seq: 9,
+          attempt_id: "att", body: "Exact synthesis: keep LRU", generation: "g", turn_id: "t", event_seq: 3, completed_at: "2026-10-07T00:00:00Z" }],
+      })),
+    );
+    renderArchive("a_judge");
+    expect(await screen.findByText("Exact synthesis: keep LRU")).toBeInTheDocument();
+    expect(screen.getByText("Its originating turn is not in this transcript.")).toBeInTheDocument();
   });
 });

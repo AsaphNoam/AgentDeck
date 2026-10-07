@@ -301,6 +301,11 @@ class SseClient {
       const transcript = await getTranscript(agentId);
       if (this.transcriptRequestToken[agentId] !== token || !this.openAgents.has(agentId)) return;
       useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
+    } catch (err) {
+      if (this.transcriptRequestToken[agentId] === token && this.openAgents.has(agentId)) {
+        useTranscriptStore.getState().settle(agentId);
+      }
+      throw err;
     } finally {
       if (this.transcriptRequestToken[agentId] === token) {
         useTranscriptStore.getState().endReconciliation(agentId);

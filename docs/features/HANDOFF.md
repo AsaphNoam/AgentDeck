@@ -111,16 +111,6 @@ None.
 
 **Unit:** `28d6c92^..9420115`.
 
-- **Must fix** — **TW-02 (INV §1/§10): An unavailable provider transcript hides a retained synthesis.**
-  `ui/src/components/chat/thinkTankResults.tsx:17–28` only offers a positive-seq unanchored result
-  when its seq lies inside the loaded event range. With an empty settled transcript, the range
-  is Infinity/−Infinity and the immutable result is omitted forever. A missing provider file
-  returns an empty transcript while the agent/result row can still exist; Archive fetch failure
-  also leaves empty events. This violates TS-14.R26/TS-08.R98's source-unavailable fallback.
-  A temporary projection probe returned zero rows for a retained result with an empty transcript.
-  Distinguish loading/window bounds from a settled unavailable source and show the exact result
-  with truthful framing; test empty/missing source and preserve waiting for an unloaded window.
-  Fix complexity: medium.
 - **Worth fixing** — **TW-04 (INV §7/§8): Synthesis read failures have no visible feedback.**
   `ui/src/components/chat/TranscriptView.tsx:91–92` uses only `results.data`. If the new results
   endpoint fails on first load, live/Archive chat renders as though no synthesis exists; the

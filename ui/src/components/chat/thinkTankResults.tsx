@@ -10,11 +10,17 @@ export const THINK_TANK_RESULT_KIND = "think_tank_result";
  *  the turn end that completed it, so it reads as that turn's result rather
  *  than as collapsible activity (FS-21.R50, TS-14.R26). An anchor beyond the
  *  loaded window waits for it; a missing anchor inside the window (or none
- *  recorded) still shows the result, framed as source-unavailable. The
- *  provider transcript itself is unchanged. */
-export function mergeThinkTankResults(events: TranscriptEvent[], results: ThinkTankResult[] | undefined): TranscriptEvent[] {
+ *  recorded) still shows the result, framed as source-unavailable. A settled
+ *  read with no provider events (missing file, failed Archive read) is no
+ *  window to wait for, so every result shows that way. The provider
+ *  transcript itself is unchanged. */
+export function mergeThinkTankResults(events: TranscriptEvent[], results: ThinkTankResult[] | undefined, settled = false): TranscriptEvent[] {
   if (!results?.length) return events;
   const seqs = events.map((event) => event.seq).filter((seq): seq is number => typeof seq === "number");
+  if (settled && !seqs.length) {
+    const rows = results.map((result) => ({ kind: THINK_TANK_RESULT_KIND, result_id: result.result_id, result, source_unavailable: true }) as TranscriptEvent);
+    return [...events, ...rows];
+  }
   const first = seqs.length ? Math.min(...seqs) : Infinity;
   const last = seqs.length ? Math.max(...seqs) : -Infinity;
   const anchored = new Map<number, TranscriptEvent[]>();

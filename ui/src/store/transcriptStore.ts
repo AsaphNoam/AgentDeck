@@ -8,6 +8,10 @@ interface TranscriptStoreState {
   pending: Record<string, TranscriptEvent | null>;
   previewByAgent: Record<string, string>;
   previewKindByAgent: Record<string, string | undefined>;
+  /** A full transcript read finished (or failed) for the agent: an absent
+   *  event is no longer merely unloaded. */
+  settled: Record<string, true>;
+  settle: (agentId: string) => void;
   appendMessage: (agentId: string, event: TranscriptEvent) => void;
   updatePreview: (agentId: string, event: TranscriptEvent) => void;
   beginReconciliation: (agentId: string) => void;
@@ -161,6 +165,8 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
   pending: {},
   previewByAgent: {},
   previewKindByAgent: {},
+  settled: {},
+  settle: (agentId) => set((state) => (state.settled[agentId] ? state : { settled: { ...state.settled, [agentId]: true } })),
   appendMessage: (agentId, raw) =>
     set((state) => {
       const event = normalizeEvent(raw);
@@ -236,10 +242,12 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       const byAgent = { ...state.byAgent };
       const rawByAgent = { ...state.rawByAgent };
       const pending = { ...state.pending };
+      const settled = { ...state.settled };
       delete byAgent[agentId];
       delete rawByAgent[agentId];
       delete pending[agentId];
-      return { byAgent, rawByAgent, pending };
+      delete settled[agentId];
+      return { byAgent, rawByAgent, pending, settled };
     }),
   setTranscript: (agentId, events) =>
     set((state) => {
@@ -268,6 +276,7 @@ export const useTranscriptStore = create<TranscriptStoreState>((set) => ({
       return {
         byAgent: { ...state.byAgent, [agentId]: folded },
         rawByAgent,
+        settled: { ...state.settled, [agentId]: true },
         previewByAgent: { ...state.previewByAgent, [agentId]: preview },
         previewKindByAgent: { ...state.previewKindByAgent, [agentId]: kindOf(lastReply ?? {}) },
       };

@@ -13,6 +13,7 @@ export function ArchiveAgentPage() {
   const [params, setParams] = useSearchParams();
   const events = useTranscriptStore((state) => state.byAgent[id] ?? []);
   const setTranscript = useTranscriptStore((state) => state.setTranscript);
+  const settle = useTranscriptStore((state) => state.settle);
   const agent = useAgentStore((state) => state.agents[id]);
   const [resuming, setResuming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +35,8 @@ export function ArchiveAgentPage() {
   const createdAt = textField(metadata?.created_at);
 
   useEffect(() => {
-    void getTranscript(id, true).then((r) => setTranscript(r.agent_id, r.events)).catch(() => {});
-  }, [id, setTranscript]);
+    void getTranscript(id, true).then((r) => setTranscript(r.agent_id, r.events)).catch(() => settle(id));
+  }, [id, setTranscript, settle]);
 
   const doResume = async () => {
     setResuming(true);

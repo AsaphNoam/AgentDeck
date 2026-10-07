@@ -17,6 +17,7 @@ import { ChildActivity } from "./renderers/ChildActivity";
 import { BackgroundTaskList } from "./renderers/BackgroundTaskList";
 import { collectTasks, markBackgrounded, nestActivities, withReasoning, type ChildNode } from "./runtimeActivity";
 import { useReasoningStore } from "../../store/reasoningStore";
+import { useTranscriptStore } from "../../store/transcriptStore";
 import { projectTurns } from "./turnActivity";
 import { TurnList, useFocusReturn, useTurnChoices } from "./TurnList";
 import { AnnotationTray } from "./AnnotationTray";
@@ -89,7 +90,8 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
   });
 
   const results = useThinkTankResults(agentId);
-  const nested = nestActivities(withReasoning(markBackgrounded(mergeThinkTankResults(events, results.data)), reasoning));
+  const settled = useTranscriptStore((state) => Boolean(state.settled[agentId]));
+  const nested = nestActivities(withReasoning(markBackgrounded(mergeThinkTankResults(events, results.data, settled)), reasoning));
   const choices = useTurnChoices(agentId);
   const trackFocus = useFocusReturn(scrollRef);
   // A Files-tab Diff reveal opens the completed turn hiding that row before the
