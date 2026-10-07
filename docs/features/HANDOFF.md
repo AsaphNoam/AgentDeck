@@ -96,6 +96,11 @@ None.
 
 ## Changelog
 
+- **2026-10-07 — Operating skill audit fixes finished.** Corrected the terminal messaging/task
+  boundary, clarified that existing task targets use current session settings, and documented
+  explicit fresh-judge retry without reopening discussion. Guidance now matches existing behavior;
+  no product or specification change. `go test ./internal/agentknowledge`, `make check-specs`, and
+  `git diff --check` passed. All three approved audit items are closed.
 - **2026-10-07 — Release preparation: v0.11.0.** Minor release for Think Tank workspace/live
   controls, quiet completed chat turns, UI polish and the 2026-10 provider refresh. Corrected the
   optional source install's Claude ACP pin to 0.85.1 and regenerated the UI embed through `make dist`.
