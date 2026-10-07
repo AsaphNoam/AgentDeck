@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, type ComponentProps } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import type { Components } from "react-markdown";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -7,6 +7,9 @@ import type { Element } from "hast";
 import { CodeBlock } from "./CodeBlock";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { classifyFileLink, type FileLink } from "./filePath";
+import { PointerContextMenu, type PointerMenuState } from "../../ui/PointerContextMenu";
+import { offerWebLink, webLinkActions } from "../../../lib/linkActions";
+import { useUiStore } from "../../../store/uiStore";
 
 // The one sanitized Markdown renderer in the product. An assistant message and the
 // file viewer's rendered Markdown form both go through it, so `rehypeSanitize`,
@@ -43,6 +46,30 @@ function fenceIsClosed(source: string, node: Element | undefined): boolean {
   return CLOSING_FENCE.test(source.slice(start, end));
 }
 
+const WEB_LINK = /^(?:https?:)?\/\//i;
+
+function WebLink({ href, children, ...rest }: ComponentProps<"a"> & { href: string }) {
+  const pushError = useUiStore((state) => state.pushError);
+  const [menu, setMenu] = useState<PointerMenuState | null>(null);
+  return (
+    <>
+      <a
+        {...rest}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onContextMenu={(mouse) => {
+          const { clientX: x, clientY: y } = mouse;
+          offerWebLink(mouse, (url) => setMenu({ x, y, actions: webLinkActions(url, pushError) }));
+        }}
+      >
+        {children}
+      </a>
+      <PointerContextMenu menu={menu} onClose={() => setMenu(null)} />
+    </>
+  );
+}
+
 export function SanitizedMarkdown({ text, onOpenFile }: { text: string; onOpenFile?: (link: FileLink) => void }) {
   // The component map must stay referentially stable for the life of the message: a new map
   // remounts every block under it, so rebuilding it per streamed delta drops a settled diagram
@@ -62,10 +89,12 @@ export function SanitizedMarkdown({ text, onOpenFile }: { text: string; onOpenFi
     },
     // A link whose target is a local path opens the file viewer instead of
     // navigating the browser, which today leaves the conversation entirely
-    // (FS-03.R51). Everything else — `http`, `https`, `mailto` — is untouched.
+    // (FS-03.R51). A web link opens in a new tab (FS-03.R78); `mailto`, fragments
+    // and rejected URLs keep plain anchor behavior.
     a({ href, children, node, ...rest }) {
       void node;
       const link = classifyFileLink(href);
+      if (!link && href && WEB_LINK.test(href)) return <WebLink href={href} {...rest}>{children}</WebLink>;
       if (!link) return <a href={href} {...rest}>{children}</a>;
       if (!openRef.current) return <span className="file-link">{children}</span>;
       return (

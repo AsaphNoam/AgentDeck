@@ -34,10 +34,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 in progress. Slices: (1) Commands removal — done: `ChatPanel` tab/`initialTab` mapping,
 phone `AgentScreen`, removed `CommandsTab`, `getTrackedCommands`, `TrackedCommand`, its CSS and
 the `tracked-list` `commands` contract variant; server tracking/API untouched. (2) Web links —
-next: `target="_blank"` + Open in new tab/Copy link menu in `SanitizedMarkdown`, composed with
-`TranscriptView` annotation menu via `PointerContextMenu`/`copyText`. (3) Table dividers,
-padding and contained overflow. (4) Real-browser rendered checks (TS-08.R110) and closure matrix
-with `make embed`. Focused checks: `cd ui && npx vitest run <files>`, `npm run check:styles`, `npx tsc -b`.
+done: `SanitizedMarkdown` `WebLink`, `lib/linkActions.ts`; every `AnnotationContextMenu` caller
+passes `link: claimWebLink(mouse)`; tests in `renderers/webLinks.test.tsx`. (3) Table dividers,
+padding and contained overflow — next. (4) Real-browser rendered checks (TS-08.R110; A59–A61,
+A14, FS-12.A32 still planned) and closure matrix with `make embed`. Focused checks: `cd ui && npx vitest run <files>`, `npm run check:styles`, `npx tsc -b`.
 
 ## Acceptance gates still owed
 

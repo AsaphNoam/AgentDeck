@@ -6,6 +6,7 @@ import { SanitizedMarkdown } from "./renderers/SanitizedMarkdown";
 import { resolveFromFile, type FileLink } from "./renderers/filePath";
 import type { AnnotationDraft } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
+import { claimWebLink } from "../../lib/linkActions";
 
 // The read-only, one-file viewer that opens beside the transcript (FS-03.R52).
 // It holds no durable state: `?file=`/`?fileLine=` on the route are the open
@@ -28,7 +29,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved,
   onClose: () => void;
   onOpenFile?: (link: FileLink) => void;
   onPathResolved?: (path: string) => void;
-  onSelectionMenu?: (selection: { x: number; y: number; text: string; draft: AnnotationDraft }) => void;
+  onSelectionMenu?: (selection: { x: number; y: number; text: string; draft: AnnotationDraft; link?: string }) => void;
 }) {
   const [view, setView] = useState<ViewState>({ status: "loading" });
   const [rendered, setRendered] = useState(true);
@@ -113,7 +114,7 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved,
       draft.end_line = Math.max(start, end);
     }
     event.preventDefault();
-    onSelectionMenu({ x: event.clientX, y: event.clientY, text, draft });
+    onSelectionMenu({ x: event.clientX, y: event.clientY, text, draft, link: claimWebLink(event) });
   };
 
   return (

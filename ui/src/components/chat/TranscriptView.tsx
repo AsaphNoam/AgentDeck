@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type Rea
 import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { copyText } from "../../lib/copyText";
+import { claimWebLink } from "../../lib/linkActions";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { Button } from "../ui";
 import { AssistantText } from "./renderers/AssistantText";
@@ -67,6 +68,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       label: selected ? "Annotate selection" : "Annotate whole event",
       copy: selected ? () => copyText(selected, pushError) : undefined,
       annotate: () => addAnnotation(agentId, draft),
+      link: claimWebLink(mouse),
     });
   };
 
@@ -119,12 +121,13 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
           onClose={() => onOpenFile(null)}
           onOpenFile={onOpenFile}
           onPathResolved={(path) => onOpenFile({ ...openFile, path }, { replace: true })}
-          onSelectionMenu={annotationsEnabled ? ({ x, y, text, draft }) => setMenu({
+          onSelectionMenu={annotationsEnabled ? ({ x, y, text, draft, link }) => setMenu({
             x,
             y,
             label: "Annotate selection",
             copy: () => copyText(text, pushError),
             annotate: () => addAnnotation(agentId, draft),
+            link,
           }) : undefined}
         />
       )}

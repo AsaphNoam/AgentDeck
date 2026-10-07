@@ -623,7 +623,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 
 ### 2.11 Web links, tables and chat tabs
 
-- **R78 (planned) — Web links keep the conversation open.** In rendered chat Markdown,
+- **R78 — Web links keep the conversation open.** In rendered chat Markdown,
   activating an HTTP(S) link, including a protocol-relative web link, opens its destination in
   a new browser tab. Right-click offers **Open in new tab** and **Copy link**; Copy link copies
   the destination rather than its label. Annotation handling cannot replace these link actions;

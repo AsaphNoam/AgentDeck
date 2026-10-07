@@ -543,6 +543,7 @@ the old behavior before relying on it.
 | `groupTranscriptRows` / `ToolRun` | `ui/src/components/chat/toolRun.tsx` | folding tool calls and results into one collapsed row on desktop and phone (§2) |
 | `clipAnnotationExcerpt` | `ui/src/lib/annotations.ts` (server copy authoritative: `internal/server/sessions.go`) | every UI surface that captures an annotation excerpt (§2) |
 | `copyText` | `ui/src/lib/copyText.ts` | UI copy actions that report clipboard failures as a toast (§2, §8) |
+| `offerWebLink` / `claimWebLink` / `webLinkActions` | `ui/src/lib/linkActions.ts` | rendered web-link menus; every annotation menu claims the link so one right-click opens one menu (§2) |
 | `displayLabel` / `displayLabels` | `ui/src/lib/labels.ts` | every model/backend/project/role/template label; the id appears only for duplicate names (§2) |
 | `AutoGrowTextarea` | `ui/src/components/ui/AutoGrowTextarea.tsx` | every multi-line text field in `ui/src`; a source-scan test rejects raw `<textarea>` (§2) |
 | `localOnly` | `internal/server/security.go` | wraps the whole mux; every new route inherits it (§14) |

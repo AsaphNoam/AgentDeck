@@ -1189,7 +1189,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   final implementation edit, including the presentation contract/style audit and embed generation;
   never hand-edit dist. No credentialed provider smoke is added solely for this display change.
 
-- **R107 (planned) — Extend the shared Markdown/link seam.** Implement FS-03.R78–R79 through
+- **R107 — Extend the shared Markdown/link seam.** Implement FS-03.R78–R79 through
   `SanitizedMarkdown` and the existing ReactMarkdown + remark-gfm + rehype-sanitize pipeline.
   Retain the sanitizer, URL transform, local-file classifier, stable component map, code and
   Mermaid overrides; do not install a second renderer or enable raw HTML. Allowed HTTP(S) and

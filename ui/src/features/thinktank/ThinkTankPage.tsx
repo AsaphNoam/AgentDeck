@@ -27,6 +27,7 @@ import { useAnnotationStore } from "../../store/annotationStore";
 import { useUiStore } from "../../store/uiStore";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { copyText } from "../../lib/copyText";
+import { claimWebLink } from "../../lib/linkActions";
 import { agentConversationPath } from "../../lib/agentConversation";
 import { NewAgentModal } from "../launch/NewAgentModal";
 import type { ThinkTankActivity, ThinkTankDetail, ThinkTankEntry } from "../../schemas/thinkTank";
@@ -149,6 +150,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
       label: selected ? "Annotate selection" : "Annotate whole entry",
       copy: selected ? () => copyText(selected, pushError) : undefined,
       annotate: () => addAnnotation(sourceKey, draft),
+      link: claimWebLink(mouse),
     });
   };
 
@@ -168,6 +170,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           label: selected ? "Annotate selection" : "Annotate whole event",
           copy: selected ? () => copyText(selected, pushError) : undefined,
           annotate: () => addAnnotation(sourceKey, toRoomDraft(draft)),
+          link: claimWebLink(mouse),
         });
       },
       onOpenFile: openFrom(attemptID),
@@ -343,12 +346,13 @@ function Room({ room }: { room: ThinkTankDetail }) {
           load={(path) => loadSourceFile(id, openSource, path)}
           onClose={() => setFile(null)}
           onOpenFile={(link) => setFile(link)}
-          onSelectionMenu={({ x, y, text, draft }) => setMenu({
+          onSelectionMenu={({ x, y, text, draft, link }) => setMenu({
             x,
             y,
             label: "Annotate selection",
             copy: () => copyText(text, pushError),
             annotate: () => addAnnotation(sourceKey, { ...draft, room_anchor: "file", source_id: openSource } as AnnotationDraft),
+            link,
           })}
         />
       )}
