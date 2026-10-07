@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–4 of 6 done).
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–5 of 6 done).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -59,7 +59,13 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    Review note: every room update invalidates mounted results queries (one fetch per open chat).
    The remote route inventory must classify every new route (`remote_routes.go` denied list) —
    run the whole `internal/server` package, not only `-run ThinkTank`.
-5. Concurrent independent openings (FS-21.R48, TS-14.R23, A35) — largest; race tests both Go variants.
+5. **Done** — concurrent openings (FS-21.R48, TS-14.R23 shipped): migration 42 splits the running
+   index (one non-opening per room, one running attempt per agent); `ThinkTankOpeningOpportunities`
+   admits openings without revision checks; boundary pause/end waits for the last running opening;
+   failed openings wait for `RetryThinkTankOpening` (`attempt_id` on `{target:"turn"}` retry);
+   `startThinkTankOpenings` bounds starts 32/room, 128/process. Wire: `active_attempts`, singular
+   actor only for a sole attempt (part of TS-14.R27). Review notes: retry idempotence rides on the
+   attempt state (`retried`), not a command receipt; `command_id` is accepted but unused.
 6. UI: wire extensions (TS-14.R27 summaries/`active_attempts`/`agent_id` filter), room cards
    (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
    speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.
@@ -183,6 +189,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: Think Tank workspace slice 5 (concurrent openings).** Independent openings
+  now run at the same time, stay hidden until all settle, and publish in member order; failures,
+  Pause, End and restart wait for running peers and need explicit per-opening retry. State/server/
+  messaging in both Go variants, focused `-race` and room UI tests passed.
 
 - **2026-10-07 — Work: Think Tank workspace slice 4 (judge results in chat).** A finalized
   synthesis is retained once in the judge's own history (survives room deletion) and shows in its

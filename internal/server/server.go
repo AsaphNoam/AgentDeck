@@ -79,6 +79,9 @@ type Server struct {
 	thinkTankRoomMu sync.Mutex
 	thinkTankRooms  map[string]struct{}
 	thinkTankMissed bool
+	// thinkTankOpeningSlots bounds concurrent opening starts process-wide
+	// (TS-14.R23).
+	thinkTankOpeningSlots chan struct{}
 	// thinkTankCaptures maps an agent to its running room attempt capture.
 	thinkTankCaptureMu sync.Mutex
 	thinkTankCaptures  map[string]*thinkTankCapture
@@ -302,6 +305,7 @@ func New(cfgStore *config.Store, stateStore *state.Store, registry *runtime.Regi
 		thinkTankKick:             make(chan struct{}, 1),
 		thinkTankSlots:            make(chan struct{}, thinkTankProgressBatch),
 		thinkTankRooms:            map[string]struct{}{},
+		thinkTankOpeningSlots:     make(chan struct{}, thinkTankOpeningStartsTotal),
 		thinkTankCaptures:         map[string]*thinkTankCapture{},
 		taskStartLocks:            map[string]*taskStartLock{},
 		cfg:                       cfg,

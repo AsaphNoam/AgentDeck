@@ -64,6 +64,14 @@ export type RoomStatus = { tone: "active" | "waiting" | "attention" | "paused" |
 /** roomStatus is the single "current action" line: who holds the floor, what
  *  the room waits for, or why it stopped (FS-21.R9, R18–R20, R28). */
 export function roomStatus(room: ThinkTankDetail): RoomStatus {
+  const running = room.active_attempts;
+  if (running.length > 1 && room.phase !== "ended") {
+    const names = running.map((a) => memberName(room, a.agent_id)).join(", ");
+    if (room.control === "end_requested") return { tone: "waiting", text: `Ending after the running openings finish (${names}).` };
+    if (room.control === "pause_requested") return { tone: "waiting", text: `Pausing after the running openings finish (${names}).` };
+    if (room.hold) return { tone: "attention", text: `${room.hold} Still writing: ${names}.` };
+    return { tone: "active", text: `${running.length} openings are being written: ${names}.` };
+  }
   const active = room.active ? memberName(room, room.active.agent_id) : "";
   const turn = room.active ? TURN_WORDS[room.active.turn] ?? "turn" : "";
   if (room.phase === "ended") {
@@ -87,6 +95,8 @@ export function memberState(room: ThinkTankDetail, m: ThinkTankMember): string {
   if (m.setup_state === "pending" || m.setup_state === "launching") return "Launching";
   if (m.setup_state === "abandoned") return "Launch skipped";
   if (room.active?.agent_id === m.agent_id) return m.role === "judge" ? "Writing synthesis" : "Speaking";
+  if (room.active_attempts.some((a) => a.agent_id === m.agent_id)) return "Writing opening";
+  if (room.failed.some((a) => a.agent_id === m.agent_id && a.turn === "opening")) return "Opening failed";
   if (m.role === "judge") return "Judge";
   if (m.state === "departed") return "Left";
   if (m.state === "exhausted" || m.completed >= m.limit) return "Limit reached";

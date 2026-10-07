@@ -36,6 +36,7 @@ import type { ThinkTankActivity, ThinkTankDetail, ThinkTankEntry } from "../../s
 import {
   entryAuthor,
   entryLabel,
+  memberName,
   memberState,
   phaseLabel,
   roomAnnotationSource,
@@ -129,6 +130,8 @@ function Room({ room }: { room: ThinkTankDetail }) {
   const participants = room.members.filter((m) => m.role === "participant");
   const judges = room.members.filter((m) => m.role === "judge");
   const failedTurn = room.failed.length > 0 && room.hold !== "";
+  // Each failed opening is retried explicitly by its attempt (FS-21.R48).
+  const failedOpenings = room.phase === "openings" ? room.failed.filter((a) => a.turn === "opening") : [];
 
   const annotateEntry = (mouse: MouseEvent<HTMLElement>, entry: ThinkTankEntry) => {
     if (entry.kind === "missing_opening") return;
@@ -233,7 +236,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                 {entry.attempt_id && byAttempt.has(entry.attempt_id) && (
                   <AttemptActivity
                     label={`${entryAuthor(entry)}'s tools and changes`}
-                    live={room.active?.attempt_id === entry.attempt_id}
+                    live={room.active_attempts.some((a) => a.attempt_id === entry.attempt_id)}
                     events={byAttempt.get(entry.attempt_id)!}
                     render={renderActivity}
                   />
@@ -242,7 +245,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
             ))}
             {loose.map((attempt) => {
               const rows = byAttempt.get(attempt)!;
-              const live = room.active?.attempt_id === attempt;
+              const live = room.active_attempts.some((a) => a.attempt_id === attempt);
               return (
                 <li key={attempt}>
                   <AttemptActivity
@@ -260,8 +263,16 @@ function Room({ room }: { room: ThinkTankDetail }) {
             {room.pending.length > 0 && <p className="think-tank-pending">{room.pending.length === 1 ? "1 message is" : `${room.pending.length} messages are`} waiting for the turn to finish.</p>}
             <div className="think-tank-status-actions">
               {room.phase === "setup" && room.hold && <Button type="button" onClick={() => act(() => retry.mutateAsync({ target: "setup" }))}>Retry launch</Button>}
-              {room.phase !== "setup" && room.hold && !ended && (
+              {failedOpenings.map((a) => (
+                <Button key={a.attempt_id} type="button" variant="primary" onClick={() => act(() => retry.mutateAsync({ target: "turn", attempt_id: a.attempt_id }))}>
+                  Retry {memberName(room, a.agent_id)}&rsquo;s opening
+                </Button>
+              ))}
+              {room.phase !== "setup" && room.hold && !ended && failedOpenings.length === 0 && (
                 <Button type="button" variant="primary" onClick={() => act(() => retry.mutateAsync({ target: "turn" }))}>{failedTurn ? "Retry turn" : "Resume"}</Button>
+              )}
+              {failedOpenings.length > 0 && room.control === "paused" && (
+                <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))}>Resume</Button>
               )}
               {room.judge_status === "failed" && (
                 <>
@@ -278,7 +289,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           <h2>Participants</h2>
           <ul className="think-tank-members">
             {[...participants, ...judges].map((m) => (
-              <li key={m.agent_id} className="think-tank-member" data-state={room.active?.agent_id === m.agent_id ? "speaking" : m.state}>
+              <li key={m.agent_id} className="think-tank-member" data-state={room.active_attempts.some((a) => a.agent_id === m.agent_id) ? "speaking" : m.state}>
                 <div>
                   {m.exists ? <Link to={agentConversationPath(m.agent_id)}>{m.name}</Link> : <strong>{m.name}</strong>}
                   <span>{projects.data?.[m.project]?.title ?? m.project}</span>

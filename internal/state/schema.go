@@ -655,4 +655,15 @@ CREATE TABLE think_tank_limit_commands (
 		version: 41,
 		apply:   migrateThinkTankResults,
 	},
+	{
+		// Independent openings run concurrently: one running non-opening
+		// attempt per room, and one running room attempt per agent across
+		// rooms (TS-14.R23). State guards keep openings and other turns apart.
+		version: 42,
+		sql: `
+DROP INDEX idx_think_tank_one_running;
+CREATE UNIQUE INDEX idx_think_tank_one_running ON think_tank_attempts(room_id) WHERE state = 'running' AND turn != 'opening';
+CREATE UNIQUE INDEX idx_think_tank_agent_running ON think_tank_attempts(agent_id) WHERE state = 'running';
+`,
+	},
 }

@@ -278,7 +278,7 @@ export function useThinkTankControl(id: string) {
 }
 
 export function useThinkTankRetry(id: string) {
-  return useRoomMutation((input: { target: "setup" | "turn" | "judge"; judge?: ThinkTankLaunch }) =>
+  return useRoomMutation((input: { target: "setup" | "turn" | "judge"; judge?: ThinkTankLaunch; attempt_id?: string }) =>
     request(roomURL(id, "/retry"), thinkTankDetailSchema, post(input)));
 }
 

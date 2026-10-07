@@ -49,6 +49,9 @@ export const thinkTankSummarySchema = z.object({
   updated_at: z.string(),
   ended_at: z.string().optional(),
   active_agent_id: z.string().optional().default(""),
+  /** Every running attempt; several only during independent openings, when
+   *  active_agent_id/active are absent (TS-14.R27). */
+  active_attempts: z.array(thinkTankAttemptSchema).optional().default([]),
 });
 
 export const thinkTankDetailSchema = thinkTankSummarySchema.extend({

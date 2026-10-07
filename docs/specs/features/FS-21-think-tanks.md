@@ -268,7 +268,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   Every participant and judge is distinguishable; user input is distinct. Speaker names, project
   attribution, synthesis labels and textual states remain readable independently of color. Code,
   diffs, permissions and annotations retain their technical contrast in all three appearances.
-- **R48 (planned)** — Eligible independent openings run concurrently: a participant's completion
+- **R48** — Eligible independent openings run concurrently: a participant's completion
   or private-work wait does not serialize other eligible openings. R6's isolation still holds;
   opening bodies/activity are withheld until all openings settle, then published in configured
   order. Show each opening's active/waiting/completed/failed state without disclosing hidden content.

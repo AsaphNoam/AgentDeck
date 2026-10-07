@@ -35,12 +35,33 @@ func (s *Store) BeginThinkTankAttempt(b ThinkTankBegin) (ThinkTankAttempt, error
 	if err != nil {
 		return ThinkTankAttempt{}, err
 	}
-	if d.Room.Revision != b.Revision {
-		return ThinkTankAttempt{}, thinkTankConflict("room changed since the turn was selected")
+	if b.Turn == ThinkTankTurnOpening {
+		// Openings are admitted independently: a sibling's start, completion,
+		// queued input or ceiling change must not veto this one, so eligibility
+		// is checked directly rather than by revision (TS-14.R23).
+		eligible := false
+		for _, o := range ThinkTankOpeningOpportunities(d) {
+			eligible = eligible || o.AgentID == b.AgentID
+		}
+		if !eligible {
+			return ThinkTankAttempt{}, thinkTankConflict("this opening can no longer start")
+		}
+	} else {
+		if d.Room.Revision != b.Revision {
+			return ThinkTankAttempt{}, thinkTankConflict("room changed since the turn was selected")
+		}
+		next, ok := NextThinkTankOpportunity(d)
+		if !ok || next.AgentID != b.AgentID || next.Turn != b.Turn {
+			return ThinkTankAttempt{}, thinkTankConflict("the selected turn is no longer next")
+		}
 	}
-	next, ok := NextThinkTankOpportunity(d)
-	if !ok || next.AgentID != b.AgentID || next.Turn != b.Turn {
-		return ThinkTankAttempt{}, thinkTankConflict("the selected turn is no longer next")
+	var otherRoom int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM think_tank_attempts WHERE agent_id = ? AND state = ?`,
+		b.AgentID, ThinkTankAttemptRunning).Scan(&otherRoom); err != nil {
+		return ThinkTankAttempt{}, fmt.Errorf("state: check think tank agent attempt: %w", err)
+	}
+	if otherRoom != 0 {
+		return ThinkTankAttempt{}, thinkTankConflict("the participant is taking another room turn")
 	}
 	if b.Generation == "" || b.TurnID == "" {
 		return ThinkTankAttempt{}, thinkTankInvalid("generation and turn id are required")
@@ -384,6 +405,11 @@ func applyThinkTankBoundaryTx(tx *sql.Tx, roomID string) error {
 	d, err := readThinkTankDetail(tx, roomID)
 	if err != nil {
 		return err
+	}
+	// Concurrent openings settle independently; pause and end take effect
+	// once the last running opening finishes (FS-21.R48).
+	if d.Active != nil {
+		return nil
 	}
 	switch d.Room.Control {
 	case ThinkTankEndRequested:

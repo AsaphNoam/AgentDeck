@@ -337,3 +337,41 @@ func TestThinkTankRoomChangeDuringResumeKeepsAgentRunning(t *testing.T) {
 	waitActiveAttempt(t, srv, room, agents[0])
 	waitPrompts(t, promptLog, 1)
 }
+
+// FS-21.A35, TS-14.R23, R27: one progression pass starts both openings as
+// overlapping provider turns; the room reports both attempts and no singular
+// speaker, and publishes once both settle.
+func TestThinkTankOpeningsRunConcurrently(t *testing.T) {
+	srv, promptLog, ids, hold := thinkTankTestServer(t)
+	agents := strings.Split(ids, ",")
+	members := []state.ThinkTankMember{}
+	for _, id := range agents {
+		members = append(members, state.ThinkTankMember{AgentID: id, AgentName: id, Project: "tmpproj", Cap: 2, MayLeave: true})
+	}
+	d, err := srv.stateStore.CreateThinkTank(state.ThinkTankCreate{CommandID: "open", Goal: "Choose", OriginProject: "tmpproj", Openings: true, Members: members})
+	if err != nil {
+		t.Fatal(err)
+	}
+	room := d.Room.RoomID
+	srv.progressThinkTanks(context.Background())
+	running := waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return len(d.Running) == 2 })
+	waitPrompts(t, promptLog, 2)
+	summary := thinkTankSummaryFor(running)
+	if summary.ActiveAgentID != "" || len(summary.ActiveAttempts) != 2 {
+		t.Fatalf("summary actors = %q %+v", summary.ActiveAgentID, summary.ActiveAttempts)
+	}
+	if u := thinkTankUpdateFor(running); u.CurrentActor == nil || *u.CurrentActor != "" {
+		t.Fatalf("update actor = %v", u.CurrentActor)
+	}
+	for _, a := range running.Running {
+		actAsAgent(t, srv, a, state.ThinkTankReply, "opening from "+a.AgentID)
+	}
+	if err := os.WriteFile(hold, []byte("go"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := waitRoom(t, srv, room, func(d state.ThinkTankDetail) bool { return d.Room.Phase == state.ThinkTankPhaseDiscussion })
+	entries, _ := srv.stateStore.ListThinkTankEntries(room, 0, 10)
+	if len(entries) != 2 || entries[0].AgentID != agents[0] || entries[1].AgentID != agents[1] || done.Room.Hold != "" {
+		t.Fatalf("published = %+v hold=%q", entries, done.Room.Hold)
+	}
+}

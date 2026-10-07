@@ -32,9 +32,16 @@ func thinkTankUpdateFor(d state.ThinkTankDetail) thinkTankUpdate {
 		Phase: d.Room.Phase, Control: d.Room.Control, Hold: d.Room.Hold, EndReason: d.Room.EndReason,
 		JudgeStatus: d.Room.JudgeStatus,
 	}
-	if d.Active != nil {
-		actor := d.Active.AgentID
+	// A sole running attempt names its actor; several concurrent openings
+	// clear any earlier singular actor explicitly (TS-14.R27).
+	switch len(d.Running) {
+	case 0:
+	case 1:
+		actor := d.Running[0].AgentID
 		u.CurrentActor = &actor
+	default:
+		none := ""
+		u.CurrentActor = &none
 	}
 	return u
 }
@@ -61,7 +68,10 @@ type thinkTankSummaryWire struct {
 	EndedAt       *time.Time `json:"ended_at,omitempty"`
 	// ActiveAgentID names the agent taking the room's running turn, so that
 	// agent's own conversation can identify the room turn (FS-03.R69).
-	ActiveAgentID string `json:"active_agent_id,omitempty"`
+	// It names a sole running attempt only; concurrent openings leave it empty
+	// and list every running attempt in ActiveAttempts (TS-14.R27).
+	ActiveAgentID  string                 `json:"active_agent_id,omitempty"`
+	ActiveAttempts []thinkTankAttemptWire `json:"active_attempts"`
 }
 
 func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
@@ -77,8 +87,12 @@ func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
 		Phase: r.Phase, Control: r.Control, Hold: r.Hold, EndReason: r.EndReason, JudgeStatus: r.JudgeStatus,
 		Participants: names, Revision: r.Revision, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, EndedAt: r.EndedAt,
 	}
-	if d.Active != nil {
-		out.ActiveAgentID = d.Active.AgentID
+	out.ActiveAttempts = []thinkTankAttemptWire{}
+	for _, a := range d.Running {
+		out.ActiveAttempts = append(out.ActiveAttempts, thinkTankAttemptFor(a))
+	}
+	if len(d.Running) == 1 {
+		out.ActiveAgentID = d.Running[0].AgentID
 	}
 	return out
 }
@@ -208,8 +222,8 @@ func (s *Server) thinkTankDetailWire(d state.ThinkTankDetail) thinkTankDetailWir
 		}
 		out.Members = append(out.Members, w)
 	}
-	if d.Active != nil {
-		a := thinkTankAttemptFor(*d.Active)
+	if len(d.Running) == 1 {
+		a := thinkTankAttemptFor(d.Running[0])
 		out.Active = &a
 	}
 	for _, a := range d.Attempts {

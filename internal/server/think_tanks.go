@@ -22,6 +22,9 @@ import (
 const (
 	thinkTankSweepInterval = 5 * time.Second
 	thinkTankProgressBatch = 4
+	// Bounded concurrent opening starts (TS-14.R23).
+	thinkTankOpeningStartsPerRoom = 32
+	thinkTankOpeningStartsTotal   = 128
 )
 
 func (s *Server) kickThinkTanks() {
@@ -131,10 +134,51 @@ func (s *Server) progressThinkTank(ctx context.Context, roomID string) {
 		s.launchThinkTankJudge(ctx, d)
 		return
 	}
+	if r.Phase == state.ThinkTankPhaseOpenings {
+		s.startThinkTankOpenings(ctx, d)
+		return
+	}
 	next, ok := state.NextThinkTankOpportunity(d)
 	if !ok {
 		return
 	}
+	s.startThinkTankOpportunity(ctx, d, next)
+}
+
+// startThinkTankOpenings starts every eligible opening concurrently, bounded
+// per room and process-wide, and waits only for the starts — not provider
+// completion — so the room claim covers admission alone. A busy member stays
+// unattempted without blocking its peers (FS-21.R48, TS-14.R23).
+func (s *Server) startThinkTankOpenings(ctx context.Context, d state.ThinkTankDetail) {
+	var wg sync.WaitGroup
+	room := make(chan struct{}, thinkTankOpeningStartsPerRoom)
+	for _, next := range state.ThinkTankOpeningOpportunities(d) {
+		select {
+		case room <- struct{}{}:
+		case <-ctx.Done():
+			wg.Wait()
+			return
+		}
+		select {
+		case s.thinkTankOpeningSlots <- struct{}{}:
+		case <-ctx.Done():
+			<-room
+			wg.Wait()
+			return
+		}
+		wg.Add(1)
+		go func(next state.ThinkTankOpportunity) {
+			defer wg.Done()
+			defer func() { <-s.thinkTankOpeningSlots; <-room }()
+			s.startThinkTankOpportunity(ctx, d, next)
+		}(next)
+	}
+	wg.Wait()
+}
+
+// startThinkTankOpportunity checks one opportunity's eligibility and starts it.
+func (s *Server) startThinkTankOpportunity(ctx context.Context, d state.ThinkTankDetail, next state.ThinkTankOpportunity) {
+	roomID := d.Room.RoomID
 	if reason := s.thinkTankIneligible(next.AgentID); reason != "" {
 		if next.Turn == state.ThinkTankTurnJudge {
 			reason = "The judge cannot start: " + reason

@@ -197,7 +197,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   `launchRequest.Group` to the title before reservation/launch, using existing `launchAgent`
   composition. Ready/existing slots are never regrouped; judge repair/retry applies the same group
   only when creating a fresh identity. Existing project/group/order/lifecycle mechanisms remain.
-- **R23 (planned)** — FS-21.R48 narrowly supersedes R2/R8's one-attempt constraint during
+- **R23** — FS-21.R48 narrowly supersedes R2/R8's one-attempt constraint during
   independent openings. Replace the running-room uniqueness with one running non-opening attempt
   per room plus one running room attempt per agent across rooms. Admit each opening independently
   in the existing `before(turnID)` transaction using phase/control, fixed-member eligibility,

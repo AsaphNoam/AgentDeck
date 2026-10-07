@@ -50,6 +50,9 @@ const (
 	ThinkTankAttemptWithheld  = "withheld"
 	ThinkTankAttemptFinalized = "finalized"
 	ThinkTankAttemptFailed    = "failed"
+	// ThinkTankAttemptRetried marks a failed opening the operator explicitly
+	// retried; until then the member is not readmitted (TS-14.R23).
+	ThinkTankAttemptRetried = "retried"
 
 	ThinkTankReply          = "reply"
 	ThinkTankLeave          = "leave"
@@ -218,9 +221,12 @@ type ThinkTankInput struct {
 
 // ThinkTankDetail is one consistent read of a room's control state.
 type ThinkTankDetail struct {
-	Room     ThinkTank
-	Members  []ThinkTankMember
+	Room    ThinkTank
+	Members []ThinkTankMember
+	// Active is a running attempt (non-nil whenever any runs); Running lists
+	// every one, several only during independent openings (TS-14.R23).
 	Active   *ThinkTankAttempt
+	Running  []ThinkTankAttempt
 	Pending  []ThinkTankInput
 	Attempts []ThinkTankAttempt
 }
@@ -720,8 +726,11 @@ ORDER BY created_at, attempt_id`, roomID)
 		}
 		d.Attempts = append(d.Attempts, a)
 		if a.State == ThinkTankAttemptRunning {
-			active := a
-			d.Active = &active
+			d.Running = append(d.Running, a)
+			if d.Active == nil {
+				active := a
+				d.Active = &active
+			}
 		}
 	}
 	if err := closeRows(rows, "think tank attempts"); err != nil {
@@ -987,7 +996,73 @@ func (s *Store) ResumeThinkTank(roomID string) (ThinkTankDetail, error) {
 		if err := setThinkTankControlTx(tx, roomID, ThinkTankRunning); err != nil {
 			return err
 		}
-		return setThinkTankHoldTx(tx, roomID, "")
+		return setThinkTankHoldTx(tx, roomID, unretriedOpeningHold(d))
+	})
+}
+
+// unretriedOpeningHold keeps a room held while a failed opening awaits
+// explicit retry; Resume alone never readmits it (TS-14.R23).
+func unretriedOpeningHold(d ThinkTankDetail) string {
+	failed := unretriedThinkTankOpenings(d)
+	if len(failed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d opening(s) failed. Retry them, or end the discussion to publish the completed openings.", len(failed))
+}
+
+// RetryThinkTankOpening authorizes one failed opening's next attempt. With
+// no attempt id, exactly one unretried failure must exist; otherwise the
+// retry is ambiguous. Retrying an already retried attempt is an exact replay.
+// A paused room stays paused; other unresolved failures keep the hold.
+// Without failed openings this is the ordinary turn retry (Resume).
+func (s *Store) RetryThinkTankOpening(roomID, attemptID string) (ThinkTankDetail, error) {
+	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		failed := unretriedThinkTankOpenings(d)
+		if attemptID == "" && len(failed) == 0 {
+			if d.Room.Control == ThinkTankEndRequested {
+				return thinkTankConflict("discussion is ending")
+			}
+			if d.Room.Control == ThinkTankRunning && d.Room.Hold == "" {
+				return errNoThinkTankChange
+			}
+			if err := setThinkTankControlTx(tx, roomID, ThinkTankRunning); err != nil {
+				return err
+			}
+			return setThinkTankHoldTx(tx, roomID, "")
+		}
+		if d.Room.Phase != ThinkTankPhaseOpenings || d.Room.Control == ThinkTankEndRequested {
+			return thinkTankConflict("openings have closed")
+		}
+		var target *ThinkTankAttempt
+		switch {
+		case attemptID != "":
+			for i := range d.Attempts {
+				if d.Attempts[i].AttemptID == attemptID && d.Attempts[i].Turn == ThinkTankTurnOpening {
+					target = &d.Attempts[i]
+				}
+			}
+			if target == nil {
+				return thinkTankInvalid("no such opening attempt")
+			}
+			if target.State == ThinkTankAttemptRetried {
+				return errNoThinkTankChange
+			}
+			if target.State != ThinkTankAttemptFailed {
+				return thinkTankConflict("that opening did not fail")
+			}
+		case len(failed) > 1:
+			return thinkTankConflict("several openings failed; choose which to retry")
+		default:
+			target = &failed[0]
+		}
+		if _, err := tx.Exec(`UPDATE think_tank_attempts SET state = ? WHERE attempt_id = ?`, ThinkTankAttemptRetried, target.AttemptID); err != nil {
+			return fmt.Errorf("state: retry think tank opening: %w", err)
+		}
+		after, err := readThinkTankDetail(tx, roomID)
+		if err != nil {
+			return err
+		}
+		return setThinkTankHoldTx(tx, roomID, unretriedOpeningHold(after))
 	})
 }
 
@@ -1354,22 +1429,16 @@ func thinkTankTransition(d ThinkTankDetail) (string, string) {
 // (FS-21.R34). Busy speakers are not skipped; the caller waits for them.
 func NextThinkTankOpportunity(d ThinkTankDetail) (ThinkTankOpportunity, bool) {
 	r := d.Room
+	if r.Phase == ThinkTankPhaseOpenings {
+		if next := ThinkTankOpeningOpportunities(d); len(next) > 0 {
+			return next[0], true
+		}
+		return ThinkTankOpportunity{}, false
+	}
 	if d.Active != nil || r.Hold != "" || r.Control != ThinkTankRunning {
 		return ThinkTankOpportunity{}, false
 	}
 	switch r.Phase {
-	case ThinkTankPhaseOpenings:
-		done := map[string]bool{}
-		for _, a := range d.Attempts {
-			if a.Turn == ThinkTankTurnOpening && a.State == ThinkTankAttemptWithheld {
-				done[a.AgentID] = true
-			}
-		}
-		for _, m := range participantsOf(d.Members) {
-			if !done[m.AgentID] {
-				return ThinkTankOpportunity{AgentID: m.AgentID, Turn: ThinkTankTurnOpening}, true
-			}
-		}
 	case ThinkTankPhaseDiscussion:
 		eligible := eligibleThinkTankMembers(d)
 		if len(eligible) < 2 {
@@ -1391,6 +1460,63 @@ func NextThinkTankOpportunity(d ThinkTankDetail) (ThinkTankOpportunity, bool) {
 		}
 	}
 	return ThinkTankOpportunity{}, false
+}
+
+// ThinkTankOpeningOpportunities lists every opening that may start now, in
+// member order: independent openings run concurrently (FS-21.R48). A member
+// with a running, withheld or published opening is done for now; one whose
+// opening failed waits for explicit retry, never a sweep or Resume.
+func ThinkTankOpeningOpportunities(d ThinkTankDetail) []ThinkTankOpportunity {
+	r := d.Room
+	if r.Phase != ThinkTankPhaseOpenings || r.Hold != "" || r.Control != ThinkTankRunning {
+		return nil
+	}
+	taken := thinkTankOpeningTaken(d)
+	out := []ThinkTankOpportunity{}
+	for _, m := range participantsOf(d.Members) {
+		if !taken[m.AgentID] {
+			out = append(out, ThinkTankOpportunity{AgentID: m.AgentID, Turn: ThinkTankTurnOpening})
+		}
+	}
+	return out
+}
+
+// thinkTankOpeningTaken marks members whose opening needs no new admission:
+// running, withheld, published or failed without an explicit retry.
+func thinkTankOpeningTaken(d ThinkTankDetail) map[string]bool {
+	taken := map[string]bool{}
+	for _, a := range d.Attempts {
+		if a.Turn != ThinkTankTurnOpening {
+			continue
+		}
+		switch a.State {
+		case ThinkTankAttemptRunning, ThinkTankAttemptWithheld, ThinkTankAttemptFinalized, ThinkTankAttemptFailed:
+			taken[a.AgentID] = true
+		}
+	}
+	return taken
+}
+
+// unretriedThinkTankOpenings lists failed openings still awaiting explicit
+// retry; each keeps the room held.
+func unretriedThinkTankOpenings(d ThinkTankDetail) []ThinkTankAttempt {
+	out := []ThinkTankAttempt{}
+	if d.Room.Phase != ThinkTankPhaseOpenings {
+		return out
+	}
+	// A pre-upgrade failure followed by a later opening is already superseded.
+	superseded := map[string]bool{}
+	for _, a := range d.Attempts {
+		if a.Turn == ThinkTankTurnOpening && a.State != ThinkTankAttemptFailed && a.State != ThinkTankAttemptRetried {
+			superseded[a.AgentID] = true
+		}
+	}
+	for _, a := range d.Attempts {
+		if a.Turn == ThinkTankTurnOpening && a.State == ThinkTankAttemptFailed && !superseded[a.AgentID] {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // DeleteThinkTank removes one room and only its own rows. It is refused unless

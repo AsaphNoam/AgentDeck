@@ -202,6 +202,31 @@ describe("ThinkTankPage", () => {
     expect(sent[1]).toMatchObject({ expected_limit: 3, limit: 6, command_id: sent[0].command_id });
   });
 
+  // FS-21.A35, R48: concurrent openings name every writer with no singular
+  // speaker, and a failed opening retries by its own attempt.
+  it("shows concurrent openings and retries a failed one by attempt", async () => {
+    const attempt = (id: string, agent: string, state: string) =>
+      ({ attempt_id: id, agent_id: agent, turn: "opening", state, failure: "", started_at: "2026-10-07T00:00:00Z" });
+    const sent: unknown[] = [];
+    server.use(http.post("/api/think-tanks/tt_fixture/retry", async ({ request }) => {
+      sent.push(await request.json());
+      return HttpResponse.json(detail);
+    }));
+    detail = { ...room(), phase: "openings", active: undefined, active_agent_id: "",
+      active_attempts: [attempt("tta_1", "a_one", "running")], hold: "", failed: [] };
+    const second = { ...detail, active_attempts: [attempt("tta_1", "a_one", "running"), attempt("tta_2", "a_gone", "running")] };
+    detail = second;
+    const { unmount } = renderRoom();
+    expect(await screen.findByText("2 openings are being written: Ari, Gone.")).toBeTruthy();
+    unmount();
+    detail = { ...second, active_attempts: [attempt("tta_1", "a_one", "running")], hold: "1 opening(s) failed.",
+      failed: [attempt("tta_2", "a_gone", "failed")] };
+    renderRoom();
+    fireEvent.click(await screen.findByRole("button", { name: "Retry Gone’s opening" }));
+    await waitFor(() => expect(sent).toEqual([{ target: "turn", attempt_id: "tta_2" }]));
+    detail = room();
+  });
+
   // FS-21.A9, R35: room messages go to the room with a stable command id.
   it("sends a room message and keeps controls available", async () => {
     renderRoom();
