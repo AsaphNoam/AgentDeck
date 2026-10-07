@@ -381,7 +381,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
             >
               <label className="phone-field">
                 {agent.state === "waiting_input" && !pending ? "Reply" : "Message"}
-                <AutoGrowTextarea rows={3} value={text} onChange={(event) => setText(event.target.value)} />
+                <AutoGrowTextarea rows={3} maxHeight="40vh" value={text} onChange={(event) => setText(event.target.value)} />
               </label>
               {error && <p className="phone-error">{error}</p>}
               {notice && <p className="phone-meta">{notice}</p>}

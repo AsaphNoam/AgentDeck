@@ -119,6 +119,8 @@ describe("AgentScreen", () => {
     useConnection.setState({ agents: { a1: { ...agent, state: "busy", detail: "" } } });
     renderScreen();
     const box = await screen.findByLabelText("Message");
+    // The phone draft caps near 40% of the viewport and scrolls inside (FS-02.R66, TS-08.R88).
+    expect(box).toHaveStyle({ maxHeight: "40vh", overflowY: "auto" });
     fireEvent.change(box, { target: { value: "also run tests" } });
     expect(screen.getByRole("button", { name: "Steer" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Send" }));

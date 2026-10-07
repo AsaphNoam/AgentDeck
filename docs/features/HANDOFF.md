@@ -32,10 +32,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
   through `phone-render.mjs`, not a paired device.
   UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00`,
-  `8e06375`) was reviewed and stays open for UP-01 below. Local choices confirmed: the 40vh
-  draft cap inside the 640px card matches R66; phone fields use the shared component as TS-08.R88
-  requires; an archived Tasks focus remains available by title as R70 requires. No additional
-  product decision is needed. Rendered proof: `polish-render.mjs` 17/17 in all three skins.
+  `8e06375`) is closed: its UP-01 fix landed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -106,17 +103,6 @@ None.
 
 ## Review findings
 
-### UI polish — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-**Unit:** `eec9038`, `221980d`, `8609d00`, `8e06375`.
-
-- **Must fix** — **UP-01 (INV §8/§10): Phone chat composer omits the growth cap.**
-  `ui/src/remote/AgentScreen.tsx:384` replaces the Message/Reply textarea with
-  `AutoGrowTextarea` without `maxHeight`. A long phone draft therefore grows without a limit
-  instead of stopping near 40% of the viewport and scrolling inside, violating FS-02.R66 and
-  TS-08.R88. Pass `maxHeight="40vh"` at this caller and verify a long draft caps and scrolls
-  at the phone viewport, while its text and Send behavior remain intact. Fix complexity: trivial/easy.
-
 ### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
 
 **Unit:** `2cf6cfa^..36f055a`.
@@ -173,6 +159,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: UI polish UP-01 (INV §8/§10).** The phone Message/Reply composer passes
+  `maxHeight="40vh"`, so a long draft caps near 40% of the viewport and scrolls inside while text
+  and Send behave as before (FS-02.R66, TS-08.R88). AgentScreen test asserts the cap; restores
+  specified behavior, no specification change. Unit closed. Remote UI tests (48) and the
+  AutoGrowTextarea suite passed; `tsc` clean. Still open: Quiet completed chat turns QT-01–QT-03.
 
 - **2026-10-07 — Review: UI polish.** One must-fix (UP-01); the unit stays open. Plain labels,
   archived Tasks filtering, icon semantics, header ordering and desktop field sizing match the
