@@ -118,7 +118,7 @@ func TestThinkTankStaleExitCannotSettleNewGeneration(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create: %s", rec.Body.String())
 	}
-	rooms, err := srv.stateStore.ListThinkTanks("", 10)
+	rooms, err := srv.stateStore.ListThinkTanks("", "", 10)
 	if err != nil || len(rooms) != 1 {
 		t.Fatalf("rooms: %+v %v", rooms, err)
 	}

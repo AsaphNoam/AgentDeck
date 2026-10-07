@@ -666,4 +666,10 @@ CREATE UNIQUE INDEX idx_think_tank_one_running ON think_tank_attempts(room_id) W
 CREATE UNIQUE INDEX idx_think_tank_agent_running ON think_tank_attempts(agent_id) WHERE state = 'running';
 `,
 	},
+	{
+		// Membership lookup for a participant or judge's own rooms
+		// (TS-14.R27).
+		version: 43,
+		sql:     `CREATE INDEX idx_think_tank_members_agent ON think_tank_members(agent_id);`,
+	},
 }

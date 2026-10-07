@@ -52,6 +52,21 @@ export const thinkTankSummarySchema = z.object({
   /** Every running attempt; several only during independent openings, when
    *  active_agent_id/active are absent (TS-14.R27). */
   active_attempts: z.array(thinkTankAttemptSchema).optional().default([]),
+  /** Card-level roster and allowances (TS-14.R27). */
+  roster: z.array(z.object({
+    agent_id: z.string(),
+    name: z.string(),
+    project: z.string(),
+    role: z.enum(["participant", "judge"]),
+    state: z.string(),
+    limit: z.number(),
+    completed: z.number(),
+    remaining: z.number(),
+    exists: z.boolean(),
+  })).optional().default([]),
+  total_remaining: z.number().optional().default(0),
+  judge_enabled: z.boolean().optional().default(false),
+  judge_name: z.string().optional().default(""),
 });
 
 export const thinkTankDetailSchema = thinkTankSummarySchema.extend({

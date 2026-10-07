@@ -72,6 +72,27 @@ type thinkTankSummaryWire struct {
 	// and list every running attempt in ActiveAttempts (TS-14.R27).
 	ActiveAgentID  string                 `json:"active_agent_id,omitempty"`
 	ActiveAttempts []thinkTankAttemptWire `json:"active_attempts"`
+	// Roster, TotalRemaining and Judge let a room card show every member's
+	// allowance and the judge without a per-card detail fetch (TS-14.R27).
+	Roster         []thinkTankRosterWire `json:"roster"`
+	TotalRemaining int                   `json:"total_remaining"`
+	JudgeEnabled   bool                  `json:"judge_enabled"`
+	JudgeName      string                `json:"judge_name,omitempty"`
+}
+
+// thinkTankRosterWire is one member's card-level identity and allowance.
+// Remaining derives from ceiling, completed turns and departure; a running
+// attempt is not yet a completed contribution.
+type thinkTankRosterWire struct {
+	AgentID   string `json:"agent_id"`
+	Name      string `json:"name"`
+	Project   string `json:"project"`
+	Role      string `json:"role"`
+	State     string `json:"state"`
+	Limit     int    `json:"limit"`
+	Completed int    `json:"completed"`
+	Remaining int    `json:"remaining"`
+	Exists    bool   `json:"exists"`
 }
 
 func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
@@ -86,6 +107,18 @@ func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
 		Version: thinkTankWireVersion, RoomID: r.RoomID, Title: r.Title, Goal: r.Goal, OriginProject: r.OriginProject,
 		Phase: r.Phase, Control: r.Control, Hold: r.Hold, EndReason: r.EndReason, JudgeStatus: r.JudgeStatus,
 		Participants: names, Revision: r.Revision, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, EndedAt: r.EndedAt,
+	}
+	out.Roster, out.JudgeEnabled = []thinkTankRosterWire{}, r.JudgeConfig != ""
+	for _, m := range d.Members {
+		w := thinkTankRosterWire{AgentID: m.AgentID, Name: m.AgentName, Project: m.Project, Role: m.Role,
+			State: m.State, Limit: m.Cap, Completed: m.Completed, Exists: true}
+		if m.Role == state.ThinkTankRoleJudge {
+			out.JudgeName = m.AgentName
+		} else if m.State != state.ThinkTankMemberDeparted {
+			w.Remaining = max(m.Cap-m.Completed, 0)
+			out.TotalRemaining += w.Remaining
+		}
+		out.Roster = append(out.Roster, w)
 	}
 	out.ActiveAttempts = []thinkTankAttemptWire{}
 	for _, a := range d.Running {
@@ -205,6 +238,7 @@ func (s *Server) thinkTankDetailWire(d state.ThinkTankDetail) thinkTankDetailWir
 		Judge: thinkTankJudgeWire{Enabled: r.JudgeConfig != "", Status: r.JudgeStatus, AgentID: r.JudgeAgentID,
 			Error: r.JudgeError, Config: rawJSONOrNil(r.JudgeConfig)},
 	}
+	s.markRosterExists(out.Roster, map[string]bool{})
 	statuses := map[string]string{}
 	for _, m := range d.Members {
 		w := thinkTankMemberWire{AgentID: m.AgentID, Name: m.AgentName, Project: m.Project, Role: m.Role,

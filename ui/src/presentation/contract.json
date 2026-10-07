@@ -640,7 +640,10 @@
         "files",
         "commands",
         "list",
-        "turn-notice"
+        "turn-notice",
+        "goal",
+        "turn-limit",
+        "result"
       ],
       "states": [
         "setup",

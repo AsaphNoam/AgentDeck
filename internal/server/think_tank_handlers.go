@@ -155,20 +155,43 @@ func (s *Server) handleCreateThinkTank(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleThinkTanks(w http.ResponseWriter, r *http.Request) {
-	rooms, err := s.stateStore.ListThinkTanks(r.URL.Query().Get("project"), thinkTankListLimit)
+	q := r.URL.Query()
+	rooms, err := s.stateStore.ListThinkTanks(q.Get("project"), q.Get("agent_id"), thinkTankListLimit+1)
 	if err != nil {
 		s.writeThinkTankError(w, err)
 		return
 	}
+	clipped := len(rooms) > thinkTankListLimit
+	if clipped {
+		rooms = rooms[:thinkTankListLimit]
+	}
 	out := make([]thinkTankSummaryWire, 0, len(rooms))
+	exists := map[string]bool{}
 	for _, room := range rooms {
 		d, err := s.stateStore.ReadThinkTank(room.RoomID)
 		if err != nil {
 			continue
 		}
-		out = append(out, thinkTankSummaryFor(d))
+		summary := thinkTankSummaryFor(d)
+		s.markRosterExists(summary.Roster, exists)
+		out = append(out, summary)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "rooms": out})
+	writeJSON(w, http.StatusOK, map[string]any{"version": thinkTankWireVersion, "rooms": out, "clipped": clipped})
+}
+
+// markRosterExists records which members still have an agent, so cards
+// offer chat links only to surviving identities (FS-21.R44).
+func (s *Server) markRosterExists(roster []thinkTankRosterWire, cache map[string]bool) {
+	for i := range roster {
+		id := roster[i].AgentID
+		found, ok := cache[id]
+		if !ok {
+			_, err := s.stateStore.ReadAgent(id)
+			found = err == nil
+			cache[id] = found
+		}
+		roster[i].Exists = found
+	}
 }
 
 func (s *Server) handleThinkTankDetail(w http.ResponseWriter, r *http.Request) {

@@ -272,3 +272,25 @@ VALUES('a_one', ?, 'Title', ?, 'att', 'Exact synthesis', 'g', 't', 7, '2026-10-0
 		t.Fatalf("other agent results = %s", other.Body.String())
 	}
 }
+
+// FS-21.A33, TS-14.R27: the membership filter finds a participant's rooms
+// from any project, and summaries carry the card roster and allowances.
+func TestThinkTankListByMemberWithRoster(t *testing.T) {
+	_, h := roomRESTServer(t)
+	rec := doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two"))
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(rec.Body.Bytes(), &room)
+	var list struct {
+		Rooms   []thinkTankSummaryWire `json:"rooms"`
+		Clipped bool                   `json:"clipped"`
+	}
+	got := doJSON(t, h, http.MethodGet, "/api/think-tanks?agent_id=a_two", "")
+	_ = json.Unmarshal(got.Body.Bytes(), &list)
+	if len(list.Rooms) != 1 || list.Clipped || list.Rooms[0].RoomID != room.RoomID || list.Rooms[0].TotalRemaining != 4 ||
+		len(list.Rooms[0].Roster) != 2 || list.Rooms[0].Roster[1].Remaining != 2 || !list.Rooms[0].Roster[1].Exists {
+		t.Fatalf("member list = %s", got.Body.String())
+	}
+	if none := doJSON(t, h, http.MethodGet, "/api/think-tanks?agent_id=a_nobody", ""); !strings.Contains(none.Body.String(), `"rooms":[]`) {
+		t.Fatalf("non-member list = %s", none.Body.String())
+	}
+}

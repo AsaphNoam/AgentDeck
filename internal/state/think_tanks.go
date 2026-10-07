@@ -787,9 +787,11 @@ func (s *Store) ReadThinkTank(roomID string) (ThinkTankDetail, error) {
 
 // ListThinkTanks lists rooms newest first, optionally only those originating
 // in one project. The limit is required (INV §16).
-func (s *Store) ListThinkTanks(project string, limit int) ([]ThinkTank, error) {
+func (s *Store) ListThinkTanks(project, agentID string, limit int) ([]ThinkTank, error) {
 	rows, err := s.db.Query(`SELECT `+thinkTankColumns+` FROM think_tanks
-WHERE (? = '' OR origin_project = ?) ORDER BY created_at DESC, room_id LIMIT ?`, project, project, limit)
+WHERE (? = '' OR origin_project = ?)
+  AND (? = '' OR room_id IN (SELECT room_id FROM think_tank_members WHERE agent_id = ?))
+ORDER BY created_at DESC, room_id LIMIT ?`, project, project, agentID, agentID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("state: list think tanks: %w", err)
 	}

@@ -66,7 +66,11 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    `startThinkTankOpenings` bounds starts 32/room, 128/process. Wire: `active_attempts`, singular
    actor only for a sole attempt (part of TS-14.R27). Review notes: retry idempotence rides on the
    attempt state (`retried`), not a command receipt; `command_id` is accepted but unused.
-6. UI: wire extensions (TS-14.R27 summaries/`active_attempts`/`agent_id` filter), room cards
+6a. **Done** — list summaries carry `roster`/`total_remaining`/`judge_enabled`/`judge_name`,
+   `GET /api/think-tanks?agent_id=` membership filter (migration 43 index) and `clipped`. Fixed the
+   presentation contract (`goal`/`turn-limit`/`result` slots): `npm test`'s pretest runs
+   `check:styles` — run `npm test`, not bare `vitest`, before committing UI.
+6. UI remaining: room cards
    (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
    speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.
 

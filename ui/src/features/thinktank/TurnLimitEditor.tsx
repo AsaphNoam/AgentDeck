@@ -41,7 +41,7 @@ export function TurnLimitEditor({ room, member }: { room: ThinkTankDetail; membe
     });
   };
   return (
-    <form className="think-tank-limit" data-slot="turn-limit" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+    <form className="think-tank-limit" data-ui="think-tank" data-slot="turn-limit" onSubmit={(event) => { event.preventDefault(); submit(); }}>
       <label>
         New turn limit for {member.name}
         <input type="number" min={member.limit + 1} max={MAX_LIMIT} value={draft}
