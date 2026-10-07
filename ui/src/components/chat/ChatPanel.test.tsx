@@ -78,6 +78,12 @@ describe("initialTab", () => {
     expect(initialTab("terminal", "acp")).toBe("terminal");
     expect(initialTab("files", "terminal")).toBe("files");
   });
+
+  // FS-03.R80: an old ?tab=commands link opens Transcript, never an empty panel.
+  it("maps the retired Commands tab to Transcript", () => {
+    expect(initialTab("commands", "acp")).toBe("transcript");
+    expect(initialTab("commands", "terminal")).toBe("transcript");
+  });
 });
 
 function renderPanel(id: string, search = "") {
@@ -112,6 +118,18 @@ const backends = {
     },
   },
 };
+
+// FS-03.A61: the agent conversation offers no Commands tab, and an old
+// ?tab=commands link lands on a working Transcript.
+it("offers no Commands tab and opens Transcript for ?tab=commands", () => {
+  useAgentStore.setState({ agents: { a_tabs: liveAgent("a_tabs") }, order: ["a_tabs"], hydrated: true, hydrating: false });
+  renderPanel("a_tabs", "?tab=commands");
+
+  const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
+  expect(tabs).toEqual(["Transcript", "Files"]);
+  expect(screen.getByRole("tab", { name: "Transcript" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tabpanel")).toBeInTheDocument();
+});
 
 // FS-03.R66/A47: the full agent screen's context meter renders the shared
 // exact used/total figure beside the percentage when both raw counts are known.

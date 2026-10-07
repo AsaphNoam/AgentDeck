@@ -15,7 +15,6 @@ import { PointerContextMenu, type PointerMenuState } from "../ui/PointerContextM
 import { Composer } from "./Composer";
 import { TranscriptView } from "./TranscriptView";
 import { FilesTab } from "./FilesTab";
-import { CommandsTab } from "./CommandsTab";
 import { TerminalTab } from "./TerminalTab";
 import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
 import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
@@ -38,8 +37,10 @@ function runtimeErrorMessage(error: unknown): string {
 // after launch and the user sees the live session (the server-side always-on PTY
 // drain already prevents a stall, but a transcript-first default would hide the
 // terminal until the user clicked over). Everything else defaults to transcript.
+// The retired Commands tab maps to Transcript so old links never open empty (FS-03.R80).
 export function initialTab(tabParam: string | null, agentInterface?: string): string {
   if (tabParam === "terminal") return "terminal";
+  if (tabParam === "commands") return "transcript";
   if (tabParam) return tabParam;
   if (agentInterface === "terminal") return "terminal";
   return "transcript";
@@ -303,7 +304,6 @@ export function ChatPanel() {
         <Tabs.List className="chat-tabs-list" data-slot="tabs">
           <Tabs.Trigger value="transcript">Transcript</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
-          <Tabs.Trigger value="commands">Commands</Tabs.Trigger>
           {inRooms && <Tabs.Trigger value="think-tank">Think Tank</Tabs.Trigger>}
           {agent.interface === "terminal" && <Tabs.Trigger value="terminal">Terminal</Tabs.Trigger>}
         </Tabs.List>
@@ -312,9 +312,6 @@ export function ChatPanel() {
         </Tabs.Content>
         <Tabs.Content value="files" className="chat-tab-content" data-slot="content">
           <FilesTab agentId={id} onReveal={revealInTranscript} onOpenFile={openFileInViewer} />
-        </Tabs.Content>
-        <Tabs.Content value="commands" className="chat-tab-content" data-slot="content">
-          <CommandsTab agentId={id} />
         </Tabs.Content>
         {inRooms && (
           <Tabs.Content value="think-tank" className="chat-tab-content" data-slot="content">

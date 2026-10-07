@@ -1,6 +1,6 @@
 # Agent chat links, readable tables and fewer tabs
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct `/design-feature` request on 2026-10-07; proposed scope approved by the user.
 **Relevant requirements:** FS-03.R78–R80/A59–A61, FS-05.R40/A23, FS-12.R60/A32,
 FS-20.R42/A14, TS-08.R107–R110, INV §2/§8/§10/§13

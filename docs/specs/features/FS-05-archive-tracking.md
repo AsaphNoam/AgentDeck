@@ -1,7 +1,7 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Partial
-**Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
+**Status:** Current
+**Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/FilesTab.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
 ## 1. Purpose
@@ -109,7 +109,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   rollups or search.
 
 
-- **R40 (planned) — Command tracking survives tab removal.** FS-03.R80 and FS-20.R42 supersede
+- **R40 — Command tracking survives tab removal.** FS-03.R80 and FS-20.R42 supersede
   R20's Commands-tab promise. Files remains visible and copyable; Commands is removed from desktop
   and phone agent conversations. R16–R19's capture, endpoint, ordering and archive rollup counts,
   retained records and transcript activity are unchanged. No deletion or migration is introduced.
@@ -327,7 +327,7 @@ R22's `active` validation remain binding.
   discussion restart. *Verified by:* Archive/room integration and component tests plus FS-21.A29's
   rendered retained-room discovery journey.
 
-- **A23 (planned)** (R40) — Record a command and its outcome, reload the transcript and read
+- **A23** (R40) — Record a command and its outcome, reload the transcript and read
   the commands endpoint and archive rollup. History, ordering and counts remain available while
   desktop and phone offer no Commands tab. *Verify:* existing tracking/server tests and focused
   chat/phone absence tests under FS-03.A61.
@@ -363,7 +363,7 @@ R22's `active` validation remain binding.
   recovery, and reindex).
 - **Resume:** `internal/server/resume.go`, `internal/server/switch.go` (`composeResumeSpec`).
 - **UI:** `ui/src/features/archive/ArchivePage.tsx` (list + search), `ArchiveAgentPage.tsx` (read-only
-  transcript + Resume), `ui/src/components/chat/{FilesTab,CommandsTab}.tsx`.
+  transcript + Resume), `ui/src/components/chat/FilesTab.tsx`.
 - **Tracked paths as file links (R37):** `FilesTab.tsx`'s path cell and
   `ui/src/components/chat/renderers/DiffBlock.tsx`'s heading call the same open-file affordance the
   transcript's own links use (FS-03.R51), so there is one path-opening path rather than three

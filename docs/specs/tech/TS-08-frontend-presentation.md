@@ -594,7 +594,7 @@ primitive seam; the rejected alternatives are recorded in §5.
   persisted browser key is added, and the pane's navigate-instead behavior (FS-03.R53) rides one
   more per-surface `TranscriptView` prop beside the shipped `annotationsEnabled` rather than a
   provider. The content read is an imperative call beside `getTrackedFiles`/`searchSessionFiles` in
-  `ui/src/api/client.ts`, carrying the per-agent request token `FilesTab`/`CommandsTab` already use
+  `ui/src/api/client.ts`, carrying the per-agent request token `FilesTab` already uses
   so a slow read cannot overwrite a newer one (`INV §1`). Every className shipped has a defined
   selector in `ui/src/styles/features/agent.css` in the same change, because the build and Testing
   Library are both blind to CSS (`INV §13`), and the viewer joins the curated contract as one
@@ -1211,7 +1211,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   the rendered file viewer and phone's shared AssistantText path. Core must work without a skin,
   all literal classes have selectors and any new public hook joins the contract (INV §13).
   No theme framework, new parser, appearance preference, raw values or animation is introduced.
-- **R109 (planned) — Remove Commands presentation without removing tracking.** Remove Commands
+- **R109 — Remove Commands presentation without removing tracking.** Remove Commands
   trigger/content from `ChatPanel` and view/state/query from remote `AgentScreen`; expanded panes
   inherit the shared chat change. Keep remaining view order and conditions. Remove unused
   CommandsTab code only after a tree-wide caller check (INV §10), and adjust affected fixtures

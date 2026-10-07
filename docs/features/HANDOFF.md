@@ -18,11 +18,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
-- **Active change:** None. All shipped change reviews and their findings are closed.
+- **Active change:** `agent-chat-links-tables-and-tabs.md` is in progress (see below).
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   `pipeline-think-tank-stages-and-task-collapse.md` is waiting to start; its behavior remains planned.
-  `agent-chat-links-tables-and-tabs.md` is also waiting to start with approved scope and planned
-  link/table/tab requirements, including phone Commands removal.
   Other available/resumable design work is in `docs/ideas.md`.
 - **Review units / findings:** None.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -32,10 +30,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Release preparation verified the shipped operator package already matches this range;
-its Think Tank reference covers concurrent openings, addressed input, live ceilings and judge results.
-Think Tank workspace closure evidence:
-[`implementation-think-tank-workspace-2026-10-07.md`](../archive/reviews/implementation-think-tank-workspace-2026-10-07.md).
+[`agent-chat-links-tables-and-tabs.md`](../ready-changes/agent-chat-links-tables-and-tabs.md) —
+in progress. Slices: (1) Commands removal — done: `ChatPanel` tab/`initialTab` mapping,
+phone `AgentScreen`, removed `CommandsTab`, `getTrackedCommands`, `TrackedCommand`, its CSS and
+the `tracked-list` `commands` contract variant; server tracking/API untouched. (2) Web links —
+next: `target="_blank"` + Open in new tab/Copy link menu in `SanitizedMarkdown`, composed with
+`TranscriptView` annotation menu via `PointerContextMenu`/`copyText`. (3) Table dividers,
+padding and contained overflow. (4) Real-browser rendered checks (TS-08.R110) and closure matrix
+with `make embed`. Focused checks: `cd ui && npx vitest run <files>`, `npm run check:styles`, `npx tsc -b`.
 
 ## Acceptance gates still owed
 
@@ -93,8 +95,8 @@ None.
   under FS-12.R52.
 - When the direct-action change resumes, align TS-01.R25/TS-03.R32 with TS-04.R40 and scope
   FS-17 section 6's opening sentence to the planned boundary.
-- Injected-steer lifetime edge case needs `/investigate-bug` before `/fix`; FilesTab and CommandsTab
-  still copy silently through bare `writeText`.
+- Injected-steer lifetime edge case needs `/investigate-bug` before `/fix`; FilesTab
+  still copies silently through bare `writeText`.
 
 ## Changelog
 

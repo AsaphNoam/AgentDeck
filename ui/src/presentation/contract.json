@@ -431,8 +431,7 @@
         "error"
       ],
       "variants": [
-        "files",
-        "commands"
+        "files"
       ]
     },
     "terminal": {

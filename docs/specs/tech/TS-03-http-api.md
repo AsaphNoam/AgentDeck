@@ -478,7 +478,7 @@ stop-and-registration-cleanup operation.
   Two rules, both named by that deviation, make recovery ordered (FS-03.R39, INV §1/§5). First, each
   transcript request carries a per-agent monotonic token and a response is applied only if its token
   is still the newest issued for that agent, which is the per-agent request-token pattern INV §1
-  already makes canonical and `FilesTab`/`CommandsTab` already use. Second, applying a transcript
+  already makes canonical and `FilesTab` already uses. Second, applying a transcript
   reconciles rather than replaces: events the store already holds whose `seq` exceeds the response's
   maximum `seq` are retained after it, so a delta that arrived while the request was in flight
   survives. Together these bound the hazard to what it can actually be — the fetched prefix plus any

@@ -638,7 +638,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   chat, expanded panes, archived chat, the phone and the shared rendered-Markdown file viewer,
   across all three appearances. Source Markdown stays unchanged; no table editing, sorting or
   new Markdown dialect is introduced.
-- **R80 (planned) — Commands leaves the agent conversation tabs.** Full chat and expanded panes
+- **R80 — Commands leaves the agent conversation tabs.** Full chat and expanded panes
   no longer offer Commands; Transcript, Files and conditional Think Tank and Terminal remain.
   The phone follows FS-20.R42. An existing `?tab=commands` chat link opens Transcript instead
   of an empty view. This supersedes only R1's Commands-tab promise. Command activity

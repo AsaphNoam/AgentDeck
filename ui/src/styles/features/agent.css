@@ -1134,10 +1134,6 @@
   border-bottom: 0;
 }
 
-.tracked-row.tracked-failed {
-  background: color-mix(in srgb, var(--ad-state-error) 8%, var(--ad-surface-raised));
-}
-
 .tracked-row-top {
   align-items: center;
   display: flex;
@@ -1146,8 +1142,7 @@
   margin-bottom: var(--ad-space-1);
 }
 
-.tracked-path,
-.tracked-command {
+.tracked-path {
   font-family: var(--ad-font-mono);
   font-size: 0.76rem;
   overflow: hidden;
@@ -1178,21 +1173,6 @@
 
 .tracked-has-diff {
   color: var(--ad-action-secondary);
-}
-
-.tracked-exit.completed { color: var(--ad-state-done); }
-.tracked-exit.failed { color: var(--ad-state-error); }
-.tracked-exit.in_progress { color: var(--ad-state-busy); }
-
-.tracked-exit-error {
-  color: var(--ad-state-error);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tracked-ts {
-  margin-left: auto;
 }
 
 .tab-placeholder,

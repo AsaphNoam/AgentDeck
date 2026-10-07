@@ -8,7 +8,6 @@ import {
   decidePermission,
   getFileContent,
   getHeldPrompt,
-  getTrackedCommands,
   getTrackedFiles,
   renameAgent,
   getTranscriptWindow,
@@ -179,13 +178,12 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"chat" | "files" | "commands" | "manage">("chat");
+  const [tab, setTab] = useState<"chat" | "files" | "manage">("chat");
   const [rename, setRename] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [diffSeq, setDiffSeq] = useState<number | null>(null);
   const chat = agent?.interface !== "terminal";
   const files = useQuery({ queryKey: ["tracked-files", agentId, rev], queryFn: () => getTrackedFiles(agentId), enabled: tab === "files" });
-  const commands = useQuery({ queryKey: ["tracked-commands", agentId, rev], queryFn: () => getTrackedCommands(agentId), enabled: tab === "commands" });
   const file = useQuery({ queryKey: ["tracked-file", agentId, filePath], queryFn: () => getFileContent(agentId, filePath!), enabled: !!filePath });
   // Open diff reads exactly the requested event, wherever it falls (FS-20.R37).
   const focusedDiff = useQuery({
@@ -329,10 +327,9 @@ export function AgentScreen({ agentId }: { agentId: string }) {
         </p>
       </header>
       <div className="phone-actions phone-tabs" role="tablist" aria-label="Agent views">
-        {(["chat", "files", "commands", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}
+        {(["chat", "files", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}
       </div>
       {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setDiffSeq(tracked.diff_refs[0].seq); setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
-      {tab === "commands" && <section className="phone-section" aria-label="Commands"><h2>Commands</h2>{commands.isError ? <p className="phone-error">{errorText(commands.error)}</p> : <ul className="phone-list">{(commands.data?.commands ?? []).map((command) => <li key={`${command.seq}:${command.command}`}><div className="phone-row"><span className="phone-row-title">{command.command}</span><span className="phone-row-meta">{command.exit_status || "Running"}{command.exit_error ? ` · ${command.exit_error}` : ""}</span></div></li>)}</ul>}</section>}
       {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} />}
       {tab === "manage" && error && <p className="phone-error">{error}</p>}
       {tab === "chat" && <>

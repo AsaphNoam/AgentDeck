@@ -237,7 +237,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   permission request or any pipeline run is active, and allows sleep again once none is. It states
   that closing the lid or choosing Sleep still sleeps the Mac.
 
-- **R42 (planned) — Commands leaves the phone agent views.** The agent screen offers Chat,
+- **R42 — Commands leaves the phone agent views.** The agent screen offers Chat,
   Files and Manage without Commands. This supersedes only R37's Commands-view promise; its Files
   behavior and access restrictions remain unchanged. Transcript command activity and capture/API
   behavior remain under FS-05.R40. Web links and tables follow FS-03.R78–R79; no new phone file

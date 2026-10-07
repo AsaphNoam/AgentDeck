@@ -403,16 +403,10 @@ describe("AgentScreen management and views", () => {
     expect(screen.getByText("Wait for the current turn to finish.")).toBeInTheDocument();
   });
 
-  it("lists the agent's commands", async () => {
-    server.use(http.get("/api/sessions/a1/commands", () => HttpResponse.json({ agent_id: "a1", commands: [
-      { command: "go test ./...", seq: 5, ts: "", tool_call_id: "t5", exit_status: "exit 1", exit_error: "FAIL" },
-      { command: "make build", seq: 6, ts: "", tool_call_id: "t6", exit_status: "", exit_error: "" },
-    ] })));
+  // FS-20.A14: the phone agent views are Chat, Files and Manage; Commands is gone.
+  it("offers Chat, Files and Manage without Commands", () => {
     renderScreen();
-    fireEvent.click(screen.getByRole("tab", { name: "Commands" }));
-    const view = await screen.findByRole("region", { name: "Commands" });
-    await waitFor(() => expect(view).toHaveTextContent("go test ./...exit 1 · FAIL"));
-    expect(view).toHaveTextContent("make buildRunning");
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Chat", "Files", "Manage"]);
   });
 
   it("opens a changed file's current text", async () => {

@@ -1,4 +1,4 @@
-import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, FileContent, Layout, TrackedCommand, TrackedFile, TranscriptEvent } from "./types";
+import type { AnnotationBatch, ArchiveProjectGroup, ArchiveResult, AvailableCommand, Capabilities, FileContent, Layout, TrackedFile, TranscriptEvent } from "./types";
 import type { ProjectResponse, WorktreeStatus } from "../schemas/project";
 
 async function json<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -263,9 +263,6 @@ export function getTrackedFiles(agentId: string) {
   return json<{ agent_id: string; files: TrackedFile[] }>(`/api/sessions/${agentId}/files`);
 }
 
-export function getTrackedCommands(agentId: string) {
-  return json<{ agent_id: string; commands: TrackedCommand[] }>(`/api/sessions/${agentId}/commands`);
-}
 
 // searchSessionFiles backs the composer `@` picker: bounded, ranked relative paths
 // from the chat session's working directory (TS-03.R24). The query is sent as text.
