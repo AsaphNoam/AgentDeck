@@ -614,7 +614,11 @@ func runScenario(name string) string {
 		// Real-browser fixture for the runtime-activity composition (TS-08.R59):
 		// live reasoning, a nested child with a grandchild, and a root
 		// background task left running so Stop can be exercised.
-		pause := func() { time.Sleep(300 * time.Millisecond) }
+		// FAKEACP_SHOWCASE_PAUSE_MS widens the default 300ms gaps so a real
+		// browser driver (ui/scripts/turns-journey.mjs) has a window to focus
+		// and interact with live activity mid-turn; unset, behavior is unchanged.
+		pauseMs := envInt("FAKEACP_SHOWCASE_PAUSE_MS", 300, 0, 10000)
+		pause := func() { time.Sleep(time.Duration(pauseMs) * time.Millisecond) }
 		for _, text := range []string{"Weighing whether to split the work… ", "a researcher can read the logs while I fix the parser."} {
 			emitUpdate(map[string]any{"sessionUpdate": "agent_thought_chunk", "content": map[string]any{"type": "text", "text": text}})
 			pause()

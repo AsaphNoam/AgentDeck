@@ -29,14 +29,15 @@ import (
 )
 
 type options struct {
-	port       int
-	workers    int
-	chunks     int
-	chunkBytes int
-	delayMS    int
-	repo       string
-	scenario   string
-	holdFile   string
+	port            int
+	workers         int
+	chunks          int
+	chunkBytes      int
+	delayMS         int
+	repo            string
+	scenario        string
+	holdFile        string
+	showcasePauseMS int
 }
 
 type launchedSession struct {
@@ -56,6 +57,7 @@ func main() {
 	flag.StringVar(&opts.repo, "repo", ".", "Chuck repository root")
 	flag.StringVar(&opts.scenario, "scenario", "stress_stream", "fake ACP scenario; any other scenario advertises runtime capabilities and launches no workload")
 	flag.StringVar(&opts.holdFile, "hold-file", "", "fake ACP hold file for hold_turn (the turn remains open until this file exists)")
+	flag.IntVar(&opts.showcasePauseMS, "showcase-pause-ms", 0, "FAKEACP_SHOWCASE_PAUSE_MS for the activity_showcase scenario; 0 keeps the fake's own default")
 	flag.Parse()
 
 	if err := run(opts); err != nil {
@@ -129,6 +131,9 @@ func run(opts options) error {
 		claude.Env = map[string]string{"FAKEACP_SCENARIO": opts.scenario, "FAKEACP_CAPS": "1"}
 		if opts.holdFile != "" {
 			claude.Env["FAKEACP_HOLD_FILE"] = opts.holdFile
+		}
+		if opts.showcasePauseMS > 0 {
+			claude.Env["FAKEACP_SHOWCASE_PAUSE_MS"] = strconv.Itoa(opts.showcasePauseMS)
 		}
 	}
 	backends.Backends["claude"] = claude

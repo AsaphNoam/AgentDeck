@@ -32,7 +32,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
   Quiet completed chat turns (`2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`) was
-  re-reviewed and stays open for QT-03–QT-05 below. QT-01/QT-02's targeted fixes are accepted;
+  re-reviewed and stays open for QT-04–QT-05 below (QT-03 fixed after the re-review). QT-01/QT-02's targeted fixes are accepted;
   phone reconnect and sliding-window ownership need further fixes. Review notes: TS-08.R102
   now keys a turn by its opening boundary seq (no key
   adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
@@ -59,10 +59,12 @@ separate waiting unit.
 
 ## Acceptance gates still owed
 
-- FS-03.A54–A58 / TS-08.R106: quiet completed turns' rendered closure remains unproven
-  (QT-03). Phone reconnect admission and stable ownership across a sliding transcript window
-  need regressions (QT-04/QT-05). Concurrent journey/fixture edits were still uncommitted during
-  the 2026-10-07 re-review and are not a closure receipt.
+- FS-03.A54–A58 / TS-08.R106: phone reconnect admission and stable ownership across a sliding
+  transcript window need regressions (QT-04/QT-05). The desktop rendered journey passed 24/24
+  twice on 2026-10-07 (QT-03 fix): from the repo root, `make embed`, then
+  `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411 -scenario activity_showcase
+  -showcase-pause-ms 900` and `node ui/scripts/turns-journey.mjs`; phone via
+  `(cd ui && node scripts/phone-render.mjs <out>/phone-transcript.json <out>/11-phone.png)`.
 
 - FS-21 / TS-06.R33 (Think Tanks): bounded credentialed Claude/Codex smoke remains owed
   (room-tool read/submit, shared addressed input, ordinary approval/denial, private Send/Steer,
@@ -120,18 +122,6 @@ None.
 
 **Unit:** `2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`; unrelated interleaved changes excluded.
 
-- **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
-  `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
-  for the second turn, swallows the wait error, and never asserts that the second turn completed.
-  Its expanded-activity PASS ignores the computed thoughts/tools/child checks. Lines 200–219
-  report Archive/dashboard success from navigation alone; the agent is not archived and no
-  transcript/disclosure assertion establishes those surfaces. The script also never exercises
-  keyboard operation, focus during automatic collapse or reading above the tail, although
-  FS-03.A58/TS-08.R106 require rendered proof and closure marks them shipped. Wait for a new
-  terminal seq, fail missing content/surfaces, and run the specified keyboard/focus/scroll
-  scenarios with receipts; keep unverified acceptance gates live until then. The phone transcript
-  render fallback is documented and is not itself a defect. Fix complexity: medium.
-
 - **Must fix** — **QT-04 (INV §1/§11): Phone reconnect admits new thoughts against stale history.**
   `ui/src/remote/connection.ts:80–109,154–160` clears thoughts on reconnect but retains the
   transcript revision and admits deltas through the existing watcher before its window is
@@ -178,6 +168,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: quiet completed turns QT-03.** The rendered journey now waits for a new
+  root turn end and fails on timeout, requires thoughts/tools/child in expanded activity, archives
+  a real agent and asserts the Archive and dashboard-pane transcripts and disclosures, and adds
+  keyboard, focus-return-on-collapse, reading-above-tail, follow-bottom and reduced-motion checks
+  (INV §17). A fake-ACP `FAKEACP_SHOWCASE_PAUSE_MS` knob (stress-fixture `-showcase-pause-ms`)
+  widens live windows; default timing is unchanged. 24/24 checks passed twice with QT-01/QT-02 in
+  the build; full Go variant via `make test` and 690 UI tests passed. QT-04/QT-05 remain open.
 
 - **2026-10-07 — Review: quiet completed turns, including QT-01/QT-02 fixes.** Accepted the
   targeted history-admission/last-view cleanup and child terminal-reset fixes; found phone
