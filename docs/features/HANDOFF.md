@@ -31,13 +31,11 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
   automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
   through `phone-render.mjs`, not a paired device.
-  UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00` and
-  the closure commit after them) is available. Review notes: inside the 640px expanded card a
-  40vh composer draft leaves the transcript little room (spec-conformant; judge whether the card
-  needs its own cap); phone textareas also use `AutoGrowTextarea` because TS-08.R88 covers all of
-  `ui/src`, though the change file excluded phone surfaces; an archived Tasks focus appears in the
-  filter by title only. Rendered proof: `node ui/scripts/polish-render.mjs` against the stress
-  fixture (17 checks, all three skins).
+  UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00`,
+  `8e06375`) was reviewed and stays open for UP-01 below. Local choices confirmed: the 40vh
+  draft cap inside the 640px card matches R66; phone fields use the shared component as TS-08.R88
+  requires; an archived Tasks focus remains available by title as R70 requires. No additional
+  product decision is needed. Rendered proof: `polish-render.mjs` 17/17 in all three skins.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
@@ -108,6 +106,17 @@ None.
 
 ## Review findings
 
+### UI polish — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+**Unit:** `eec9038`, `221980d`, `8609d00`, `8e06375`.
+
+- **Must fix** — **UP-01 (INV §8/§10): Phone chat composer omits the growth cap.**
+  `ui/src/remote/AgentScreen.tsx:384` replaces the Message/Reply textarea with
+  `AutoGrowTextarea` without `maxHeight`. A long phone draft therefore grows without a limit
+  instead of stopping near 40% of the viewport and scrolling inside, violating FS-02.R66 and
+  TS-08.R88. Pass `maxHeight="40vh"` at this caller and verify a long draft caps and scrolls
+  at the phone viewport, while its text and Send behavior remain intact. Fix complexity: trivial/easy.
+
 ### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
 
 **Unit:** `2cf6cfa^..36f055a`.
@@ -164,6 +173,15 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Review: UI polish.** One must-fix (UP-01); the unit stays open. Plain labels,
+  archived Tasks filtering, icon semantics, header ordering and desktop field sizing match the
+  specs. Focused UI tests: 108/108; styles/presentation: 40/40 plus contract check;
+  isolated loopback fake-ACP `polish-render.mjs`: 17/17, screenshots inspected in all three skins.
+  INV sweep: §1/§2/§3/§4/§8/§10/§13/§17 checked; no applicable surface for
+  §5/§6/§7/§9/§11/§12/§14/§15/§16. Existing submit/persistence paths are unchanged;
+  resize listener cleanup is paired; tests use explicit requirements and DOM/layout observations.
+  The concurrent BU-01 fix and its handoff closure were preserved.
 
 - **2026-10-07 — Fix: 2026-10 provider bundle refresh BU-01 (INV §1/§2).** `markBackgrounded`
   now reads `collectTasks`, so a tool's background label follows the resume and clone fences:
