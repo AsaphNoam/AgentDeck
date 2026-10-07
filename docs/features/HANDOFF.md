@@ -21,7 +21,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and `chuck update --repo AsaphNoam/AgentDeck`. Renaming later fixes them without a new release.
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
-- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes are available.
+- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
+  (`32da712`, `eadab5a`) are reviewed and closed without findings.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) was reviewed and stays open for BU-01 below. TS-04.R81's linked-task derivation
   was confirmed against both pinned adapters; no separate backgrounded-marker decoder is needed.
@@ -178,6 +179,18 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Review: post-release test synchronization.** Reviewed `32da712` and
+  `eadab5a`: held-context prompt delivery is observed before the no-new-turn baseline, and
+  New Agent options wait for the rendered default model before changing runtime controls.
+  Existing provider-count, persistence, launch-payload and runtime-control assertions remain
+  intact; no product or specification change, findings, or unresolved local choices. Unit closed.
+  **Fix model:** trivial/easy — Claude Sonnet or Codex Luna (no open fixes).
+  INV §17 reviewed; classes 1–16 have no applicable changed production surface.
+  Both context integration tests passed three repetitions untagged and once with `sqlite_fts5`;
+  all 26 New Agent tests passed. The adjacent onboarding synchronization was also inspected and
+  its two tests passed, but is outside this unit. Go tests required sandbox-external loopback
+  listeners. Concurrent chat edits were preserved; this review changes only the handoff.
 
 - **2026-10-07 — Implementation: UI polish.** Every text field auto-grows with no grip (composers
   cap near 40% of the window); Send, Cancel, Collapse and Collapse all are icons; expanded cards put
