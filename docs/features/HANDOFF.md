@@ -31,8 +31,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
-  Quiet completed chat turns (`2cf6cfa^..36f055a`) was reviewed and stays open for QT-01–QT-03
-  below. Review notes: TS-08.R102 now keys a turn by its opening boundary seq (no key
+  Quiet completed chat turns (`2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`) was
+  re-reviewed and stays open for QT-03–QT-05 below. QT-01/QT-02's targeted fixes are accepted;
+  phone reconnect and sliding-window ownership need further fixes. Review notes: TS-08.R102
+  now keys a turn by its opening boundary seq (no key
   adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
   automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
   through `phone-render.mjs`, not a paired device.
@@ -56,6 +58,11 @@ source shows retained results as source-unavailable. Pending pipeline-owned room
 separate waiting unit.
 
 ## Acceptance gates still owed
+
+- FS-03.A54–A58 / TS-08.R106: quiet completed turns' rendered closure remains unproven
+  (QT-03). Phone reconnect admission and stable ownership across a sliding transcript window
+  need regressions (QT-04/QT-05). Concurrent journey/fixture edits were still uncommitted during
+  the 2026-10-07 re-review and are not a closure receipt.
 
 - FS-21 / TS-06.R33 (Think Tanks): bounded credentialed Claude/Codex smoke remains owed
   (room-tool read/submit, shared addressed input, ordinary approval/denial, private Send/Steer,
@@ -111,7 +118,7 @@ None.
 
 ### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
 
-**Unit:** `2cf6cfa^..36f055a`.
+**Unit:** `2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`; unrelated interleaved changes excluded.
 
 - **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
   `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
@@ -124,6 +131,34 @@ None.
   terminal seq, fail missing content/surfaces, and run the specified keyboard/focus/scroll
   scenarios with receipts; keep unverified acceptance gates live until then. The phone transcript
   render fallback is documented and is not itself a defect. Fix complexity: medium.
+
+- **Must fix** — **QT-04 (INV §1/§11): Phone reconnect admits new thoughts against stale history.**
+  `ui/src/remote/connection.ts:80–109,154–160` clears thoughts on reconnect but retains the
+  transcript revision and admits deltas through the existing watcher before its window is
+  refreshed. `ui/src/remote/AgentScreen.tsx:206–210,235–238` treats cached/placeholder data as
+  ready. If a disconnect misses a root terminal boundary, the next turn's thought acquires the
+  old turn key and seq anchor; after the window catches up, it remains inside the previous
+  completed turn's hidden activity. Reproduced through the actual connection/store/projection:
+  cached user seq 1; missed response seq 2 and root end seq 3; reconnect/hydrate; admit a new
+  thought; load seqs 1–4 including the new user prompt. The new thought renders in completed
+  `start`, with no thought in live turn `3`. This violates TS-08.R103–R104 and FS-03.R73/R77.
+  Fence admission across reconnect until an authoritative window read completes, refresh open
+  windows after hydration, and regress delayed reads with stale cached/placeholder content.
+  Fix complexity: medium.
+
+- **Must fix** — **QT-05 (INV §1/§11): Sliding phone windows change a live turn's identity.**
+  `ui/src/remote/AgentScreen.tsx:206–210,235–243` projects the latest 150 events while
+  `ui/src/components/chat/turnActivity.ts:49–91` derives the opening key only from boundaries
+  still in that slice. When a long turn pushes its preceding root end out of the window, its
+  key changes from that boundary seq to `start`. `runtimeActivity.ts:67–71` then filters out
+  retained thoughts owned by the original key; later chunks acquire `start`, which no longer
+  matches the person's manual collapse scope. Reproduced with preceding end seq 10, input
+  seq 11 and a collapsed thought owned by `10`; slide to 150 rows beginning at seq 11:
+  retained thought rows become zero, and a later chunk no longer respects `10|`'s collapse.
+  Completed choices can also collide when different leading turns reuse `start` in one mounted
+  view. Preserve the durable opening-boundary identity across bounded-window shifts and older
+  page loads, and test a live manual collapse across the 150-event boundary. This violates
+  FS-03.R73/R75/R77 and TS-08.R102–R104. Fix complexity: medium.
 
 ## Decisions needing your input
 
@@ -143,6 +178,19 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Review: quiet completed turns, including QT-01/QT-02 fixes.** Accepted the
+  targeted history-admission/last-view cleanup and child terminal-reset fixes; found phone
+  reconnect misassociation and sliding-window identity loss (QT-04/QT-05). QT-03 remains open;
+  concurrent uncommitted journey/fixture/embed edits were preserved and not reviewed as closure.
+  Focused SSE/reasoning/child/projection/phone checks passed (58 tests); the independent
+  transcript/projection/phone audit also passed its 58 tests and TypeScript build. Styles and
+  presentation checks passed (41 tests plus contract audit). Actual-module reproductions prove
+  both phone defects. Fix routing remains medium — Codex Terra or Claude Opus.
+  INV sweep: §1/§2/§4/§7/§8/§10/§11/§13/§16/§17 checked; no applicable changed surface for
+  §3/§5/§6/§9/§12/§14/§15. Local choices remain accepted: boundary-based keys rather than
+  adoption, visible notices, native scroll anchoring pending rendered proof, and the documented
+  real-transcript phone render fallback.
 
 - **2026-10-07 — Fix: quiet completed turns QT-01.** Live thoughts are admitted only after the
   source's transcript read reconciles (desktop and phone), render only while their slot stays in
