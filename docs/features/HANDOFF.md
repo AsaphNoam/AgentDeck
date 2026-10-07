@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `ui-polish-fields-icons-labels` (see below).
+- **Active change:** none.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -31,21 +31,19 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
   automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
   through `phone-render.mjs`, not a paired device.
+  UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00` and
+  the closure commit after them) is available. Review notes: inside the 640px expanded card a
+  40vh composer draft leaves the transcript little room (spec-conformant; judge whether the card
+  needs its own cap); phone textareas also use `AutoGrowTextarea` because TS-08.R88 covers all of
+  `ui/src`, though the change file excluded phone surfaces; an archived Tasks focus appears in the
+  filter by title only. Rendered proof: `node ui/scripts/polish-render.mjs` against the stress
+  fixture (17 checks, all three skins).
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
 - **Branch:** `main`.
 
 ## Active change
 
-[`ui-polish-fields-icons-labels`](../ready-changes/ui-polish-fields-icons-labels.md) — in progress.
-
-- Done: icon Send/Cancel/Collapse/Collapse all (`ui/src/components/ui/icons.tsx`) and the
-  expanded card header reorder (`.agent-card-context` row).
-- Done: shared `AutoGrowTextarea` (`ui/src/components/ui`) replaces every textarea, with a
-  source-scan guard in its test; composers pass `maxHeight="40vh"`; global `resize: none`.
-- Done: `displayLabel`/`displayLabels` (`ui/src/lib/labels.ts`) across selectors and run-start
-  summaries; archived agent tag on Tasks; Tasks all-projects view/filter skip archived projects.
-- Owed at closure: rendered composer/expanded-card screenshots per skin and one settings form
-  (FS-02.A48–A50), then remove `(planned)` from A48–A52 and the change file.
+None.
 
 Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
 -scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411
@@ -180,6 +178,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Implementation: UI polish.** Every text field auto-grows with no grip (composers
+  cap near 40% of the window); Send, Cancel, Collapse and Collapse all are icons; expanded cards put
+  badge and Collapse top-right with the context meter beneath; selectors show plain names with ids
+  only for duplicates; Tasks hides archived projects. Closure: `make test` (one run failed while the
+  stress fixture was being stopped; the rerun passed), `make build`, UI tests/build, style checks and
+  `polish-render.mjs` 17/17.
 
 - **2026-10-06 — Review: quiet completed chat turns.** Three must-fix findings (QT-01–QT-03);
   unit stays open. Shared boundary keys, conservative final-passage selection, visible approvals,

@@ -63,8 +63,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 - [`phone-desktop-flow-and-agent-management.md`](phone-desktop-flow-and-agent-management.md) —
   give the phone the desktop's dashboard → project → chat flow, New agent with runtime choice,
   project-page pipeline start, agent management, and tracked-file views; remove phone task UI.
-- [`ui-polish-fields-icons-labels.md`](ui-polish-fields-icons-labels.md) — auto-grow text fields,
-  icon actions, card header order, plain labels, and archived projects hidden on Tasks.
 
 - [`think-tank-workspace-and-live-controls.md`](think-tank-workspace-and-live-controls.md) — titled
   room cards, standard chat composition and shared mentions, stable speaker tints, concurrent

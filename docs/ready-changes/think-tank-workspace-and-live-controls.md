@@ -55,10 +55,9 @@ empty/loading/errors, opening/private waits, approval, pause/failure, End/judge 
 
 ## Existing design work and verified seams
 
-- `ui-polish-fields-icons-labels.md` owns FS-02.R66–R67/A48–A49 and TS-08.R88–R89's shared
-  auto-growing textarea/Send icons. Use the same seams in both composers. This unit may implement
-  only the shared seam needed here if it starts first; update that change's remaining scope and
-  planned/shipped tags accurately, leaving unrelated card/label/Tasks polish in its own unit.
+- The shared auto-growing textarea and Send icon have shipped (FS-02.R66–R67, TS-08.R88–R89):
+  `AutoGrowTextarea` in `ui/src/components/ui` and `SendIcon` in `ui/src/components/ui/icons.tsx`.
+  The room composer already uses `AutoGrowTextarea` with `maxHeight="40vh"`; reuse both seams.
 - Shared layout is already shipped (FS-12.R52–R59, TS-08.R74–R79); inherit normal Composer
   construction, bounded reading measure, semantic tokens/hooks and all-three-appearance behavior.
 - `pipeline-think-tank-stages-and-task-collapse.md` is an independent waiting unit. These controls

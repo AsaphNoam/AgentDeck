@@ -859,26 +859,26 @@ picker and launches with the route project's id; the general modal continues to 
   work, without adding a synthetic room-agent card. *Verified by:* scoped dashboard component
   tests and the FS-21.A17 rendered journey, using normal full conversation-page navigation.
 
-- **A48** (R66) (planned) — Typing ten lines into a form textarea grows it to show all ten with no
+- **A48** (R66) — Typing ten lines into a form textarea grows it to show all ten with no
   scrollbar, deleting them shrinks it back, and no resize grip renders; a long chat composer draft
   stops at about 40% of the window and scrolls. *Verify:* shared auto-grow component test plus a
   real-browser check of the composer and one settings form.
 
-- **A49** (R67) (planned) — The composer renders Send and, while busy, Cancel as icon buttons whose
+- **A49** (R67) — The composer renders Send and, while busy, Cancel as icon buttons whose
   accessible names are **Send** and **Cancel**; Enter still sends; card Collapse and Collapse all
   are icon buttons named **Collapse** and **Collapse all**. *Verify:* `Composer.test.tsx`,
   `CardGrid.test.tsx` role/name queries and a rendered screenshot in each skin.
 
-- **A50** (R68) (planned) — An expanded scoped-dashboard card shows badge and Collapse right-aligned
+- **A50** (R68) — An expanded scoped-dashboard card shows badge and Collapse right-aligned
   on the identity row and the context meter on the row beneath. *Verify:* rendered screenshot and a
   `AgentCard.test.tsx` DOM-order check.
 
-- **A51** (R69) (planned) — Model, backend, project, role, template and run selectors render
+- **A51** (R69) — Model, backend, project, role, template and run selectors render
   `Claude Sonnet`, not `Claude Sonnet (sonnet)`; two entries with the same name both show their id;
   an archived agent shows an **archived** tag. Submitted values are unchanged ids. *Verify:* shared
   label-helper tests and selector component tests (`RunStartForm`, `ChatPanel`, `TemplateEditor`).
 
-- **A52** (R70) (planned) — With one active and one archived project, the Tasks page lists only the
+- **A52** (R70) — With one active and one archived project, the Tasks page lists only the
   active project's section and filter option; opening the archived project's Tasks focus still
   shows its tasks. *Verify:* `TasksPage.test.tsx`.
 
