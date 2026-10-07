@@ -1189,6 +1189,47 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   final implementation edit, including the presentation contract/style audit and embed generation;
   never hand-edit dist. No credentialed provider smoke is added solely for this display change.
 
+- **R107 (planned) — Extend the shared Markdown/link seam.** Implement FS-03.R78–R79 through
+  `SanitizedMarkdown` and the existing ReactMarkdown + remark-gfm + rehype-sanitize pipeline.
+  Retain the sanitizer, URL transform, local-file classifier, stable component map, code and
+  Mermaid overrides; do not install a second renderer or enable raw HTML. Allowed HTTP(S) and
+  protocol-relative web anchors get native `target="_blank"` and `rel="noopener noreferrer"`;
+  keyboard/modifier/middle-click behavior stays native. Local paths remain viewer controls,
+  fragments/mail retain current handling and rejected URLs gain no actionable link menu.
+  Resolve link actions from the sanitized rendered destination, never reparsed unsanitized input.
+  Reuse `PointerContextMenu` and `copyText` for the requested link actions and clipboard errors.
+  Detect link targets before annotation handling suppresses the browser menu; on annotation-enabled
+  transcripts, compose link actions with the applicable selection/event actions. Shared Markdown
+  surfaces without annotations must still expose the link actions to a right-click. Reuse one
+  link-action construction path across those surfaces (INV §2/§8). Opening from the menu happens
+  synchronously from user activation and provides no opener access. Add no persistence or API.
+- **R108 (planned) — Table presentation uses existing tokens and semantic markup.** Keep GFM's
+  table/thead/tbody/tr/th/td structure and alignment. Extend the existing Markdown presentation
+  styles with semantic border and spacing tokens for faint horizontal separators, header boundary
+  and increased cell padding. Use contained horizontal overflow for wide tables; any minimal table
+  wrapper belongs to the shared renderer, without rebuilding cell content. Cover assistant text,
+  the rendered file viewer and phone's shared AssistantText path. Core must work without a skin,
+  all literal classes have selectors and any new public hook joins the contract (INV §13).
+  No theme framework, new parser, appearance preference, raw values or animation is introduced.
+- **R109 (planned) — Remove Commands presentation without removing tracking.** Remove Commands
+  trigger/content from `ChatPanel` and view/state/query from remote `AgentScreen`; expanded panes
+  inherit the shared chat change. Keep remaining view order and conditions. Remove unused
+  CommandsTab code only after a tree-wide caller check (INV §10), and adjust affected fixtures
+  and assertions without weakening command capture/endpoint tests. Do not change tracked_commands,
+  hooks, tool projection, transcript activity, archive counts or HTTP/remote route contracts.
+  Chat/phone tab selections are component state, but desktop `initialTab` also accepts `?tab=`.
+  Remove commands from its accepted values and map `?tab=commands` to Transcript, never an empty
+  content panel. Preserve other valid tab parameters; no browser-storage migration is required.
+- **R110 (planned) — Closure verifies links, tables and every affected tab surface.** Focused
+  tests cover FS-03.A59–A61, FS-05.A23 and FS-20.A14, including annotation/link menu coexistence,
+  clipboard failure, dangerous URLs remaining blocked and unchanged file-link classification.
+  FS-12.A32 and FS-03.A60 require the working tree's real-browser rendered checks across Core,
+  Sky & Grove and Studio at the supported desktop floor, wider desktop, narrow pane and phone
+  width, plus archive and rendered file viewer. Component tests alone cannot prove spacing,
+  separators, actual new-tab navigation or contained overflow. Run the applicable TS-06 closure
+  matrix, style/presentation checks and `make embed` after final implementation edits; never edit
+  generated dist. No credentialed provider smoke is added for this presentation-only change.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

@@ -21,6 +21,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Active change:** None. All shipped change reviews and their findings are closed.
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   `pipeline-think-tank-stages-and-task-collapse.md` is waiting to start; its behavior remains planned.
+  `agent-chat-links-tables-and-tabs.md` is also waiting to start with approved scope and planned
+  link/table/tab requirements, including phone Commands removal.
   Other available/resumable design work is in `docs/ideas.md`.
 - **Review units / findings:** None.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -96,6 +98,12 @@ None.
 
 ## Changelog
 
+- **2026-10-07 — Chat cleanup design ready.** User approved web-link new-tab/copy actions,
+  local-file viewer preservation, readable tables and Commands-tab removal including phones.
+  Added planned FS-03.R78–R80/A59–A61, FS-05.R40/A23, FS-12.R60/A32, FS-20.R42/A14 and
+  TS-08.R107–R110; promoted the idea to `agent-chat-links-tables-and-tabs.md`, waiting to start.
+  Existing react-markdown/GFM renderer is retained; command tracking/API/history are preserved.
+  No active implementation or product edits. Documentation and twin-skill checks passed.
 - **2026-10-07 — Operating skill audit fixes finished.** Corrected the terminal messaging/task
   boundary, clarified that existing task targets use current session settings, and documented
   explicit fresh-judge retry without reopening discussion. Guidance now matches existing behavior;

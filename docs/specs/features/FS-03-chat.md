@@ -621,6 +621,30 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   permission authority and reasoning retention remain unchanged. Thoughts never reappear from
   durable history or leave empty controls when unavailable.
 
+### 2.11 Web links, tables and chat tabs
+
+- **R78 (planned) — Web links keep the conversation open.** In rendered chat Markdown,
+  activating an HTTP(S) link, including a protocol-relative web link, opens its destination in
+  a new browser tab. Right-click offers **Open in new tab** and **Copy link**; Copy link copies
+  the destination rather than its label. Annotation handling cannot replace these link actions;
+  existing selection-copy and annotation actions remain available. Keyboard activation and
+  normal browser modifier/middle-click behavior remain usable. Clipboard failure shows the
+  existing Copy failed feedback. Local-file links retain R51–R55's viewer behavior; fragments
+  and mail links retain existing behavior. No action sends agent input or changes the transcript.
+- **R79 (planned) — Markdown tables are readable.** Rendered GFM tables have faint horizontal
+  separators between rows, a clear header boundary and increased horizontal cell padding.
+  Preserve column alignment and selectable content. Wide tables scroll inside their reading
+  surface without page overflow, clipping or unreadable column compression. Apply this in full
+  chat, expanded panes, archived chat, the phone and the shared rendered-Markdown file viewer,
+  across all three appearances. Source Markdown stays unchanged; no table editing, sorting or
+  new Markdown dialect is introduced.
+- **R80 (planned) — Commands leaves the agent conversation tabs.** Full chat and expanded panes
+  no longer offer Commands; Transcript, Files and conditional Think Tank and Terminal remain.
+  The phone follows FS-20.R42. An existing `?tab=commands` chat link opens Transcript instead
+  of an empty view. This supersedes only R1's Commands-tab promise. Command activity
+  remains inspectable in transcript activity; FS-05.R40 preserves capture, tracking endpoints,
+  archive counts and stored history. No replacement command-history screen is added.
+
 ## 3. States & transitions
 
 - **Open/reload:** panel fetches durable events → normalizes/folds them → subscribes to live SSE
@@ -1052,6 +1076,22 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   scrolled above the tail, and follow completion at the bottom; controls/focus remain reachable
   without clipping or unnecessary layout animation. *Verify:* real-binary rendered journey with
   reduced-motion check; source inspection alone cannot satisfy this acceptance item.
+
+- **A59 (planned)** (R78) — In live chat, an expanded pane and archived chat, activate a web link
+  by pointer and keyboard, then exercise both right-click actions, including inside a table and
+  with selected text. The conversation stays open, Copy link yields its destination, and selection
+  copy/annotation still work. Check modifier/middle click, clipboard refusal, local-file viewer,
+  fragment/mail behavior and dangerous URLs remaining inert. On the phone, tap a web link.
+  *Verify:* focused renderer/menu tests and a real-browser interaction check.
+- **A60 (planned)** (R79) — Read a multi-row table with headers, left/center/right alignment,
+  long links and inline code at 1024px/wider desktop, in a narrow pane, archived chat, rendered
+  file viewer and at 390px phone width in Core, Sky & Grove and Studio. Dividers and increased
+  padding are perceptible; cells remain selectable, alignment is preserved and wide content
+  scrolls locally without page overflow. *Verify:* real-browser rendered checks and focused
+  GFM structure/alignment and presentation checks.
+- **A61 (planned)** (R80) — Full chat, expanded pane and phone offer no Commands tab;
+  remaining views work, `?tab=commands` opens Transcript, and command activity survives reload.
+  *Verify:* chat/phone component tests and rendered navigation; FS-05.A23 covers tracking.
 
 ## 6. Deviations & open decisions
 

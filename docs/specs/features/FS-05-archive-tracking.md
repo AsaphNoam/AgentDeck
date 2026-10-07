@@ -1,6 +1,6 @@
 # FS-05 — Session archive, search, resume & tracking
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/archive/`, `internal/index/`, `internal/state/` (sessions, tracked_files, tracked_commands), `internal/server/` (`archive.go`, `resume.go`, `files_commands.go`, `sessions.go`), `ui/src/features/archive/`, `ui/src/components/chat/{FilesTab,CommandsTab}.tsx` · **Journeys:** J7, J8
 **Absorbed:** exact source mapping in the [phase archive manifest](../../archive/phases/README.md)
 
@@ -108,6 +108,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   one tracked edit or command. Reasoning and ignored plan updates contribute nothing to tracking,
   rollups or search.
 
+
+- **R40 (planned) — Command tracking survives tab removal.** FS-03.R80 and FS-20.R42 supersede
+  R20's Commands-tab promise. Files remains visible and copyable; Commands is removed from desktop
+  and phone agent conversations. R16–R19's capture, endpoint, ordering and archive rollup counts,
+  retained records and transcript activity are unchanged. No deletion or migration is introduced.
 
 ## 3. States & transitions
 
@@ -321,6 +326,11 @@ R22's `active` validation remain binding.
   attribution and room history, preserved normal session archive/resume behavior, and no automatic
   discussion restart. *Verified by:* Archive/room integration and component tests plus FS-21.A29's
   rendered retained-room discovery journey.
+
+- **A23 (planned)** (R40) — Record a command and its outcome, reload the transcript and read
+  the commands endpoint and archive rollup. History, ordering and counts remain available while
+  desktop and phone offer no Commands tab. *Verify:* existing tracking/server tests and focused
+  chat/phone absence tests under FS-03.A61.
 
 ## 6. Deviations & open decisions
 

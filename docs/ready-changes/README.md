@@ -43,6 +43,8 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`agent-chat-links-tables-and-tabs.md`](agent-chat-links-tables-and-tabs.md) — new-tab web links
+  and right-click link actions, readable Markdown tables, and Commands-tab removal including phones.
 - [`pipeline-think-tank-stages-and-task-collapse.md`](pipeline-think-tank-stages-and-task-collapse.md)
   — Think Tank pipeline stages whose judge synthesis is the output, readable workspace consent,
   and per-parent task-level collapse.

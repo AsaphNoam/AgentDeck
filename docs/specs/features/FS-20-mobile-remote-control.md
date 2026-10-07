@@ -237,6 +237,12 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   permission request or any pipeline run is active, and allows sleep again once none is. It states
   that closing the lid or choosing Sleep still sleeps the Mac.
 
+- **R42 (planned) — Commands leaves the phone agent views.** The agent screen offers Chat,
+  Files and Manage without Commands. This supersedes only R37's Commands-view promise; its Files
+  behavior and access restrictions remain unchanged. Transcript command activity and capture/API
+  behavior remain under FS-05.R40. Web links and tables follow FS-03.R78–R79; no new phone file
+  access, annotation or custom touch-menu behavior is introduced.
+
 ## 3. States & transitions
 
 Desktop remote connection: `Off → Needs Tailscale sign-in → Connecting → On`; `On → Connecting` on
@@ -338,6 +344,12 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   appears on its project page and its own attention still notifies; a `/task/<id>` link opens Home;
   every task route is unreachable from the tailnet. — server tests on attention, push, and the route
   inventory; UI tests.
+
+- **A14 (planned)** (R42) — At phone width, open an agent with recorded command/file activity.
+  Chat, Files and Manage work; Commands is absent, recorded command activity remains inspectable,
+  web-link taps open separately and wide tables scroll locally. *Verify:* phone component tests
+  and FS-03.A59–A61's focused browser journey. This supersedes only A12's Commands-list check;
+  its file-access and route-restriction checks remain owed.
 
 ## 6. Deviations & open decisions
 
