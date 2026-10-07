@@ -62,6 +62,33 @@ const activity = [
     ev(6, "tta_3", "a_ari", "Ari", "permission_request", { tool_call_id: "c9", name: "Edit", reason: "Edit cache/ttl.go", args: {}, options: [{ option_id: "allow", label: "Allow", kind: "allow_once" }, { option_id: "deny", label: "Deny", kind: "reject_once" }], auto_approved: false, expires_at: "2026-10-06T10:00:00Z" }),
   ] : []),
 ];
+// "project" renders the originating project's room cards before its agents
+// (FS-02.R71): concurrent openings, a held room and an ended room with judge.
+const roster = (agent_id, name, project, limit, completed, extra = {}) => ({
+  agent_id, name, project, role: "participant", state: "active", limit, completed, remaining: limit - completed, exists: true, ...extra,
+});
+const summary = (room_id, title, extra) => ({
+  version: 1, room_id, title, goal: room.goal, origin_project: "alpha", phase: "discussion", control: "running", hold: "",
+  end_reason: "", judge_status: "", participants: [], revision: 3, created_at: at, updated_at: at, active_attempts: [],
+  roster: [], total_remaining: 0, judge_enabled: false, judge_name: "", ...extra,
+});
+const attempt = (agent_id, turn) => ({ attempt_id: `tta_${agent_id}`, agent_id, turn, state: "running", failure: "", started_at: at });
+const cards = [
+  summary("tt_a", "Session cache invalidation", {
+    phase: "openings", judge_enabled: true, judge_status: "waiting", total_remaining: 14,
+    active_attempts: [attempt("a_ari", "opening"), attempt("a_bea", "opening")],
+    roster: [roster("a_ari", "Ari", "alpha", 4, 0), roster("a_bea", "Bea the long-named reviewer of storage engines", "beta", 4, 0),
+      roster("a_cyd", "Cyd", "gamma", 3, 0), roster("a_dov", "Dov", "alpha", 3, 0)],
+  }),
+  summary("tt_b", "Queue retry policy", {
+    hold: "Bea's turn failed: provider error. Retry it, or end the discussion.", total_remaining: 3,
+    roster: [roster("a_ari", "Ari", "alpha", 3, 2), roster("a_bea", "Bea", "beta", 3, 1), roster("a_cyd", "Cyd", "gamma", 2, 2, { state: "exhausted", remaining: 0, exists: false })],
+  }),
+  summary("tt_c", "Pick a release cadence", {
+    phase: "ended", end_reason: "allowance_exhausted", judge_enabled: true, judge_status: "completed", judge_name: "Judge",
+    roster: [roster("a_ari", "Ari", "alpha", 2, 2, { state: "exhausted", remaining: 0 }), roster("a_bea", "Bea", "beta", 2, 1, { state: "departed", remaining: 0 })],
+  }),
+];
 const agents = room.members.filter((m) => m.exists).map((m) => ({
   agent_id: m.agent_id, name: m.name, role: "impl", project: m.project, backend: "claude", model: "m", fast: false,
   interface: "chat", created_at: at, running: true, state: m.agent_status || "idle", detail: "", context_pct: 0, updated_at: 0, archived: false,
@@ -89,10 +116,11 @@ try {
       }, [...agents.map((data) => ({ agent_id: data.agent_id, data })), { agent_id: "__hydrated__", data: { hydrated: true } }]);
       await context.route((url) => url.pathname.startsWith("/api/"), (route) => {
         const path = new URL(route.request().url()).pathname;
+        if (path === "/api/think-tanks") return route.fulfill({ json: { version: 1, rooms: cards, clipped: false } });
         if (path === "/api/think-tanks/tt_demo") return route.fulfill({ json: room });
         if (path === "/api/think-tanks/tt_demo/entries") return route.fulfill({ json: { version: 1, entries, complete: true } });
         if (path === "/api/think-tanks/tt_demo/activity") return route.fulfill({ json: { version: 1, activity, complete: true } });
-        if (path === "/api/projects") return route.fulfill({ json: { alpha: { title: "Alpha", cwd: "/tmp" }, beta: { title: "Beta", cwd: "/tmp" } } });
+        if (path === "/api/projects") return route.fulfill({ json: { alpha: { title: "Alpha", cwd: "/tmp", color: [80, 120, 200] }, beta: { title: "Beta", cwd: "/tmp", color: [60, 160, 120] } } });
         if (path === "/api/config") return route.fulfill({ json: { appearance_skin: skin, onboarded: true } });
         if (path === "/api/layout") return route.fulfill({ json: { order: [], density: { perRow: 3, gap: 16 } } });
         if (path === "/api/backends") return route.fulfill({ json: { version: 2, backends: {} } });
@@ -101,8 +129,10 @@ try {
       });
       const page = await context.newPage();
       page.on("pageerror", (error) => { failed = true; console.error(`page error: ${error.stack}`); });
-      await page.goto("http://localhost:5198/think-tank/tt_demo");
-      const shown = await page.getByRole("list", { name: "Discussion" }).waitFor({ timeout: 15_000 }).then(() => true, () => false);
+      const project = state === "project";
+      await page.goto(project ? "http://localhost:5198/project/alpha" : "http://localhost:5198/think-tank/tt_demo");
+      const ready = project ? page.getByRole("heading", { name: "Think Tanks" }) : page.getByRole("list", { name: "Discussion" });
+      const shown = await ready.waitFor({ timeout: 15_000 }).then(() => true, () => false);
       await page.waitForTimeout(600);
       const out = join(outDir, `room-${state}-${skin || "core"}-${width}.png`);
       await page.screenshot({ path: out, fullPage: true });

@@ -643,7 +643,9 @@
         "turn-notice",
         "goal",
         "turn-limit",
-        "result"
+        "result",
+        "card",
+        "roster"
       ],
       "states": [
         "setup",

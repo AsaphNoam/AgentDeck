@@ -70,6 +70,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    `GET /api/think-tanks?agent_id=` membership filter (migration 43 index) and `clipped`. Fixed the
    presentation contract (`goal`/`turn-limit`/`result` slots): `npm test`'s pretest runs
    `check:styles` — run `npm test`, not bare `vitest`, before committing UI.
+6b. **Done** — room cards (FS-02.R71, FS-21.R44, TS-08.R96 shipped) in `RoomList`, before the
+   agent grid. Stubbed render: `(cd ui && node scripts/room-render.mjs <out> project)` (also
+   `live`/`ended`). Direction: title+phase → status/attention → quiet 2-line goal → wrapping roster
+   chips with remaining → total/judge; inline-start rule is the collective cue; no motion.
 6. UI remaining: room cards
    (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
    speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.

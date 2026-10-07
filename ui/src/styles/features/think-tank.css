@@ -58,7 +58,7 @@
 .think-tank-entries,
 .think-tank-members,
 .think-tank-panel ul,
-.think-tank-list ul,
+.think-tank-list > ul,
 .think-tank-setup-participants ol {
   display: grid;
   gap: var(--ad-space-3);
@@ -276,16 +276,14 @@
   gap: var(--ad-space-2);
 }
 
-.think-tank-panel li,
-.think-tank-list li {
+.think-tank-panel li {
   display: grid;
   gap: var(--ad-space-1);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.think-tank-panel li span,
-.think-tank-list li span {
+.think-tank-panel li span {
   color: var(--ad-text-secondary);
   font-size: 0.85rem;
 }
@@ -298,16 +296,110 @@
 .think-tank-list {
   display: grid;
   gap: var(--ad-space-3);
-  padding: var(--ad-space-4) var(--ad-space-6);
+  padding: var(--ad-space-4) 0;
 }
 
-.think-tank-list li {
-  border-inline-start: var(--ad-border-thick) solid var(--ad-border-strong);
-  padding-inline-start: var(--ad-space-3);
+/* One wide room card per row: title and state lead, the goal stays quiet,
+   and the full roster wraps with each member's remaining ceiling
+   (FS-02.R71, TS-08.R96). The inline-start rule is the collective cue that
+   separates a room from an agent card; it follows the card's state. */
+.think-tank-card {
+  background: var(--ad-surface-panel);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-inline-start: var(--ad-border-thick) solid var(--ad-state-busy);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-2);
+  min-width: 0;
+  padding: var(--ad-space-3) var(--ad-space-4);
 }
 
-.think-tank-list li[data-state="ended"] {
+.think-tank-card[data-state="attention"] {
+  border-inline-start-color: var(--ad-state-waiting);
+}
+
+.think-tank-card[data-state="paused"],
+.think-tank-card[data-state="waiting"] {
+  border-inline-start-color: var(--ad-border-strong);
+}
+
+.think-tank-card[data-state="ended"] {
   border-inline-start-color: var(--ad-border-default);
+}
+
+.think-tank-card-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2) var(--ad-space-3);
+  min-width: 0;
+}
+
+.think-tank-card-head h3 {
+  font-size: 1rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.think-tank-card-origin,
+.think-tank-card-goal,
+.think-tank-card-totals {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-card-status,
+.think-tank-card-goal,
+.think-tank-card-totals {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.think-tank-card-goal {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  max-width: 72ch;
+  overflow: hidden;
+}
+
+.think-tank-card[data-state="attention"] .think-tank-card-status {
+  font-weight: 600;
+}
+
+.think-tank-card-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.think-tank-card-roster > li {
+  align-items: baseline;
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-small);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--ad-space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.think-tank-card-roster > li > span {
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
+.think-tank-card-roster > li[data-state="speaking"] {
+  border-color: var(--ad-state-busy);
+}
+
+.think-tank-card-roster > li[data-state="departed"],
+.think-tank-card-roster > li[data-state="exhausted"] {
+  color: var(--ad-text-muted);
 }
 
 .room-turn-notice {

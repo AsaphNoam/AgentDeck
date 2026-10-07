@@ -308,7 +308,7 @@ entries in the same list share a readable name. Status suffixes such as `(archiv
 projects. Their tasks are not changed. A Tasks route or saved focus naming an archived project
 still shows that project's tasks.
 
-**R71** (planned) — A scoped project's Think Tanks section precedes its agent grid and displays
+**R71** — A scoped project's Think Tanks section precedes its agent grid and displays
 one wide room card per row, independently of agent column density. Room title/phase lead a quiet
 goal preview, full wrapping roster, current speaker(s), per-member/collective remaining ceilings,
 judge state and attention/completion reason under FS-21.R43–R44. The card has familiar Chuck

@@ -1041,7 +1041,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   the presentation contract for any new public slots in all three skins. Rendered closure exercises
   FS-14.A50–A51 and FS-16.A30, with no phone room workspace added.
 
-- **R96 (planned)** — FS-02.R71/FS-21.R43–R44 extend the existing `RoomList` feature projection
+- **R96** — FS-02.R71/FS-21.R43–R44 extend the existing `RoomList` feature projection
   into distinct room navigation cards before the project agent grid, one row per room independent
   of `CardGrid` density/order. Archive uses titled room discovery without acquiring agent-grid
   layout. Use existing Surface/Badge/Button/link seams, semantic depth/radius/spacing and full

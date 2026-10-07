@@ -292,8 +292,9 @@ function ScopedProjectView({ id, project }: { id: string; project?: Omit<Project
           <button type="button" onClick={() => setForkOpen(true)}>New worktree project</button>
         )}
       </div>
-      <CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} />
+      {/* Rooms precede the agent grid, one card per row (FS-02.R71). */}
       <RoomList project={id} />
+      <CardGrid projectID={id} fixedProject={project ? id : undefined} projectTitle={project?.title ?? id} />
       {forkOpen && project && (
         <WorktreeForkDialog sourceID={id} sourceTitle={project.title} onClose={() => setForkOpen(false)} />
       )}

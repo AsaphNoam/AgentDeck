@@ -236,7 +236,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   individual-chat room cues use the title. The room's compact header leads with title and phase;
   the full goal remains available in a subordinate disclosure rather than occupying the first
   conversation viewport. Title fallback neither rewrites history nor changes the goal.
-- **R44 (planned)** — Originating-project room discovery follows FS-02.R71: one distinct wide
+- **R44** — Originating-project room discovery follows FS-02.R71: one distinct wide
   room card per row before the agent grid. Show every participant, phase/control, current speaker
   or all active openings, per-member remaining allowance, the sum of non-departed participants'
   remaining allowances, judge state and attention/completion reason. Allowance is a maximum, not
