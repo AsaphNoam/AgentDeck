@@ -45,11 +45,13 @@ function boundaryKey(event: TranscriptEvent) {
   return String(event.seq ?? "unsequenced");
 }
 
-// projectTurns partitions a root list produced by nestActivities.
-export function projectTurns(events: TranscriptEvent[], scope = ""): Turn[] {
+// projectTurns partitions a root list produced by nestActivities. `lead` is the
+// key of the turn already open at the list's first row: `start` for a whole
+// transcript, or the identity a bounded window carried forward (carryLeadKey).
+export function projectTurns(events: TranscriptEvent[], scope = "", lead = "start"): Turn[] {
   const turns: Turn[] = [];
   let buffer: TranscriptEvent[] = [];
-  let key = `${scope}start`;
+  let key = `${scope}${lead}`;
   const close = (completed: boolean, stopReason?: string) => {
     if (buffer.length) turns.push(build(key, buffer, completed, stopReason));
     buffer = [];
@@ -73,19 +75,35 @@ export function projectTurns(events: TranscriptEvent[], scope = ""): Turn[] {
 
 // openTurnKey names the turn a live row admitted now belongs to: the same key
 // projectTurns gives the unfinished tail of this folded list (TS-08.R103).
-export function openTurnKey(events: TranscriptEvent[]): string {
+export function openTurnKey(events: TranscriptEvent[], lead = "start"): string {
   for (let index = events.length - 1; index >= 0; index--) {
     if (isFence(events[index]) || isRootTurnEnd(events[index])) return boundaryKey(events[index]);
   }
-  return "start";
+  return lead;
 }
 
 // slotTurnKeys gives, for each insertion slot 0..n of this list, the key of the
 // turn a row placed there belongs to, matching openTurnKey (TS-08.R103).
-export function slotTurnKeys(events: TranscriptEvent[]): string[] {
-  const keys = ["start"];
+export function slotTurnKeys(events: TranscriptEvent[], lead = "start"): string[] {
+  const keys = [lead];
   for (const event of events) keys.push(isFence(event) || isRootTurnEnd(event) ? boundaryKey(event) : keys[keys.length - 1]);
   return keys;
+}
+
+// carryLeadKey keeps a sliding window's leading turn on its durable identity
+// after its opening boundary scrolls out (TS-08.R102): `known` maps each seq the
+// previous window held to its turn key. A window at the transcript's start leads
+// with `start`; one first opened mid-turn names that turn by its first seq seen.
+// The returned map covers only this window, so it stays bounded.
+export function carryLeadKey(events: TranscriptEvent[], atStart: boolean, known: Map<number, string>) {
+  const first = events.find((event) => typeof event.seq === "number")?.seq;
+  const lead = atStart || first === undefined ? "start" : known.get(first) ?? `from-${first}`;
+  const keys = slotTurnKeys(events, lead);
+  const next = new Map<number, string>();
+  events.forEach((event, index) => {
+    if (typeof event.seq === "number") next.set(event.seq, keys[index]);
+  });
+  return { lead, known: next };
 }
 
 function build(key: string, events: TranscriptEvent[], completed: boolean, stopReason?: string): Turn {

@@ -31,11 +31,12 @@ import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { groupTranscriptRows, ToolRun } from "../components/chat/toolRun";
 import { markBackgrounded, nestActivities, withReasoning, type ChildNode } from "../components/chat/runtimeActivity";
+import { carryLeadKey } from "../components/chat/turnActivity";
 import { ChildActivity } from "../components/chat/renderers/ChildActivity";
 import { ThinkingDisclosure } from "../components/chat/renderers/ThinkingDisclosure";
 import { TurnList, useFocusReturn, useTurnChoices } from "../components/chat/TurnList";
 import { PhoneAnnotationForm } from "./AnnotationForm";
-import { useConnection, watchReasoning } from "./connection";
+import { useConnection, watchReasoning, type OpenTranscript } from "./connection";
 import { getRuntimeOptions } from "./api";
 import { navigate } from "./router";
 
@@ -230,16 +231,24 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   // Live reasoning arrives on the same authenticated stream as the desktop's and
   // shares its bounded store (TS-08.R104). The phone's window slides as the
   // conversation grows, so a span anchors after the last seq it saw rather than
-  // at a list position. Before the first window loads there is no turn to own
-  // a thought, so none is admitted (TS-08.R103).
+  // at a list position. Only an exact window read owns a thought: none before the
+  // first read, nor while a newer read replaces placeholder data (TS-08.R103).
+  // The leading turn keeps its identity as the window slides (TS-08.R102).
   const reasoning = useReasoningStore((state) => state.byAgent[agentId]?.spans);
-  const eventsRef = useRef<TranscriptEvent[] | null>(null);
-  eventsRef.current = transcript.data ? events : null;
-  useEffect(() => watchReasoning(agentId, () => eventsRef.current), [agentId]);
+  const knownKeys = useRef(new Map<number, string>());
+  const atStart = earlier ? !earlier.hasMore : !transcript.data?.has_more;
+  const lead = useMemo(() => {
+    const carried = carryLeadKey(events, atStart, knownKeys.current);
+    knownKeys.current = carried.known;
+    return carried.lead;
+  }, [events, atStart]);
+  const viewRef = useRef<OpenTranscript | null>(null);
+  viewRef.current = transcript.data && !transcript.isPlaceholderData ? { events, lead, rev } : null;
+  useEffect(() => watchReasoning(agentId, () => viewRef.current), [agentId]);
   const rows = useMemo(() => {
     const spans = reasoning?.map((span) => ({ ...span, anchor: slotAfter(events, span.anchor) }));
-    return nestActivities(withReasoning(markBackgrounded(events), spans));
-  }, [events, reasoning]);
+    return nestActivities(withReasoning(markBackgrounded(events), spans, lead));
+  }, [events, reasoning, lead]);
   const choices = useTurnChoices(agentId);
   const listRef = useRef<HTMLDivElement>(null);
   const trackFocus = useFocusReturn(listRef);
@@ -350,7 +359,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
               <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
             ))}
           <div className="phone-transcript" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
-            <TurnList agentId={agentId} events={rows} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
+            <TurnList agentId={agentId} events={rows} lead={lead} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
           </div>
           <PhoneAnnotationForm agent={agent} />
           {heldText && (

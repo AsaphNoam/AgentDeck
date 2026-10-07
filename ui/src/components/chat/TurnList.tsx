@@ -41,16 +41,18 @@ export type TurnChoices = ReturnType<typeof useTurnChoices>;
 // proven completed turn with activity gets one Show activity control at its
 // first activity position; the hidden rows stay in place when opened
 // (TS-08.R100, R105).
-export function TurnList({ agentId, events, scope = "", choices, renderEvents }: {
+export function TurnList({ agentId, events, scope = "", lead, choices, renderEvents }: {
   agentId: string;
   events: TranscriptEvent[];
   scope?: string;
+  /** Key of the turn open at the first row of a bounded window (carryLeadKey). */
+  lead?: string;
   choices: TurnChoices;
   renderEvents: (events: TranscriptEvent[]) => ReactNode;
 }) {
   return (
     <>
-      {projectTurns(events, scope).map((turn) => {
+      {projectTurns(events, scope, lead).map((turn) => {
         const hidden = turn.parts.some((part) => part.hidden);
         const open = choices.isOpen(turn.key);
         const ids = turn.parts.flatMap((part, index) => (part.hidden ? [`turn-${agentId}-${turn.key}-${index}`] : []));

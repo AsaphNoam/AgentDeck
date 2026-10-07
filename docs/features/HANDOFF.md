@@ -31,13 +31,14 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
-  Quiet completed chat turns (`2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`) was
-  re-reviewed and stays open for QT-04–QT-05 below (QT-03 fixed after the re-review). QT-01/QT-02's targeted fixes are accepted;
-  phone reconnect and sliding-window ownership need further fixes. Review notes: TS-08.R102
-  now keys a turn by its opening boundary seq (no key
-  adoption); notices stay visible in completed turns as outcomes; scroll anchoring through
-  automatic collapse relies on native `overflow-anchor`; the phone render uses a real transcript
-  through `phone-render.mjs`, not a paired device.
+  Quiet completed chat turns (`2cf6cfa^..36f055a`) is closed: QT-01–QT-05 fixes landed.
+  Review notes: TS-08.R102 keys a turn by its opening boundary seq (no key adoption; a phone
+  window carries it forward by seq); notices stay visible in completed turns as outcomes; scroll
+  anchoring through automatic collapse relies on native `overflow-anchor`; the phone render uses
+  a real transcript through `phone-render.mjs`, not a paired device. Rendered journey: from the
+  repo root, `make embed`, `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
+  -scenario activity_showcase -showcase-pause-ms 900`, then `node ui/scripts/turns-journey.mjs`.
+  Live thought deltas that arrive during a transcript re-read are dropped, not buffered (TS-08.R103).
   UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00`,
   `8e06375`) is closed: its UP-01 fix landed.
 - **Design units:** available and resumable entries remain in `docs/ideas.md`.
@@ -58,13 +59,6 @@ source shows retained results as source-unavailable. Pending pipeline-owned room
 separate waiting unit.
 
 ## Acceptance gates still owed
-
-- FS-03.A54–A58 / TS-08.R106: phone reconnect admission and stable ownership across a sliding
-  transcript window need regressions (QT-04/QT-05). The desktop rendered journey passed 24/24
-  twice on 2026-10-07 (QT-03 fix): from the repo root, `make embed`, then
-  `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411 -scenario activity_showcase
-  -showcase-pause-ms 900` and `node ui/scripts/turns-journey.mjs`; phone via
-  `(cd ui && node scripts/phone-render.mjs <out>/phone-transcript.json <out>/11-phone.png)`.
 
 - FS-21 / TS-06.R33 (Think Tanks): bounded credentialed Claude/Codex smoke remains owed
   (room-tool read/submit, shared addressed input, ordinary approval/denial, private Send/Steer,
@@ -118,37 +112,7 @@ None.
 
 ## Review findings
 
-### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
-
-**Unit:** `2cf6cfa^..36f055a`, plus fixes `467e83f`, `ca0fe9a`; unrelated interleaved changes excluded.
-
-- **Must fix** — **QT-04 (INV §1/§11): Phone reconnect admits new thoughts against stale history.**
-  `ui/src/remote/connection.ts:80–109,154–160` clears thoughts on reconnect but retains the
-  transcript revision and admits deltas through the existing watcher before its window is
-  refreshed. `ui/src/remote/AgentScreen.tsx:206–210,235–238` treats cached/placeholder data as
-  ready. If a disconnect misses a root terminal boundary, the next turn's thought acquires the
-  old turn key and seq anchor; after the window catches up, it remains inside the previous
-  completed turn's hidden activity. Reproduced through the actual connection/store/projection:
-  cached user seq 1; missed response seq 2 and root end seq 3; reconnect/hydrate; admit a new
-  thought; load seqs 1–4 including the new user prompt. The new thought renders in completed
-  `start`, with no thought in live turn `3`. This violates TS-08.R103–R104 and FS-03.R73/R77.
-  Fence admission across reconnect until an authoritative window read completes, refresh open
-  windows after hydration, and regress delayed reads with stale cached/placeholder content.
-  Fix complexity: medium.
-
-- **Must fix** — **QT-05 (INV §1/§11): Sliding phone windows change a live turn's identity.**
-  `ui/src/remote/AgentScreen.tsx:206–210,235–243` projects the latest 150 events while
-  `ui/src/components/chat/turnActivity.ts:49–91` derives the opening key only from boundaries
-  still in that slice. When a long turn pushes its preceding root end out of the window, its
-  key changes from that boundary seq to `start`. `runtimeActivity.ts:67–71` then filters out
-  retained thoughts owned by the original key; later chunks acquire `start`, which no longer
-  matches the person's manual collapse scope. Reproduced with preceding end seq 10, input
-  seq 11 and a collapsed thought owned by `10`; slide to 150 rows beginning at seq 11:
-  retained thought rows become zero, and a later chunk no longer respects `10|`'s collapse.
-  Completed choices can also collide when different leading turns reuse `start` in one mounted
-  view. Preserve the durable opening-boundary identity across bounded-window shifts and older
-  page loads, and test a live manual collapse across the 150-event boundary. This violates
-  FS-03.R73/R75/R77 and TS-08.R102–R104. Fix complexity: medium.
+None.
 
 ## Decisions needing your input
 
@@ -168,6 +132,14 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: quiet completed turns QT-04/QT-05; unit closed.** The phone admits no live
+  thought after a (re)connect until hydration ends and each open window has re-read past its
+  bumped revision, nor against placeholder data (INV §1/§11). A sliding phone window carries its
+  leading turn's key forward by seq, so thoughts and collapse choices survive the 150-event slide
+  (INV §1/§11). TS-08.R102–R103 updated; both phone regressions fail on the old code. Closure:
+  `make test`, 692 UI tests, UI and binary builds, `-count=1` runtime tests, and the rendered
+  journey (24/24) passed. Nothing in this unit remains open.
 
 - **2026-10-07 — Fix: quiet completed turns QT-03.** The rendered journey now waits for a new
   root turn end and fails on timeout, requires thoughts/tools/child in expanded activity, archives

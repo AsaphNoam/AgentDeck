@@ -232,4 +232,67 @@ describe("phone conversation turns", () => {
     act(() => stream.onopen?.());
     await waitFor(() => expect(screen.queryByText("Planning tests")).toBeNull());
   });
+
+  const thinking = (span: string, delta: string) =>
+    ({ agent_id: "a1", data: { agent_id: "a1", generation: "g1", span_id: span, kind: "reasoning_delta", delta } });
+
+  // TS-08.R103 (QT-04) — a disconnect that misses a turn's end must not let the
+  // next turn's thought join the stale window's turn.
+  it("admits no thought after a reconnect until the window has re-read", async () => {
+    window_ = [wire(1, "user_text", { text: "Old ask" })];
+    window.history.replaceState(null, "", "/agent/a1");
+    renderApp();
+    const stream = await waitFor(() => FakeEventSource.last!);
+    const hydrate = () => act(() => {
+      stream.onopen?.();
+      stream.emit("state_update", { data: phoneAgent });
+      stream.emit("state_update", { agent_id: "__hydrated__", data: { hydrated: true } });
+    });
+    hydrate();
+    await screen.findByText("Old ask");
+
+    // Missed while disconnected: the answer, the root end and the next prompt.
+    window_ = [...window_, wire(2, "assistant_text", { delta: "Old answer" }), wire(3, "turn_end", { stop_reason: "end_turn" }), wire(4, "user_text", { text: "New ask" })];
+    hydrate();
+    act(() => stream.emit("runtime_activity", thinking("r1", "Stale thought")));
+    await screen.findByText("New ask");
+    act(() => stream.emit("runtime_activity", thinking("r2", "Fresh thought")));
+    const fresh = await screen.findByText("Fresh thought");
+    expect(screen.queryByText("Stale thought")).toBeNull();
+    expect(screen.getByText("New ask").compareDocumentPosition(fresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The completed first turn holds no hideable activity, so no thought was tucked into it.
+    expect(screen.queryByRole("button", { name: /Show activity/ })).toBeNull();
+  });
+
+  // TS-08.R102 (QT-05) — when a long turn pushes its opening boundary out of the
+  // 150-event window, its thoughts and their collapse choice keep their turn.
+  it("keeps a live turn's identity as the window slides past its boundary", async () => {
+    window_ = [wire(9, "assistant_text", { delta: "Earlier answer" }), wire(10, "turn_end", { stop_reason: "end_turn" }), wire(11, "user_text", { text: "Long job" })];
+    let hasMore = true;
+    server.use(http.get("/api/sessions/a1/transcript", () => HttpResponse.json({ agent_id: "a1", events: window_, has_more: hasMore })));
+    window.history.replaceState(null, "", "/agent/a1");
+    renderApp();
+    const stream = await waitFor(() => FakeEventSource.last!);
+    act(() => {
+      stream.onopen?.();
+      stream.emit("state_update", { data: phoneAgent });
+      stream.emit("state_update", { agent_id: "__hydrated__", data: { hydrated: true } });
+    });
+    await screen.findByText("Long job");
+    await waitFor(() => expect(screen.getByText("Long job")).toBeInTheDocument());
+    act(() => stream.emit("runtime_activity", thinking("r1", "First idea")));
+    const toggle = await screen.findByRole("button", { name: /Thinking/ });
+    fireEvent.click(toggle);
+    expect(screen.queryByText("First idea")).toBeNull();
+
+    // 150 rows from the prompt on: the root end at seq 10 has left the window.
+    window_ = [wire(11, "user_text", { text: "Long job" }), ...Array.from({ length: 149 }, (_, i) => wire(12 + i, "tool_call", { tool_call_id: `t${i}`, name: "Read" }))];
+    hasMore = true;
+    act(() => stream.emit("new_message", { agent_id: "a1", data: { seq: 160 } }));
+    await screen.findByRole("button", { name: /Ran 149 tools/ });
+    act(() => stream.emit("runtime_activity", thinking("r2", "Second idea")));
+    await waitFor(() => expect(screen.getAllByRole("button", { name: /Thinking/ })).toHaveLength(2));
+    for (const button of screen.getAllByRole("button", { name: /Thinking/ })) expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Second idea")).toBeNull();
+  });
 });

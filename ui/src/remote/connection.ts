@@ -82,7 +82,10 @@ export function connect() {
     unreachableTimer = undefined;
     hydratingAgents = {};
     // Live-only reasoning and its live choices have no seq to recover (TS-08.R103).
+    // No thought is admitted again until hydration ends and each open window
+    // has re-read past what the disconnect may have missed.
     useReasoningStore.getState().clearAll();
+    admitting = false;
     setLink("reconnecting");
   };
   source.onerror = () => {
@@ -101,10 +104,15 @@ export function connect() {
     if (envelope?.agent_id === "__hydrated__") {
       const agents = hydratingAgents ?? {};
       hydratingAgents = null;
-      useConnection.setState((state) => ({
-        agents,
-        transcriptRev: Object.fromEntries(Object.entries(state.transcriptRev).filter(([id]) => agents[id])),
-      }));
+      useConnection.setState((state) => {
+        const transcriptRev = Object.fromEntries(Object.entries(state.transcriptRev).filter(([id]) => agents[id]));
+        for (const id of openTranscripts.keys()) {
+          transcriptRev[id] = (transcriptRev[id] ?? 0) + 1;
+          fenceRev.set(id, transcriptRev[id]);
+        }
+        return { agents, transcriptRev };
+      });
+      admitting = true;
       setLink("connected");
       bump(); // catch up only after the authoritative snapshot is complete.
       return;
@@ -136,15 +144,27 @@ export function connect() {
 
 // Open conversations admit live reasoning, as the desktop's open agents do
 // (TS-08.R104). Each reads its current folded window on arrival.
-// A read returns null until its first window loads. Leaving the conversation
-// drops its thoughts and live choices with it (TS-08.R102).
-const openTranscripts = new Map<string, () => TranscriptEvent[] | null>();
+// A read returns null unless it holds an exact (not placeholder) window read,
+// with the revision that read answered. Leaving the conversation drops its
+// thoughts and live choices with it (TS-08.R102).
+export interface OpenTranscript {
+  events: TranscriptEvent[];
+  /** The leading turn's carried key (carryLeadKey). */
+  lead: string;
+  rev: number;
+}
 
-export function watchReasoning(agentId: string, read: () => TranscriptEvent[] | null): () => void {
+const openTranscripts = new Map<string, () => OpenTranscript | null>();
+// The revision each open window must reach after the latest hydration.
+const fenceRev = new Map<string, number>();
+let admitting = false;
+
+export function watchReasoning(agentId: string, read: () => OpenTranscript | null): () => void {
   openTranscripts.set(agentId, read);
   return () => {
     if (openTranscripts.get(agentId) !== read) return;
     openTranscripts.delete(agentId);
+    fenceRev.delete(agentId);
     useReasoningStore.getState().discard(agentId);
   };
 }
@@ -154,10 +174,10 @@ export function watchReasoning(agentId: string, read: () => TranscriptEvent[] | 
 function admitReasoning(event: Event) {
   const activity = parse(event)?.data as RuntimeActivity | undefined;
   const read = activity?.agent_id ? openTranscripts.get(activity.agent_id) : undefined;
-  const events = read?.();
-  if (!activity || !events) return;
-  const last = [...events].reverse().find((item) => typeof item.seq === "number")?.seq ?? 0;
-  useReasoningStore.getState().append(activity, Number(last), openTurnKey(events));
+  const view = admitting ? read?.() : null;
+  if (!activity || !view || view.rev < (fenceRev.get(activity.agent_id) ?? 0)) return;
+  const last = [...view.events].reverse().find((item) => typeof item.seq === "number")?.seq ?? 0;
+  useReasoningStore.getState().append(activity, Number(last), openTurnKey(view.events, view.lead));
 }
 
 function parse(event: Event): { agent_id?: string; data?: unknown } | null {

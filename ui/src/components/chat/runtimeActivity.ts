@@ -62,9 +62,9 @@ export function nestActivities(events: TranscriptEvent[]): TranscriptEvent[] {
 // the transcript store (FS-03.R57). Desktop and phone both render through it.
 // A span whose slot now falls in another turn than the one that owned it at
 // admission is not shown, so it can never be backfilled into history (TS-08.R103).
-export function withReasoning(events: TranscriptEvent[], all: ReasoningSpan[] | undefined): TranscriptEvent[] {
+export function withReasoning(events: TranscriptEvent[], all: ReasoningSpan[] | undefined, lead?: string): TranscriptEvent[] {
   if (!all?.length) return events;
-  const keys = slotTurnKeys(events);
+  const keys = slotTurnKeys(events, lead);
   const spans = all.filter((span) => span.turn === undefined || keys[Math.min(span.anchor, events.length)] === span.turn);
   const row = (span: ReasoningSpan): TranscriptEvent => ({
     kind: "reasoning",

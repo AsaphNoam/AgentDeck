@@ -1119,7 +1119,10 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   and optional child activity scope. That key exists before the turn's first durable event, so
   optimistic input never becomes an identity and its durable replacement cannot reset a live
   manual choice; no key adoption step exists. Component rerenders/refetches preserve stable
-  choices. Root/child reasoning
+  choices. A bounded window (phone) whose leading turn's opening boundary has slid out carries
+  that turn's key forward by the seqs it previously held; a window first opened mid-turn names it
+  `from-<first seq>`, and only a window at the transcript's start leads with `start`.
+  Root/child reasoning
   starts open for a new active turn; manual close applies to later spans in that scope/turn and can
   be explicitly reopened. On first observing its root terminal boundary, that turn's activity and
   nested thought/tool disclosure choices reset closed once. Subsequent replay, task updates and
@@ -1144,7 +1147,8 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   thought placeholder when ownership is unknown. An ambiguously owned notification may remain
   in the bounded live-only display but never be backfilled into a completed turn's activity.
   A source admits no delta until its transcript read has reconciled (desktop: no read pending;
-  phone: first window loaded); a delta before that is dropped. Rendering shows a span only while
+  phone: stream hydration complete and an exact, non-placeholder window read at or after the
+  revision each open window was bumped to on hydration); a delta before that is dropped. Rendering shows a span only while
   its anchor slot still lies in the turn that owned it at admission.
   SSE reconnect/generation change still clears thoughts and live choices.
   Thought association and live manual choices are per mounted source;
