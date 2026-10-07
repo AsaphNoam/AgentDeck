@@ -31,6 +31,7 @@ type thinkTankParticipantRequest struct {
 
 type thinkTankCreateRequest struct {
 	CommandID     string                        `json:"command_id"`
+	Title         string                        `json:"title,omitempty"`
 	Goal          string                        `json:"goal"`
 	OriginProject string                        `json:"origin_project"`
 	Openings      bool                          `json:"openings"`
@@ -99,7 +100,7 @@ func (s *Server) handleCreateThinkTank(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, ae)
 		return
 	}
-	create := state.ThinkTankCreate{CommandID: req.CommandID, Goal: req.Goal, OriginProject: req.OriginProject, Openings: req.Openings}
+	create := state.ThinkTankCreate{CommandID: req.CommandID, Title: req.Title, Goal: req.Goal, OriginProject: req.OriginProject, Openings: req.Openings}
 	if req.Judge != nil {
 		config, ae := s.thinkTankLaunchConfig(req.Judge, "the judge")
 		if ae != nil {

@@ -21,6 +21,7 @@
   "room": {
     "version": 1,
     "room_id": "tt_fixture",
+    "title": "Cache choice",
     "goal": "Pick a cache",
     "origin_project": "alpha",
     "phase": "discussion",

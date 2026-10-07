@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useThinkTanks } from "../../api/thinkTanks";
 import { useProjects } from "../../api/config";
-import { endReasonText, phaseLabel, thinkTankPath } from "./roomText";
+import { endReasonText, phaseLabel, roomTitle, thinkTankPath } from "./roomText";
 
 /** RoomList discovers rooms on their originating project and in Archive,
  *  including after the project is removed (FS-21.R39, FS-05.R39). Rooms are
@@ -21,7 +21,7 @@ export function RoomList({ project, title = "Think Tanks", emptyText }: { projec
           const origin = projects.data?.[room.origin_project];
           return (
             <li key={room.room_id} data-state={room.phase}>
-              <Link to={thinkTankPath(room.room_id)}>{room.goal}</Link>
+              <Link to={thinkTankPath(room.room_id)}>{roomTitle(room)}</Link>
               <span>
                 {phaseLabel(room.phase)}
                 {room.phase === "ended" && room.end_reason ? ` — ${endReasonText(room.end_reason)}` : ""}

@@ -626,4 +626,10 @@ ALTER TABLE think_tank_attempts ADD COLUMN activity_bytes INTEGER NOT NULL DEFAU
 CREATE INDEX idx_think_tank_attempts_room ON think_tank_attempts(room_id);
 `,
 	},
+	{
+		// A short fixed room title beside the goal; existing rooms get a
+		// goal-derived fallback with no goal/history rewrite (TS-14.R22).
+		version: 39,
+		apply:   migrateThinkTankTitles,
+	},
 }

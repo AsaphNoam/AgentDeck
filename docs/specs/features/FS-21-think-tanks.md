@@ -292,7 +292,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   arguments. Live/reloaded and archived chat show the same result; failed/staged judge output is
   not a completed synthesis. No synthetic assistant messages are inserted into other participants'
   chats. Explicit room deletion retains the judge's own result with its ordinary agent history.
-- **R51 (planned)** — Newly deployed room participants and the fresh judge receive an ordinary
+- **R51** — Newly deployed room participants and the fresh judge receive an ordinary
   agent group matching the room title in their own projects, reusing an existing same-named group.
   Existing participants keep their groups. Group assignment accompanies successful ordinary launch
   and retry does not reset later manual regrouping. Completing/deleting the room preserves groups

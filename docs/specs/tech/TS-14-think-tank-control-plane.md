@@ -189,7 +189,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   origin and current recovery state; all room projections retain existing privacy/activity scope.
   No new MCP action, provider feature, direct-action transport or remote room route is needed.
 
-- **R22 (planned)** — Persist a normalized room `title` (1–120 Unicode runes) separately from
+- **R22** — Persist a normalized room `title` (1–120 Unicode runes) separately from
   goal and include it in normalized create intent/replay matching. UI creation requires it;
   absent/blank legacy API input and existing rows use the first 120 runes of the whitespace-folded
   goal, with no goal/history rewrite. A forward migration adds title and backfills only that field.

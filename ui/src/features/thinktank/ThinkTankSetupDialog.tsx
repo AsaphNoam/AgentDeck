@@ -11,6 +11,7 @@ import { thinkTankPath } from "./roomText";
 const DEFAULT_LIMIT = 3;
 const MAX_PARTICIPANTS = 32;
 const MAX_GOAL = 8000;
+const MAX_TITLE = 120;
 
 type Row = { key: string; agentID?: string; launch?: ThinkTankLaunch; label: string; project: string; limit: number; mayLeave: boolean };
 
@@ -24,6 +25,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
   const projects = useProjects();
   const agents = useAgentStore((state) => state.agents);
   const create = useCreateThinkTank();
+  const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [openings, setOpenings] = useState(false);
@@ -47,7 +49,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
     return next;
   });
   const reset = () => {
-    setGoal(""); setRows([]); setOpenings(false); setJudge(null); setError(""); setPick(""); setCommandID(newCommandID());
+    setTitle(""); setGoal(""); setRows([]); setOpenings(false); setJudge(null); setError(""); setPick(""); setCommandID(newCommandID());
   };
 
   const addExisting = () => {
@@ -58,6 +60,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
   };
 
   const problems = [
+    !title.trim() && "Give the Think Tank a title.",
     !goal.trim() && "Describe the goal.",
     rows.length < 2 && "Add at least two participants.",
     rows.some((r) => !Number.isInteger(r.limit) || r.limit < 1 || r.limit > 1000) && "Turn limits are whole numbers from 1 to 1000.",
@@ -71,6 +74,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
     }
     create.mutate({
       command_id: commandID,
+      title,
       goal,
       origin_project: originProject,
       openings,
@@ -95,6 +99,10 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
             <Dialog.Title>New Think Tank</Dialog.Title>
             <Dialog.Description>Independent agents discuss one goal in turn. Each keeps its own conversation.</Dialog.Description>
             <form className="config-form" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+              <div className="form-field">
+                <label htmlFor="think-tank-title">Title</label>
+                <input id="think-tank-title" value={title} maxLength={MAX_TITLE} onChange={(e) => { setTitle(e.target.value); setCommandID(newCommandID()); }} placeholder="A short name for this Think Tank" />
+              </div>
               <div className="form-field">
                 <label htmlFor="think-tank-goal">Goal</label>
                 <AutoGrowTextarea id="think-tank-goal" value={goal} maxLength={MAX_GOAL} rows={3} onChange={(e) => { setGoal(e.target.value); setCommandID(newCommandID()); }} placeholder="What should the participants work out?" />

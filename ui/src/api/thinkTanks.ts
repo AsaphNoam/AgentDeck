@@ -49,6 +49,7 @@ export interface ThinkTankParticipantInput {
 
 export interface CreateThinkTankInput {
   command_id: string;
+  title: string;
   goal: string;
   origin_project: string;
   openings: boolean;

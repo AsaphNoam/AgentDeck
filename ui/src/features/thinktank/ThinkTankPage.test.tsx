@@ -165,9 +165,11 @@ describe("ThinkTankPage", () => {
   // FS-21.A1, A16, A17, TS-08.R87: goal and phase lead, contributions are
   // attributed, live participants link to their own conversation and a
   // deleted one keeps attribution without a link.
-  it("renders the goal, attributed discussion and participants", async () => {
+  it("renders the title, goal disclosure, attributed discussion and participants", async () => {
     renderRoom();
-    expect(await screen.findByRole("heading", { name: "Pick a cache" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Cache choice" })).toBeTruthy();
+    // FS-21.R43: the full goal is subordinate to the title.
+    expect(screen.getByText("Goal", { selector: "summary" })).toBeTruthy();
     expect(await screen.findByText("LRU")).toBeTruthy();
     expect(screen.getByText("Consider eviction")).toBeTruthy();
     const participantLinks = screen.getAllByRole("link", { name: "Ari" });

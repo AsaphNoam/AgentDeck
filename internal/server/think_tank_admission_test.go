@@ -145,3 +145,36 @@ func TestThinkTankSlowSetupEndDeletion(t *testing.T) {
 		t.Fatalf("deleted room launched provider: %v", err)
 	}
 }
+
+// FS-21.A33, R51: newly launched room participants join the title group while
+// an existing participant keeps its own; a later relaunch pass never regroups.
+func TestThinkTankNewParticipantsJoinTitleGroup(t *testing.T) {
+	srv, _, ids, _ := thinkTankTestServer(t)
+	existing := strings.Split(ids, ",")[0]
+	before, err := srv.stateStore.ReadAgent(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := `{"role":"impl","project":"tmpproj","interface":"chat","group":"ignored"}`
+	d, err := srv.stateStore.CreateThinkTank(state.ThinkTankCreate{CommandID: "group", Title: "Cache plan", Goal: "Decide", OriginProject: "tmpproj", Members: []state.ThinkTankMember{
+		{AgentID: existing, AgentName: "Existing", Project: "tmpproj", Cap: 1},
+		{AgentID: "a_group1", AgentName: "New", Project: "tmpproj", Cap: 1, SetupConfig: config},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.launchThinkTankSetup(context.Background(), d)
+	added, err := srv.stateStore.ReadAgent("a_group1")
+	if err != nil || added.Group != "Cache plan" {
+		t.Fatalf("new participant group = %q %v", added.Group, err)
+	}
+	if kept, _ := srv.stateStore.ReadAgent(existing); kept.Group != before.Group {
+		t.Fatalf("existing participant regrouped to %q", kept.Group)
+	}
+	if name, msg := srv.launchReservedThinkTankAgent(context.Background(), "a_group1", config, "Other"); msg != "" || name != added.Name {
+		t.Fatalf("relaunch = %q %q", name, msg)
+	}
+	if again, _ := srv.stateStore.ReadAgent("a_group1"); again.Group != "Cache plan" {
+		t.Fatalf("relaunch regrouped to %q", again.Group)
+	}
+}

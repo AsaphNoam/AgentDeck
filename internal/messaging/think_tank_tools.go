@@ -77,6 +77,7 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 		"turn_open": page.Attempt != nil,
 	}
 	if page.First {
+		result["title"] = page.Room.Title
 		result["goal"] = page.Room.Goal
 		// The judge has no turn allowance; only participants get ceiling fields.
 		if m.Role != state.ThinkTankRoleJudge {

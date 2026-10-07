@@ -40,6 +40,7 @@ import {
   phaseLabel,
   roomAnnotationSource,
   roomStatus,
+  roomTitle,
 } from "./roomText";
 import { RoomAnnotationTray } from "./RoomAnnotationTray";
 
@@ -178,7 +179,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
     <section className="think-tank" data-ui="think-tank" data-state={room.phase}>
       <PageHeader
         eyebrow={<>Think Tank · <Link to={`/project/${encodeURIComponent(room.origin_project)}`}>{originTitle}</Link></>}
-        title={<span className="think-tank-goal">{room.goal}</span>}
+        title={<span className="think-tank-title">{roomTitle(room)}</span>}
         description={<span className="think-tank-phase"><Badge variant={ended ? "neutral" : "info"}>{phaseLabel(room.phase)}</Badge>{room.openings && <span>Independent openings</span>}{room.judge.enabled && <span>Final synthesis</span>}</span>}
         actions={
           <>
@@ -193,6 +194,10 @@ function Room({ room }: { room: ThinkTankDetail }) {
         }
         data-slot="header"
       />
+      <details className="think-tank-goal" data-slot="goal">
+        <summary>Goal</summary>
+        <p>{room.goal}</p>
+      </details>
       <div className="think-tank-body" data-slot="body">
         <div className="think-tank-discussion" data-slot="discussion">
           <ol className="think-tank-entries" aria-label="Discussion">

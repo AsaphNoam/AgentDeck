@@ -35,6 +35,7 @@ export const thinkTankAttemptSchema = z.object({
 export const thinkTankSummarySchema = z.object({
   version: z.literal(1),
   room_id: z.string(),
+  title: z.string().optional().default(""),
   goal: z.string(),
   origin_project: z.string(),
   phase: z.enum(THINK_TANK_PHASES),

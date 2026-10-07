@@ -180,7 +180,7 @@ func TestThinkTankWireFixtureMatchesServerEncoding(t *testing.T) {
 	srv, _ := roomRESTServer(t)
 	at := time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)
 	d := state.ThinkTankDetail{
-		Room: state.ThinkTank{RoomID: "tt_fixture", Goal: "Pick a cache", OriginProject: "alpha",
+		Room: state.ThinkTank{RoomID: "tt_fixture", Title: "Cache choice", Goal: "Pick a cache", OriginProject: "alpha",
 			Phase: state.ThinkTankPhaseDiscussion, Control: state.ThinkTankRunning, Revision: 7,
 			JudgeConfig: `{"role":"impl","project":"alpha","interface":"chat"}`, JudgeStatus: state.ThinkTankJudgeWaiting,
 			CreatedAt: at, UpdatedAt: at},

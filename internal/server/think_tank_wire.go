@@ -46,6 +46,7 @@ func (s *Server) publishThinkTankUpdate(d state.ThinkTankDetail) {
 type thinkTankSummaryWire struct {
 	Version       int        `json:"version"`
 	RoomID        string     `json:"room_id"`
+	Title         string     `json:"title"`
 	Goal          string     `json:"goal"`
 	OriginProject string     `json:"origin_project"`
 	Phase         string     `json:"phase"`
@@ -72,7 +73,7 @@ func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
 		}
 	}
 	out := thinkTankSummaryWire{
-		Version: thinkTankWireVersion, RoomID: r.RoomID, Goal: r.Goal, OriginProject: r.OriginProject,
+		Version: thinkTankWireVersion, RoomID: r.RoomID, Title: r.Title, Goal: r.Goal, OriginProject: r.OriginProject,
 		Phase: r.Phase, Control: r.Control, Hold: r.Hold, EndReason: r.EndReason, JudgeStatus: r.JudgeStatus,
 		Participants: names, Revision: r.Revision, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, EndedAt: r.EndedAt,
 	}

@@ -1,6 +1,6 @@
 # Think Tank workspace and live controls
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct human request, 2026-10-06, confirmed with explicit normal Chuck composer parity.
 **Relevant requirements:** FS-21.R43–R51/A33–A37; FS-02.R71/A53; FS-03.R71–R72/A52–A53;
 TS-14.R22–R28; TS-08.R96–R99; INV §1–§2, §5, §7–§11, §13–§17.
@@ -79,4 +79,4 @@ empty/loading/errors, opening/private waits, approval, pause/failure, End/judge 
 
 ## Waiting on
 
-None. All new requirements remain planned; product implementation has not started.
+None. Progress and next slice live in the handoff's Active change.

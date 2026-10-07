@@ -11,11 +11,25 @@
   padding: 0 var(--ad-space-6) var(--ad-space-6);
 }
 
+.think-tank-title {
+  overflow-wrap: anywhere;
+}
+
+/* The full goal is subordinate to the title: available on demand, never
+   occupying the first conversation viewport (FS-21.R43). */
 .think-tank-goal {
-  /* A goal is a sentence, not a headline: keep long goals readable. */
-  font-size: 0.7em;
-  line-height: 1.2;
-  display: block;
+  color: var(--ad-text-secondary);
+}
+
+.think-tank-goal > summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.think-tank-goal > p {
+  color: var(--ad-text-primary);
+  margin: var(--ad-space-2) 0 0;
+  max-width: 72ch;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }

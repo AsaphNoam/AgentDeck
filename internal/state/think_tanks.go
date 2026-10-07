@@ -82,6 +82,7 @@ const (
 // Initial bounds (TS-14.R17).
 const (
 	ThinkTankMaxGoalRunes     = 8000
+	ThinkTankMaxTitleRunes    = 120
 	ThinkTankMinParticipants  = 2
 	ThinkTankMaxParticipants  = 32
 	ThinkTankMaxTurnLimit     = 1000
@@ -122,8 +123,11 @@ func thinkTankConflict(format string, args ...any) error {
 }
 
 type ThinkTank struct {
-	RoomID        string
-	CommandID     string
+	RoomID    string
+	CommandID string
+	// Title is the short fixed room name; legacy rows carry a goal-derived
+	// fallback (FS-21.R43, TS-14.R22).
+	Title         string
 	Goal          string
 	OriginProject string
 	Openings      bool
@@ -351,7 +355,10 @@ func newThinkTankID(prefix string, n int) (string, error) {
 // identities: SetupConfig non-empty marks a new agent whose launch is still
 // owed; empty marks an existing agent that joins ready.
 type ThinkTankCreate struct {
-	CommandID     string
+	CommandID string
+	// Title is the caller's explicit title; empty selects the goal-derived
+	// fallback at insert, so legacy replay intents keep matching.
+	Title         string `json:",omitempty"`
 	Goal          string
 	OriginProject string
 	Openings      bool
@@ -368,6 +375,9 @@ func validateThinkTankCreate(c ThinkTankCreate) error {
 	}
 	if utf8.RuneCountInString(c.Goal) > ThinkTankMaxGoalRunes {
 		return thinkTankInvalid("goal exceeds %d characters", ThinkTankMaxGoalRunes)
+	}
+	if utf8.RuneCountInString(c.Title) > ThinkTankMaxTitleRunes {
+		return thinkTankInvalid("title exceeds %d characters", ThinkTankMaxTitleRunes)
 	}
 	if strings.TrimSpace(c.OriginProject) == "" {
 		return thinkTankInvalid("origin project is required")
@@ -405,6 +415,50 @@ func sameThinkTankCreate(room ThinkTank, members []ThinkTankMember, c ThinkTankC
 	return true
 }
 
+func foldThinkTankWhitespace(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// ThinkTankFallbackTitle derives a readable title from the goal for callers
+// and rows without one, without changing the goal (TS-14.R22).
+func ThinkTankFallbackTitle(goal string) string {
+	r := []rune(foldThinkTankWhitespace(goal))
+	if len(r) > ThinkTankMaxTitleRunes {
+		r = r[:ThinkTankMaxTitleRunes]
+	}
+	return strings.TrimSpace(string(r))
+}
+
+// migrateThinkTankTitles adds the title column and backfills only that field.
+func migrateThinkTankTitles(tx *sql.Tx) error {
+	if _, err := tx.Exec(`ALTER TABLE think_tanks ADD COLUMN title TEXT NOT NULL DEFAULT ''`); err != nil {
+		return err
+	}
+	rows, err := tx.Query(`SELECT room_id, goal FROM think_tanks`)
+	if err != nil {
+		return err
+	}
+	titles := map[string]string{}
+	for rows.Next() {
+		var id, goal string
+		if err := rows.Scan(&id, &goal); err != nil {
+			rows.Close()
+			return err
+		}
+		titles[id] = ThinkTankFallbackTitle(goal)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for id, title := range titles {
+		if _, err := tx.Exec(`UPDATE think_tanks SET title = ? WHERE room_id = ?`, title, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func thinkTankCreateIntent(c ThinkTankCreate) string {
 	members := make([]ThinkTankMember, len(c.Members))
 	for i, m := range c.Members {
@@ -423,6 +477,7 @@ func thinkTankCreateIntent(c ThinkTankCreate) string {
 // launch effect (TS-14.R2). An exact replay of CommandID returns the original
 // room; a different request under the same id is a conflict.
 func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
+	c.Title = foldThinkTankWhitespace(c.Title)
 	if err := validateThinkTankCreate(c); err != nil {
 		return ThinkTankDetail{}, err
 	}
@@ -486,12 +541,16 @@ func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
 	if c.JudgeConfig != "" {
 		judgeStatus = ThinkTankJudgeWaiting
 	}
+	title := c.Title
+	if title == "" {
+		title = ThinkTankFallbackTitle(c.Goal)
+	}
 	now := formatTime(timeNow())
 	if _, err := tx.Exec(`
-INSERT INTO think_tanks(room_id, command_id, goal, origin_project, openings, phase, control,
+INSERT INTO think_tanks(room_id, command_id, title, goal, origin_project, openings, phase, control,
   judge_config, judge_status, created_at, updated_at, create_intent)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		roomID, c.CommandID, c.Goal, c.OriginProject, c.Openings, phase, ThinkTankRunning,
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		roomID, c.CommandID, title, c.Goal, c.OriginProject, c.Openings, phase, ThinkTankRunning,
 		c.JudgeConfig, judgeStatus, now, now, intent); err != nil {
 		return ThinkTankDetail{}, fmt.Errorf("state: insert think tank: %w", err)
 	}
@@ -536,7 +595,7 @@ type thinkTankQueryer interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
-const thinkTankColumns = `room_id, command_id, goal, origin_project, openings, phase, control, hold,
+const thinkTankColumns = `room_id, command_id, title, goal, origin_project, openings, phase, control, hold,
   end_reason, rotation, revision, judge_config, judge_status, judge_agent_id, judge_error,
   created_at, updated_at, ended_at`
 
@@ -544,7 +603,7 @@ func scanThinkTank(row interface{ Scan(...any) error }) (ThinkTank, error) {
 	var r ThinkTank
 	var created, updated string
 	var ended sql.NullString
-	if err := row.Scan(&r.RoomID, &r.CommandID, &r.Goal, &r.OriginProject, &r.Openings, &r.Phase,
+	if err := row.Scan(&r.RoomID, &r.CommandID, &r.Title, &r.Goal, &r.OriginProject, &r.Openings, &r.Phase,
 		&r.Control, &r.Hold, &r.EndReason, &r.Rotation, &r.Revision, &r.JudgeConfig, &r.JudgeStatus,
 		&r.JudgeAgentID, &r.JudgeError, &created, &updated, &ended); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

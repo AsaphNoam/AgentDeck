@@ -7,6 +7,12 @@ export function thinkTankPath(roomID: string) {
   return `/think-tank/${encodeURIComponent(roomID)}`;
 }
 
+/** roomTitle is the short room name; the server backfills a goal-derived
+ *  fallback, and the goal covers a pre-title payload (FS-21.R43). */
+export function roomTitle(room: Pick<ThinkTankSummary, "title" | "goal">): string {
+  return room.title || room.goal;
+}
+
 export const roomAnnotationSource = (roomID: string) => `room:${roomID}`;
 
 export function phaseLabel(phase: ThinkTankSummary["phase"]): string {

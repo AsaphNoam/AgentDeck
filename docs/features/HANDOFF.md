@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** none.
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slice 1 of 6 done).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -38,7 +38,22 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None.
+[`think-tank-workspace-and-live-controls.md`](../ready-changes/think-tank-workspace-and-live-controls.md)
+— in progress. Slices (each closes with focused tests, spec marks, handoff, commit):
+
+1. **Done** — title + title group (FS-21.R51, TS-14.R22 shipped; R43 header/fallback shipped,
+   card/Archive/chat cues finish with slice 6). Migration 39 `migrateThinkTankTitles`; explicit
+   title kept in create intent with `omitempty` so pre-title replays still match; group applied in
+   `launchReservedThinkTankAgent` (existing identities never regrouped).
+2. Live ceiling increase: `IncreaseThinkTankTurnLimit` state mutation + receipts table, REST
+   `POST /participants/{agent_id}/turn-limit` (FS-21.R49, TS-14.R24, A36).
+3. Structured mentions on shared messages + context delivery (FS-21.R46 server half, TS-14.R25).
+4. Judge synthesis result projection + `GET /api/sessions/{id}/think-tank-results` + chat merge
+   (FS-21.R50, TS-14.R26, A37).
+5. Concurrent independent openings (FS-21.R48, TS-14.R23, A35) — largest; race tests both Go variants.
+6. UI: wire extensions (TS-14.R27 summaries/`active_attempts`/`agent_id` filter), room cards
+   (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
+   speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.
 
 Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
 -scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411
@@ -159,6 +174,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: Think Tank workspace slice 1 (titles, title groups).** Rooms carry a fixed
+  short title (legacy rows/API callers get a goal-derived fallback via migration 39); the room
+  header leads with it and the goal moves into a disclosure; new participants/judge launch into the
+  title group. State, server (`ThinkTank` filter) and room UI tests passed; wire fixture regenerated.
 
 - **2026-10-07 — Fix: UI polish UP-01 (INV §8/§10).** The phone Message/Reply composer passes
   `maxHeight="40vh"`, so a long draft caps near 40% of the viewport and scrolls inside while text

@@ -230,6 +230,56 @@ func TestThinkTankCreateReplayUsesImmutableIntent(t *testing.T) {
 	}
 }
 
+// FS-21.A33, TS-14.R22: explicit titles are normalized and fixed; omitted
+// titles fall back to the folded goal without changing it; replay keeps the
+// original title and a different title under the same command conflicts.
+func TestThinkTankTitleFallbackAndReplay(t *testing.T) {
+	st, _ := newTestStore(t)
+	members := []ThinkTankMember{ttMember("a", 1), ttMember("b", 1)}
+	titled := ThinkTankCreate{CommandID: "titled", Title: "  Cache \n plan ", Goal: "g", OriginProject: "p", Members: members}
+	d, err := st.CreateThinkTank(titled)
+	if err != nil || d.Room.Title != "Cache plan" {
+		t.Fatalf("titled = %q %v", d.Room.Title, err)
+	}
+	if again, err := st.CreateThinkTank(titled); err != nil || again.Room.RoomID != d.Room.RoomID {
+		t.Fatalf("replay = %v", err)
+	}
+	titled.Title = "Other"
+	if _, err := st.CreateThinkTank(titled); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("retitled replay err = %v", err)
+	}
+	long := strings.Repeat("é", ThinkTankMaxTitleRunes+1)
+	if _, err := st.CreateThinkTank(ThinkTankCreate{CommandID: "long", Title: long, Goal: "g", OriginProject: "p", Members: members}); !errors.Is(err, ErrThinkTankInvalid) {
+		t.Fatalf("long title err = %v", err)
+	}
+	goal := "Pick\n\n  a   cache " + long
+	fb, err := st.CreateThinkTank(ThinkTankCreate{CommandID: "fallback", Title: " ", Goal: goal, OriginProject: "p", Members: members})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fb.Room.Goal != goal || utf8.RuneCountInString(fb.Room.Title) != ThinkTankMaxTitleRunes || !strings.HasPrefix(fb.Room.Title, "Pick a cache é") {
+		t.Fatalf("fallback title = %q goal changed=%v", fb.Room.Title, fb.Room.Goal != goal)
+	}
+	// The forward migration backfills only the title of existing rows.
+	if _, err := st.db.Exec(`ALTER TABLE think_tanks DROP COLUMN title`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := st.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateThinkTankTitles(tx); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	back, err := st.ReadThinkTank(d.Room.RoomID)
+	if err != nil || back.Room.Title != "g" || back.Room.Goal != "g" {
+		t.Fatalf("backfilled = %q/%q %v", back.Room.Title, back.Room.Goal, err)
+	}
+}
+
 // FS-21.A1, A2, A8, A12: attributed single-floor turns, delta reads that skip
 // one's own entries, ceilings, closing opportunity and stop reason.
 func TestThinkTankDiscussionRotationReadsAndClosing(t *testing.T) {

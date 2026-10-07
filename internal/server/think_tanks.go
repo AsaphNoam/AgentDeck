@@ -314,7 +314,7 @@ func (s *Server) launchThinkTankSetup(ctx context.Context, d state.ThinkTankDeta
 		if _, err := s.stateStore.ClaimThinkTankMemberSetup(d.Room.RoomID, m.AgentID); err != nil {
 			return
 		}
-		name, launchErr := s.launchReservedThinkTankAgent(ctx, m.AgentID, m.SetupConfig)
+		name, launchErr := s.launchReservedThinkTankAgent(ctx, m.AgentID, m.SetupConfig, d.Room.Title)
 		updated, err := s.stateStore.MarkThinkTankMemberSetup(d.Room.RoomID, m.AgentID, name, launchErr)
 		if err != nil {
 			s.log.Debug("mark think tank setup", "room", d.Room.RoomID, "agent", m.AgentID, "err", err)
@@ -348,7 +348,10 @@ func (s *Server) interruptThinkTankOnExit(agentID, generation, cause string) {
 	s.kickThinkTanks()
 }
 
-func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, config string) (string, string) {
+// launchReservedThinkTankAgent launches a reserved room identity into the
+// group named by the room title. An identity that already exists is never
+// relaunched or regrouped (FS-21.R51, TS-14.R22).
+func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, config, title string) (string, string) {
 	if agent, err := s.stateStore.ReadAgent(agentID); err == nil {
 		return agent.Name, ""
 	}
@@ -356,6 +359,7 @@ func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, conf
 	if err := json.Unmarshal([]byte(config), &req); err != nil {
 		return "", "the saved launch settings are unreadable"
 	}
+	req.Group = title
 	resp, ae := s.launchAgent(ctx, req, launchOptions{AgentID: agentID})
 	if ae != nil {
 		return "", ae.Message
@@ -382,7 +386,7 @@ func (s *Server) launchThinkTankJudge(ctx context.Context, d state.ThinkTankDeta
 		return
 	}
 	s.publishThinkTankUpdate(reserved)
-	name, launchErr := s.launchReservedThinkTankAgent(ctx, agentID, d.Room.JudgeConfig)
+	name, launchErr := s.launchReservedThinkTankAgent(ctx, agentID, d.Room.JudgeConfig, d.Room.Title)
 	updated, err := s.stateStore.MarkThinkTankJudgeLaunched(d.Room.RoomID, name, launchErr)
 	if err != nil {
 		s.log.Debug("mark think tank judge", "room", d.Room.RoomID, "err", err)

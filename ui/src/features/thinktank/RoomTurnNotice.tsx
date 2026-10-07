@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useThinkTanks } from "../../api/thinkTanks";
-import { thinkTankPath } from "./roomText";
+import { roomTitle, thinkTankPath } from "./roomText";
 
 /** RoomTurnNotice identifies a running Think Tank turn in the agent's own
  *  conversation, so ordinary Send and Steer stay understandable: Steer shapes
@@ -14,7 +14,7 @@ export function RoomTurnNotice({ agentId, busy }: { agentId: string; busy: boole
   if (!room) return null;
   return (
     <p className="room-turn-notice" data-ui="think-tank" data-slot="turn-notice" role="status">
-      Taking a turn in the Think Tank <Link to={thinkTankPath(room.room_id)}>{room.goal}</Link>. Steer shapes this
+      Taking a turn in the Think Tank <Link to={thinkTankPath(room.room_id)}>{roomTitle(room)}</Link>. Steer shapes this
       contribution and stays in this private conversation; Send waits until the turn ends.
     </p>
   );
