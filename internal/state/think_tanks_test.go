@@ -632,10 +632,32 @@ func TestThinkTankJudgeLifecycle(t *testing.T) {
 	}
 	st.ReserveThinkTankJudge(room, "j2", "Judge 2", "p")
 	st.MarkThinkTankJudgeLaunched(room, "Judge", "")
+	if err := st.WriteAgent(testAgent("j2", timeNow())); err != nil {
+		t.Fatal(err)
+	}
 	j2, _, r := ttTurn(t, st, room)
-	f = ttSubmit(t, st, j2, r, ThinkTankReply, "Synthesis; B's objection unresolved")
+	if _, err := st.StageThinkTankTurn(j2.AgentID, j2.Token, ThinkTankReply, "Synthesis; B's objection unresolved", r); err != nil {
+		t.Fatal(err)
+	}
+	f, err = st.FinalizeThinkTankAttemptAt(j2.AgentID, j2.Generation, j2.TurnID, 42)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if f.Detail.Room.JudgeStatus != ThinkTankJudgeCompleted || f.Published[0].Kind != ThinkTankEntrySynthesis {
 		t.Fatalf("synthesis = %s %+v", f.Detail.Room.JudgeStatus, f.Published)
+	}
+	// FS-21.A37, TS-14.R26: exactly one retained result with the exact body,
+	// anchored at the completion event; a duplicate completion adds nothing.
+	if _, err := st.FinalizeThinkTankAttemptAt(j2.AgentID, j2.Generation, j2.TurnID, 43); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("duplicate completion = %v", err)
+	}
+	results, err := st.ListThinkTankResults("j2", 0, 10)
+	if err != nil || len(results) != 1 || results[0].Body != "Synthesis; B's objection unresolved" ||
+		results[0].EventSeq != 42 || results[0].RoomTitle != "g" || results[0].EntrySeq != f.Published[0].Seq {
+		t.Fatalf("results = %+v %v", results, err)
+	}
+	if failed, _ := st.ListThinkTankResults("j1", 0, 10); len(failed) != 0 {
+		t.Fatalf("failed judge got a result: %+v", failed)
 	}
 	for _, m := range f.Detail.Members {
 		if m.Role == ThinkTankRoleParticipant && m.Completed != 1 {
@@ -647,6 +669,15 @@ func TestThinkTankJudgeLifecycle(t *testing.T) {
 	}
 	if _, err := st.ReadThinkTank(room); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("deleted room read err = %v", err)
+	}
+	if kept, _ := st.ListThinkTankResults("j2", 0, 10); len(kept) != 1 {
+		t.Fatalf("room deletion removed the judge result: %+v", kept)
+	}
+	if err := st.DeleteAgent("j2"); err != nil {
+		t.Fatal(err)
+	}
+	if gone, _ := st.ListThinkTankResults("j2", 0, 10); len(gone) != 0 {
+		t.Fatalf("agent deletion kept the result: %+v", gone)
 	}
 }
 

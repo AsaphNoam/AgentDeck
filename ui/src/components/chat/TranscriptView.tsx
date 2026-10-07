@@ -22,6 +22,8 @@ import { TurnList, useFocusReturn, useTurnChoices } from "./TurnList";
 import { AnnotationTray } from "./AnnotationTray";
 import { AnnotationContextMenu, type AnnotationMenuState } from "./AnnotationContextMenu";
 import { FileViewer } from "./FileViewer";
+import { mergeThinkTankResults, THINK_TANK_RESULT_KIND, ThinkTankResultRow } from "./thinkTankResults";
+import { useThinkTankResults } from "../../api/thinkTanks";
 import type { FileLink } from "./renderers/filePath";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useAgentStore } from "../../store/agentStore";
@@ -86,7 +88,8 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
     onOpenFile,
   });
 
-  const nested = nestActivities(withReasoning(markBackgrounded(events), reasoning));
+  const results = useThinkTankResults(agentId);
+  const nested = nestActivities(withReasoning(markBackgrounded(mergeThinkTankResults(events, results.data)), reasoning));
   const choices = useTurnChoices(agentId);
   const trackFocus = useFocusReturn(scrollRef);
   // A Files-tab Diff reveal opens the completed turn hiding that row before the
@@ -287,6 +290,7 @@ function TranscriptItem({ agentId, event, onAnnotate, onOpenFile }: { agentId: s
   if (kind === "notice") return <NoticeRow event={event} />;
   if (kind === "reasoning") return <ThinkingDisclosure text={String(event.text ?? "")} activityId={event.activity_id} />;
   if (kind === "turn_end") return <hr className="turn-end" />;
+  if (kind === THINK_TANK_RESULT_KIND) return <ThinkTankResultRow event={event} />;
   if (kind === "backend_switch") {
     const from = String(event.from ?? "");
     const to = String(event.to ?? "");

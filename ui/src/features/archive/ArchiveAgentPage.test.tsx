@@ -2,6 +2,7 @@ import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { useTranscriptStore } from "../../store/transcriptStore";
@@ -21,6 +22,19 @@ const server = setupServer(
     });
   }),
 );
+
+function renderArchive(id: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[`/archive/${id}`]}>
+        <Routes>
+          <Route path="/archive/:id" element={<ArchiveAgentPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 beforeEach(() => useTranscriptStore.setState({ byAgent: {}, pending: {} }));
@@ -43,13 +57,7 @@ describe("ArchiveAgentPage switched session identity", () => {
       ],
     })));
 
-    render(
-      <MemoryRouter initialEntries={["/archive/a_switched"]}>
-        <Routes>
-          <Route path="/archive/:id" element={<ArchiveAgentPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderArchive("a_switched");
 
     expect(await screen.findByText("chuck · claude · sonnet · Normal speed")).toBeInTheDocument();
     expect(screen.queryByText("chuck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
@@ -60,13 +68,7 @@ describe("ArchiveAgentPage switched session identity", () => {
 
 describe("ArchiveAgentPage", () => {
   it("renders a stored assistant stream as one message", async () => {
-    render(
-      <MemoryRouter initialEntries={["/archive/a_archive"]}>
-        <Routes>
-          <Route path="/archive/:id" element={<ArchiveAgentPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderArchive("a_archive");
 
     expect(await screen.findByText("Sure, I'll do that.")).toBeInTheDocument();
     expect(document.querySelectorAll("article.assistant-message")).toHaveLength(1);
@@ -74,5 +76,35 @@ describe("ArchiveAgentPage", () => {
     expect(screen.getByText("chuck · codex · gpt-5.6-sol · Normal speed")).toBeInTheDocument();
     expect(screen.getByText(/Archived · read-only/)).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
+  });
+});
+
+// FS-21.A37, TS-14.R26: an archived judge shows its retained synthesis once,
+// with its exact body and a room link, before the completing turn's end —
+// not the incidental provider reply.
+describe("ArchiveAgentPage judge result", () => {
+  it("renders the retained synthesis at its completion anchor", async () => {
+    server.use(
+      http.get("/api/sessions/a_judge/transcript", () => HttpResponse.json({
+        agent_id: "a_judge",
+        events: [
+          { seq: 1, type: "session_meta", ts: "t1", data: { name: "Judge", project: "chuck", backend: "codex", model: "m", interface: "chat", created_at: "2026-07-24T12:30:00Z" } },
+          { seq: 2, type: "assistant_text", ts: "t2", data: { delta: "Submitted." } },
+          { seq: 3, type: "turn_end", ts: "t3", data: { stop_reason: "end_turn" } },
+        ],
+      })),
+      http.get("/api/sessions/a_judge/think-tank-results", () => HttpResponse.json({
+        version: 1, complete: true,
+        results: [{ result_id: 1, room_id: "tt_1", room_title: "Cache choice", room_available: true, entry_seq: 9,
+          attempt_id: "att", body: "Exact synthesis: keep LRU", generation: "g", turn_id: "t", event_seq: 3, completed_at: "2026-10-07T00:00:00Z" }],
+      })),
+    );
+    renderArchive("a_judge");
+    expect(await screen.findByText("Exact synthesis: keep LRU")).toBeInTheDocument();
+    expect(screen.getAllByText("Exact synthesis: keep LRU")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Cache choice" }).getAttribute("href")).toBe("/think-tank/tt_1");
+    const result = document.querySelector("[data-slot='result']")!;
+    const end = document.querySelector("hr.turn-end")!;
+    expect(result.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

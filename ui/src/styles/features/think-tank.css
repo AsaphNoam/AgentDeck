@@ -366,6 +366,28 @@
   gap: var(--ad-space-2);
 }
 
+/* A judge's retained synthesis in its own chat reads as an attributed result,
+   not as collapsible activity (FS-21.R50). */
+.think-tank-result {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  display: grid;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-3) var(--ad-space-4);
+}
+
+.think-tank-result > header {
+  color: var(--ad-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-3);
+}
+
+.think-tank-result > header strong {
+  color: var(--ad-text-primary);
+}
+
 @media (width < 900px) {
   .think-tank-body {
     grid-template-columns: minmax(0, 1fr);

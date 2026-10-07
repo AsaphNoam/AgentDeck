@@ -332,3 +332,58 @@ func (s *Server) handleDeleteThinkTank(w http.ResponseWriter, r *http.Request) {
 	s.eventBus.Publish("think_tank_update", nil, thinkTankUpdate{Version: thinkTankWireVersion, RoomID: roomID, Deleted: true})
 	w.WriteHeader(http.StatusNoContent)
 }
+
+const (
+	thinkTankResultPage  = 500
+	thinkTankResultBytes = 1 << 20
+)
+
+type thinkTankResultWire struct {
+	ResultID      int64  `json:"result_id"`
+	RoomID        string `json:"room_id"`
+	RoomTitle     string `json:"room_title"`
+	RoomAvailable bool   `json:"room_available"`
+	EntrySeq      int64  `json:"entry_seq"`
+	AttemptID     string `json:"attempt_id"`
+	Body          string `json:"body"`
+	Generation    string `json:"generation"`
+	TurnID        string `json:"turn_id"`
+	EventSeq      int64  `json:"event_seq"`
+	CompletedAt   string `json:"completed_at"`
+}
+
+// handleThinkTankResults pages a judge's retained synthesis results for its
+// ordinary chat and archive, bounded by count and encoded size. A deleted
+// room is marked unavailable; the result stays (FS-21.R50, TS-14.R26).
+func (s *Server) handleThinkTankResults(w http.ResponseWriter, r *http.Request) {
+	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+	rows, err := s.stateStore.ListThinkTankResults(r.PathValue("id"), after, thinkTankResultPage+1)
+	if err != nil {
+		s.writeThinkTankError(w, err)
+		return
+	}
+	out := []thinkTankResultWire{}
+	rooms := map[string]bool{}
+	size, complete := 0, true
+	for i, res := range rows {
+		if i == thinkTankResultPage || (len(out) > 0 && size+len(res.Body)+512 > thinkTankResultBytes) {
+			complete = false
+			break
+		}
+		available, seen := rooms[res.RoomID]
+		if !seen {
+			_, err := s.stateStore.ReadThinkTank(res.RoomID)
+			available = err == nil
+			rooms[res.RoomID] = available
+		}
+		size += len(res.Body) + 512
+		out = append(out, thinkTankResultWire{ResultID: res.ResultID, RoomID: res.RoomID, RoomTitle: res.RoomTitle,
+			RoomAvailable: available, EntrySeq: res.EntrySeq, AttemptID: res.AttemptID, Body: res.Body,
+			Generation: res.Generation, TurnID: res.TurnID, EventSeq: res.EventSeq, CompletedAt: res.CompletedAt})
+	}
+	resp := map[string]any{"version": thinkTankWireVersion, "results": out, "complete": complete}
+	if !complete && len(out) > 0 {
+		resp["next_after"] = out[len(out)-1].ResultID
+	}
+	writeJSON(w, http.StatusOK, resp)
+}

@@ -254,7 +254,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   explicitly says when the caller is addressed. Reading requires the same full-view receipt; no
   private prompt, extra activation, membership grant, speaker reorder or new MCP action is added.
   All participants can read the same shared body/targets, subject to existing opening isolation.
-- **R26 (planned)** — In the successful judge-finalization transaction, insert an immutable
+- **R26** — In the successful judge-finalization transaction, insert an immutable
   agent-owned synthesis read projection with exact body, room/title/entry/attempt attribution,
   judge id, completion time and source generation/runtime turn id/completion-event seq. Key it
   uniquely by room/entry; pass the actual completion event seq from `finishThinkTankTurn`. Its

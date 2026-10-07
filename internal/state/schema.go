@@ -649,4 +649,10 @@ CREATE TABLE think_tank_limit_commands (
 );
 `,
 	},
+	{
+		// Judge synthesis results owned by the judge's agent history, not the
+		// room, so room deletion retains them (TS-14.R26).
+		version: 41,
+		apply:   migrateThinkTankResults,
+	},
 }

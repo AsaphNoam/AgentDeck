@@ -286,7 +286,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   end-requested, ended and judging rooms reject increases without reopening. Concurrent updates
   cannot silently lose an increase, and validation/conflict errors preserve the operator's draft.
   Decreases and unlimited budgets are excluded; existing finite bounds still apply.
-- **R50 (planned)** — A successfully finalized judge synthesis is readable once as an attributed
+- **R50** — A successfully finalized judge synthesis is readable once as an attributed
   result in its own ordinary chat as well as canonical room history, with a link back to the room.
   The body is the exact submitted synthesis, not inferred provider prose or only collapsed tool
   arguments. Live/reloaded and archived chat show the same result; failed/staged judge output is

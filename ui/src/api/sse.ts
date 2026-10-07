@@ -105,6 +105,8 @@ class SseClient {
   private onThinkTankUpdate(event: MessageEvent<string>) {
     const parsed = thinkTankUpdateSchema.safeParse(parseBusData(event.data));
     queryClient.invalidateQueries({ queryKey: [...THINK_TANK_KEYS.all, "list"] });
+    // A committed synthesis or a deleted room changes judge chats' results.
+    queryClient.invalidateQueries({ queryKey: [...THINK_TANK_KEYS.all, "results"] });
     if (!parsed.success) {
       queryClient.invalidateQueries({ queryKey: THINK_TANK_KEYS.all });
       return;

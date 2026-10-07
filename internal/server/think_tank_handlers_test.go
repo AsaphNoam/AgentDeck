@@ -244,3 +244,31 @@ func TestThinkTankTurnLimitOverREST(t *testing.T) {
 		t.Fatalf("decrease = %d %s", got.Code, got.Body.String())
 	}
 }
+
+// FS-21.A37, TS-14.R26: the judge's retained results read through its
+// session route; a deleted room is marked unavailable, not dropped.
+func TestThinkTankResultsRoute(t *testing.T) {
+	srv, h := roomRESTServer(t)
+	rec := doJSON(t, h, http.MethodPost, "/api/think-tanks", roomBody("a_one", "a_two"))
+	var room thinkTankDetailWire
+	_ = json.Unmarshal(rec.Body.Bytes(), &room)
+	for i, id := range []string{room.RoomID, "tt_deleted"} {
+		if _, err := srv.stateStore.DB().Exec(`INSERT INTO think_tank_results(agent_id, room_id, room_title, entry_seq, attempt_id, body, generation, turn_id, event_seq, completed_at)
+VALUES('a_one', ?, 'Title', ?, 'att', 'Exact synthesis', 'g', 't', 7, '2026-10-07T00:00:00Z')`, id, i+1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := doJSON(t, h, http.MethodGet, "/api/sessions/a_one/think-tank-results", "")
+	var body struct {
+		Results  []thinkTankResultWire `json:"results"`
+		Complete bool                  `json:"complete"`
+	}
+	_ = json.Unmarshal(got.Body.Bytes(), &body)
+	if got.Code != http.StatusOK || !body.Complete || len(body.Results) != 2 || !body.Results[0].RoomAvailable ||
+		body.Results[1].RoomAvailable || body.Results[0].Body != "Exact synthesis" || body.Results[0].EventSeq != 7 {
+		t.Fatalf("results = %d %s", got.Code, got.Body.String())
+	}
+	if other := doJSON(t, h, http.MethodGet, "/api/sessions/a_two/think-tank-results", ""); !strings.Contains(other.Body.String(), `"results":[]`) {
+		t.Fatalf("other agent results = %s", other.Body.String())
+	}
+}

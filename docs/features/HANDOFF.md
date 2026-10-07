@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–3 of 6 done).
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–4 of 6 done).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -52,8 +52,13 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    `think_tank_mentions.go` snapshot `{"addressees":[...]}` into input/entry context (REST entries
    already expose `context`); MCP read adds `addressed_to`/`addresses_you` and an `addressed` note.
    Picker/composer UI is slice 6 (FS-21.R46 stays planned). Departed-target refusal lacks a test.
-4. Judge synthesis result projection + `GET /api/sessions/{id}/think-tank-results` + chat merge
-   (FS-21.R50, TS-14.R26, A37).
+4. **Done** — judge synthesis result (FS-21.R50, TS-14.R26 shipped): migration 41
+   `think_tank_results` (FK to agents, not rooms) written in judge finalization via
+   `FinalizeThinkTankAttemptAt(..., ev.Seq)`; `GET /api/sessions/{id}/think-tank-results`;
+   `mergeThinkTankResults` in `TranscriptView` places the row before the anchoring `turn_end`.
+   Review note: every room update invalidates mounted results queries (one fetch per open chat).
+   The remote route inventory must classify every new route (`remote_routes.go` denied list) —
+   run the whole `internal/server` package, not only `-run ThinkTank`.
 5. Concurrent independent openings (FS-21.R48, TS-14.R23, A35) — largest; race tests both Go variants.
 6. UI: wire extensions (TS-14.R27 summaries/`active_attempts`/`agent_id` filter), room cards
    (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
@@ -178,6 +183,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: Think Tank workspace slice 4 (judge results in chat).** A finalized
+  synthesis is retained once in the judge's own history (survives room deletion) and shows in its
+  live and archived chat with a room link. Also classifies slice 2's turn-limit route as phone-denied
+  (the slice 2 commit had left `TestRemoteRouteInventoryIsClassified` failing).
 
 - **2026-10-07 — Work: Think Tank workspace slice 3 (shared mentions, server).** Shared room
   messages accept validated participant mention ranges; addressees are snapshotted, visible to all

@@ -200,7 +200,14 @@ type ThinkTankFinish struct {
 // nothing fails instead: assistant output is never substituted. ErrNotFound
 // means no attempt matches, so the completion belongs to no room.
 func (s *Store) FinalizeThinkTankAttempt(agentID, generation, turnID string) (ThinkTankFinish, error) {
-	return s.finishThinkTankAttempt(agentID, generation, turnID, "")
+	return s.finishThinkTankAttempt(agentID, generation, turnID, "", 0)
+}
+
+// FinalizeThinkTankAttemptAt finalizes like FinalizeThinkTankAttempt and
+// anchors a judge's retained synthesis result at the completing event's seq
+// in the judge's own history (TS-14.R26).
+func (s *Store) FinalizeThinkTankAttemptAt(agentID, generation, turnID string, eventSeq int64) (ThinkTankFinish, error) {
+	return s.finishThinkTankAttempt(agentID, generation, turnID, "", eventSeq)
 }
 
 // FailThinkTankAttempt holds the room for explicit intervention after a
@@ -209,7 +216,7 @@ func (s *Store) FailThinkTankAttempt(agentID, generation, turnID, reason string)
 	if reason == "" {
 		reason = "The room turn did not complete."
 	}
-	return s.finishThinkTankAttempt(agentID, generation, turnID, reason)
+	return s.finishThinkTankAttempt(agentID, generation, turnID, reason, 0)
 }
 
 func (s *Store) RunningThinkTankAttempts(agentID, generation string) ([]ThinkTankAttempt, error) {
@@ -229,7 +236,7 @@ func (s *Store) RunningThinkTankAttempts(agentID, generation string) ([]ThinkTan
 	return attempts, rows.Err()
 }
 
-func (s *Store) finishThinkTankAttempt(agentID, generation, turnID, failure string) (ThinkTankFinish, error) {
+func (s *Store) finishThinkTankAttempt(agentID, generation, turnID, failure string, eventSeq int64) (ThinkTankFinish, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return ThinkTankFinish{}, fmt.Errorf("state: begin finish think tank attempt: %w", err)
@@ -257,6 +264,13 @@ WHERE agent_id = ? AND generation = ? AND turn_id = ? AND state = ?`,
 	out := ThinkTankFinish{Published: published}
 	if out.Detail, err = readThinkTankDetail(tx, a.RoomID); err != nil {
 		return ThinkTankFinish{}, err
+	}
+	for _, e := range published {
+		if e.Kind == ThinkTankEntrySynthesis {
+			if err := insertThinkTankResultTx(tx, out.Detail.Room, a, e, eventSeq); err != nil {
+				return ThinkTankFinish{}, err
+			}
+		}
 	}
 	if out.Attempt, err = scanThinkTankAttempt(tx.QueryRow(`SELECT `+thinkTankAttemptColumns+` FROM think_tank_attempts WHERE attempt_id = ?`, a.AttemptID)); err != nil {
 		return ThinkTankFinish{}, err

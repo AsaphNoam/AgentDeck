@@ -23,7 +23,41 @@ export const THINK_TANK_KEYS = {
   activity: (id: string) => ["think-tanks", "room", id, "activity"] as const,
   files: (id: string) => ["think-tanks", "room", id, "files"] as const,
   commands: (id: string) => ["think-tanks", "room", id, "commands"] as const,
+  results: (agentID: string) => ["think-tanks", "results", agentID] as const,
 };
+
+export const thinkTankResultSchema = z.object({
+  result_id: z.number(),
+  room_id: z.string(),
+  room_title: z.string(),
+  room_available: z.boolean(),
+  entry_seq: z.number(),
+  attempt_id: z.string(),
+  body: z.string(),
+  event_seq: z.number(),
+  completed_at: z.string(),
+});
+export type ThinkTankResult = z.output<typeof thinkTankResultSchema>;
+
+/** useThinkTankResults reads a judge's retained synthesis results for its
+ *  ordinary chat and archive (FS-21.R50, TS-14.R26). Room updates refetch it. */
+export function useThinkTankResults(agentID: string) {
+  return useQuery({
+    queryKey: THINK_TANK_KEYS.results(agentID),
+    enabled: Boolean(agentID),
+    queryFn: async ({ signal }) => {
+      const page = z.object({ results: z.array(thinkTankResultSchema), complete: z.boolean(), next_after: z.number().optional() });
+      const all: ThinkTankResult[] = [];
+      let after = 0;
+      for (;;) {
+        const data = await request(`/api/sessions/${encodeURIComponent(agentID)}/think-tank-results?after=${after}`, page, { signal });
+        all.push(...data.results);
+        if (data.complete || data.next_after === undefined) return all;
+        after = data.next_after;
+      }
+    },
+  });
+}
 
 /** Browser-held room history is bounded; longer rooms show their newest part
  *  and say so (TS-14.R16, INV §16). */

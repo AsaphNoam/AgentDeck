@@ -415,7 +415,7 @@ func (s *Server) finishThinkTankTurn(ev runtime.Event) {
 		finish, err = s.stateStore.FailThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID,
 			"Room activity for this turn could not be saved.")
 	} else if td.StopReason == "end_turn" {
-		finish, err = s.stateStore.FinalizeThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID)
+		finish, err = s.stateStore.FinalizeThinkTankAttemptAt(ev.AgentID, ev.Generation, ev.TurnID, ev.Seq)
 	} else {
 		finish, err = s.stateStore.FailThinkTankAttempt(ev.AgentID, ev.Generation, ev.TurnID, thinkTankStopText(td.StopReason))
 	}

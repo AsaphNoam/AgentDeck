@@ -157,6 +157,7 @@ func (s *Server) routeTable() []routeEntry {
 	api("GET /api/sessions/{id}/file", s.handleFileRead)
 	api("GET /api/sessions/{id}/available-commands", s.handleAvailableCommands)
 	api("GET /api/sessions/{id}/messages", s.handleMessages)
+	api("GET /api/sessions/{id}/think-tank-results", s.handleThinkTankResults)
 
 	// Phase 6 terminal runtime: capability probe (§8.5) and the PTY↔WebSocket
 	// bridge (§3.4). The WS route is registered raw (no API middleware): the
