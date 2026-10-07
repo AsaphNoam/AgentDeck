@@ -24,8 +24,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
   (`32da712`, `eadab5a`) are reviewed and closed without findings.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
-  design commits) was reviewed and stays open for BU-01 below. TS-04.R81's linked-task derivation
-  was confirmed against both pinned adapters; no separate backgrounded-marker decoder is needed.
+  design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
   Quiet completed chat turns (`2cf6cfa^..36f055a`) was reviewed and stays open for QT-01–QT-03
   below. Review notes: TS-08.R102 now keys a turn by its opening boundary seq (no key
@@ -147,20 +146,6 @@ None.
   scenarios with receipts; keep unverified acceptance gates live until then. The phone transcript
   render fallback is documented and is not itself a defect. Fix complexity: medium.
 
-### 2026-10 provider bundle refresh — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-**Unit:** `7c95fa9^..2f39c3f`, excluding interleaved design commits.
-
-- **Must fix** — **BU-01 (INV §1/§2): Backgrounded tool labels ignore resume and clone fences.**
-  `ui/src/components/chat/runtimeActivity.ts:114–125` derives `background_state` directly from
-  task events, while `collectTasks` fences old running tasks at `session_meta.resumed_at` and
-  `fork_boundary`. Resume or clone an agent with a running background command and its tool still
-  says "Continues in background", although the task list correctly says it ended with the previous
-  session or stayed with the source agent. This violates TS-08.R86's shared task-state projection
-  and FS-03.R67 / FS-01.R36. A direct execution of both helpers with either boundary reproduced
-  tool=`running`, task=`stopped`. Share the fenced task-state semantics and add resume/clone
-  assertions for the tool label alongside the existing task-list tests.
-
 ## Decisions needing your input
 
 - **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
@@ -179,6 +164,13 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: 2026-10 provider bundle refresh BU-01 (INV §1/§2).** `markBackgrounded`
+  now reads `collectTasks`, so a tool's background label follows the resume and clone fences:
+  after either boundary it reads "Ran in background", matching the task list (FS-01.R36,
+  TS-08.R86). Resume/clone tool-label tests added; restores specified behavior, no specification
+  change. Unit closed. `make test`, `make build`, UI tests (661) and UI build passed.
+  Still open: Quiet completed chat turns QT-01–QT-03; UI polish review.
 
 - **2026-10-07 — Review: post-release test synchronization.** Reviewed `32da712` and
   `eadab5a`: held-context prompt delivery is observed before the no-new-turn baseline, and

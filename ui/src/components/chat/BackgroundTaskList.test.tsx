@@ -123,4 +123,16 @@ describe("steer-backgrounded tool calls (FS-03.A48)", () => {
     openRuns();
     expect(document.querySelector("[data-ui='tool-call']")).toHaveTextContent("Ran in background");
   });
+
+  // FS-01.R36: the tool label follows the same fenced task state as the list.
+  it.each([
+    ["resume", wire(6, "session_meta", { resumed_at: "later" })],
+    ["clone", wire(6, "fork_boundary", { forked_from_agent_id: "a_src", forked_from_seq: 5 })],
+  ])("stops claiming the background after a %s boundary", (_, boundary) => {
+    renderTranscript([...steered, boundary]);
+    openRuns();
+    const call = document.querySelector("[data-ui='tool-call']");
+    expect(call).toHaveTextContent("Ran in background");
+    expect(call).not.toHaveTextContent("Continues in background");
+  });
 });

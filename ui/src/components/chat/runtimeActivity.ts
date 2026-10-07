@@ -81,6 +81,7 @@ export type TaskState = "running" | "completed" | "failed" | "stopped";
 export interface BackgroundTask {
   taskId: string;
   activityId?: string;
+  toolCallId?: string;
   /** The native child that owns it, when one does. */
   owner?: string;
   toolTitle?: string;
@@ -118,6 +119,7 @@ export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
     tasks.set(id, {
       taskId: id,
       activityId: event.activity_id,
+      toolCallId: event.tool_call_id ? String(event.tool_call_id) : prior?.toolCallId,
       owner: event.activity_id ? owners.get(event.activity_id) : undefined,
       toolTitle: titles.get(String(event.tool_call_id ?? "")) || prior?.toolTitle,
       name: String(event.name || prior?.name || ""),
@@ -131,14 +133,11 @@ export function collectTasks(events: TranscriptEvent[]): BackgroundTask[] {
 // markBackgrounded gives each tool call the latest state of the background
 // task its runtime linked to it, so a command that moved to the background
 // (including on Steer) reads as continuing there rather than finished. Desktop
-// and phone both render through it (FS-03.R67, TS-08.R86, INV §2).
+// and phone both render through it (FS-03.R67, TS-08.R86, INV §2). It reads
+// collectTasks, so resume and clone fences apply to the label too (FS-01.R36).
 export function markBackgrounded(events: TranscriptEvent[]): TranscriptEvent[] {
   const states = new Map<string, string>();
-  for (const event of events) {
-    if (kindOf(event) === "background_task_state" && event.tool_call_id && TASK_STATES.has(String(event.state))) {
-      states.set(String(event.tool_call_id), String(event.state));
-    }
-  }
+  for (const task of collectTasks(events)) if (task.toolCallId) states.set(task.toolCallId, task.state);
   if (states.size === 0) return events;
   return events.map((event) => {
     const state = kindOf(event) === "tool_call" ? states.get(String(event.tool_call_id ?? "")) : undefined;
