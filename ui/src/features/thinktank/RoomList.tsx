@@ -70,12 +70,14 @@ function RoomCard({ room, showOrigin }: { room: ThinkTankSummary; showOrigin: bo
           </li>
         ))}
       </ul>
-      {!ended && (
-        <p className="think-tank-card-totals">
-          {`${room.total_remaining} turns left in total — a ceiling, not a plan`}
-          {room.judge_enabled && <> · Judge: {judgeText(room.judge_status) || "waiting"}</>}
-        </p>
-      )}
+      {/* Ended cards keep the collective total as an unused ceiling; their
+          judge state is already in the card status (FS-21.R44). */}
+      <p className="think-tank-card-totals">
+        {ended
+          ? `${room.total_remaining} turns went unused`
+          : `${room.total_remaining} turns left in total — a ceiling, not a plan`}
+        {!ended && room.judge_enabled && <> · Judge: {judgeText(room.judge_status) || "waiting"}</>}
+      </p>
     </li>
   );
 }

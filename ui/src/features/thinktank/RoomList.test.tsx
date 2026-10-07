@@ -50,4 +50,13 @@ describe("RoomList cards", () => {
     expect(screen.getByText("Gone (deleted)")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Gone" })).toBeNull();
   });
+
+  it("keeps the unused collective allowance on an ended card", async () => {
+    rooms = [{ ...summary(), phase: "ended" }];
+    renderList();
+    const card = (await screen.findByRole("link", { name: "Cache choice" })).closest("li")!;
+    expect(within(card as HTMLElement).getByText("2 turns went unused")).toBeTruthy();
+    expect(within(card as HTMLElement).getByText("2 of 3 left")).toBeTruthy();
+    expect(within(card as HTMLElement).queryByText(/left in total/)).toBeNull();
+  });
 });

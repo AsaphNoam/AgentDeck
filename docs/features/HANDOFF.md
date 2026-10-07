@@ -117,12 +117,6 @@ None.
   query's error never reaches the operator. Surface a results-unavailable message with retry
   while preserving provider history and drafts; test a failed query followed by recovery.
   Fix complexity: trivial/easy.
-- **Must fix** — **TW-06 (INV §10): Ended cards omit the collective allowance summary.**
-  `ui/src/features/thinktank/RoomList.tsx:73–78` hides the total whenever phase is ended, although
-  FS-21.R44 requires the collective allowance alongside the retained per-member counts.
-  Project/Archive cards keep individual amounts and judge/completion state but lose the total.
-  Retain a truthful unused-ceiling summary on ended cards and test that state; judge status is
-  already correctly shown in `cardStatus` and needs no fix. Fix complexity: trivial/easy.
 
 Review verification: focused Think Tank state/server/MCP tests passed with `-race` in both Go
 variants; style/presentation checks (41 tests) and 60 affected UI tests passed. Three temporary
