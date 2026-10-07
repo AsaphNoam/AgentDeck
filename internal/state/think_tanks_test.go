@@ -280,6 +280,31 @@ func TestThinkTankTitleFallbackAndReplay(t *testing.T) {
 	}
 }
 
+// TS-14.R22: a room predating saved create intent replays title-less and with
+// its explicit title, but a changed explicit title conflicts.
+func TestThinkTankLegacyCreateReplayComparesTitle(t *testing.T) {
+	st, _ := newTestStore(t)
+	c := ThinkTankCreate{CommandID: "legacy", Title: "Cache plan", Goal: "g", OriginProject: "p",
+		Members: []ThinkTankMember{ttMember("a", 1), ttMember("b", 1)}}
+	d, err := st.CreateThinkTank(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.db.Exec(`UPDATE think_tanks SET create_intent = '' WHERE room_id = ?`, d.Room.RoomID); err != nil {
+		t.Fatal(err)
+	}
+	for _, title := range []string{"Cache plan", " Cache  plan ", ""} {
+		c.Title = title
+		if again, err := st.CreateThinkTank(c); err != nil || again.Room.RoomID != d.Room.RoomID {
+			t.Fatalf("legacy replay with title %q = %v", title, err)
+		}
+	}
+	c.Title = "Other"
+	if _, err := st.CreateThinkTank(c); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("legacy retitled replay err = %v", err)
+	}
+}
+
 // FS-21.A1, A2, A8, A12: attributed single-floor turns, delta reads that skip
 // one's own entries, ceilings, closing opportunity and stop reason.
 func TestThinkTankDiscussionRotationReadsAndClosing(t *testing.T) {

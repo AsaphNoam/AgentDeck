@@ -121,13 +121,6 @@ None.
   Distinguish loading/window bounds from a settled unavailable source and show the exact result
   with truthful framing; test empty/missing source and preserve waiting for an unloaded window.
   Fix complexity: medium.
-- **Must fix** — **TW-03 (INV §2/§11): Legacy create replay does not compare the title.**
-  `internal/state/think_tanks.go:410–421,503–504` uses `sameThinkTankCreate` for rooms predating
-  migration 37's saved create intent. That fallback omits title, so a changed explicit title under
-  the same command id is accepted, contrary to TS-14.R22's normalized title/replay contract.
-  A temporary state probe with the legacy empty intent confirmed acceptance. Compare an explicit
-  normalized title while preserving title-less legacy replay; add a migrated-row replay test.
-  Fix complexity: trivial/easy.
 - **Worth fixing** — **TW-04 (INV §7/§8): Synthesis read failures have no visible feedback.**
   `ui/src/components/chat/TranscriptView.tsx:91–92` uses only `results.data`. If the new results
   endpoint fails on first load, live/Archive chat renders as though no synthesis exists; the

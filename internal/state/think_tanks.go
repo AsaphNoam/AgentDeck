@@ -408,7 +408,7 @@ func validateThinkTankCreate(c ThinkTankCreate) error {
 }
 
 func sameThinkTankCreate(room ThinkTank, members []ThinkTankMember, c ThinkTankCreate) bool {
-	if room.Goal != c.Goal || room.OriginProject != c.OriginProject || room.Openings != c.Openings ||
+	if (c.Title != "" && room.Title != c.Title) || room.Goal != c.Goal || room.OriginProject != c.OriginProject || room.Openings != c.Openings ||
 		room.JudgeConfig != c.JudgeConfig || len(members) != len(c.Members) {
 		return false
 	}
