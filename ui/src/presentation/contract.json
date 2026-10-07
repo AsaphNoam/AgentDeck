@@ -678,6 +678,7 @@
         "goal",
         "turn-limit",
         "result",
+        "results-error",
         "card",
         "roster",
         "membership",

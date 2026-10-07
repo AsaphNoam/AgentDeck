@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished; review found TW-01–TW-06 below.
+- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished and its review findings are fixed.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -21,11 +21,13 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and `chuck update --repo AsaphNoam/AgentDeck`. Renaming later fixes them without a new release.
 - **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
+  `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun` flakes intermittently with a
+  409 "a resume is already in progress" (pre-existing at `74c8e84`); needs a synchronization fix.
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
   (`32da712`, `eadab5a`) are reviewed and closed without findings.
   Think Tank workspace and live controls (`28d6c92^..9420115`), including the earlier slices,
-  recovered composer/mention/tint work and verification closure, was reviewed and stays open
-  for TW-01–TW-06 below.
+  recovered composer/mention/tint work and verification closure, is closed: its TW-01–TW-06
+  fixes landed.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
@@ -43,15 +45,15 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 None. The completed
 [`think-tank-workspace-and-live-controls.md`](../ready-changes/think-tank-workspace-and-live-controls.md)
-was independently reviewed and has open findings TW-01–TW-06 below. All implementation slices and
-automated/fake-provider closure are finished;
-credentialed checks remain below. Evidence and reproduction commands:
+was independently reviewed and its findings TW-01–TW-06 are fixed; the unit is closed.
+Credentialed checks remain below. Evidence and reproduction commands:
 [`implementation-think-tank-workspace-2026-10-07.md`](../archive/reviews/implementation-think-tank-workspace-2026-10-07.md).
 
-Review outcomes: attempt-state opening retry does not satisfy the specified command identity
-contract (TW-01). Invalidating mounted judge-results queries on every room update matches
-TS-14.R26 and is accepted. No new runtime/driver or phone room interface was added. Pending
-pipeline-owned room work remains a separate waiting unit.
+Review notes: invalidating mounted judge-results queries on every room update matches TS-14.R26
+and is accepted. Opening-retry command ids are bound on the retried attempt row (migration 44).
+The transcript store's `settled` flag marks a finished or failed full read, so a settled empty
+source shows retained results as source-unavailable. Pending pipeline-owned room work remains a
+separate waiting unit.
 
 ## Acceptance gates still owed
 
@@ -106,24 +108,6 @@ pipeline-owned room work remains a separate waiting unit.
 None.
 
 ## Review findings
-
-### Think Tank workspace and live controls — **Fix model:** medium — Codex Terra or Claude Opus.
-
-**Unit:** `28d6c92^..9420115`.
-
-- **Worth fixing** — **TW-04 (INV §7/§8): Synthesis read failures have no visible feedback.**
-  `ui/src/components/chat/TranscriptView.tsx:91–92` uses only `results.data`. If the new results
-  endpoint fails on first load, live/Archive chat renders as though no synthesis exists; the
-  query's error never reaches the operator. Surface a results-unavailable message with retry
-  while preserving provider history and drafts; test a failed query followed by recovery.
-  Fix complexity: trivial/easy.
-
-Review verification: focused Think Tank state/server/MCP tests passed with `-race` in both Go
-variants; style/presentation checks (41 tests) and 60 affected UI tests passed. Three temporary
-probes reproduced TW-01–TW-03 and were removed. Product code/specs were not changed. The rendered
-harness assertions and credentialed-gate separation were reviewed; live-provider gates remain owed.
-Invariant sweep: §1–§3, §5, §7–§11 and §13–§17 apply and were checked; §4 (new registration artifacts),
-§6 (new runtime/interface) and §12 (external CLI invocation changes) have no applicable diff surface.
 
 ### Quiet completed chat turns — **Fix model:** medium — Codex Terra or Claude Opus.
 
@@ -181,6 +165,15 @@ Invariant sweep: §1–§3, §5, §7–§11 and §13–§17 apply and were check
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: Think Tank workspace and live controls review (TW-01–TW-06).** Opening
+  retry now binds its command id (INV §11/§15); legacy create replay compares an explicit title
+  (INV §2/§11); a retained synthesis shows when the transcript is empty or unreadable (INV §1/§10);
+  a failed synthesis read shows Retry (INV §7/§8); clipped membership lists say so (INV §10/§11/§16);
+  ended cards keep the unused total (INV §10). Unit closed; QT-01–QT-03 remain open. The FTS5 Go
+  variant, 684 UI tests and both builds passed; the plain variant passed except
+  `TestOrdinaryStageAgentStopPausesPipelineRun`, which flakes ("a resume is already in progress",
+  roughly 1 in 40 runs) and reproduces at `74c8e84`, before these fixes.
 
 - **2026-10-07 — Review: Think Tank workspace and live controls.** Found command-retry and legacy
   title replay gaps, a missing-transcript synthesis defect, and smaller read-feedback, clipping and

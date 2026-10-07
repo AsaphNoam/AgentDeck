@@ -3,6 +3,7 @@ import type { AnnotationDraft, TranscriptEvent } from "../../api/types";
 import { clipAnnotationExcerpt } from "../../lib/annotations";
 import { copyText } from "../../lib/copyText";
 import { ErrorBoundary } from "../ErrorBoundary";
+import { Button } from "../ui";
 import { AssistantText } from "./renderers/AssistantText";
 import { DiffBlock } from "./renderers/DiffBlock";
 import { PermissionPrompt } from "./renderers/PermissionPrompt";
@@ -129,6 +130,12 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
       )}
       <div className="transcript-view" data-slot="list" ref={scrollRef} onScroll={onScroll} onFocus={trackFocus}>
         <TurnList agentId={agentId} events={nested} choices={choices} renderEvents={(list) => renderEvents(list, [], 1)} />
+        {results.isError && (
+          <p className="form-error" role="status" data-ui="think-tank" data-slot="results-error">
+            Think Tank synthesis could not be loaded.{" "}
+            <Button type="button" onClick={() => void results.refetch()}>Retry</Button>
+          </p>
+        )}
         <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
         {busy && (
           <div className="transcript-pending" aria-live="polite">
