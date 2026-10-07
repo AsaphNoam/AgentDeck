@@ -205,18 +205,26 @@ func (s *Server) handleThinkTankEntries(w http.ResponseWriter, r *http.Request) 
 }
 
 type thinkTankMessageRequest struct {
-	CommandID string `json:"command_id"`
-	Body      string `json:"body"`
+	CommandID string                   `json:"command_id"`
+	Body      string                   `json:"body"`
+	Mentions  []state.ThinkTankMention `json:"mentions,omitempty"`
 }
 
 // handleThinkTankMessage adds durable shared user input: published between
-// turns, or held for the active turn's boundary (FS-21.R15, R35).
+// turns, or held for the active turn's boundary (FS-21.R15, R35). Selected
+// mentions address live participants on their next room turn (FS-21.R46).
 func (s *Server) handleThinkTankMessage(w http.ResponseWriter, r *http.Request) {
 	var req thinkTankMessageRequest
 	if !decodeThinkTankBody(w, r, &req) {
 		return
 	}
-	input, d, err := s.stateStore.AddThinkTankInput(r.PathValue("id"), req.CommandID, state.ThinkTankEntryUser, req.Body, "")
+	for _, m := range req.Mentions {
+		if _, err := s.stateStore.ReadAgent(m.AgentID); err != nil {
+			writeAPIError(w, apiError(runtime.CodeConflict, "an addressed participant's agent was deleted"))
+			return
+		}
+	}
+	input, d, err := s.stateStore.AddThinkTankMessage(r.PathValue("id"), req.CommandID, req.Body, req.Mentions)
 	if err != nil {
 		s.writeThinkTankError(w, err)
 		return

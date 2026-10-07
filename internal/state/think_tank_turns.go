@@ -390,7 +390,17 @@ func applyThinkTankBoundaryTx(tx *sql.Tx, roomID string) error {
 // held for the boundary (FS-21.R35). An exact CommandID replay returns the
 // original input; ended discussion refuses Room delivery (R30).
 func (s *Store) AddThinkTankInput(roomID, commandID, kind, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
-	return s.addThinkTankInput(roomID, commandID, kind, body, context, false, nil)
+	return s.addThinkTankInput(roomID, commandID, kind, body, context, nil, false, nil)
+}
+
+// AddThinkTankMessage adds shared user input with optional selected
+// mentions. Mentions snapshot their addressees into the input context; they
+// grant nothing and change no speaker order (FS-21.R46, TS-14.R25).
+func (s *Store) AddThinkTankMessage(roomID, commandID, body string, mentions []ThinkTankMention) (ThinkTankInput, ThinkTankDetail, error) {
+	if mentions == nil {
+		mentions = []ThinkTankMention{}
+	}
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryUser, body, "", mentions, false, nil)
 }
 
 // AddThinkTankRecord records a room-source annotation delivered to a selected
@@ -398,13 +408,13 @@ func (s *Store) AddThinkTankInput(roomID, commandID, kind, body, context string)
 // delivery happens; it is not shared input held for a turn boundary
 // (FS-13.R26, FS-21.R30).
 func (s *Store) AddThinkTankRecord(roomID, commandID, body, context string) (ThinkTankInput, ThinkTankDetail, error) {
-	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true, nil)
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, nil, true, nil)
 }
 
 // AddThinkTankAnnotationMail commits the room record, recipient mail and wake
 // receipt together. Exact command replay leaves all three unchanged.
 func (s *Store) AddThinkTankAnnotationMail(roomID, commandID, body, context string, mail Message) (ThinkTankInput, ThinkTankDetail, error) {
-	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, true, func(tx *sql.Tx) error {
+	return s.addThinkTankInput(roomID, commandID, ThinkTankEntryAnnotation, body, context, nil, true, func(tx *sql.Tx) error {
 		mail.Body, mail.Wake, mail.DeliveredVia = body, true, DeliveryPending
 		if _, err := insertMessageTx(tx, mail); err != nil {
 			return err
@@ -413,7 +423,10 @@ func (s *Store) AddThinkTankAnnotationMail(roomID, commandID, body, context stri
 	})
 }
 
-func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string, record bool, effect func(*sql.Tx) error) (ThinkTankInput, ThinkTankDetail, error) {
+// addThinkTankInput stores one input. Non-nil mentions (user messages only)
+// replace context with the validated addressee snapshot; replay compares the
+// mention intent rather than the snapshot.
+func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string, mentions []ThinkTankMention, record bool, effect func(*sql.Tx) error) (ThinkTankInput, ThinkTankDetail, error) {
 	if kind != ThinkTankEntryUser && kind != ThinkTankEntryAnnotation {
 		return ThinkTankInput{}, ThinkTankDetail{}, thinkTankInvalid("unknown input kind %q", kind)
 	}
@@ -431,7 +444,11 @@ func (s *Store) addThinkTankInput(roomID, commandID, kind, body, context string,
 		existing, err := scanThinkTankInput(tx.QueryRow(`SELECT input_id, room_id, command_id, kind, body, context, entry_seq, created_at
 FROM think_tank_inputs WHERE room_id = ? AND command_id = ?`, roomID, commandID))
 		if err == nil {
-			if existing.Kind != kind || existing.Body != body || existing.Context != context {
+			sameContext := existing.Context == context
+			if mentions != nil {
+				sameContext = sameThinkTankMentions(existing.Context, mentions)
+			}
+			if existing.Kind != kind || existing.Body != body || !sameContext {
 				return thinkTankConflict("command id reused for a different message")
 			}
 			input = existing
@@ -442,6 +459,11 @@ FROM think_tank_inputs WHERE room_id = ? AND command_id = ?`, roomID, commandID)
 		}
 		if d.Room.Phase == ThinkTankPhaseEnded && !record {
 			return thinkTankConflict("discussion has ended")
+		}
+		if len(mentions) > 0 {
+			if context, err = thinkTankMentionContext(d, body, mentions); err != nil {
+				return err
+			}
 		}
 		id, err := newThinkTankID("tti_", 8)
 		if err != nil {

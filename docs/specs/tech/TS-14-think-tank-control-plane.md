@@ -242,7 +242,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   control/holds and active attempts; increment room revision, commit, then emit the normal update.
   A saved change is acknowledged before dispatch; it never uses Send/Steer. Context reads and later
   activation read authoritative cap, while already-delivered instructions remain historical facts.
-- **R25 (planned)** — Extend shared-message input with optional bounded structured mention ranges
+- **R25** — Extend shared-message input with optional bounded structured mention ranges
   `{agent_id, start, end}` over UTF-8 bytes of the submitted body. UI picker selection retains the
   id/range, updates unaffected ranges and invalidates edited mentions; labels are presentation,
   never identity. The server validates at most 32 nonoverlapping, rune-boundary ranges and recorded

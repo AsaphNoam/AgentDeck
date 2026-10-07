@@ -35,6 +35,10 @@ type thinkTankEntryOut struct {
 	Offset    int    `json:"offset,omitempty"`
 	Continues bool   `json:"continues,omitempty"`
 	Own       bool   `json:"own,omitempty"`
+	// AddressedTo names the participants the user selected for this shared
+	// message; AddressesYou marks the reader among them (TS-14.R25).
+	AddressedTo  []string `json:"addressed_to,omitempty"`
+	AddressesYou bool     `json:"addresses_you,omitempty"`
 }
 
 func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest, args readThinkTankArgs) (*mcp.CallToolResult, any, error) {
@@ -52,6 +56,7 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 		return s.thinkTankRefusal(identity.AgentID, err)
 	}
 	entries := make([]thinkTankEntryOut, 0, len(page.Items))
+	addressed := false
 	for _, item := range page.Items {
 		e := item.Entry
 		author := e.AgentName
@@ -62,6 +67,14 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 			Text: e.Body, Offset: item.Offset, Continues: item.Continues, Own: item.Own}
 		if item.Own {
 			out.Text = ""
+		}
+		if e.Kind == state.ThinkTankEntryUser {
+			for _, a := range state.ThinkTankEntryAddressees(e.Context) {
+				out.AddressedTo = append(out.AddressedTo, a.Name)
+				if a.AgentID == identity.AgentID {
+					out.AddressesYou, addressed = true, true
+				}
+			}
 		}
 		entries = append(entries, out)
 	}
@@ -87,6 +100,9 @@ func (s *Server) handleReadThinkTank(_ context.Context, req *mcp.CallToolRequest
 			result["may_leave"] = m.MayLeave
 		}
 		result["guidance"] = thinkTankGuidance(page)
+	}
+	if addressed {
+		result["addressed"] = "The user addressed you directly in a shared message marked addresses_you; everyone in the room can read it. Respond to it in your contribution if useful."
 	}
 	if page.Attempt != nil {
 		result["turn"] = page.Attempt.Turn

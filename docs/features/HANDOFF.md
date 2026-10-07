@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–2 of 6 done).
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–3 of 6 done).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -48,7 +48,10 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 2. **Done** — live ceiling increase (FS-21.R49, TS-14.R24 shipped): `IncreaseThinkTankTurnLimit`,
    migration 40 `think_tank_limit_commands` receipts, REST `.../participants/{agent_id}/turn-limit`,
    `TurnLimitEditor` in the room roster. A36's rendered live-budget journey is owed with slice 6.
-3. Structured mentions on shared messages + context delivery (FS-21.R46 server half, TS-14.R25).
+3. **Done** — structured mentions server half (TS-14.R25 shipped): `AddThinkTankMessage` +
+   `think_tank_mentions.go` snapshot `{"addressees":[...]}` into input/entry context (REST entries
+   already expose `context`); MCP read adds `addressed_to`/`addresses_you` and an `addressed` note.
+   Picker/composer UI is slice 6 (FS-21.R46 stays planned). Departed-target refusal lacks a test.
 4. Judge synthesis result projection + `GET /api/sessions/{id}/think-tank-results` + chat merge
    (FS-21.R50, TS-14.R26, A37).
 5. Concurrent independent openings (FS-21.R48, TS-14.R23, A35) — largest; race tests both Go variants.
@@ -175,6 +178,10 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: Think Tank workspace slice 3 (shared mentions, server).** Shared room
+  messages accept validated participant mention ranges; addressees are snapshotted, visible to all
+  and flagged to the addressee on its next room read. State/MCP/server tests passed.
 
 - **2026-10-07 — Work: Think Tank workspace slice 2 (live turn limits).** Operators can raise a
   participant's turn ceiling during openings/discussion (paused or held included); exhausted members

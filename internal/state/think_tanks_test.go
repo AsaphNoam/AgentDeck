@@ -790,3 +790,47 @@ func TestThinkTankTurnLimitIncrease(t *testing.T) {
 		t.Fatalf("receipts after delete = %d %v", n, err)
 	}
 }
+
+// TS-14.R25: mention ranges are validated against the body and live
+// participants, snapshotted into the published entry, and replay compares the
+// mention intent.
+func TestThinkTankMessageMentions(t *testing.T) {
+	st, _ := newTestStore(t)
+	d := ttCreate(t, st, false, ttMember("a", 2), ttMember("b", 2))
+	room := d.Room.RoomID
+	body := "é @Agent b and @Agent a"
+	mb := ThinkTankMention{AgentID: "b", Start: 3, End: 11}
+	for i, bad := range [][]ThinkTankMention{
+		{{AgentID: "b", Start: 1, End: 4}},       // splits é
+		{{AgentID: "b", Start: 3, End: 99}},      // past body
+		{mb, {AgentID: "a", Start: 5, End: 12}},  // overlap
+		{{AgentID: "nobody", Start: 3, End: 11}}, // not a member
+		{{AgentID: "b", Start: -1, End: 2}},      // negative
+	} {
+		if _, _, err := st.AddThinkTankMessage(room, fmt.Sprintf("bad-%d", i), body, bad); !errors.Is(err, ErrThinkTankInvalid) {
+			t.Fatalf("case %d err = %v", i, err)
+		}
+	}
+	ma := ThinkTankMention{AgentID: "a", Start: 16, End: len(body)}
+	in, _, err := st.AddThinkTankMessage(room, "ok", body, []ThinkTankMention{ma, mb})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := st.AddThinkTankMessage(room, "ok", body, []ThinkTankMention{mb, ma}); err != nil {
+		t.Fatalf("reordered replay = %v", err)
+	}
+	if _, _, err := st.AddThinkTankMessage(room, "ok", body, []ThinkTankMention{mb}); !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("changed mention replay = %v", err)
+	}
+	entries := ttEntries(t, st, room)
+	got := ThinkTankEntryAddressees(entries[len(entries)-1].Context)
+	if in.EntrySeq == 0 || len(got) != 2 || got[0].AgentID != "b" || got[0].Name != "Agent b" || got[1].Project != "proj-a" {
+		t.Fatalf("published addressees = %+v (seq %d)", got, in.EntrySeq)
+	}
+	if _, _, err := st.AddThinkTankMessage(room, "plain", "no mentions", nil); err != nil {
+		t.Fatal(err)
+	}
+	if entries := ttEntries(t, st, room); entries[len(entries)-1].Context != "" {
+		t.Fatalf("plain message context = %q", entries[len(entries)-1].Context)
+	}
+}

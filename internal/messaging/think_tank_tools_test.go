@@ -171,3 +171,59 @@ func TestThinkTankJudgeReadOmitsTurnCeiling(t *testing.T) {
 		t.Fatalf("guidance = %q", guidance)
 	}
 }
+
+// FS-21.A34, TS-14.R25: a selected mention is shared with every participant
+// and explicitly identifies the addressee on its next room turn read.
+func TestThinkTankMentionAddressesParticipant(t *testing.T) {
+	store := newStore(t)
+	srv := New(store, nil)
+	srv.Register("tok-a", "a")
+	srv.Register("tok-b", "b")
+	a, b := connect(t, srv, "tok-a"), connect(t, srv, "tok-b")
+	d, err := store.CreateThinkTank(state.ThinkTankCreate{CommandID: "c", Goal: "Pick storage", OriginProject: "p",
+		Members: []state.ThinkTankMember{{AgentID: "a", AgentName: "Ari", Project: "p", Cap: 3}, {AgentID: "b", AgentName: "Bea", Project: "p", Cap: 3}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := "@Bea what about cost?"
+	if _, _, err := store.AddThinkTankMessage(d.Room.RoomID, "m1", body, []state.ThinkTankMention{{AgentID: "b", Start: 0, End: 4}}); err != nil {
+		t.Fatal(err)
+	}
+	read := func(cs *mcp.ClientSession, agent, turn string) map[string]any {
+		cur, _ := store.ReadThinkTank(d.Room.RoomID)
+		if _, err := store.BeginThinkTankAttempt(state.ThinkTankBegin{RoomID: d.Room.RoomID, Revision: cur.Room.Revision,
+			AgentID: agent, Turn: state.ThinkTankTurnDiscussion, Generation: "g", TurnID: turn}); err != nil {
+			t.Fatal(err)
+		}
+		obj, isErr := callRoomTool(t, cs, "read_think_tank", map[string]any{})
+		if isErr {
+			t.Fatalf("read = %v", obj)
+		}
+		return obj
+	}
+	obj := read(a, "a", "t1")
+	entry := obj["entries"].([]any)[0].(map[string]any)
+	if entry["addresses_you"] != nil || obj["addressed"] != nil || entry["addressed_to"].([]any)[0] != "Bea" {
+		t.Fatalf("unaddressed reader sees %v", obj)
+	}
+	if _, err := store.StageThinkTankTurn("a", tokenOf(t, store, "a"), state.ThinkTankReply, "SQLite", obj["read_receipt"].(string)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.FinalizeThinkTankAttempt("a", "g", "t1"); err != nil {
+		t.Fatal(err)
+	}
+	obj = read(b, "b", "t2")
+	entry = obj["entries"].([]any)[0].(map[string]any)
+	if entry["addresses_you"] != true || obj["addressed"] == nil {
+		t.Fatalf("addressee read = %v", obj)
+	}
+}
+
+func tokenOf(t *testing.T, store *state.Store, agent string) string {
+	t.Helper()
+	running, err := store.RunningThinkTankAttempts(agent, "g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return running[0].Token
+}
