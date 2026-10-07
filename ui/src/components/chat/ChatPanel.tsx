@@ -61,7 +61,7 @@ export function ChatPanel() {
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
   // The Think Tank tab appears for any room membership, idle or ended (FS-03.R71).
-  const inRooms = (useAgentThinkTanks(id).data ?? []).length > 0;
+  const inRooms = (useAgentThinkTanks(id).data?.rooms ?? []).length > 0;
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
   const [reveal, setReveal] = useState<{ seq: number } | null>(null);
   const [runtime, setRuntime] = useState<RuntimeSelection>(() => agent ? runtimeSelection(agent) : { backend: "", model: "", effort: "" });

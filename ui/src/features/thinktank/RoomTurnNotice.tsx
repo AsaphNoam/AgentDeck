@@ -12,7 +12,7 @@ import { judgeText, phaseLabel, roomTitle, thinkTankPath } from "./roomText";
  *  agent in no room. */
 export function RoomCue({ agentId }: { agentId: string }) {
   const rooms = useAgentThinkTanks(agentId);
-  const list = rooms.data ?? [];
+  const list = rooms.data?.rooms ?? [];
   if (list.length === 0) return null;
   const turnIn = list.find((room) => room.active_attempts.some((a) => a.agent_id === agentId));
   const shown = turnIn ?? list.find((room) => room.phase !== "ended") ?? list[0];
@@ -34,7 +34,7 @@ export function ThinkTankTab({ agentId }: { agentId: string }) {
   const rooms = useAgentThinkTanks(agentId);
   if (rooms.isError) return <p className="form-error">Could not load this agent's Think Tanks.</p>;
   if (rooms.isLoading) return <p>Loading Think Tanks…</p>;
-  const list = rooms.data ?? [];
+  const list = rooms.data?.rooms ?? [];
   if (list.length === 0) return <p>This agent is not in a Think Tank.</p>;
   return (
     <div className="think-tank-tab" data-ui="think-tank" data-slot="membership">
@@ -43,6 +43,7 @@ export function ThinkTankTab({ agentId }: { agentId: string }) {
         stays private; Send waits until the turn ends. Nothing private here is copied into the room.
       </p>
       {list.map((room) => <Membership key={room.room_id} room={room} agentId={agentId} />)}
+      {rooms.data?.clipped && <p role="status">Showing the {list.length} most recent Think Tanks; older ones are not listed here.</p>}
     </div>
   );
 }

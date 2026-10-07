@@ -117,13 +117,6 @@ None.
   query's error never reaches the operator. Surface a results-unavailable message with retry
   while preserving provider history and drafts; test a failed query followed by recovery.
   Fix complexity: trivial/easy.
-- **Must fix** — **TW-05 (INV §10/§11/§16): Membership lists discard clipping feedback.**
-  `ui/src/api/thinkTanks.ts:144–149` strips the server's `clipped` field and returns only rooms;
-  `ui/src/features/thinktank/RoomTurnNotice.tsx:40–60` presents that list without a warning.
-  A long-lived participant with more than 200 rooms silently loses older memberships from its
-  Think Tank tab, violating TS-14.R27's explicit clipping feedback. Preserve/display the flag
-  and test a serialized clipped response; the bounded list need not become unbounded.
-  Fix complexity: trivial/easy.
 - **Must fix** — **TW-06 (INV §10): Ended cards omit the collective allowance summary.**
   `ui/src/features/thinktank/RoomList.tsx:73–78` hides the total whenever phase is ended, although
   FS-21.R44 requires the collective allowance alongside the retained per-member counts.

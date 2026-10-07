@@ -136,17 +136,18 @@ export function useThinkTanks(project?: string, enabled = true) {
 
 /** useAgentThinkTanks lists the rooms an agent belongs to as participant or
  *  judge, busy or not, for its chat's room cue and Think Tank tab
- *  (FS-03.R71, TS-14.R27). */
+ *  (FS-03.R71, TS-14.R27). `clipped` reports that older memberships fell
+ *  outside the bounded list. */
 export function useAgentThinkTanks(agentID: string) {
   return useQuery({
     queryKey: THINK_TANK_KEYS.list(`agent:${agentID}`),
     enabled: Boolean(agentID),
     queryFn: ({ signal }) => request(
       `/api/think-tanks?agent_id=${encodeURIComponent(agentID)}`,
-      z.object({ rooms: z.array(thinkTankSummarySchema) }),
+      z.object({ rooms: z.array(thinkTankSummarySchema), clipped: z.boolean().optional() }),
       { signal },
     ),
-    select: (data) => data.rooms,
+    select: (data) => ({ rooms: data.rooms, clipped: Boolean(data.clipped) }),
   });
 }
 

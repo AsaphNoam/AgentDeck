@@ -512,5 +512,29 @@ it("shows a compact room cue and a Think Tank tab for room membership", async ()
   expect(await screen.findByText("1 of 2 turns left", { exact: false })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Ari" }).getAttribute("href")).toBe("/agent/a_ari");
   expect(screen.getByText("Nova (this agent)")).toBeInTheDocument();
+  expect(screen.queryByText(/most recent Think Tanks/)).toBeNull();
+  fetchSpy.mockRestore();
+});
+
+// TS-14.R27: a clipped membership list says so in the Think Tank tab.
+it("reports a clipped membership list in the Think Tank tab", async () => {
+  const room = {
+    version: 1, room_id: "tt_new", title: "Newest room", goal: "g", origin_project: "app",
+    phase: "ended", control: "running", participants: ["Nova"], revision: 2, created_at: "2026-10-07T00:00:00Z",
+    updated_at: "2026-10-07T00:00:00Z", active_attempts: [], total_remaining: 0, judge_enabled: false,
+    roster: [{ agent_id: "a_room", name: "Nova", project: "app", role: "participant", state: "active", limit: 2, completed: 2, remaining: 0, exists: true }],
+  };
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input).startsWith("/api/think-tanks?agent_id=a_room")) return new Response(JSON.stringify({ version: 1, rooms: [room], clipped: true }));
+    return new Response("{}", { status: 404 });
+  });
+  useAgentStore.setState({ agents: { a_room: liveAgent("a_room") }, order: ["a_room"], hydrated: true, hydrating: false });
+  mocks.useBackends.mockReturnValue({ data: backends });
+  renderPanel("a_room");
+
+  const tab = await screen.findByRole("tab", { name: "Think Tank" });
+  fireEvent.mouseDown(tab);
+  fireEvent.click(tab);
+  expect(await screen.findByText("Showing the 1 most recent Think Tanks; older ones are not listed here.")).toBeInTheDocument();
   fetchSpy.mockRestore();
 });
