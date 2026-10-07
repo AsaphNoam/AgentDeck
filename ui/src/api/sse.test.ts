@@ -140,7 +140,9 @@ describe("SseClient watchdog reconnect", () => {
     const es = FakeEventSource.instances[0];
     const activity = (agent: string) =>
       JSON.stringify({ type: "runtime_activity", seq: 40, ts: 1, agent_id: agent, data: { agent_id: agent, generation: "g", span_id: "r1", kind: "reasoning_delta", delta: "hm" } });
+    const { useTranscriptStore } = await import("../store/transcriptStore");
     sseClient.registerOpenAgent("a_think");
+    await vi.waitFor(() => expect(useTranscriptStore.getState().byAgent.a_think).toBeDefined());
     (client.getTranscript as ReturnType<typeof vi.fn>).mockClear();
     es.emit("runtime_activity", activity("a_think"));
     es.emit("runtime_activity", activity("a_closed"));
@@ -149,6 +151,50 @@ describe("SseClient watchdog reconnect", () => {
     expect(client.getTranscript).not.toHaveBeenCalled();
     es.onopen?.();
     expect(useReasoningStore.getState().byAgent).toEqual({});
+  });
+
+  // TS-08.R103 — a thought arriving before the first transcript read lands has
+  // no proven turn; once history is in, a thought joins the current turn, never
+  // an earlier completed one. Leaving the source drops its thoughts.
+  it("admits reasoning only against reconciled history and drops it on close", async () => {
+    const { sseClient } = await import("./sse");
+    const client = await import("./client");
+    const { useReasoningStore } = await import("../store/reasoningStore");
+    const { useTranscriptStore } = await import("../store/transcriptStore");
+    const { nestActivities, withReasoning } = await import("../components/chat/runtimeActivity");
+    const { projectTurns } = await import("../components/chat/turnActivity");
+    const history = [
+      { agent_id: "a_hist", seq: 1, type: "user_text", ts: "t", data: { text: "Old ask" } },
+      { agent_id: "a_hist", seq: 2, type: "assistant_text", ts: "t", data: { delta: "Old answer" } },
+      { agent_id: "a_hist", seq: 3, type: "turn_end", ts: "t", data: { stop_reason: "end_turn" } },
+      { agent_id: "a_hist", seq: 4, type: "user_text", ts: "t", data: { text: "New ask" } },
+    ];
+    let resolve: (value: { agent_id: string; events: typeof history }) => void = () => undefined;
+    (client.getTranscript as ReturnType<typeof vi.fn>).mockImplementationOnce(() => new Promise((r) => { resolve = r; }));
+    sseClient.connect();
+    const es = FakeEventSource.instances[0];
+    const activity = (span: string, delta: string) => JSON.stringify({
+      type: "runtime_activity", ts: 1, agent_id: "a_hist",
+      data: { agent_id: "a_hist", generation: "g", span_id: span, kind: "reasoning_delta", delta },
+    });
+    const close = sseClient.registerOpenAgent("a_hist");
+    es.emit("runtime_activity", activity("early", "unproven"));
+    expect(useReasoningStore.getState().byAgent.a_hist).toBeUndefined();
+
+    resolve({ agent_id: "a_hist", events: history });
+    await vi.waitFor(() => expect(useTranscriptStore.getState().byAgent.a_hist).toHaveLength(4));
+    es.emit("runtime_activity", activity("now", "current thought"));
+    const events = useTranscriptStore.getState().byAgent.a_hist;
+    const turns = projectTurns(nestActivities(withReasoning(events, useReasoningStore.getState().byAgent.a_hist?.spans)));
+    const texts = (index: number) => turns[index].parts.flatMap((part) => part.events.map((event) => event.text));
+    expect(texts(0)).not.toContain("current thought");
+    expect(texts(1)).toContain("current thought");
+
+    close();
+    expect(useReasoningStore.getState().byAgent.a_hist).toBeUndefined();
+    sseClient.registerOpenAgent("a_hist");
+    await vi.waitFor(() => expect(useTranscriptStore.getState().byAgent.a_hist).toBeDefined());
+    expect(useReasoningStore.getState().byAgent.a_hist).toBeUndefined();
   });
 
   it("contains a missing open transcript during reconnect hydration", async () => {

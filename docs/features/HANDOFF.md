@@ -113,18 +113,6 @@ None.
 
 **Unit:** `2cf6cfa^..36f055a`.
 
-- **Must fix** — **QT-01 (INV §1/§11): Reasoning admitted before hydration is backfilled into old history.**
-  `ui/src/api/sse.ts:189–193` admits a delta even while the first transcript fetch is pending,
-  using an empty or unreconciled window for its anchor and turn key.
-  `ui/src/components/chat/runtimeActivity.ts:62–75` then inserts that span solely by list index;
-  the stored turn key only participates in its message id. Opening a running conversation with
-  earlier completed turns can therefore hide its current thought inside the first completed turn
-  when REST hydration arrives. Leaving and reopening a source also retains old reasoning while
-  `registerOpenAgent` discards its transcript. This violates TS-08.R103's proven ownership and
-  no historical backfill rules. A temporary projection probe confirmed a delta admitted at
-  anchor 0 before hydration lands in the old completed turn, absent from the current turn.
-  Gate association on a reconciled active boundary and validate ownership when inserting spans;
-  add a real SSE-path test with delayed initial hydration and source reopen. Fix complexity: medium.
 - **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
   `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
   for the second turn, swallows the wait error, and never asserts that the second turn completed.
@@ -155,6 +143,11 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: quiet completed turns QT-01.** Live thoughts are admitted only after the
+  source's transcript read reconciles (desktop and phone), render only while their slot stays in
+  the owning turn, and drop when the source's last view closes (INV §1/§11; TS-08.R102–R103
+  clarified). SSE-path and render tests fail on the old code. QT-03 remains open.
 
 - **2026-10-07 — Fix: quiet completed turns QT-02.** A child's first terminal activity state now
   drops any open choice once, closing its nested tool/thought detail while the root turn is live;

@@ -99,6 +99,20 @@ describe("live reasoning (FS-03.A39, A54)", () => {
 });
 
 describe("reasoning turn association (TS-08.R103)", () => {
+  it("does not show a span whose slot now lies in another turn", () => {
+    const events: TranscriptEvent[] = [
+      { kind: "user_text", seq: 1 },
+      { kind: "turn_end", seq: 2 },
+      { kind: "user_text", seq: 3 },
+    ];
+    const rows = withReasoning(events, [
+      { spanId: "stale", text: "backfilled", anchor: 0, turn: "2" },
+      { spanId: "old", text: "owned old", anchor: 1, turn: "start" },
+      { spanId: "now", text: "owned now", anchor: 3, turn: "2" },
+    ]);
+    expect(rows.map((row) => row.text ?? row.kind)).toEqual(["user_text", "owned old", "turn_end", "user_text", "owned now"]);
+  });
+
   it("never grows a finished turn's span from a repeated id and drops live choices with the generation", () => {
     const { append, setCollapsed } = useReasoningStore.getState();
     append(delta("r1", "first"), 1, "start");

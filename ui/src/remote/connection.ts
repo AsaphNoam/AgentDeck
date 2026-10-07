@@ -136,12 +136,16 @@ export function connect() {
 
 // Open conversations admit live reasoning, as the desktop's open agents do
 // (TS-08.R104). Each reads its current folded window on arrival.
-const openTranscripts = new Map<string, () => TranscriptEvent[]>();
+// A read returns null until its first window loads. Leaving the conversation
+// drops its thoughts and live choices with it (TS-08.R102).
+const openTranscripts = new Map<string, () => TranscriptEvent[] | null>();
 
-export function watchReasoning(agentId: string, read: () => TranscriptEvent[]): () => void {
+export function watchReasoning(agentId: string, read: () => TranscriptEvent[] | null): () => void {
   openTranscripts.set(agentId, read);
   return () => {
-    if (openTranscripts.get(agentId) === read) openTranscripts.delete(agentId);
+    if (openTranscripts.get(agentId) !== read) return;
+    openTranscripts.delete(agentId);
+    useReasoningStore.getState().discard(agentId);
   };
 }
 
@@ -150,8 +154,8 @@ export function watchReasoning(agentId: string, read: () => TranscriptEvent[]): 
 function admitReasoning(event: Event) {
   const activity = parse(event)?.data as RuntimeActivity | undefined;
   const read = activity?.agent_id ? openTranscripts.get(activity.agent_id) : undefined;
-  if (!activity || !read) return;
-  const events = read();
+  const events = read?.();
+  if (!activity || !events) return;
   const last = [...events].reverse().find((item) => typeof item.seq === "number")?.seq ?? 0;
   useReasoningStore.getState().append(activity, Number(last), openTurnKey(events));
 }

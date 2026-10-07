@@ -1,4 +1,5 @@
 import type { TranscriptEvent } from "../../api/types";
+import { slotTurnKeys } from "./turnActivity";
 import type { ReasoningSpan } from "../../store/reasoningStore";
 
 // The runtime-activity projection (TS-08.R59): the root conversation stays the
@@ -59,8 +60,12 @@ export function nestActivities(events: TranscriptEvent[]): TranscriptEvent[] {
 // withReasoning places each live reasoning span at its chronological slot as a
 // render-only row. It has no seq, so it is never annotated, and it never enters
 // the transcript store (FS-03.R57). Desktop and phone both render through it.
-export function withReasoning(events: TranscriptEvent[], spans: ReasoningSpan[] | undefined): TranscriptEvent[] {
-  if (!spans?.length) return events;
+// A span whose slot now falls in another turn than the one that owned it at
+// admission is not shown, so it can never be backfilled into history (TS-08.R103).
+export function withReasoning(events: TranscriptEvent[], all: ReasoningSpan[] | undefined): TranscriptEvent[] {
+  if (!all?.length) return events;
+  const keys = slotTurnKeys(events);
+  const spans = all.filter((span) => span.turn === undefined || keys[Math.min(span.anchor, events.length)] === span.turn);
   const row = (span: ReasoningSpan): TranscriptEvent => ({
     kind: "reasoning",
     activity_id: span.activityId,

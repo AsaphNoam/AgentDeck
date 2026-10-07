@@ -1131,7 +1131,8 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   transcript text; evict the oldest first. Completed turns start closed, so the reset needs no
   recorded transition: hidden rows unmount and remount closed. Opened-turn choices live in the
   mounted transcript and drop on source change or unmount; live thought choices live beside the
-  bounded reasoning spans and drop with them on reconnect or runtime-generation change.
+  bounded reasoning spans and drop with them on reconnect, runtime-generation change or when the
+  source's last open view closes.
   No localStorage/sessionStorage, server setting, database migration or account preference is added.
 - **R103 — Ephemeral thoughts have a stable presentation turn association.** Keep
   TS-01.R35/TS-04.R63's runtime notification and reasoning retention unchanged. At live reasoning
@@ -1142,6 +1143,9 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   provider repeats a span id. Do not attach a late delta to a completed turn or create a historical
   thought placeholder when ownership is unknown. An ambiguously owned notification may remain
   in the bounded live-only display but never be backfilled into a completed turn's activity.
+  A source admits no delta until its transcript read has reconciled (desktop: no read pending;
+  phone: first window loaded); a delta before that is dropped. Rendering shows a span only while
+  its anchor slot still lies in the turn that owned it at admission.
   SSE reconnect/generation change still clears thoughts and live choices.
   Thought association and live manual choices are per mounted source;
   route mounts hydrate only currently available reasoning for a demonstrably active turn.

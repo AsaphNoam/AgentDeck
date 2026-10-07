@@ -32,6 +32,8 @@ interface ReasoningState {
   byAgent: Record<string, AgentReasoning>;
   append: (activity: RuntimeActivity, anchor: number, turn?: string) => void;
   setCollapsed: (agentId: string, scope: string, collapsed: boolean) => void;
+  /** Closing a source drops its thoughts and live choices with its transcript. */
+  discard: (agentId: string) => void;
   clearAll: () => void;
 }
 
@@ -66,6 +68,13 @@ export const useReasoningStore = create<ReasoningState>((set) => ({
       const kept = current.collapsed.filter((item) => item !== scope);
       const next = collapsed ? [...kept, scope].slice(-MAX_CHOICES) : kept;
       return { byAgent: { ...state.byAgent, [agentId]: { ...current, collapsed: next } } };
+    }),
+  discard: (agentId) =>
+    set((state) => {
+      if (!state.byAgent[agentId]) return state;
+      const byAgent = { ...state.byAgent };
+      delete byAgent[agentId];
+      return { byAgent };
     }),
   clearAll: () => set({ byAgent: {} }),
 }));

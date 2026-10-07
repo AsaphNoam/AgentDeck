@@ -36,6 +36,8 @@ class SseClient {
   private openAgents = new Map<string, number>();
   private transcriptRequestToken: Record<string, number> = {};
   private lastAgentSeq: Record<string, number> = {};
+  /** Open agents whose transcript read finished with no newer read pending. */
+  private reconciled = new Set<string>();
 
   connect() {
     if (this.es) return;
@@ -137,7 +139,9 @@ class SseClient {
       if (next > 0) this.openAgents.set(agentId, next);
       else {
         this.openAgents.delete(agentId);
+        this.reconciled.delete(agentId);
         useTranscriptStore.getState().discardAgent(agentId);
+        useReasoningStore.getState().discard(agentId);
       }
     };
   }
@@ -156,6 +160,7 @@ class SseClient {
       // derived from that agent (FS-13.R16). Nothing else ever clears it.
       useAnnotationStore.getState().discard(envelope.agent_id);
       useTranscriptStore.getState().discardAgent(envelope.agent_id);
+      useReasoningStore.getState().discard(envelope.agent_id);
       discardChatDraft(envelope.agent_id);
       return;
     }
@@ -186,11 +191,13 @@ class SseClient {
   }
 
   // Live-only reasoning streams into its own memory-only store, anchored at the
-  // open transcript's current rendered length (FS-03.R57).
+  // open transcript's current rendered length (FS-03.R57). Until the transcript
+  // read settles, that length and its turn are unproven, so the delta is
+  // dropped rather than guessed into history (TS-08.R103).
   private onRuntimeActivity(event: MessageEvent<string>) {
     const envelope = JSON.parse(event.data) as BusEvent<RuntimeActivity>;
     const activity = envelope.data;
-    if (!activity?.agent_id || !this.openAgents.has(activity.agent_id)) return;
+    if (!activity?.agent_id || !this.reconciled.has(activity.agent_id)) return;
     const events = useTranscriptStore.getState().byAgent[activity.agent_id] ?? [];
     useReasoningStore.getState().append(activity, events.length, openTurnKey(events));
   }
@@ -296,11 +303,13 @@ class SseClient {
   private async refetchTranscript(agentId: string) {
     const token = (this.transcriptRequestToken[agentId] ?? 0) + 1;
     this.transcriptRequestToken[agentId] = token;
+    this.reconciled.delete(agentId);
     useTranscriptStore.getState().beginReconciliation(agentId);
     try {
       const transcript = await getTranscript(agentId);
       if (this.transcriptRequestToken[agentId] !== token || !this.openAgents.has(agentId)) return;
       useTranscriptStore.getState().setTranscript(transcript.agent_id, transcript.events);
+      this.reconciled.add(agentId);
     } catch (err) {
       if (this.transcriptRequestToken[agentId] === token && this.openAgents.has(agentId)) {
         useTranscriptStore.getState().settle(agentId);

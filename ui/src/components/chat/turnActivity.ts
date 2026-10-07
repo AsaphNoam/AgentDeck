@@ -80,6 +80,14 @@ export function openTurnKey(events: TranscriptEvent[]): string {
   return "start";
 }
 
+// slotTurnKeys gives, for each insertion slot 0..n of this list, the key of the
+// turn a row placed there belongs to, matching openTurnKey (TS-08.R103).
+export function slotTurnKeys(events: TranscriptEvent[]): string[] {
+  const keys = ["start"];
+  for (const event of events) keys.push(isFence(event) || isRootTurnEnd(event) ? boundaryKey(event) : keys[keys.length - 1]);
+  return keys;
+}
+
 function build(key: string, events: TranscriptEvent[], completed: boolean, stopReason?: string): Turn {
   const seqs = new Set<number>();
   collectSeqs(events, seqs);

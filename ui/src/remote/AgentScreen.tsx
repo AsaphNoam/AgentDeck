@@ -230,10 +230,11 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   // Live reasoning arrives on the same authenticated stream as the desktop's and
   // shares its bounded store (TS-08.R104). The phone's window slides as the
   // conversation grows, so a span anchors after the last seq it saw rather than
-  // at a list position.
+  // at a list position. Before the first window loads there is no turn to own
+  // a thought, so none is admitted (TS-08.R103).
   const reasoning = useReasoningStore((state) => state.byAgent[agentId]?.spans);
-  const eventsRef = useRef(events);
-  eventsRef.current = events;
+  const eventsRef = useRef<TranscriptEvent[] | null>(null);
+  eventsRef.current = transcript.data ? events : null;
   useEffect(() => watchReasoning(agentId, () => eventsRef.current), [agentId]);
   const rows = useMemo(() => {
     const spans = reasoning?.map((span) => ({ ...span, anchor: slotAfter(events, span.anchor) }));
