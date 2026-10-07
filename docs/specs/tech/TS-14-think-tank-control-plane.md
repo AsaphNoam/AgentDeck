@@ -274,7 +274,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   invalidate/refetch the judge result query, including live clients arriving after completion.
   Room-link metadata marks a deleted room unavailable without deleting the result. Do not blend
   the result into an incidental provider assistant delta or change provider history/search records.
-- **R27 (planned)** — Extend existing version-1 room create/list/detail/entry/read shapes with
+- **R27** — Extend existing version-1 room create/list/detail/entry/read shapes with
   optional-compatible title, stable member summaries/allowances, shared addressee snapshots and an
   explicit `active_attempts` array. Preserve old fields; singular `active`/`active_agent_id`/
   `current_actor` describe a sole active attempt only and are absent/empty for multiple openings.

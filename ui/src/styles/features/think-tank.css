@@ -2,13 +2,26 @@
 /* Think Tank room (TS-08.R87). Reading order: goal and phase, then the
    attributed discussion, then the current action and composer; participants
    stay compact beside the discussion. */
-.think-tank {
+.think-tank[data-ui="think-tank"] {
   display: grid;
   gap: var(--ad-space-4);
   margin: 0 auto;
   max-width: 1440px;
   min-width: 0;
   padding: 0 var(--ad-space-6) var(--ad-space-6);
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.app-shell:has(.think-tank) {
+  height: 100dvh;
+  min-height: 0;
+}
+
+.app-main:has(> .think-tank) {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .think-tank-title {
@@ -43,16 +56,25 @@
 }
 
 .think-tank-body {
-  align-items: start;
+  align-items: stretch;
   display: grid;
   gap: var(--ad-space-6);
   grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  min-height: 0;
 }
 
 .think-tank-discussion {
   display: grid;
   gap: var(--ad-space-4);
   min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+
+.think-tank-discussion > .think-tank-entries {
+  overflow-y: auto;
+  align-content: start;
+  padding-inline-end: var(--ad-space-2);
 }
 
 .think-tank-entries,
@@ -133,6 +155,12 @@
   overflow-wrap: anywhere;
 }
 
+.think-tank-addressed {
+  margin: 0;
+  color: var(--ad-text-secondary);
+  font-size: 0.85rem;
+}
+
 /* Retained activity sits under the contribution it produced, scoped to that
    attempt. Settled activity is read-only. */
 .think-tank-activity {
@@ -191,19 +219,27 @@
 .think-tank-composer {
   display: grid;
   gap: var(--ad-space-2);
+  background: var(--ad-surface-raised);
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  min-width: 0;
 }
 
-.think-tank-composer textarea {
-  min-height: 5rem;
+.think-tank-composer .composer {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin-inline: auto;
+  width: min(100%, 52rem);
 }
 
-.think-tank-composer-row {
+.think-tank-composer-source {
   align-items: center;
   color: var(--ad-text-secondary);
   display: flex;
   font-size: 0.85rem;
   gap: var(--ad-space-3);
-  justify-content: space-between;
+  padding: 0 var(--ad-space-2) var(--ad-space-2);
+  flex-wrap: wrap;
 }
 
 .think-tank-side {
@@ -212,6 +248,9 @@
   min-width: 0;
   position: sticky;
   top: var(--ad-space-4);
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .think-tank-side h2,
@@ -525,6 +564,57 @@
 .think-tank-result > header strong {
   color: var(--ad-text-primary);
 }
+
+/* R99: slots map to the stable Core speaker palette; identity is never a
+   lifecycle/state color. */
+
+.think-tank-entry[data-speaker-slot],
+.think-tank-member[data-speaker-slot] {
+  --ad-think-tank-speaker-tint: var(--ad-surface-panel);
+}
+
+.think-tank-entry[data-speaker-slot] {
+  background: color-mix(in srgb, var(--ad-think-tank-speaker-tint) 10%, var(--ad-surface-panel));
+}
+
+.think-tank-member[data-speaker-slot] {
+  border-inline-start: var(--ad-border-thick) solid var(--ad-think-tank-speaker-tint);
+  padding-inline-start: var(--ad-space-2);
+}
+
+.think-tank [data-speaker-slot="0"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-0); }
+.think-tank [data-speaker-slot="1"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-1); }
+.think-tank [data-speaker-slot="2"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-2); }
+.think-tank [data-speaker-slot="3"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-3); }
+.think-tank [data-speaker-slot="4"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-4); }
+.think-tank [data-speaker-slot="5"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-5); }
+.think-tank [data-speaker-slot="6"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-6); }
+.think-tank [data-speaker-slot="7"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-7); }
+.think-tank [data-speaker-slot="8"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-8); }
+.think-tank [data-speaker-slot="9"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-9); }
+.think-tank [data-speaker-slot="10"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-10); }
+.think-tank [data-speaker-slot="11"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-11); }
+.think-tank [data-speaker-slot="12"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-12); }
+.think-tank [data-speaker-slot="13"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-13); }
+.think-tank [data-speaker-slot="14"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-14); }
+.think-tank [data-speaker-slot="15"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-15); }
+.think-tank [data-speaker-slot="16"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-16); }
+.think-tank [data-speaker-slot="17"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-17); }
+.think-tank [data-speaker-slot="18"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-18); }
+.think-tank [data-speaker-slot="19"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-19); }
+.think-tank [data-speaker-slot="20"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-20); }
+.think-tank [data-speaker-slot="21"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-21); }
+.think-tank [data-speaker-slot="22"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-22); }
+.think-tank [data-speaker-slot="23"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-23); }
+.think-tank [data-speaker-slot="24"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-24); }
+.think-tank [data-speaker-slot="25"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-25); }
+.think-tank [data-speaker-slot="26"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-26); }
+.think-tank [data-speaker-slot="27"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-27); }
+.think-tank [data-speaker-slot="28"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-28); }
+.think-tank [data-speaker-slot="29"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-29); }
+.think-tank [data-speaker-slot="30"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-30); }
+.think-tank [data-speaker-slot="31"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-31); }
+.think-tank [data-speaker-slot="judge"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-judge); }
 
 @media (width < 900px) {
   .think-tank-body {

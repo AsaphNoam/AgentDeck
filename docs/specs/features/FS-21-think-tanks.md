@@ -251,7 +251,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   allowances and links to the whole room and every surviving member's ordinary chat. Membership
   stays discoverable between turns and after completion, with separate entries for multiple rooms.
   Private Send/Steer semantics under R28/R33 remain explicit and unchanged.
-- **R46 (planned)** — The room composer is anchored at the bottom of the conversation region,
+- **R46** — The room composer is anchored at the bottom of the conversation region,
   below its scrollable discussion, and looks like the standard Chuck chat input: the same textarea,
   sizing, surface, spacing, focus treatment and Send action. Enter sends, Shift+Enter inserts a
   newline, and an open suggestion picker consumes its normal selection keys first. Queued-input
@@ -263,7 +263,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   interrupts/reorders turns, grants allowance or wakes the judge early. Exhausted targets expose
   their lack of allowance; departed/deleted targets cannot be newly addressed. Plain unselected
   text is not silently resolved to an agent. R35's boundary/independent-opening hold still applies.
-- **R47 (planned)** — Each participant's room contributions use a consistent subtle bubble
+- **R47** — Each participant's room contributions use a consistent subtle bubble
   background tint with a matching roster cue for that room, including reload and retained history.
   Every participant and judge is distinguishable; user input is distinct. Speaker names, project
   attribution, synthesis labels and textual states remain readable independently of color. Code,
@@ -301,7 +301,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
 
 ## 3. States & transitions
 
-The workspace/control upgrade in R43–R51 is planned. It extends the existing room lifecycle;
+The workspace/control upgrade in R43–R51 extends the existing room lifecycle;
 R48 changes only independent-opening concurrency and R49 permits live ceiling increases.
 
 The core phase distinction from R4–R6, R13 and R20 is optional independent openings → shared

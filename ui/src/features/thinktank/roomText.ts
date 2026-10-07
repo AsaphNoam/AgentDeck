@@ -1,4 +1,14 @@
 import type { ThinkTankDetail, ThinkTankEntry, ThinkTankMember, ThinkTankSummary } from "../../schemas/thinkTank";
+import { z } from "zod";
+
+const addresseeContext = z.object({ addressees: z.array(z.object({ agent_id: z.string(), name: z.string(), project: z.string() })).max(32) });
+
+/** Use the immutable wire snapshot, including retained/deleted identities. */
+export function entryAddressees(entry: ThinkTankEntry): string {
+  const parsed = addresseeContext.safeParse(entry.context);
+  if (!parsed.success) return "";
+  return [...new Map(parsed.data.addressees.map((a) => [a.agent_id, `${a.name} (${a.project})`])).values()].join(", ");
+}
 
 /** Plain-language room vocabulary shared by the room page and room lists
  *  (FS-21.R9, TS-08.R87). Every state names its reason in words. */

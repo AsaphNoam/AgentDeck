@@ -865,3 +865,20 @@ func TestThinkTankMessageMentions(t *testing.T) {
 		t.Fatalf("plain message context = %q", entries[len(entries)-1].Context)
 	}
 }
+
+// FS-21.R46: a target leaving between selection and send refuses the whole
+// addressed message; no unaddressed input is silently published instead.
+func TestThinkTankMessageRefusesDepartedMention(t *testing.T) {
+	st, _ := newTestStore(t)
+	d := ttCreate(t, st, false, ttMember("a", 2), ttMember("b", 2), ttMember("c", 2))
+	attempt, _, receipt := ttTurn(t, st, d.Room.RoomID)
+	ttSubmit(t, st, attempt, receipt, ThinkTankLeave, "Leaving")
+	before := ttEntries(t, st, d.Room.RoomID)
+	_, _, err := st.AddThinkTankMessage(d.Room.RoomID, "stale-target", "@Agent a", []ThinkTankMention{{AgentID: "a", Start: 0, End: 8}})
+	if !errors.Is(err, ErrThinkTankConflict) {
+		t.Fatalf("departed mention = %v, want conflict", err)
+	}
+	if got := ttEntries(t, st, d.Room.RoomID); len(got) != len(before) {
+		t.Fatalf("refused message published an entry: %+v", got)
+	}
+}

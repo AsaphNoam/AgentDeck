@@ -1050,7 +1050,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   and retained tombstone states. This refines R87's goal-first hierarchy to compact title/state;
   the full goal remains available without competing with conversation. No provider-agent card,
   duplicate layout setting, dashboard grouping system or new motion is introduced.
-- **R97 (planned)** — FS-21.R46's room composer uses the ordinary `composer` construction,
+- **R97** — FS-21.R46's room composer uses the ordinary `composer` construction,
   shared `composer-input`/actions/picker styling and public `data-ui="composer"` hooks; it receives
   the same R88 `AutoGrowTextarea` and R89 Send icon as ordinary chat. Extract only repeated visual
   markup if needed; feature-owned room send/queue state remains separate from private Send/Steer.
@@ -1073,7 +1073,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   existing Markdown/content seam and a clear synthesis/source label; retained result body remains
   visible when the room is deleted. Query completion/failure and room switches preserve current
   drafts and reject stale replies. Existing annotation source availability remains explicit.
-- **R99 (planned)** — FS-21.R47 speaker tints are a finite shared semantic palette keyed by fixed
+- **R99** — FS-21.R47 speaker tints are a finite shared semantic palette keyed by fixed
   room member order, with one distinct slot for each of the at most 32 participants and a separate
   judge slot. Retained identity/order keep the same mapping through reload/deletion; judge retries
   use the judge-role slot. Define colors only through Core tokens and supported skin overrides,

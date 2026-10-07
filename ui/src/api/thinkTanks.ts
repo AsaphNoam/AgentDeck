@@ -305,7 +305,7 @@ export function useThinkTankTurnLimit(id: string) {
 }
 
 export function useThinkTankMessage(id: string) {
-  return useRoomMutation((input: { command_id: string; body: string }) =>
+  return useRoomMutation((input: { command_id: string; body: string; mentions?: { agent_id: string; start: number; end: number }[] }) =>
     request(roomURL(id, "/messages"), z.object({ input_id: z.string() }).passthrough(), post(input)));
 }
 

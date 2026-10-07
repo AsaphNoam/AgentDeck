@@ -1,7 +1,6 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
-  newCommandID,
   sourceFileURL,
   useDeleteThinkTank,
   useThinkTank,
@@ -10,13 +9,12 @@ import {
   useThinkTankControl,
   useThinkTankEntries,
   useThinkTankFiles,
-  useThinkTankMessage,
   useThinkTankRetry,
   type ThinkTankLaunch,
 } from "../../api/thinkTanks";
 import { useProjects } from "../../api/config";
 import type { AnnotationDraft, FileContent, TranscriptEvent } from "../../api/types";
-import { AutoGrowTextarea, Badge, Button, ConfirmDialog, PageHeader } from "../../components/ui";
+import { Badge, Button, ConfirmDialog, PageHeader } from "../../components/ui";
 import { AnnotationContextMenu, type AnnotationMenuState } from "../../components/chat/AnnotationContextMenu";
 import { FileViewer } from "../../components/chat/FileViewer";
 import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMarkdown";
@@ -24,7 +22,6 @@ import type { FileLink } from "../../components/chat/renderers/filePath";
 import { canAnnotate, eventDraft, eventRenderer, selectionWithin } from "../../components/chat/TranscriptView";
 import { markBackgrounded, nestActivities } from "../../components/chat/runtimeActivity";
 import { TurnList, useTurnChoices } from "../../components/chat/TurnList";
-import { useAutocomplete } from "../../components/chat/autocomplete";
 import { foldTranscript } from "../../store/transcriptStore";
 import { useAnnotationStore } from "../../store/annotationStore";
 import { useUiStore } from "../../store/uiStore";
@@ -35,6 +32,7 @@ import { NewAgentModal } from "../launch/NewAgentModal";
 import type { ThinkTankActivity, ThinkTankDetail, ThinkTankEntry } from "../../schemas/thinkTank";
 import {
   entryAuthor,
+  entryAddressees,
   entryLabel,
   memberName,
   memberState,
@@ -45,6 +43,8 @@ import {
 } from "./roomText";
 import { RoomAnnotationTray } from "./RoomAnnotationTray";
 import { TurnLimitEditor } from "./TurnLimitEditor";
+import { RoomComposer } from "./RoomComposer";
+import { speakerSlot } from "./speakerSlot";
 
 /** ThinkTankPage is the room's full conversation page (FS-21.R27): goal and
  *  phase first, then the attributed discussion, then the current action and
@@ -216,6 +216,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                   className="think-tank-entry"
                   data-slot="entry"
                   data-variant={entry.input_id ? "user" : entry.kind}
+                  data-speaker-slot={entry.input_id || entry.kind === "departure" || entry.kind === "missing_opening" ? undefined : speakerSlot(room.members.find((m) => m.agent_id === entry.agent_id))}
                   onContextMenu={(mouse) => annotateEntry(mouse, entry)}
                 >
                   <header className="think-tank-entry-meta">
@@ -227,6 +228,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                     {entry.undiscussed && <span className="think-tank-entry-kind">Not discussed before the end</span>}
                     <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleTimeString()}</time>
                   </header>
+                  {entryAddressees(entry) && <p className="think-tank-addressed">Addressed to {entryAddressees(entry)} · shared with the room</p>}
                   {entry.body && (
                     <div className="think-tank-entry-body">
                       <SanitizedMarkdown text={entry.body} onOpenFile={entry.attempt_id ? openFrom(entry.attempt_id) : undefined} />
@@ -289,7 +291,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
           <h2>Participants</h2>
           <ul className="think-tank-members">
             {[...participants, ...judges].map((m) => (
-              <li key={m.agent_id} className="think-tank-member" data-state={room.active_attempts.some((a) => a.agent_id === m.agent_id) ? "speaking" : m.state}>
+              <li key={m.agent_id} className="think-tank-member" data-speaker-slot={speakerSlot(m)} data-state={room.active_attempts.some((a) => a.agent_id === m.agent_id) ? "speaking" : m.state}>
                 <div>
                   {m.exists ? <Link to={agentConversationPath(m.agent_id)}>{m.name}</Link> : <strong>{m.name}</strong>}
                   <span>{projects.data?.[m.project]?.title ?? m.project}</span>
@@ -433,77 +435,4 @@ async function loadSourceFile(roomID: string, sourceID: string, path: string): P
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error((body as { error?: { message?: string } }).error?.message ?? "That file could not be read.");
   return body as FileContent;
-}
-
-/** RoomComposer writes shared room input. `@` file and `#` command suggestions
- *  come from one explicitly chosen participant, and each inserted token names
- *  that participant so paths and commands stay attributed (FS-21.R35). */
-function RoomComposer({ room }: { room: ThinkTankDetail }) {
-  const [text, setText] = useState("");
-  const [commandID, setCommandID] = useState(newCommandID);
-  const [error, setError] = useState("");
-  const send = useThinkTankMessage(room.room_id);
-  const ended = room.phase === "ended";
-  const held = room.active || room.phase === "openings" || room.phase === "setup";
-  const sources = room.members.filter((m) => m.exists);
-  const [sourceId, setSourceId] = useState(sources[0]?.agent_id ?? "");
-  const sourceName = sources.find((m) => m.agent_id === sourceId)?.name ?? "";
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const autocomplete = useAutocomplete({
-    sourceId,
-    text,
-    textareaRef,
-    onText: (next) => { setText(next); setCommandID(newCommandID()); },
-    qualify: (item) => `${item.insert.trimEnd()} (${sourceName}) `,
-  });
-  const submit = () => {
-    if (!text.trim()) return;
-    setError("");
-    send.mutate({ command_id: commandID, body: text }, {
-      onSuccess: () => {
-        setText("");
-        setCommandID(newCommandID());
-      },
-      onError: (err) => setError(err instanceof Error ? err.message : "The message was not sent."),
-    });
-  };
-  return (
-    <form className="think-tank-composer" data-ui="composer" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-      <label htmlFor="think-tank-message">Message the room</label>
-      <div className="composer-input">
-        <AutoGrowTextarea
-          id="think-tank-message"
-          ref={textareaRef}
-          maxHeight="40vh"
-          value={text}
-          disabled={ended || send.isPending}
-          placeholder={ended ? "The discussion has ended. Annotate an entry to follow up with an agent." : "Shared with every participant between turns. Type @ or # for a participant's files or commands."}
-          onChange={(event) => { setText(event.target.value); setCommandID(newCommandID()); autocomplete.syncTrigger(event.target); }}
-          onKeyUp={(event) => autocomplete.syncTrigger(event.currentTarget)}
-          onClick={(event) => autocomplete.syncTrigger(event.currentTarget)}
-          onKeyDown={(event) => {
-            if (autocomplete.onKeyDown(event)) return;
-            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              submit();
-            }
-          }}
-        />
-        {autocomplete.picker}
-      </div>
-      <div className="think-tank-composer-row">
-        {sources.length > 0 && !ended && (
-          <label className="think-tank-check">
-            Suggestions from
-            <select value={sourceId} onChange={(event) => { setSourceId(event.target.value); autocomplete.reset(); }}>
-              {sources.map((m) => <option key={m.agent_id} value={m.agent_id}>{m.name}</option>)}
-            </select>
-          </label>
-        )}
-        <span>{held && !ended ? "Held until the current turn finishes." : ""}</span>
-        <Button type="submit" variant="primary" disabled={ended || !text.trim()} busy={send.isPending}>Send to room</Button>
-      </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
-    </form>
-  );
 }

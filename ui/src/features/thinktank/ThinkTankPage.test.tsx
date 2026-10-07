@@ -31,6 +31,7 @@ const server = setupServer(
   http.get("/api/think-tanks/tt_fixture/entries", () => HttpResponse.json({ version: 1, entries: fixture.entries, complete: true })),
   http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ version: 1, activity: [], complete: true })),
   http.get("/api/think-tanks/tt_fixture/files", () => HttpResponse.json({ version: 1, sources: [], files: [] })),
+  http.get("/api/sessions/:agentId/file-search", () => HttpResponse.json({ agent_id: "a_one", files: [] })),
   http.post("/api/think-tanks/tt_fixture/messages", async ({ request }) => {
     posted.push(await request.json());
     return HttpResponse.json({ version: 1, input_id: "tti_2", published_seq: 0 });
@@ -246,11 +247,141 @@ describe("ThinkTankPage", () => {
     server.use(http.get("/api/sessions/a_one/file-search", () => HttpResponse.json({ agent_id: "a_one", files: ["notes.md"] })));
     renderRoom();
     const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
-    expect((screen.getByLabelText("Suggestions from") as HTMLSelectElement).value).toBe("a_one");
+    expect((screen.getByLabelText("Files and commands from") as HTMLSelectElement).value).toBe("a_one");
     fireEvent.change(box, { target: { value: "see @no", selectionStart: 7 } });
     const option = await screen.findByRole("option", { name: "notes.md" });
     fireEvent.mouseDown(option);
     await waitFor(() => expect(box.value).toBe("see @notes.md (Ari) "));
+  });
+
+  it("selects a participant with Enter before sending, and wires UTF-8 mention offsets", async () => {
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "é @Ar", selectionStart: 5 } });
+    expect(await screen.findByRole("option", { name: /@Ari/ })).toBeTruthy();
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(box.value).toBe("é @Ari ");
+    expect(document.querySelector<HTMLElement>(".composer-notice")).toHaveTextContent("Addressed to Ari");
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ body: "é @Ari ", mentions: [{ agent_id: "a_one", start: 3, end: 7 }] });
+  });
+
+  it("drops an addressee when its selected label is edited, while plain @ text stays unresolved", async () => {
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "@Ar", selectionStart: 3 } });
+    await screen.findByRole("option", { name: /@Ari/ });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(box.value).toBe("@Ari ");
+    fireEvent.change(box, { target: { value: "@Ar ", selectionStart: 4 } });
+    expect(document.querySelector(".composer-notice")).toBeNull();
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({ body: "@Ar ", mentions: [] });
+
+    fireEvent.change(box, { target: { value: "plain @Ari", selectionStart: 10 } });
+    // Clicking Send submits the ordinary typed token without accepting its open suggestion.
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    await waitFor(() => expect(posted).toHaveLength(2));
+    expect(posted[1]).toMatchObject({ body: "plain @Ari", mentions: [] });
+  });
+
+  it("keeps a refused addressed draft, body, mentions and command id for retry", async () => {
+    let attempts = 0;
+    server.use(http.post("/api/think-tanks/tt_fixture/messages", async ({ request }) => {
+      const body = await request.json();
+      posted.push(body);
+      attempts++;
+      if (attempts === 1) return HttpResponse.json({ error: { code: "conflict", message: "room is busy" } }, { status: 409 });
+      return HttpResponse.json({ version: 1, input_id: "tti_retry", published_seq: 0 });
+    }));
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "@Ar", selectionStart: 3 } });
+    await screen.findByRole("option", { name: /@Ari/ });
+    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    await screen.findByText("room is busy");
+    expect(box.value).toBe("@Ari ");
+    expect(document.querySelector<HTMLElement>(".composer-notice")).toHaveTextContent("Addressed to Ari");
+    const first = posted[0] as { command_id: string; body: string; mentions: unknown[] };
+    expect(first.mentions).toEqual([{ agent_id: "a_one", start: 0, end: 4 }]);
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    await waitFor(() => expect(posted).toHaveLength(2));
+    expect(posted[1]).toEqual(first);
+  });
+
+  it("uses Shift+Enter for a newline without sending", async () => {
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "line one", selectionStart: 8 } });
+    fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+    // fireEvent does not apply the browser's default textarea insertion.
+    fireEvent.change(box, { target: { value: "line one\n", selectionStart: 9 } });
+    expect(box.value).toBe("line one\n");
+    expect(posted).toHaveLength(0);
+    fireEvent.change(box, { target: { value: "@Ar", selectionStart: 3 } });
+    await screen.findByRole("option", { name: /@Ari/ });
+    // Even an open picker leaves Shift+Enter's default newline untouched.
+    expect(fireEvent.keyDown(box, { key: "Enter", shiftKey: true })).toBe(true);
+    expect(box.value).toBe("@Ar");
+    expect(posted).toHaveLength(0);
+  });
+
+  it("wires two selected mentions with UTF-8 offsets after text before them is edited", async () => {
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "é @Ar", selectionStart: 5 } });
+    await screen.findByRole("option", { name: /@Ari/ });
+    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.change(box, { target: { value: "é @Ari and @Ar", selectionStart: 14 } });
+    await screen.findByRole("option", { name: /@Ari/ });
+    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Send to room" }));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0]).toMatchObject({
+      body: "é @Ari and @Ari ",
+      mentions: [
+        { agent_id: "a_one", start: 3, end: 7 },
+        { agent_id: "a_one", start: 12, end: 16 },
+      ],
+    });
+  });
+
+  it("renders persisted addressee identity from an entry context snapshot", async () => {
+    const addressed = {
+      ...fixture.entries[1],
+      context: { addressees: [{ agent_id: "a_one", name: "Ari", project: "alpha" }] },
+    };
+    server.use(http.get("/api/think-tanks/tt_fixture/entries", () => HttpResponse.json({ entries: [addressed], complete: true })));
+    renderRoom();
+    expect(await screen.findByText("Addressed to Ari (alpha) · shared with the room")).toBeTruthy();
+  });
+
+  it("disambiguates duplicate names by project and identity", async () => {
+    const base = room();
+    const duplicate = { ...base.members[0], agent_id: "a_two", project: "alpha", order: 2 };
+    detail = { ...base, members: [...base.members, duplicate] };
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "@", selectionStart: 1 } });
+    expect(await screen.findByRole("option", { name: /@Ari \(alpha · a_one\)/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /@Ari \(alpha · a_two\)/ })).toBeTruthy();
+  });
+
+  it("offers exhausted live targets with their limit and excludes departed or missing targets", async () => {
+    const base = room();
+    const exhausted = { ...base.members[0], agent_id: "a_tired", name: "Tired", state: "exhausted" as const, completed: 2, limit: 2 };
+    const departed = { ...base.members[0], agent_id: "a_left", name: "Left", state: "departed" as const };
+    detail = { ...base, members: [...base.members, exhausted, departed] };
+    renderRoom();
+    const box = await screen.findByLabelText("Message the room") as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "@", selectionStart: 1 } });
+    expect(await screen.findByRole("option", { name: /@Tired/ })).toBeTruthy();
+    expect(screen.getByText("No turns left")).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /@Left/ })).toBeNull();
+    expect(screen.queryByRole("option", { name: /@Gone/ })).toBeNull();
   });
 
   it("disables room input once the discussion has ended", async () => {

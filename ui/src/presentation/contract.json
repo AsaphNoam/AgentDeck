@@ -30,6 +30,39 @@
     "--ad-technical-surface",
     "--ad-technical-text",
     "--ad-technical-muted",
+    "--ad-think-tank-speaker-0",
+    "--ad-think-tank-speaker-1",
+    "--ad-think-tank-speaker-2",
+    "--ad-think-tank-speaker-3",
+    "--ad-think-tank-speaker-4",
+    "--ad-think-tank-speaker-5",
+    "--ad-think-tank-speaker-6",
+    "--ad-think-tank-speaker-7",
+    "--ad-think-tank-speaker-8",
+    "--ad-think-tank-speaker-9",
+    "--ad-think-tank-speaker-10",
+    "--ad-think-tank-speaker-11",
+    "--ad-think-tank-speaker-12",
+    "--ad-think-tank-speaker-13",
+    "--ad-think-tank-speaker-14",
+    "--ad-think-tank-speaker-15",
+    "--ad-think-tank-speaker-16",
+    "--ad-think-tank-speaker-17",
+    "--ad-think-tank-speaker-18",
+    "--ad-think-tank-speaker-19",
+    "--ad-think-tank-speaker-20",
+    "--ad-think-tank-speaker-21",
+    "--ad-think-tank-speaker-22",
+    "--ad-think-tank-speaker-23",
+    "--ad-think-tank-speaker-24",
+    "--ad-think-tank-speaker-25",
+    "--ad-think-tank-speaker-26",
+    "--ad-think-tank-speaker-27",
+    "--ad-think-tank-speaker-28",
+    "--ad-think-tank-speaker-29",
+    "--ad-think-tank-speaker-30",
+    "--ad-think-tank-speaker-31",
+    "--ad-think-tank-speaker-judge",
     "--ad-font-display",
     "--ad-font-text",
     "--ad-font-mono",
@@ -278,7 +311,8 @@
       "slots": [],
       "states": [],
       "variants": [
-        "dashboard"
+        "dashboard",
+        "room"
       ]
     },
     "file-viewer": {
@@ -646,7 +680,8 @@
         "result",
         "card",
         "roster",
-        "membership"
+        "membership",
+        "composer"
       ],
       "states": [
         "setup",
@@ -673,6 +708,12 @@
         "annotation",
         "synthesis",
         "missing_opening"
+      ],
+      "speaker_slots": [
+        "0", "1", "2", "3", "4", "5", "6", "7",
+        "8", "9", "10", "11", "12", "13", "14", "15",
+        "16", "17", "18", "19", "20", "21", "22", "23",
+        "24", "25", "26", "27", "28", "29", "30", "31", "judge"
       ]
     }
   },

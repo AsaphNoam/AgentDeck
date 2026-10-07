@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (slices 1–5 of 6 done).
+- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (implementation slices done; rendered and suite closure in progress).
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -51,7 +51,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 3. **Done** — structured mentions server half (TS-14.R25 shipped): `AddThinkTankMessage` +
    `think_tank_mentions.go` snapshot `{"addressees":[...]}` into input/entry context (REST entries
    already expose `context`); MCP read adds `addressed_to`/`addresses_you` and an `addressed` note.
-   Picker/composer UI is slice 6 (FS-21.R46 stays planned). Departed-target refusal lacks a test.
+   Picker/composer UI shipped in slice 6d. Departed-target refusal now has a state regression.
 4. **Done** — judge synthesis result (FS-21.R50, TS-14.R26 shipped): migration 41
    `think_tank_results` (FK to agents, not rooms) written in judge finalization via
    `FinalizeThinkTankAttemptAt(..., ev.Seq)`; `GET /api/sessions/{id}/think-tank-results`;
@@ -76,9 +76,17 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    chips with remaining → total/judge; inline-start rule is the collective cue; no motion.
 6c. **Done** — chat `RoomCue` + `ThinkTankTab` (in `RoomTurnNotice.tsx`) via
    `useAgentThinkTanks` (FS-03.R71–R72, FS-21.R43/R45, TS-08.R98 shipped).
-6. UI remaining: room cards
-   (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
-   speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.
+6d. **Done** — anchored standard room composer, grouped shared participant mentions with UTF-8
+   offsets and draft-preserving refusal, persisted addressee labels, and fixed speaker/roster tints
+   (FS-21.R46–R47, TS-08.R97/R99). Full UI suite: 676 tests passed; final focused UI suite: 49
+   passed; style/contract and UI/binary builds passed. Think Tank `-race` passed without tags;
+   tagged race and final Go closure are running. The first tagged full server suite hit two
+   unrelated inline-mail completion timing tests; both passed a `-count=3` focused rerun.
+6e. **In progress** — final real-binary fake-provider populated-room journey and closure.
+   `room-journey.mjs` stages contributions through isolated per-agent MCP configs, then checks
+   publication, scroll/input anchoring, live ceilings, shared mentions, End/judge and retained
+   results. Initial 53 checks passed; the final run strengthens actual long-discussion scrolling
+   and all-appearance composer parity. Credentialed provider smokes remain separate owed gates.
 
 Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
 -scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411

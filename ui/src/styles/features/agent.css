@@ -1018,6 +1018,13 @@
   font-size: 0.72rem;
 }
 
+.composer-picker-group {
+  color: var(--ad-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
 /* Send is always present; Steer, Withdraw, and Cancel join it only in the states
    that make them meaningful (FS-03.R48, FS-03.R50). */
 .composer-actions {
