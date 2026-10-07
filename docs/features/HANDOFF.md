@@ -11,13 +11,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   prior remote main). The user requested a minor release and authorized the push.
   `make test` (both Go variants), 692 UI tests, 41 presentation/style checks,
   `make dist VERSION=0.11.0`, FTS5 build-tag proof, shell syntax and old-name checks passed.
-  Release run `37655214991` passed assembly, transaction/bootstrap and fresh-install/archive
-  verification, then failed creating the GitHub Release with HTTP 500 (three workflow retries).
-  Direct `gh release create` and two `gh run rerun --failed` requests also returned HTTP 500;
-  no release exists. CI `37655215773` shows every step passed in `gh run watch`, including Go,
-  vet, UI tests/build and cleanup, but its run/job APIs still report `in_progress` without a final
-  conclusion at the last check; confirm final status during recovery.
-  Publication recovery is the next release step; this version is pushed but not published.
+  Release run `37655214991` first failed creating the GitHub Release with transient GitHub
+  HTTP 500s (workflow unchanged from v0.10.0); a later `gh run rerun --failed` succeeded and
+  published `v0.11.0` with the arm64 archive, `manifest.json` and `install.sh`.
+  CI `37655215773` concluded `success`.
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
