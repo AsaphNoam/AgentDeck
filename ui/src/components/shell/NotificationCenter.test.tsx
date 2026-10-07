@@ -2,6 +2,7 @@ import React from "react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, act, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationCenter } from "./NotificationCenter";
 import { ChatPanel } from "../chat/ChatPanel";
 import { useAgentStore } from "../../store/agentStore";
@@ -105,13 +106,15 @@ describe("NotificationCenter opens the agent's conversation (FS-02.A46)", () => 
   it("a toast for an agent removed before the click shows Agent not found", () => {
     useAgentStore.setState({ agents: {}, order: [], hydrated: true, hydrating: false });
     render(
-      <MemoryRouter initialEntries={["/tasks"]}>
-        <Routes>
-          <Route path="/tasks" element={<p>tasks page</p>} />
-          <Route path="/agent/:id" element={<ChatPanel />} />
-        </Routes>
-        <NotificationCenter />
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/tasks"]}>
+          <Routes>
+            <Route path="/tasks" element={<p>tasks page</p>} />
+            <Route path="/agent/:id" element={<ChatPanel />} />
+          </Routes>
+          <NotificationCenter />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     notify("permission_required", "gone", "Needs permission");
     fireEvent.click(screen.getByText("Needs permission"));

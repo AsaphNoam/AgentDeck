@@ -230,7 +230,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   be deleted while retained run history needs it. Run deletion removes only the pin. Standalone
   room creation, manual End, private follow-up, retention and eligible deletion are unchanged.
 
-- **R43 (planned)** — A room has a short title distinct from its full goal. The creation UI asks
+- **R43** — A room has a short title distinct from its full goal. The creation UI asks
   for a title; existing rooms and API callers omitting it receive a readable goal-derived fallback.
   Titles are fixed after creation in this change. Project cards, Archive, room navigation and
   individual-chat room cues use the title. The room's compact header leads with title and phase;
@@ -244,7 +244,7 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   keep retained identity without active-chat actions. A card opens the full room; participant chat
   links remain independent keyboard-accessible actions. Failed reads expose unavailable state
   rather than guessed zero allowances or an empty roster.
-- **R45 (planned)** — Participant and judge chats retain the ordinary compact agent header,
+- **R45** — Participant and judge chats retain the ordinary compact agent header,
   transcript and private composer. A restrained Think Tank header accent and short title/active-turn
   cue identify room work; full goals and explanations move into a Think Tank tab beside Files and
   Commands under FS-03.R71. The tab exposes associated rooms, room status, participants/judge,

@@ -1061,7 +1061,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   feedback. Extend the existing autocomplete hook/picker with discriminated participant versus file
   items, stable id/range selection and grouping labels; preserve file context selection and `#`
   behavior. Do not create another suggestion engine or a room-specific textarea style.
-- **R98 (planned)** — FS-03.R71–R72 extend `ChatPanel`/`TranscriptView` with a compact room cue,
+- **R98** — FS-03.R71–R72 extend `ChatPanel`/`TranscriptView` with a compact room cue,
   Think Tank tab and source-attributed host synthesis row. Use room-title membership queries under
   TS-14.R27, including idle/ended memberships; do not scan only busy-agent turns. Fixed membership
   and source identities own links, not labels; deleted room/agent links become truthful unavailable

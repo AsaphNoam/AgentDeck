@@ -134,6 +134,22 @@ export function useThinkTanks(project?: string, enabled = true) {
   });
 }
 
+/** useAgentThinkTanks lists the rooms an agent belongs to as participant or
+ *  judge, busy or not, for its chat's room cue and Think Tank tab
+ *  (FS-03.R71, TS-14.R27). */
+export function useAgentThinkTanks(agentID: string) {
+  return useQuery({
+    queryKey: THINK_TANK_KEYS.list(`agent:${agentID}`),
+    enabled: Boolean(agentID),
+    queryFn: ({ signal }) => request(
+      `/api/think-tanks?agent_id=${encodeURIComponent(agentID)}`,
+      z.object({ rooms: z.array(thinkTankSummarySchema) }),
+      { signal },
+    ),
+    select: (data) => data.rooms,
+  });
+}
+
 export function useThinkTank(id: string | undefined) {
   return useQuery({
     queryKey: THINK_TANK_KEYS.room(id ?? ""),

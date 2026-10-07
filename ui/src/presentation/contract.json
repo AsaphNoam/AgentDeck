@@ -645,7 +645,8 @@
         "turn-limit",
         "result",
         "card",
-        "roster"
+        "roster",
+        "membership"
       ],
       "states": [
         "setup",

@@ -20,7 +20,8 @@ import { TerminalTab } from "./TerminalTab";
 import { resetRuntimeForBackend, resetRuntimeForModel, type RuntimeSelection } from "../../lib/runtimeSelection";
 import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParams";
 import { copyText } from "../../lib/copyText";
-import { RoomTurnNotice } from "../../features/thinktank/RoomTurnNotice";
+import { RoomCue, ThinkTankTab } from "../../features/thinktank/RoomTurnNotice";
+import { useAgentThinkTanks } from "../../api/thinkTanks";
 import type { FileLink } from "./renderers/filePath";
 import { displayLabels } from "../../lib/labels";
 
@@ -59,6 +60,8 @@ export function ChatPanel() {
   const pushError = useUiStore((state) => state.pushError);
   const { data: backends } = useBackends();
   const { data: projects } = useProjects();
+  // The Think Tank tab appears for any room membership, idle or ended (FS-03.R71).
+  const inRooms = (useAgentThinkTanks(id).data ?? []).length > 0;
   const [tab, setTab] = useState(() => initialTab(params.get("tab"), agent?.interface));
   const [reveal, setReveal] = useState<{ seq: number } | null>(null);
   const [runtime, setRuntime] = useState<RuntimeSelection>(() => agent ? runtimeSelection(agent) : { backend: "", model: "", effort: "" });
@@ -294,13 +297,14 @@ export function ChatPanel() {
         </div>
         <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} /></div>
       </header>
-      <RoomTurnNotice agentId={id} busy={agent.state === "busy" || agent.state === "waiting_input"} />
+      <RoomCue agentId={id} />
       <PointerContextMenu menu={headerMenu} onClose={() => setHeaderMenu(null)} />
       <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs" data-slot="tabs">
         <Tabs.List className="chat-tabs-list" data-slot="tabs">
           <Tabs.Trigger value="transcript">Transcript</Tabs.Trigger>
           <Tabs.Trigger value="files">Files</Tabs.Trigger>
           <Tabs.Trigger value="commands">Commands</Tabs.Trigger>
+          {inRooms && <Tabs.Trigger value="think-tank">Think Tank</Tabs.Trigger>}
           {agent.interface === "terminal" && <Tabs.Trigger value="terminal">Terminal</Tabs.Trigger>}
         </Tabs.List>
         <Tabs.Content value="transcript" className="chat-tab-content" data-slot="content">
@@ -312,6 +316,11 @@ export function ChatPanel() {
         <Tabs.Content value="commands" className="chat-tab-content" data-slot="content">
           <CommandsTab agentId={id} />
         </Tabs.Content>
+        {inRooms && (
+          <Tabs.Content value="think-tank" className="chat-tab-content" data-slot="content">
+            <ThinkTankTab agentId={id} />
+          </Tabs.Content>
+        )}
         {agent.interface === "terminal" && (
           <Tabs.Content value="terminal" className="chat-tab-content" data-slot="content">
             <TerminalTab agentId={id} />

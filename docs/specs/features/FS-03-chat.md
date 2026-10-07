@@ -567,12 +567,12 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   families and their chosen permission policy remain unchanged; R40's listed inventory grows by
   these two actions rather than introducing a separate approval bypass.
 
-- **R71 (planned)** — Individual participant/judge conversations use FS-21.R45's compact room
+- **R71** — Individual participant/judge conversations use FS-21.R45's compact room
   cue and Think Tank tab beside Files/Commands, retaining the normal agent header, transcript,
   private composer and Send/Steer behavior. Full goal/membership navigation belongs in that tab,
   not a large banner before the first message. Associated room titles and states remain discoverable
   between turns and after completion; deleted sources retain attribution without dead chat links.
-- **R72 (planned)** — FS-21.R50's successfully committed synthesis is a readable, attributed
+- **R72** — FS-21.R50's successfully committed synthesis is a readable, attributed
   source-linked result in the judge's ordinary live/replayed/archived chat. It preserves exact
   submitted text and ordinary history retention independently of subsequent room deletion; it
   is not an inferred assistant turn or an import into participant conversations.

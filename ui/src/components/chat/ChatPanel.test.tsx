@@ -480,3 +480,37 @@ describe("the open file on the agent route", () => {
     expect(document.querySelector('[data-ui="agent-workspace"]')).not.toHaveAttribute("data-file-open");
   });
 });
+
+// FS-03.A52, FS-21.R45: a member's chat keeps its ordinary header and shows a
+// compact room cue plus a Think Tank tab with the goal, members and links —
+// also between turns, when the agent is idle.
+it("shows a compact room cue and a Think Tank tab for room membership", async () => {
+  const room = {
+    version: 1, room_id: "tt_1", title: "Cache choice", goal: "A long goal about caches", origin_project: "app",
+    phase: "discussion", control: "running", participants: ["Nova", "Ari"], revision: 2, created_at: "2026-10-07T00:00:00Z",
+    updated_at: "2026-10-07T00:00:00Z", active_attempts: [], total_remaining: 3, judge_enabled: false,
+    roster: [
+      { agent_id: "a_room", name: "Nova", project: "app", role: "participant", state: "active", limit: 2, completed: 1, remaining: 1, exists: true },
+      { agent_id: "a_ari", name: "Ari", project: "app", role: "participant", state: "active", limit: 2, completed: 0, remaining: 2, exists: true },
+    ],
+  };
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input).startsWith("/api/think-tanks?agent_id=a_room")) return new Response(JSON.stringify({ version: 1, rooms: [room] }));
+    return new Response("{}", { status: 404 });
+  });
+  useAgentStore.setState({ agents: { a_room: liveAgent("a_room") }, order: ["a_room"], hydrated: true, hydrating: false });
+  mocks.useBackends.mockReturnValue({ data: backends });
+  renderPanel("a_room");
+
+  const cue = await screen.findByRole("link", { name: "Cache choice" });
+  expect(cue.getAttribute("href")).toBe("/think-tank/tt_1");
+  expect(screen.getByRole("heading", { name: "Nova" })).toBeInTheDocument();
+  expect(screen.queryByText("A long goal about caches")).toBeNull();
+  const tab = screen.getByRole("tab", { name: "Think Tank" });
+  fireEvent.mouseDown(tab);
+  fireEvent.click(tab);
+  expect(await screen.findByText("1 of 2 turns left", { exact: false })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Ari" }).getAttribute("href")).toBe("/agent/a_ari");
+  expect(screen.getByText("Nova (this agent)")).toBeInTheDocument();
+  fetchSpy.mockRestore();
+});

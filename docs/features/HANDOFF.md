@@ -74,6 +74,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
    agent grid. Stubbed render: `(cd ui && node scripts/room-render.mjs <out> project)` (also
    `live`/`ended`). Direction: title+phase → status/attention → quiet 2-line goal → wrapping roster
    chips with remaining → total/judge; inline-start rule is the collective cue; no motion.
+6c. **Done** — chat `RoomCue` + `ThinkTankTab` (in `RoomTurnNotice.tsx`) via
+   `useAgentThinkTanks` (FS-03.R71–R72, FS-21.R43/R45, TS-08.R98 shipped).
 6. UI remaining: room cards
    (FS-02.R71), participant Think Tank tab (FS-03.R71–R72), anchored composer + mention picker,
    speech tints (FS-21.R44–R47, TS-08.R96–R99), then rendered A33 journey and TS-06 closure.
