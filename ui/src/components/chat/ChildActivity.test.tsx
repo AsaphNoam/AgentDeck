@@ -57,6 +57,37 @@ describe("native child activity (FS-03.A40)", () => {
     expect(within(section).getByText("Grandchild says")).toBeInTheDocument();
   });
 
+  // A child's terminal activity_state closes its opened tool detail once while
+  // the root turn is still live; reopening it afterwards stays possible (TS-08.R102).
+  it.each(["completed", "failed", "stopped", "disconnected"])("closes opened tool detail when the child is %s", (state) => {
+    const live = [
+      wire(1, "user_text", { text: "Delegate" }),
+      wire(2, "activity_started", { name: "researcher" }, "act_c"),
+      wire(3, "tool_call", { tool_call_id: "act_c/tc_1", name: "Read", args: { path: "a.go" } }, "act_c"),
+    ];
+    const view = renderTranscript(foldTranscript(live));
+    const child = screen.getByRole("button", { name: /researcher · Running/ });
+    // An explicit open choice must not survive the terminal transition either.
+    fireEvent.click(child);
+    fireEvent.click(child);
+    fireEvent.click(screen.getByRole("button", { name: /Ran 1 tool/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Tool call: Read/ }));
+    expect(screen.getByText(/"a.go"/)).toBeInTheDocument();
+
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TranscriptView agentId="a1" events={foldTranscript([...live, wire(4, "activity_state", { state }, "act_c")])} />
+      </QueryClientProvider>,
+    );
+    const ended = screen.getByRole("button", { name: /researcher · / });
+    expect(ended).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/"a.go"/)).toBeNull();
+
+    fireEvent.click(ended);
+    expect(ended).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Ran 1 tool/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("renders the same nesting live as on replay", () => {
     const store = useTranscriptStore.getState();
     for (const event of history) store.appendMessage("a1", event);

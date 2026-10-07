@@ -23,6 +23,14 @@ export function ChildActivity({ node, ancestry, depth, renderEvents }: {
   renderEvents: (events: TranscriptEvent[], ancestry: string[], depth: number) => ReactNode;
 }) {
   const [chosen, setChosen] = useState<boolean | null>(null);
+  // The first terminal state drops any open choice once, so the child and its
+  // nested tool/thought detail close; a later manual reopen stays (TS-08.R102).
+  const terminal = node.state !== "active";
+  const [sawTerminal, setSawTerminal] = useState(terminal);
+  if (terminal && !sawTerminal) {
+    setSawTerminal(true);
+    setChosen(null);
+  }
   const scope = useThoughtScope();
   const open = chosen ?? (node.state === "active" || hasPendingPermission(node));
   const path = [...ancestry, node.name || "Subagent"];

@@ -125,16 +125,6 @@ None.
   anchor 0 before hydration lands in the old completed turn, absent from the current turn.
   Gate association on a reconciled active boundary and validate ownership when inserting spans;
   add a real SSE-path test with delayed initial hydration and source reopen. Fix complexity: medium.
-- **Must fix** — **QT-02 (INV §1): Child completion does not close opened tool detail.**
-  `ui/src/components/chat/renderers/ChildActivity.tsx:25–45` retains an explicit open choice
-  through a terminal child state and only changes the thought context's `live` flag. Nested
-  `toolRun.tsx:28–36` and `renderers/ToolCall.tsx:4–16` retain their open state. Open a child's
-  tool run/arguments while it executes, then receive `activity_state=completed` before root
-  completion: tool detail stays expanded, violating TS-08.R102. Reset nested disclosure choices
-  once at the child's terminal transition and test completed/failed/stopped/disconnected with
-  the root still live, preserving later manual reopening. A temporary component probe confirmed
-  the opened tool run remains expanded after child completion; the probe was removed.
-  Fix complexity: trivial/easy.
 - **Must fix** — **QT-03 (INV §17): The rendered journey does not prove its claimed closure.**
   `ui/scripts/turns-journey.mjs:72–80,172–195` accepts any existing root turn end while waiting
   for the second turn, swallows the wait error, and never asserts that the second turn completed.
@@ -165,6 +155,10 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Fix: quiet completed turns QT-02.** A child's first terminal activity state now
+  drops any open choice once, closing its nested tool/thought detail while the root turn is live;
+  manual reopening still works (INV §1). QT-01 and QT-03 remain open.
 
 - **2026-10-07 — Fix: Think Tank workspace and live controls review (TW-01–TW-06).** Opening
   retry now binds its command id (INV §11/§15); legacy create replay compares an explicit title
