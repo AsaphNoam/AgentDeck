@@ -7,6 +7,10 @@ import { http, HttpResponse } from "msw";
 import { BackendsEditor } from "./BackendsEditor";
 import { BACKEND_SUPPORT_WIRE } from "../../test/backendSupport";
 
+// Type selects show the plain provider name (FS-02.R69), the same text as a default backend name,
+// so display-value queries name the field kind they mean (a select matches on its option).
+const shown = (text: string, tag: "INPUT" | "OPTION") => (value: string, element: Element | null) => value === text && element?.tagName === tag;
+
 const defaultBackendsDoc = {
   version: 2,
   backends: {
@@ -48,7 +52,7 @@ function renderWithQuery(ui: React.ReactElement) {
 describe("BackendsEditor", () => {
   it("renders backend name from GET /api/backends", async () => {
     renderWithQuery(<BackendsEditor />);
-    expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(shown("Claude", "INPUT"))).toBeInTheDocument();
   });
 
   it("does not crash when a malformed response contains null collections", async () => {
@@ -56,13 +60,13 @@ describe("BackendsEditor", () => {
       http.get("/api/backends", () => HttpResponse.json({ version: 2, backends: { claude: { ...defaultBackendsDoc.backends.claude, models: null } } })),
     );
     renderWithQuery(<BackendsEditor />);
-    expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(shown("Claude", "INPUT"))).toBeInTheDocument();
     expect(screen.getByText("+ Add model")).toBeInTheDocument();
   });
 
   it("shows ok cred chip after Save", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
 
     fireEvent.click(screen.getByText("Save"));
 
@@ -79,7 +83,7 @@ describe("BackendsEditor", () => {
       ),
     );
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
 
     fireEvent.click(screen.getByText("Save"));
 
@@ -90,7 +94,7 @@ describe("BackendsEditor", () => {
   // and choose the default from among them.
   it("edits a model's effort levels and default in the expanded editor", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
 
     // Expand the sonnet model row's env/effort editor (the ▾ toggle button).
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
@@ -112,7 +116,7 @@ describe("BackendsEditor", () => {
   // opt-in with Claude-specific copy, and the toggle updates its state.
   it("offers the Claude configured-model import toggle on a claude-acp backend", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
 
     const toggle = screen.getByLabelText(/Import configured models from Claude on startup/) as HTMLInputElement;
     expect(toggle.checked).toBe(false);
@@ -122,9 +126,9 @@ describe("BackendsEditor", () => {
 
   it("offers all four backend types in the type dropdown", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
 
-    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    const typeSelect = screen.getByDisplayValue(shown("Claude", "OPTION")) as HTMLSelectElement;
     const values = Array.from(typeSelect.options).map((o) => o.value);
     expect(values).toEqual(["claude-acp", "codex-acp", "opencode-acp", "openhands-acp"]);
   });
@@ -141,7 +145,7 @@ describe("BackendsEditor", () => {
 
   async function openAddDialog() {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByText("Add backend"));
     return screen.findByLabelText("Provider");
   }
@@ -167,9 +171,9 @@ describe("BackendsEditor", () => {
 
     // The created card is merged in with its usable starter model, and the
     // existing backend is still there.
-    expect(await screen.findByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(shown("Codex / OpenAI", "INPUT"))).toBeInTheDocument();
     expect(screen.getByDisplayValue("gpt-5.6-sol")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Claude")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(shown("Claude", "INPUT"))).toBeInTheDocument();
   });
 
   // The whole-catalog draft is browser-local: creating one backend must not
@@ -181,14 +185,14 @@ describe("BackendsEditor", () => {
       ),
     );
     renderWithQuery(<BackendsEditor />);
-    const nameInput = (await screen.findByDisplayValue("Claude")) as HTMLInputElement;
+    const nameInput = (await screen.findByDisplayValue(shown("Claude", "INPUT"))) as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "Renamed but unsaved" } });
 
     fireEvent.click(screen.getByText("Add backend"));
     await screen.findByLabelText("Provider");
     fireEvent.click(screen.getByText("Create backend"));
 
-    expect(await screen.findByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue(shown("Codex / OpenAI", "INPUT"))).toBeInTheDocument();
     expect(screen.getByDisplayValue("Renamed but unsaved")).toBeInTheDocument();
   });
 
@@ -247,7 +251,7 @@ describe("BackendsEditor", () => {
 
     expect(await screen.findByText(/is not connected: no native configuration found/)).toBeInTheDocument();
     // The valid backend is still created and rendered so the person can retry.
-    expect(screen.getByDisplayValue("Codex / OpenAI")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(shown("Codex / OpenAI", "INPUT"))).toBeInTheDocument();
   });
 
   // FS-08.A11 / TS-03.R23 / INV §1: a create-and-connect binds the source
@@ -279,7 +283,7 @@ describe("BackendsEditor", () => {
     );
 
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     // The seeded claude-acp backend mounts the global config-source query once.
     await waitFor(() => expect(sourceGets).toBeGreaterThanOrEqual(1));
     const before = sourceGets;
@@ -311,7 +315,7 @@ describe("BackendsEditor", () => {
 
     await waitFor(() => expect(screen.queryByLabelText("Provider")).not.toBeInTheDocument());
     expect(posts).toBe(0);
-    expect(screen.getByDisplayValue("Claude")).toBeInTheDocument();
+    expect(screen.getByDisplayValue(shown("Claude", "INPUT"))).toBeInTheDocument();
   });
 
   // ---- Model capability controls (FS-09.R62 / A32) ----
@@ -331,7 +335,7 @@ describe("BackendsEditor", () => {
       },
     })));
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
 
     expect(screen.getByRole("status").textContent).toContain("Effort support could not be loaded.");
@@ -351,7 +355,7 @@ describe("BackendsEditor", () => {
       },
     })));
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
 
     expect(screen.getByRole("status").textContent).not.toContain("Effort support could not be loaded.");
@@ -362,7 +366,7 @@ describe("BackendsEditor", () => {
 
   it("lets a supported Claude model gain effort and fast declarations", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
 
     const levels = screen.getByPlaceholderText("low, medium, high") as HTMLInputElement;
@@ -385,14 +389,14 @@ describe("BackendsEditor", () => {
       }),
     );
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
     fireEvent.change(screen.getByPlaceholderText("low, medium, high"), { target: { value: "low, high" } });
     await waitFor(() => expect((screen.getByPlaceholderText("low, medium, high") as HTMLInputElement).value).toBe("low, high"));
     fireEvent.click(fastCheckbox());
     await waitFor(() => expect(fastCheckbox().checked).toBe(true));
 
-    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    const typeSelect = screen.getByDisplayValue(shown("Claude", "OPTION")) as HTMLSelectElement;
     fireEvent.change(typeSelect, { target: { value: "opencode-acp" } });
 
     // The values stay, but as disabled controls with a reason and a clear action.
@@ -424,20 +428,20 @@ describe("BackendsEditor", () => {
       backends: { claude: { ...defaultBackendsDoc.backends.claude, models: { sonnet: { name: "Sonnet", model: "s", efforts: ["low", "high"], default_effort: "low" } } } },
     })));
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     expect(screen.queryByText("Clear effort levels")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByDisplayValue(/Claude \(claude-acp\)/), { target: { value: "opencode-acp" } });
+    fireEvent.change(screen.getByDisplayValue(shown("Claude", "OPTION")), { target: { value: "opencode-acp" } });
     expect(await screen.findByText("Clear effort levels")).toBeInTheDocument();
   });
 
   it("retains unsupported values when switching back to a supporting type before clearing", async () => {
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
     fireEvent.change(screen.getByPlaceholderText("low, medium, high"), { target: { value: "low, high" } });
     await waitFor(() => expect((screen.getByPlaceholderText("low, medium, high") as HTMLInputElement).value).toBe("low, high"));
 
-    const typeSelect = screen.getByDisplayValue(/Claude \(claude-acp\)/) as HTMLSelectElement;
+    const typeSelect = screen.getByDisplayValue(shown("Claude", "OPTION")) as HTMLSelectElement;
     fireEvent.change(typeSelect, { target: { value: "opencode-acp" } });
     await waitFor(() => expect(screen.getByDisplayValue("low, high")).toBeInTheDocument());
 
@@ -490,14 +494,14 @@ describe("BackendsEditor", () => {
     );
 
     renderWithQuery(<BackendsEditor />);
-    await screen.findByDisplayValue("Claude");
+    await screen.findByDisplayValue(shown("Claude", "INPUT"));
     fireEvent.click(screen.getByRole("button", { name: /▾ env/ }));
 
     expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("low, medium, high")).not.toBeInTheDocument();
 
     // An unsaved edit made while support is missing must survive the retry.
-    const nameInput = screen.getByDisplayValue("Claude") as HTMLInputElement;
+    const nameInput = screen.getByDisplayValue(shown("Claude", "INPUT")) as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "Renamed Claude" } });
 
     fireEvent.click(screen.getByText("Retry"));
@@ -650,7 +654,7 @@ describe("BackendsEditor", () => {
       fireEvent.click(refresh);
       await screen.findByRole("button", { name: "Checking…" });
 
-      fireEvent.change(screen.getByDisplayValue("Claude"), { target: { value: "Claude edited" } });
+      fireEvent.change(screen.getByDisplayValue(shown("Claude", "INPUT")), { target: { value: "Claude edited" } });
       release();
 
       expect((await screen.findAllByDisplayValue("claude-opus-5-5")).length).toBe(2);
@@ -702,7 +706,7 @@ describe("BackendsEditor", () => {
         http.get("/api/backends", () => HttpResponse.json({ ...savedDoc, backend_support: BACKEND_SUPPORT_WIRE, provider_runtimes: { claude: { sonnet: { source: "weird" } } } })),
       );
       renderWithQuery(<BackendsEditor />);
-      expect(await screen.findByDisplayValue("Claude")).toBeInTheDocument();
+      expect(await screen.findByDisplayValue(shown("Claude", "INPUT"))).toBeInTheDocument();
       expect(screen.getByText("Save to check provider.")).toBeInTheDocument();
     });
 

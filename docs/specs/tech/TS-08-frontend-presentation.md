@@ -1002,10 +1002,11 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   the expanded header row's trailing grid column; the context meter renders as the sibling row
   `.agent-card-context` below `.agent-card-top`. Collapsed cards are unchanged.
 
-- **R91** (planned) — FS-02.R69 labels come from one shared helper, lifted from
+- **R91** — FS-02.R69 labels come from one shared helper, lifted from
   `NewAgentModal`'s `displayLabel`, that returns the readable name and appends `(id)` only for
   duplicate names within the list (INV §2). All `name (id)` renders identified in selectors and
-  status labels switch to it; option `value`s and keys stay ids. FS-02.R70 filters `archived`
+  status labels switch to it (`ui/src/lib/labels.ts`); the fixed, unique `BACKEND_TYPE_LABELS` just
+  drop their type suffix. Option `value`s and keys stay ids. FS-02.R70 filters `archived`
   projects from the Tasks page's all-projects list and filter only, leaving an explicit focus as is.
 
 - **R92 (planned)** — FS-16.R46–R47 extend the existing `taskWork.ts` projection/Tasks rows with

@@ -22,6 +22,7 @@ import { fileLinkFromParams, writeFileLinkParams } from "../../lib/fileLinkParam
 import { copyText } from "../../lib/copyText";
 import { RoomTurnNotice } from "../../features/thinktank/RoomTurnNotice";
 import type { FileLink } from "./renderers/filePath";
+import { displayLabels } from "../../lib/labels";
 
 function runtimeSelection(agent: AgentState): RuntimeSelection {
   return { backend: agent.backend, model: agent.model, effort: agent.effort ?? "" };
@@ -243,14 +244,14 @@ export function ChatPanel() {
                 <label htmlFor="chat-runtime-backend">Backend</label>
                 <select id="chat-runtime-backend" value={runtime.backend} disabled={!backends || switching} onChange={(event) => setRuntime(resetRuntimeForBackend(backends, event.target.value))}>
                   {!backends?.backends[runtime.backend] && runtime.backend && <option value={runtime.backend}>{runtime.backend}</option>}
-                  {Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}
+                  {displayLabels(Object.entries(backends?.backends ?? {}).map(([id, backend]) => [id, backend.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </div>
               <div className="form-field">
                 <label htmlFor="chat-runtime-model">Model</label>
                 <select id="chat-runtime-model" value={runtime.model} disabled={!selectedBackend || switching} onChange={(event) => setRuntime(resetRuntimeForModel(backends, runtime.backend, event.target.value))}>
                   {!selectedModel && runtime.model && <option value={runtime.model}>{runtime.model}</option>}
-                  {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
+                  {displayLabels(Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => [id, model.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </div>
               {runtimeChanged && <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>}

@@ -119,7 +119,7 @@ export function AddBackendDialog({
               >
                 {BACKEND_TYPE_OPTIONS.map((t) => (
                   <option key={t} value={t}>
-                    {BACKEND_TYPE_LABELS[t]} ({t})
+                    {BACKEND_TYPE_LABELS[t]}
                   </option>
                 ))}
               </select>

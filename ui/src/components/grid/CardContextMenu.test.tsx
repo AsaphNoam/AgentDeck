@@ -136,7 +136,7 @@ describe("CardContextMenu error surfacing", () => {
     );
     renderMenu();
     fireEvent.click(screen.getByRole("button", { name: /Switch runtime/i }));
-    await screen.findByRole("option", { name: "Codex (codex)" });
+    await screen.findByRole("option", { name: "Codex" });
     const terminalOption = screen.getByRole("option", { name: "Terminal" }) as HTMLOptionElement;
     await waitFor(() => expect(terminalOption.disabled).toBe(false));
     fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });

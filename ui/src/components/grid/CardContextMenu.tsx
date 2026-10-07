@@ -11,6 +11,7 @@ import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeS
 import { useAgentStore } from "../../store/agentStore";
 import { useUiStore } from "../../store/uiStore";
 import { ConfirmDialog } from "../ui";
+import { displayLabels } from "../../lib/labels";
 
 type DialogKind = "rename" | "stop" | "switch" | "group";
 type ActiveDialog = { kind: DialogKind; agent: AgentState };
@@ -206,8 +207,8 @@ export function CardContextMenu() {
               {dialog.kind === "switch" && (
                 <form className="config-form" onSubmit={(event) => { event.preventDefault(); submitSwitch(); }}>
                   <div className="form-field"><label htmlFor="runtime-interface">Interface</label><select id="runtime-interface" value={runtime.interface} onChange={(event) => setRuntime((current) => ({ ...current, interface: event.target.value }))}><option value="chat">Chat</option><option value="terminal" disabled={!terminalOK}>Terminal</option></select></div>
-                  <div className="form-field"><label htmlFor="runtime-backend">Backend</label><select id="runtime-backend" value={runtime.backend} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForBackend(backends, event.target.value) }))}>{Object.entries(backends?.backends ?? {}).map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}</select></div>
-                  <div className="form-field"><label htmlFor="runtime-model">Model</label><select id="runtime-model" value={runtime.model} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForModel(backends, current.backend, event.target.value) }))}>{modelEntries.map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}</select></div>
+                  <div className="form-field"><label htmlFor="runtime-backend">Backend</label><select id="runtime-backend" value={runtime.backend} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForBackend(backends, event.target.value) }))}>{displayLabels(Object.entries(backends?.backends ?? {}).map(([id, backend]) => [id, backend.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></div>
+                  <div className="form-field"><label htmlFor="runtime-model">Model</label><select id="runtime-model" value={runtime.model} onChange={(event) => setRuntime((current) => ({ ...current, ...resetRuntimeForModel(backends, current.backend, event.target.value) }))}>{displayLabels(modelEntries.map(([id, model]) => [id, model.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></div>
                   {(selectedBackend?.models[runtime.model]?.efforts ?? []).length > 0 && <div className="form-field"><label htmlFor="runtime-effort">Effort</label><select id="runtime-effort" value={runtime.effort} onChange={(event) => setRuntime((current) => ({ ...current, effort: event.target.value }))}>{(selectedBackend?.models[runtime.model]?.efforts ?? []).map((level) => <option key={level} value={level}>{level}</option>)}</select></div>}
                   {terminalSupportMissing && (
                     <div className="form-warning" role="status">

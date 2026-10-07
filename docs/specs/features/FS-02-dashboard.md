@@ -298,13 +298,13 @@ Keyboard submission and every action's behavior are unchanged.
 Collapse control at the top right of the header row beside the agent identity; the context meter
 occupies its own full-width row below that header.
 
-**R69** (planned) — Chuck labels models, backends/providers, projects, roles, pipeline templates and
+**R69** — Chuck labels models, backends/providers, projects, roles, pipeline templates and
 pipeline runs by their readable name alone, without a parenthesised id or provider string (for
 example `Claude Sonnet`, not `Claude Sonnet (sonnet)`). A parenthesised id is added only when two
 entries in the same list share a readable name. Status suffixes such as `(archived)` become a small
 **archived** tag beside the name. Selected values, stored data and the API stay keyed by id.
 
-**R70** (planned) — The Tasks page's all-projects view and its project filter omit archived
+**R70** — The Tasks page's all-projects view and its project filter omit archived
 projects. Their tasks are not changed. A Tasks route or saved focus naming an archived project
 still shows that project's tasks.
 

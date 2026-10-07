@@ -58,7 +58,7 @@ describe("LaunchStep", () => {
     renderWithQuery(<LaunchStep onDone={() => {}} initialProject="user-proj" />);
 
     // Wait for role/project data to populate the selects.
-    expect(await screen.findByText("User Proj (user-proj)")).toBeInTheDocument();
+    expect(await screen.findByText("User Proj")).toBeInTheDocument();
 
     await clickLaunch();
 
@@ -81,7 +81,7 @@ describe("LaunchStep", () => {
 
     renderWithQuery(<LaunchStep onDone={onDone} initialProject="user-proj" />);
 
-    expect(await screen.findByText("User Proj (user-proj)")).toBeInTheDocument();
+    expect(await screen.findByText("User Proj")).toBeInTheDocument();
     await clickLaunch();
 
     // Wait for launch to succeed; config write will fail and show an error toast.

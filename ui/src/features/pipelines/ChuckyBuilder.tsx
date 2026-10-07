@@ -13,6 +13,7 @@ import type { PipelineListedProposal, PipelineProposal, PipelineTemplateRecord }
 import { useAgentStore } from "../../store/agentStore";
 import { formatRelative } from "./RunBrowser";
 import { asPipelineProposal, proposalKindLabel, summarizeProposal } from "./proposalSummary";
+import { displayLabels } from "../../lib/labels";
 
 const BUILDER_KEY = "chuck.pipeline-builder-agent";
 
@@ -154,15 +155,15 @@ export function ChuckyBuilder({
       <div className="pipeline-form-grid">
         <label className="form-field"><span>Project</span><select value={project} onChange={(event) => setProject(event.target.value)}>
           <option value="">Select project</option>
-          {projectEntries.map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
+          {displayLabels(projectEntries.map(([projectID, item]) => [projectID, item.title])).map(([projectID, title]) => <option key={projectID} value={projectID}>{title}</option>)}
         </select></label>
         <label className="form-field"><span>Configured backend</span><select value={backendID} onChange={(event) => setBackendID(event.target.value)}>
           <option value="">Select backend</option>
-          {backendEntries.map(([id, backend]) => <option key={id} value={id}>{backend.name} ({id})</option>)}
+          {displayLabels(backendEntries.map(([id, backend]) => [id, backend.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select></label>
         <label className="form-field"><span>Configured model</span><select value={modelID} onChange={(event) => setModelID(event.target.value)}>
           <option value="">Select model</option>
-          {Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => <option key={id} value={id}>{model.name} ({id})</option>)}
+          {displayLabels(Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => [id, model.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select></label>
       </div>
       <label className="form-field"><span>Describe the pipeline</span><AutoGrowTextarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>

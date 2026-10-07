@@ -42,8 +42,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   expanded card header reorder (`.agent-card-context` row).
 - Done: shared `AutoGrowTextarea` (`ui/src/components/ui`) replaces every textarea, with a
   source-scan guard in its test; composers pass `maxHeight="40vh"`; global `resize: none`.
-- Next slices: shared duplicate-gated label helper lifted from `NewAgentModal.displayLabel`; Tasks
-  page skips archived projects.
+- Done: `displayLabel`/`displayLabels` (`ui/src/lib/labels.ts`) across selectors and run-start
+  summaries; archived agent tag on Tasks; Tasks all-projects view/filter skip archived projects.
 - Owed at closure: rendered composer/expanded-card screenshots per skin and one settings form
   (FS-02.A48–A50), then remove `(planned)` from A48–A52 and the change file.
 

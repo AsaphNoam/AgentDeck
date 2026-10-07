@@ -27,7 +27,7 @@ function plural(count: number, word: string) {
 function AgentLabel({ id }: { id: string }) {
   const agent = useAgentStore((state) => state.agents[id]);
   if (!agent) return <span className="task-agent-unavailable">{id} (unavailable)</span>;
-  if (agent.archived) return <span>{agent.name} (archived)</span>;
+  if (agent.archived) return <span>{agent.name} <Badge>archived</Badge></span>;
   return <Link to={`/agent/${encodeURIComponent(id)}`}>{agent.name}</Link>;
 }
 
@@ -219,9 +219,11 @@ export function TasksPage() {
   const [search, setSearch] = useSearchParams();
   const projectsQuery = useProjects();
   const catalog = projectsQuery.data ?? {};
-  const projectNames = useMemo(() => Object.keys(projectsQuery.data ?? {}).sort((a, b) => a.localeCompare(b)), [projectsQuery.data]);
+  // Archived projects leave the all-projects view and filter; an explicit focus still shows them (FS-02.R70).
+  const projectNames = useMemo(() => Object.entries(projectsQuery.data ?? {}).filter(([, item]) => !item.archived).map(([name]) => name).sort((a, b) => a.localeCompare(b)), [projectsQuery.data]);
   const focus = search.get("project") ?? ALL;
-  const unknownFocus = focus !== ALL && projectsQuery.isSuccess && !projectNames.includes(focus);
+  const unknownFocus = focus !== ALL && projectsQuery.isSuccess && !(focus in catalog);
+  const archivedFocus = focus !== ALL && Boolean(catalog[focus]?.archived);
   const scope = focus === ALL ? projectNames : [focus];
   const queries = useQueries({ queries: scope.map((project) => taskListOptions(project, projectReads)) });
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -259,6 +261,7 @@ export function TasksPage() {
           <select value={focus} onChange={(e) => setSearch(e.target.value ? { project: e.target.value } : {})}>
             <option value={ALL}>All projects</option>
             {projectNames.map((name) => <option key={name} value={name}>{catalog[name]?.title || name}</option>)}
+            {archivedFocus && <option value={focus}>{catalog[focus]?.title || focus}</option>}
             {unknownFocus && <option value={focus}>{focus} (unknown)</option>}
           </select>
         </label>

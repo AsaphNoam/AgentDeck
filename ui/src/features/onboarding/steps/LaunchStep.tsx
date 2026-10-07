@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRoles, useProjects, useBackends, useLaunchAgent, usePutConfig, configErrorMessage } from "../../../api/config";
 import { useSuggestedName } from "../../launch/useSuggestedName";
 import { useUiStore } from "../../../store/uiStore";
+import { displayLabels } from "../../../lib/labels";
 
 interface LaunchStepProps {
   onDone: () => void;
@@ -100,8 +101,8 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
       <div className="form-field">
         <label>Role</label>
         <select value={role} onChange={(e) => setRole(e.target.value)}>
-          {roleEntries.map(([id, r]) => (
-            <option key={id} value={id}>{r.title} ({id})</option>
+          {displayLabels(roleEntries.map(([id, r]) => [id, r.title])).map(([id, title]) => (
+            <option key={id} value={id}>{title}</option>
           ))}
         </select>
       </div>
@@ -109,8 +110,8 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
       <div className="form-field">
         <label>Project</label>
         <select value={project} onChange={(e) => setProject(e.target.value)}>
-          {projectEntries.map(([id, p]) => (
-            <option key={id} value={id}>{p.title} ({id})</option>
+          {displayLabels(projectEntries.map(([id, p]) => [id, p.title])).map(([id, title]) => (
+            <option key={id} value={id}>{title}</option>
           ))}
         </select>
       </div>

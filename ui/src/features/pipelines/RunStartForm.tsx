@@ -16,6 +16,7 @@ import type {
   PipelineWorkspaceConflict,
 } from "../../schemas/pipeline";
 import type { Backend } from "../../schemas/backends";
+import { displayLabel, displayLabels } from "../../lib/labels";
 
 function requestID() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -36,8 +37,8 @@ function RuntimeAssignment({ label, field, number = 1, value, backends, entries,
   return <div className="pipeline-runtime-row" data-field={field}>
     <span className="pipeline-stage-number">{number}</span>
     <div><strong>{label}</strong><small>Frozen for this run</small></div>
-    <label className="form-field"><span>Backend</span><select value={value.backend} onChange={(event) => { const backendID = event.target.value; const selected = backends?.[backendID]; const model = selected?.default_model || Object.keys(selected?.models ?? {})[0] || ""; onChange({ backend: backendID, model, effort: selected?.models[model]?.default_effort || "", fast: false }); }}><option value="">Select configured backend</option>{entries.map(([backendID, item]) => <option key={backendID} value={backendID}>{item.name} ({backendID})</option>)}</select></label>
-    <label className="form-field"><span>Model</span><select value={value.model} onChange={(event) => { const model = backend?.models[event.target.value]; onChange({ ...value, model: event.target.value, effort: model?.default_effort || "", fast: false }); }}><option value="">Select configured model</option>{Object.entries(backend?.models ?? {}).map(([modelID, model]) => <option key={modelID} value={modelID}>{model.name} ({modelID})</option>)}</select></label>
+    <label className="form-field"><span>Backend</span><select value={value.backend} onChange={(event) => { const backendID = event.target.value; const selected = backends?.[backendID]; const model = selected?.default_model || Object.keys(selected?.models ?? {})[0] || ""; onChange({ backend: backendID, model, effort: selected?.models[model]?.default_effort || "", fast: false }); }}><option value="">Select configured backend</option>{displayLabels(entries.map(([backendID, item]) => [backendID, item.name])).map(([backendID, name]) => <option key={backendID} value={backendID}>{name}</option>)}</select></label>
+    <label className="form-field"><span>Model</span><select value={value.model} onChange={(event) => { const model = backend?.models[event.target.value]; onChange({ ...value, model: event.target.value, effort: model?.default_effort || "", fast: false }); }}><option value="">Select configured model</option>{displayLabels(Object.entries(backend?.models ?? {}).map(([modelID, model]) => [modelID, model.name])).map(([modelID, name]) => <option key={modelID} value={modelID}>{name}</option>)}</select></label>
     {(backend?.models[value.model]?.efforts ?? []).length > 0 && <label className="form-field"><span>Effort</span><select value={value.effort} onChange={(event) => onChange({ ...value, effort: event.target.value })}>{(backend?.models[value.model]?.efforts ?? []).map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}
     {backend?.models[value.model]?.fast && <label className="form-field"><span>Speed</span><span><input type="checkbox" checked={value.fast} onChange={(event) => onChange({ ...value, fast: event.target.checked })} /> Fast mode</span></label>}
   </div>;
@@ -46,8 +47,8 @@ function RuntimeAssignment({ label, field, number = 1, value, backends, entries,
 function runtimeSummary(value: PipelineRuntimeAssignment, backends: Record<string, Backend> | undefined) {
   const backend = backends?.[value.backend];
   const model = backend?.models[value.model];
-  const backendLabel = backend ? `${backend.name} (${value.backend})` : value.backend || "Choose a backend";
-  const modelLabel = model ? `${model.name} (${value.model})` : value.model || "choose a model";
+  const backendLabel = backend ? displayLabel(Object.entries(backends ?? {}).map(([id, item]) => [id, item.name]), value.backend) : value.backend || "Choose a backend";
+  const modelLabel = model ? displayLabel(Object.entries(backend.models).map(([id, item]) => [id, item.name]), value.model) : value.model || "choose a model";
   const fastLabel = model?.fast ? (value.fast ? "Fast mode on" : "Fast mode off") : "";
   return [backendLabel, modelLabel, value.effort, fastLabel].filter(Boolean).join(" · ");
 }
@@ -257,12 +258,12 @@ export function RunStartForm({
       {(!stepMode || step === 0) && <div className="pipeline-start-pane" data-slot="content"><div className="pipeline-form-grid">
         <label className="form-field" data-field="template_id"><span>Template</span><select value={templateID} onChange={(event) => { edit(); setTemplateID(event.target.value); }}>
           <option value="">Select a valid template</option>
-          {(templates.data ?? []).filter((record) => record.valid).map((record) => <option key={record.id} value={record.id}>{record.template.title} ({record.id})</option>)}
+          {displayLabels((templates.data ?? []).filter((record) => record.valid).map((record) => [record.id, record.template.title])).map(([id, title]) => <option key={id} value={id}>{title}</option>)}
         </select></label>
         <label className="form-field" data-field="display_name"><span>Run display name</span><input value={displayName} placeholder={template?.title || "Delivery run"} onChange={(event) => { edit(); setDisplayName(event.target.value); }} /></label>
         <label className="form-field" data-field="project"><span>Project</span><select value={project} onChange={(event) => { edit(); setProject(event.target.value); }}>
           <option value="">Select project</option>
-          {Object.entries(projects.data ?? {}).filter(([, item]) => !item.archived).map(([projectID, item]) => <option key={projectID} value={projectID}>{item.title} ({projectID})</option>)}
+          {displayLabels(Object.entries(projects.data ?? {}).filter(([, item]) => !item.archived).map(([projectID, item]) => [projectID, item.title])).map(([projectID, title]) => <option key={projectID} value={projectID}>{title}</option>)}
         </select></label>
       </div>
       <label className="form-field" data-field="goal"><span>Run goal</span><AutoGrowTextarea rows={3} value={goal} onChange={(event) => { edit(); setGoal(event.target.value); }} /></label>

@@ -343,7 +343,7 @@ describe("OnboardingGate", () => {
     );
     renderWithQuery(<OnboardingWizard steps={wizardSteps} onComplete={() => {}} />);
     fireEvent.click(await screen.findByText("Continue"));
-    await screen.findByText("App (app)");
+    await screen.findByText("App");
     const launchButton = screen.getByRole("button", { name: "Launch" });
     await waitFor(() => expect(launchButton).not.toBeDisabled());
     fireEvent.click(launchButton);

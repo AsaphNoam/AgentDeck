@@ -152,7 +152,7 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
         <select value={type} onChange={(e) => setType(e.target.value as BackendType)}>
           {BACKEND_TYPE_OPTIONS.map((t) => (
             <option key={t} value={t}>
-              {BACKEND_TYPE_LABELS[t]} ({t})
+              {BACKEND_TYPE_LABELS[t]}
             </option>
           ))}
         </select>

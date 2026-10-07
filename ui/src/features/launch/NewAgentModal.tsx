@@ -9,6 +9,7 @@ import { useLaunchAgent, type LaunchParams } from "../../api/config";
 import { useConfigSources } from "../../api/configSources";
 import { launchSupportFor, type LaunchSupport } from "../../schemas/backends";
 import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeSelection";
+import { displayLabel } from "../../lib/labels";
 import { describeProviderRuntime, hasProviderSource } from "../../lib/providerRuntime";
 import { useSuggestedName } from "./useSuggestedName";
 
@@ -358,11 +359,4 @@ function terminalOptionTitle(canTerminal: boolean, hostAvailable: boolean, suppo
   if (!hostAvailable) return "Terminal unavailable";
   if (!support) return "Launch options could not be loaded";
   return "This backend does not support Terminal";
-}
-
-function displayLabel(entries: [string, string][], id: string): string {
-  const entry = entries.find(([entryId]) => entryId === id);
-  if (!entry) return "";
-  const duplicates = entries.filter(([, label]) => label === entry[1]).length > 1;
-  return duplicates ? `${entry[1]} (${entry[0]})` : entry[1];
 }

@@ -64,7 +64,7 @@ describe("RunStartForm", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><RunStartForm onStarted={() => {}} /></QueryClientProvider>);
 
-    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    await screen.findByRole("option", { name: "Delivery" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
     const start = screen.getByRole("button", { name: "Start run" });
@@ -88,7 +88,7 @@ describe("RunStartForm", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     const { container } = render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
 
-    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    await screen.findByRole("option", { name: "Delivery" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
 
@@ -106,7 +106,7 @@ describe("RunStartForm", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
 
-    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    await screen.findByRole("option", { name: "Delivery" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
     await waitFor(() => expect(screen.getByRole("button", { name: "Review" })).toBeEnabled());
@@ -117,7 +117,7 @@ describe("RunStartForm", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     expect(screen.getByRole("heading", { name: "Delivery" })).toBeInTheDocument();
-    expect(screen.getAllByText(/Codex \(codex\).*GPT-5.6-Sol/)).toHaveLength(3);
+    expect(screen.getAllByText(/Codex · GPT-5.6-Sol/)).toHaveLength(3);
     fireEvent.click(screen.getByRole("button", { name: "Start run" }));
     await waitFor(() => expect(starts).toHaveLength(1));
     expect(starts[0]).toMatchObject({
@@ -138,7 +138,7 @@ describe("RunStartForm", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
 
-    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    await screen.findByRole("option", { name: "Delivery" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
 
@@ -152,7 +152,7 @@ describe("RunStartForm", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
     render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
 
-    await screen.findByRole("option", { name: "Delivery (delivery)" });
+    await screen.findByRole("option", { name: "Delivery" });
     fireEvent.change(screen.getByLabelText("Template"), { target: { value: "delivery" } });
     fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Ship it" } });
     fireEvent.click(screen.getByText("Customize runtimes"));
@@ -165,7 +165,7 @@ describe("RunStartForm", () => {
     expect(disclosure).not.toBeNull();
     fireEvent.click(screen.getByText("Customize runtimes"));
     expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByText(/Alternate \(alternate\).*Opus \(opus\).*Fast mode on/)).toBeInTheDocument();
+    expect(screen.getByText(/Alternate · Opus.*Fast mode on/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("Customize runtimes"));
     expect(screen.getAllByRole("checkbox")[0]).toBeChecked();
 
@@ -173,7 +173,7 @@ describe("RunStartForm", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Review" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Review" }));
     expect(screen.getByRole("heading", { name: "Release train" })).toBeInTheDocument();
-    expect(screen.getByText(/Alternate \(alternate\).*Opus \(opus\).*Fast mode on/)).toBeInTheDocument();
+    expect(screen.getByText(/Alternate · Opus.*Fast mode on/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByLabelText("Run display name")).toHaveValue("Release train");
     expect(screen.getByLabelText("Run goal")).toHaveValue("Ship it");
@@ -199,7 +199,7 @@ describe("RunStartForm", () => {
     render(<QueryClientProvider client={client}><RunStartForm stepMode proposal={proposal} onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
 
     expect(await screen.findByText("Proposal selections")).toBeInTheDocument();
-    expect(screen.getByText(/Alternate \(alternate\).*Opus \(opus\).*high.*Fast mode on/)).toBeInTheDocument();
+    expect(screen.getByText(/Alternate · Opus.*high.*Fast mode on/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("Customize runtimes"));
     expect(screen.getAllByLabelText("Backend")[0]).toHaveValue("alternate");
     expect(screen.getAllByLabelText("Model")[0]).toHaveValue("opus");
@@ -211,7 +211,7 @@ describe("RunStartForm", () => {
         alternate: { name: "Updated Alternate", type: "codex-acp", default: true, default_model: "opus", models: { opus: { name: "Updated Opus", model: "opus", fast: true, efforts: ["low", "high"], default_effort: "high" } } },
       },
     });
-    expect(await screen.findAllByText(/Updated Alternate \(alternate\).*Updated Opus \(opus\)/)).toHaveLength(2);
+    expect(await screen.findAllByText(/Updated Alternate · Updated Opus/)).toHaveLength(2);
     expect(screen.getAllByLabelText("Backend")[0]).toHaveValue("alternate");
     expect(screen.getAllByLabelText("Model")[0]).toHaveValue("opus");
     expect(screen.getAllByRole("checkbox")[0]).toBeChecked();

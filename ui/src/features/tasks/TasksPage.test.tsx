@@ -105,6 +105,26 @@ function createForm() {
 }
 
 describe("Tasks work in motion", () => {
+  // FS-02.A52 — archived projects leave the all-projects view and filter, but
+  // an explicit focus on one still shows its tasks.
+  it("omits archived projects from all projects while an explicit focus still works", async () => {
+    server.use(http.get("/api/projects", () => HttpResponse.json({
+      "my-app": { title: "My App", cwd: "/tmp" },
+      other: { title: "Other", cwd: "/tmp/other", archived: true },
+    })));
+    renderPage();
+    await screen.findByRole("heading", { name: "My App" });
+    expect(screen.queryByRole("heading", { name: "Other" })).not.toBeInTheDocument();
+    const filter = within(document.querySelector("[data-slot=\"toolbar\"]") as HTMLElement).getByRole("combobox", { name: "Project" });
+    expect(within(filter).queryByRole("option", { name: "Other" })).not.toBeInTheDocument();
+    cleanup();
+
+    renderPage("/tasks?project=other");
+    expect(await screen.findByText("Rotate keys")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(document.querySelector("[data-slot=\"toolbar\"]") as HTMLElement).getByRole("combobox", { name: "Project" })).toHaveDisplayValue("Other");
+  });
+
   // FS-16.A27/A29 — no project means All projects, grouped by project and by
   // recorded relationships, with authoring closed below the work.
   it("opens on all projects with connected groups and closed authoring at the bottom", async () => {
@@ -225,7 +245,10 @@ describe("Tasks work in motion", () => {
     expect(within(row).getByText(/Result: success · recorded by agent/)).toBeInTheDocument();
     expect(within(row).getByText("docs/schema.md")).toBeInTheDocument();
     expect(within(row).getByRole("link", { name: "Schema author" })).toHaveAttribute("href", "/agent/ag_a");
-    expect(within(row).getByText("Lead (archived)")).toBeInTheDocument();
+    // FS-02.A51 — an archived agent reads as its name plus an **archived** tag.
+    const tag = within(row).getByText("archived").closest('[data-ui="badge"]')!;
+    expect(tag).not.toBeNull();
+    expect(tag.parentElement).toHaveTextContent(/^Lead archived$/);
     expect(within(row).queryByRole("link", { name: /Lead/ })).not.toBeInTheDocument();
     const missing = await rowOf("Draft release notes");
     expect(within(missing).getByText("ag_gone (unavailable)")).toBeInTheDocument();
