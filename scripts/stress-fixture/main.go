@@ -36,6 +36,7 @@ type options struct {
 	delayMS    int
 	repo       string
 	scenario   string
+	holdFile   string
 }
 
 type launchedSession struct {
@@ -54,6 +55,7 @@ func main() {
 	flag.IntVar(&opts.delayMS, "delay-ms", 5, "delay between assistant deltas")
 	flag.StringVar(&opts.repo, "repo", ".", "Chuck repository root")
 	flag.StringVar(&opts.scenario, "scenario", "stress_stream", "fake ACP scenario; any other scenario advertises runtime capabilities and launches no workload")
+	flag.StringVar(&opts.holdFile, "hold-file", "", "fake ACP hold file for hold_turn (the turn remains open until this file exists)")
 	flag.Parse()
 
 	if err := run(opts); err != nil {
@@ -125,6 +127,9 @@ func run(opts options) error {
 	// when the fake advertises those capabilities.
 	if opts.scenario != "stress_stream" {
 		claude.Env = map[string]string{"FAKEACP_SCENARIO": opts.scenario, "FAKEACP_CAPS": "1"}
+		if opts.holdFile != "" {
+			claude.Env["FAKEACP_HOLD_FILE"] = opts.holdFile
+		}
 	}
 	backends.Backends["claude"] = claude
 	for id, backend := range backends.Backends {
@@ -167,8 +172,8 @@ func run(opts options) error {
 		}
 	}
 
-	fmt.Printf("Chuck stress fixture ready\nURL: %s\nHome: %s\nAgents: %d (Claude Haiku; deterministic fake ACP)\nDeltas: %d x %d bytes per agent, %dms apart\n",
-		baseURL, home, len(launched), opts.chunks, opts.chunkBytes, opts.delayMS)
+	fmt.Printf("Chuck stress fixture ready\nURL: %s\nHome: %s\nHold file: %s\nAgents: %d (Claude Haiku; deterministic fake ACP)\nDeltas: %d x %d bytes per agent, %dms apart\n",
+		baseURL, home, opts.holdFile, len(launched), opts.chunks, opts.chunkBytes, opts.delayMS)
 	for _, session := range launched {
 		fmt.Printf("- %s (%s)\n", session.Agent.Name, session.Agent.AgentID)
 	}

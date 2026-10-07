@@ -504,7 +504,7 @@ completion; R37 defines partial opening publication and pending input on End.
   finishes the active turn normally and does not stop agents. *Verify:* lifecycle/race tests under
   FS-14.A49 and the existing standalone End regression coverage.
 
-- **A33 (planned)** (R43–R45, R47, R51) — Create a titled room with a long goal, dense roster and
+- **A33** (R43–R45, R47, R51) — Create a titled room with a long goal, dense roster and
   mixed existing/new cross-project agents. At 1024px and a wider desktop in Core, Sky & Grove and
   Studio, inspect its card before the agent grid, all member identities/budgets, concurrent-opening
   and attention/ended states, compact room/participant headers and stable speech tints. Navigate
@@ -514,7 +514,7 @@ completion; R37 defines partial opening publication and pending input on End.
   creation and pre-migration rows get a fallback without goal/history changes; duplicate create
   commands reuse reserved identities and the original title. *Verify:* server/UI contracts plus an
   isolated real-binary fake-provider rendered journey, including Archive.
-- **A34 (planned)** (R46) — The room input matches a normal Chuck chat input side by side in all
+- **A34** (R46) — The room input matches a normal Chuck chat input side by side in all
   appearances at desktop floor/wide widths. Scroll a long discussion; the input remains anchored.
   Exercise Enter/Shift+Enter, keyboard picker selection/Escape, distinguish agent/file/command
   suggestions and duplicate names, send to multiple shared addressees, preserve failed drafts and
@@ -523,20 +523,20 @@ completion; R37 defines partial opening publication and pending input on End.
   deleted targets, stale membership and ended-room sends report truthful refusal/feedback.
   *Verify:* state/MCP/wire/UI tests and the rendered A33 journey; include FS-02.A48–A49's planned
   shared textarea/icon behavior when integrated.
-- **A35 (planned)** (R48) — Hold two or more fake-provider opening turns simultaneously and
+- **A35** (R48) — Hold two or more fake-provider opening turns simultaneously and
   observe overlapping provider frames before any finishes. Read room history/activity through
   REST/SSE and another participant: no peer opening leaks. Finish out of order; publication uses
   configured order once after the barrier. Busy peers, failed opening/retry, Pause/End during
   concurrent admission/completion, Stop/restart and stale callbacks preserve committed openings
   and exact accounting without duplicate effects. Ordinary discussion still has one floor.
   *Verify:* state/server/runtime race integration tests plus A33's concurrent-opening UI journey.
-- **A36 (planned)** (R49) — Increase a ceiling during an active opening/turn and while paused or
+- **A36** (R49) — Increase a ceiling during an active opening/turn and while paused or
   held; verify persistence/reload, unchanged completed counts, updated cards, future activation
   context and exhausted-member re-eligibility. Test duplicate commands, simultaneous increases,
   completion/End/closing races, bounds, departed/judge targets and planned pipeline closure guards.
   A refused update preserves input and changes no counts/phase; a saved increase does not resume,
   steer or clear unrelated holds. *Verify:* state/HTTP/MCP tests and A33's live-budget journey.
-- **A37 (planned)** (R50) — Complete synthesis with a body different from the judge's incidental
+- **A37** (R50) — Complete synthesis with a body different from the judge's incidental
   provider reply; inspect its ordinary chat live, on reload and in Archive. Exactly one attributed
   result equals the committed synthesis and links to the room; failed attempts and duplicated
   completion callbacks produce no false/duplicate result. Room deletion preserves that result in
@@ -546,16 +546,19 @@ completion; R37 defines partial opening publication and pending input on End.
 ## 6. Deviations & open decisions
 
 R43–R51/A33–A37 are the 2026-10-06 confirmed Think Tank workspace/live-control upgrade, including
-the explicit requirement to match the standard Chuck chat input. They remain unshipped and planned.
-FS-02.R66–R67 and TS-08.R88–R89 already own pending shared auto-grow fields and icon actions;
+the explicit requirement to match the standard Chuck chat input. Implementation and automated/
+fake-provider verification shipped 2026-10-07; bounded credentialed checks remain owed under
+TS-06.R33. FS-02.R66–R67 and TS-08.R88–R89 own the shipped shared auto-grow fields and icon actions;
 this upgrade uses their shared seams rather than a separate room input design. Pipeline-owned
 rooms under R41–R42 use these general room controls subject to their run/stage closure guards.
 
 Shipped 2026-10-06. R35's autocomplete uses the agent composer's shared `@`/`#` picker against one
 participant chosen in the room composer, and appends that participant's name to each inserted
 token. R8 is superseded by R12/R20. A new participant's turn limit defaults to 3 in setup.
-Rendered acceptance so far uses stubbed room data in every appearance at 1024px and 1440px; the
-real-binary fake-ACP journey and the credentialed Claude/Codex smoke (TS-06.R33) remain owed.
+Rendered evidence now includes both retained/tombstone room fixtures at 1024px/1440px and a
+real-binary fake-ACP journey at 1024px/1600px in every appearance. Its MCP client stages explicit
+contributions, verifies the opening barrier, shared input, live ceiling, scrolling, End and exact
+judge results live/reloaded/in Archive. Credentialed Claude/Codex smoke (TS-06.R33) remains owed.
 
 ## 7. Traceability
 

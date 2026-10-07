@@ -7,7 +7,7 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Active change:** `think-tank-workspace-and-live-controls.md` — in progress (implementation slices done; rendered and suite closure in progress).
+- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished and available for review.
 - **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
   release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
   archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
@@ -23,6 +23,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
   (`32da712`, `eadab5a`) are reviewed and closed without findings.
+  **Available:** Think Tank workspace and live controls (`28d6c92^..9b5e8cb`, plus the
+  verification closure), including the earlier slices and recovered composer/mention/tint work.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
@@ -38,72 +40,23 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
+None. The completed
 [`think-tank-workspace-and-live-controls.md`](../ready-changes/think-tank-workspace-and-live-controls.md)
-— in progress. Slices (each closes with focused tests, spec marks, handoff, commit):
+is available for independent review. All slices and automated/fake-provider closure are finished;
+credentialed checks remain below. Evidence and reproduction commands:
+[`implementation-think-tank-workspace-2026-10-07.md`](../archive/reviews/implementation-think-tank-workspace-2026-10-07.md).
 
-1. **Done** — title + title group (FS-21.R51, TS-14.R22 shipped; R43 header/fallback shipped,
-   card/Archive/chat cues finish with slice 6). Migration 39 `migrateThinkTankTitles`; explicit
-   title kept in create intent with `omitempty` so pre-title replays still match; group applied in
-   `launchReservedThinkTankAgent` (existing identities never regrouped).
-2. **Done** — live ceiling increase (FS-21.R49, TS-14.R24 shipped): `IncreaseThinkTankTurnLimit`,
-   migration 40 `think_tank_limit_commands` receipts, REST `.../participants/{agent_id}/turn-limit`,
-   `TurnLimitEditor` in the room roster. A36's rendered live-budget journey is owed with slice 6.
-3. **Done** — structured mentions server half (TS-14.R25 shipped): `AddThinkTankMessage` +
-   `think_tank_mentions.go` snapshot `{"addressees":[...]}` into input/entry context (REST entries
-   already expose `context`); MCP read adds `addressed_to`/`addresses_you` and an `addressed` note.
-   Picker/composer UI shipped in slice 6d. Departed-target refusal now has a state regression.
-4. **Done** — judge synthesis result (FS-21.R50, TS-14.R26 shipped): migration 41
-   `think_tank_results` (FK to agents, not rooms) written in judge finalization via
-   `FinalizeThinkTankAttemptAt(..., ev.Seq)`; `GET /api/sessions/{id}/think-tank-results`;
-   `mergeThinkTankResults` in `TranscriptView` places the row before the anchoring `turn_end`.
-   Review note: every room update invalidates mounted results queries (one fetch per open chat).
-   The remote route inventory must classify every new route (`remote_routes.go` denied list) —
-   run the whole `internal/server` package, not only `-run ThinkTank`.
-5. **Done** — concurrent openings (FS-21.R48, TS-14.R23 shipped): migration 42 splits the running
-   index (one non-opening per room, one running attempt per agent); `ThinkTankOpeningOpportunities`
-   admits openings without revision checks; boundary pause/end waits for the last running opening;
-   failed openings wait for `RetryThinkTankOpening` (`attempt_id` on `{target:"turn"}` retry);
-   `startThinkTankOpenings` bounds starts 32/room, 128/process. Wire: `active_attempts`, singular
-   actor only for a sole attempt (part of TS-14.R27). Review notes: retry idempotence rides on the
-   attempt state (`retried`), not a command receipt; `command_id` is accepted but unused.
-6a. **Done** — list summaries carry `roster`/`total_remaining`/`judge_enabled`/`judge_name`,
-   `GET /api/think-tanks?agent_id=` membership filter (migration 43 index) and `clipped`. Fixed the
-   presentation contract (`goal`/`turn-limit`/`result` slots): `npm test`'s pretest runs
-   `check:styles` — run `npm test`, not bare `vitest`, before committing UI.
-6b. **Done** — room cards (FS-02.R71, FS-21.R44, TS-08.R96 shipped) in `RoomList`, before the
-   agent grid. Stubbed render: `(cd ui && node scripts/room-render.mjs <out> project)` (also
-   `live`/`ended`). Direction: title+phase → status/attention → quiet 2-line goal → wrapping roster
-   chips with remaining → total/judge; inline-start rule is the collective cue; no motion.
-6c. **Done** — chat `RoomCue` + `ThinkTankTab` (in `RoomTurnNotice.tsx`) via
-   `useAgentThinkTanks` (FS-03.R71–R72, FS-21.R43/R45, TS-08.R98 shipped).
-6d. **Done** — anchored standard room composer, grouped shared participant mentions with UTF-8
-   offsets and draft-preserving refusal, persisted addressee labels, and fixed speaker/roster tints
-   (FS-21.R46–R47, TS-08.R97/R99). Full UI suite: 676 tests passed; final focused UI suite: 49
-   passed; style/contract and UI/binary builds passed. Think Tank `-race` passed without tags;
-   tagged race and final Go closure are running. The first tagged full server suite hit two
-   unrelated inline-mail completion timing tests; both passed a `-count=3` focused rerun.
-6e. **In progress** — final real-binary fake-provider populated-room journey and closure.
-   `room-journey.mjs` stages contributions through isolated per-agent MCP configs, then checks
-   publication, scroll/input anchoring, live ceilings, shared mentions, End/judge and retained
-   results. Initial 53 checks passed; the final run strengthens actual long-discussion scrolling
-   and all-appearance composer parity. Credentialed provider smokes remain separate owed gates.
-
-Turn journey: `make embed`, then `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
--scenario activity_showcase` and `(cd ui && node scripts/turns-journey.mjs http://127.0.0.1:4411
-<outDir>)`.
-
-Tasks wire fixture regeneration: `CHUCK_UPDATE_TASK_FIXTURE=1 go test ./internal/server
--run TestTaskWireFixture`. Think Tank room fixture: `CHUCK_UPDATE_THINK_TANK_FIXTURE=1 go test
-./internal/server -run TestThinkTankWireFixture`. Room screenshots: `(cd ui && node
-scripts/room-render.mjs <outDir> live|ended)`.
+Review notes: opening retry idempotence uses the attempt's `retried` state (`command_id` is accepted
+but unused); every room update invalidates mounted judge-results queries. No new runtime/driver or
+phone room interface was added. Pending pipeline-owned room work remains a separate waiting unit.
 
 ## Acceptance gates still owed
 
-- FS-21 / TS-06.R33 (Think Tanks): the real-binary fake-ACP rendered journey (creation →
-  discussion → annotation/private follow-up → End/judge → retained Archive at 1024px and wider in
-  Core, Sky & Grove and Studio) and the bounded credentialed Claude/Codex smoke (room-tool
-  read/submit, an ordinary approval/denial, private Send/Steer, native resume, end-only judge).
-  Stubbed-data renders of live and ended rooms in all three appearances passed 2026-10-06.
+- FS-21 / TS-06.R33 (Think Tanks): bounded credentialed Claude/Codex smoke remains owed
+  (room-tool read/submit, shared addressed input, ordinary approval/denial, private Send/Steer,
+  native resume, end-only judge and its retained exact result). Automated/race closure and the
+  real-binary fake-provider rendered journey passed 2026-10-07: 60 main checks plus nine
+  annotation-mail/deletion checks, across all appearances. Fake ACP is not a live-provider receipt.
 
 - FS-10.R25/A14, TS-02.R41: one supervised cutover rehearsal on a disposable copy of the real
   AgentDeck home, following `docs/chuck-cutover.md`, with a receipt. The GitHub repository rename
@@ -207,6 +160,12 @@ None.
   CommandsTab still copy silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-07 — Work: completed interrupted Think Tank workspace UI and closure.** Anchored
+  standard composer, shared participant picker/mentions, retained addressee cues and stable speech/
+  roster tints shipped. Full Go variants, 676 UI tests, final focused UI/style/build checks and
+  Think Tank race checks passed; 60 real-binary journey checks plus nine annotation/deletion checks
+  passed. The unit is available for independent review; credentialed smokes remain owed.
 
 - **2026-10-07 — Work: Think Tank workspace slice 5 (concurrent openings).** Independent openings
   now run at the same time, stay hidden until all settle, and publish in member order; failures,

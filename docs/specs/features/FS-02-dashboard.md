@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -882,7 +882,7 @@ picker and launches with the route project's id; the general modal continues to 
   active project's section and filter option; opening the archived project's Tasks focus still
   shows its tasks. *Verify:* `TasksPage.test.tsx`.
 
-**A53** (planned) — FS-21.A33 exercises R71's distinct titled room cards before the agent grid,
+**A53** — FS-21.A33 exercises R71's distinct titled room cards before the agent grid,
 full roster/allowances, current speaker(s), attention/ended states and separate accessible links in
 all three appearances at 1024px and a wider desktop. Existing density/group/card behavior remains;
 new room deployments get FS-21.R51's title group. *Verify:* dashboard/wire tests and that real-binary

@@ -1,6 +1,6 @@
 # Think Tank workspace and live controls
 
-**State:** In progress
+**State:** Finished
 **Why:** Direct human request, 2026-10-06, confirmed with explicit normal Chuck composer parity.
 **Relevant requirements:** FS-21.R43–R51/A33–A37; FS-02.R71/A53; FS-03.R71–R72/A52–A53;
 TS-14.R22–R28; TS-08.R96–R99; INV §1–§2, §5, §7–§11, §13–§17.
@@ -79,4 +79,7 @@ empty/loading/errors, opening/private waits, approval, pause/failure, End/judge 
 
 ## Waiting on
 
-None. Progress and next slice live in the handoff's Active change.
+Implementation and automated/fake-provider closure finished 2026-10-07. Evidence:
+[`implementation-think-tank-workspace-2026-10-07.md`](../archive/reviews/implementation-think-tank-workspace-2026-10-07.md).
+Independent review is available in the handoff. Credentialed provider smokes remain separate owed
+gates; they were not run during this quota recovery.

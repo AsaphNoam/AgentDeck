@@ -1014,11 +1014,11 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   is refused server-side without bypassing authority. *Verified by:* runtime permission/MCP room
   integration tests, with catalog membership derived from actual tool registrations.
 
-- **A52 (planned)** (R71) — FS-21.A33's rendered navigation journey checks compact participant/
+- **A52** (R71) — FS-21.A33's rendered navigation journey checks compact participant/
   judge chat cues, the Think Tank tab, multiple/ended memberships and ordinary private Send/Steer;
   long goals do not push the first message below a large room banner. *Verify:* ChatPanel tests
   plus that real-binary rendered journey in every appearance at desktop floor/wide widths.
-- **A53 (planned)** (R72) — FS-21.A37 checks exact, single judge synthesis results live, replayed
+- **A53** (R72) — FS-21.A37 checks exact, single judge synthesis results live, replayed
   and archived, including room deletion and failed/stale completion. *Verify:* state/HTTP/projection/
   UI tests and A37's rendered journey.
 

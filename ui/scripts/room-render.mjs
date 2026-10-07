@@ -6,7 +6,8 @@
 //   node scripts/room-render.mjs [outDir] [state]
 //
 // state is "live" (default: a speaker mid-turn with a pending approval and a
-// queued message) or "ended" (operator ended, judge synthesis complete).
+// queued message), "ended" (operator ended, judge synthesis complete), "project"
+// (room discovery cards), or "matrix" (the development presentation matrix).
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +24,7 @@ const member = (agent_id, name, project, order, limit, completed, extra = {}) =>
 });
 const live = state === "live";
 const room = {
-  version: 1, room_id: "tt_demo", goal: "Choose the cache invalidation strategy for the session store, including how stale reads are bounded under failover.",
+  version: 1, room_id: "tt_demo", title: "Session cache invalidation", goal: "Choose the cache invalidation strategy for the session store, including how stale reads are bounded under failover.",
   origin_project: "alpha", phase: live ? "discussion" : "ended", control: "running", hold: "",
   end_reason: live ? "" : "operator", judge_status: live ? "waiting" : "completed",
   participants: ["Ari", "Bea", "Cyd"], revision: 9, created_at: at, updated_at: at, openings: true,
@@ -39,6 +40,7 @@ const room = {
   judge: { enabled: true, status: live ? "waiting" : "completed", agent_id: live ? "" : "a_judge", error: "" },
   deletable: !live,
 };
+room.active_attempts = room.active ? [room.active] : [];
 const entry = (seq, kind, agent_id, agent_name, project, body, extra = {}) => ({ seq, kind, agent_id, agent_name, project, body, attempt_id: `tta_${seq}`, created_at: at, ...extra });
 const entries = [
   entry(1, "opening", "a_ari", "Ari", "alpha", "**Write-through with TTL.** Every write updates Redis synchronously; reads tolerate at most `ttl=30s` staleness.\n\n```go\ncache.Set(ctx, key, value, 30*time.Second)\n```"),
@@ -130,9 +132,11 @@ try {
       const page = await context.newPage();
       page.on("pageerror", (error) => { failed = true; console.error(`page error: ${error.stack}`); });
       const project = state === "project";
-      await page.goto(project ? "http://localhost:5198/project/alpha" : "http://localhost:5198/think-tank/tt_demo");
-      const ready = project ? page.getByRole("heading", { name: "Think Tanks" }) : page.getByRole("list", { name: "Discussion" });
+      const matrix = state === "matrix";
+      await page.goto(matrix ? "http://localhost:5198/__visual-matrix" : project ? "http://localhost:5198/project/alpha" : "http://localhost:5198/think-tank/tt_demo");
+      const ready = matrix ? page.getByRole("heading", { name: "Presentation matrix" }) : project ? page.getByRole("heading", { name: "Think Tanks" }) : page.getByRole("list", { name: "Discussion" });
       const shown = await ready.waitFor({ timeout: 15_000 }).then(() => true, () => false);
+      if (matrix && shown) await page.getByLabel("Fixture appearance").selectOption(skin || "core");
       await page.waitForTimeout(600);
       const out = join(outDir, `room-${state}-${skin || "core"}-${width}.png`);
       await page.screenshot({ path: out, fullPage: true });
