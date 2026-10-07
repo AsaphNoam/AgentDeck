@@ -23,8 +23,8 @@ beside it. Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
 - **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
   (`32da712`, `eadab5a`) are reviewed and closed without findings.
-  **Available:** Think Tank workspace and live controls (`28d6c92^..9b5e8cb`, plus the
-  verification closure), including the earlier slices and recovered composer/mention/tint work.
+  **Available:** Think Tank workspace and live controls (`28d6c92^..9420115`), including the
+  earlier slices, recovered composer/mention/tint work and verification closure.
   The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
   design commits) is closed: its BU-01 fix landed.
   Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
