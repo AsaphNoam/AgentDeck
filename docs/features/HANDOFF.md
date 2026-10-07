@@ -7,11 +7,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Release:** `v0.11.0` is ready to tag on `main`, from `v0.10.0..main` (50 commits before
-  release preparation). The user requested a minor release and authorized pushing when done.
+- **Release:** `v0.11.0` is tagged at `ddf8dda` and pushed with `main` (51 commits after the
+  prior remote main). The user requested a minor release and authorized the push.
   `make test` (both Go variants), 692 UI tests, 41 presentation/style checks,
   `make dist VERSION=0.11.0`, FTS5 build-tag proof, shell syntax and old-name checks passed.
-  Commit/tag/push, then GitHub assembly/publication verification remain.
+  Release run `37655214991` passed assembly, transaction/bootstrap and fresh-install/archive
+  verification, then failed creating the GitHub Release with HTTP 500 (three workflow retries).
+  Direct `gh release create` and two `gh run rerun --failed` requests also returned HTTP 500;
+  no release exists. CI `37655215773` shows every step passed in `gh run watch`, including Go,
+  vet, UI tests/build and cleanup, but its run/job APIs still report `in_progress` without a final
+  conclusion at the last check; confirm final status during recovery.
+  Publication recovery is the next release step; this version is pushed but not published.
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
@@ -59,12 +65,17 @@ Think Tank workspace closure evidence:
 - TS-06.R26/R32: credentialed Codex 2.1.1 receipt for FS-03.A41/A42 and FS-01.A20.
 - TS-06.R32: two-point Claude/Codex smoke on ACP 0.85.1/2.1.1 and Codex 0.159.3, one notice,
   Steer during a running command (FS-03.A48's live half), and a refused model switch where
-  account policy allows. Automated assembly/fake-runtime proofs passed 2026-10-06; release CI
-  assembly must still be verified for v0.11.0.
+  account policy allows. Automated assembly/fake-runtime proofs passed 2026-10-06; v0.11.0
+  release CI assembly and native-provider probes passed 2026-10-07. Live receipts remain owed.
 
 ## Blocked on human
 
-None.
+No human decision is needed. Publication is blocked by GitHub HTTP 500 on release creation and
+workflow rerun (2026-10-07); reads and git push work, and GitHub's public status reports operational.
+When the API recovers, rerun release `37655214991` with `gh run rerun 37655214991 --failed`, verify
+its archive/manifest/installer assets, then set the notes from
+[`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`.
+The tag already points at verified `ddf8dda`; do not retag or recut a new version.
 
 ## Review findings
 
@@ -92,4 +103,6 @@ None.
   controls, quiet completed chat turns, UI polish and the 2026-10 provider refresh. Corrected the
   optional source install's Claude ACP pin to 0.85.1 and regenerated the UI embed through `make dist`.
   The shipped operator package already matched the range. Full Go/UI/build checks passed;
-  archived the settled pre-release handoff and retained manual gates above.
+  archived the settled pre-release handoff and retained manual gates above. Main/tag pushed;
+  macOS assembly/install proofs passed, but GitHub release creation/rerun returns HTTP 500.
+  Release notes are preserved for publication recovery; the release is not published yet.
