@@ -1,0 +1,357 @@
+# Chuck — Handoff snapshot before v0.11.0
+
+**Historical snapshot.** The v0.11.0 release closes this epoch. Current state is in
+[`HANDOFF.md`](../../features/HANDOFF.md); earlier epochs remain beside this file.
+
+## Current position
+
+- **Active change:** None. `think-tank-workspace-and-live-controls.md` is finished and its review findings are fixed.
+- **Release:** `v0.10.0` is tagged at `2904c8e` and published to `AsaphNoam/AgentDeck`; the macOS
+  release workflow and CI passed. The GitHub Release carries the 293,367,237-byte `darwin-arm64`
+  archive, `install.sh`, and a `0.10.0` manifest matching that size; the `AsaphNoam/Chuck` releases
+  API still returns 404 until the rename. It is the first Chuck release: 39 commits after `v0.9.0` ship the Chuck rename and Think Tanks.
+  Its notes tell paired phones to re-pair at the new `chuck` address and point existing users at
+  `docs/chuck-cutover.md`.
+- **Repository name:** the GitHub repository is still `AsaphNoam/AgentDeck`; the human postponed
+  the rename to `AsaphNoam/Chuck` and chose to release first. Release CI publishes to the current
+  repository, but the shipped installer bootstrap, README one-liner and `chuck update` default to
+  `AsaphNoam/Chuck` and 404 until the rename; workarounds are `CHUCK_REPO=AsaphNoam/AgentDeck`
+  and `chuck update --repo AsaphNoam/AgentDeck`. Renaming later fixes them without a new release.
+- **Work units:** `migrate-internal-actions-from-mcp.md` stays paused on its transport blocker.
+  The 2026-10 provider bundle refresh is finished (its live-provider smokes are owed).
+  `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun` flakes intermittently with a
+  409 "a resume is already in progress" (pre-existing at `74c8e84`); needs a synchronization fix.
+- **Review units:** the test-only `post-release-flaky-test-synchronization` fixes
+  (`32da712`, `eadab5a`) are reviewed and closed without findings.
+  Think Tank workspace and live controls (`28d6c92^..9420115`), including the earlier slices,
+  recovered composer/mention/tint work and verification closure, is closed: its TW-01–TW-06
+  fixes landed.
+  The 2026-10 provider bundle refresh (`7c95fa9^..2f39c3f`, excluding the interleaved `docs:`
+  design commits) is closed: its BU-01 fix landed.
+  Think Tanks (`46379da..539ab11`) is closed again: its second-pass findings are fixed.
+  Quiet completed chat turns (`2cf6cfa^..36f055a`) is closed: QT-01–QT-05 fixes landed.
+  Review notes: TS-08.R102 keys a turn by its opening boundary seq (no key adoption; a phone
+  window carries it forward by seq); notices stay visible in completed turns as outcomes; scroll
+  anchoring through automatic collapse relies on native `overflow-anchor`; the phone render uses
+  a real transcript through `phone-render.mjs`, not a paired device. Rendered journey: from the
+  repo root, `make embed`, `go run -tags sqlite_fts5 ./scripts/stress-fixture -port 4411
+  -scenario activity_showcase -showcase-pause-ms 900`, then `node ui/scripts/turns-journey.mjs`.
+  Live thought deltas that arrive during a transcript re-read are dropped, not buffered (TS-08.R103).
+  UI polish — auto-grow fields, icon actions, plain labels (`eec9038`, `221980d`, `8609d00`,
+  `8e06375`) is closed: its UP-01 fix landed.
+- **Design units:** available and resumable entries remain in `docs/ideas.md`.
+- **Branch:** `main`.
+
+## Active change
+
+None. The completed
+[`think-tank-workspace-and-live-controls.md`](../../ready-changes/think-tank-workspace-and-live-controls.md)
+was independently reviewed and its findings TW-01–TW-06 are fixed; the unit is closed.
+Credentialed checks remain below. Evidence and reproduction commands:
+[`implementation-think-tank-workspace-2026-10-07.md`](../reviews/implementation-think-tank-workspace-2026-10-07.md).
+
+Review notes: invalidating mounted judge-results queries on every room update matches TS-14.R26
+and is accepted. Opening-retry command ids are bound on the retried attempt row (migration 44).
+The transcript store's `settled` flag marks a finished or failed full read, so a settled empty
+source shows retained results as source-unavailable. Pending pipeline-owned room work remains a
+separate waiting unit.
+
+## Acceptance gates still owed
+
+- FS-21 / TS-06.R33 (Think Tanks): bounded credentialed Claude/Codex smoke remains owed
+  (room-tool read/submit, shared addressed input, ordinary approval/denial, private Send/Steer,
+  native resume, end-only judge and its retained exact result). Automated/race closure and the
+  real-binary fake-provider rendered journey passed 2026-10-07: 60 main checks plus nine
+  annotation-mail/deletion checks, across all appearances. Fake ACP is not a live-provider receipt.
+
+- FS-10.R25/A14, TS-02.R41: one supervised cutover rehearsal on a disposable copy of the real
+  AgentDeck home, following `docs/chuck-cutover.md`, with a receipt. The GitHub repository rename
+  to `AsaphNoam/Chuck` (installer and updater fetch there) is still owed; see Current position.
+
+- FS-02.A46: real-browser toast click check and a manual macOS desktop-notification click are
+  owed; automated component and `sse.test.ts` coverage passes.
+
+- FS-18.A12 / TS-11.R17: the six manual role scenarios with a role-free follow-up against the
+  pinned Claude and Codex providers have not been run; no qualitative receipt exists yet.
+- FS-18.A13: the credentialed fresh and resumed Claude chat check of native-preset adoption is
+  owed. Automated coverage proves only the sent shape against pinned
+  `claude-agent-acp` 0.85.1 (`scripts/release/node_modules/.../dist/acp-agent.js` forwards an
+  object `_meta.systemPrompt` as a preset append; a string replaces the preset).
+
+- FS-20.A1/A5/A6/A8: real tailnet, Android, iPhone, and `pmset -g assertions` checks. The iPhone
+  Home Screen experience also still lacks a PNG touch icon. The 390px fake-provider browser pass
+  covered A3/A4/A7/A9, except the fast-mode picker and Continue on an approval pause.
+- FS-20.A10–A13: focused server and UI suites pass; the remaining phone UI-coverage gaps are listed
+  under Review findings. The combined 390px fake-provider browser journey
+  for the new dashboard, project, agent-management, Files/Commands, and retired task flow also remains
+  owed.
+- TS-06.R21: credentialed Claude and Codex login/chat checks.
+- TS-06.R31 / FS-09.A40/A42/A46/A47/R78, FS-10.A10–A12 (installed providers): at most four real
+  combinations — Claude and Codex, each with the current bundle and one current installed CLI —
+  running the finite smoke (fresh chat, native resume, model/effort, one approval/denial and
+  cancel, Steer, a role/skill and an MCP action), plus two rendered fake-provider journeys
+  (Installed update → Refresh → choose new model; missing Installed → Bundle save → retry →
+  back to Installed with overrides). Needs authorization and credentials; `assemble.sh`'s native
+  probes run first in release CI. Claude Installed fresh launch at `claude-opus-5-5` passed live
+  2026-10-05 (adapter 0.75.1/SDK 0.3.257, Claude Code 2.1.282, macOS, the user's existing login); the
+  Bundle still refuses it with Claude Code 2.1.257's version error, as designed.
+- TS-06.R26/R32: the credentialed Codex 2.1.1 receipt gating FS-03.A41/A42 and FS-01.A20.
+- TS-06.R32 (2026-10 bundle, Claude ACP 0.85.1 / Codex ACP 2.1.1 / Codex 0.159.3): the two-point
+  Claude and Codex smoke plus one notice, one Steer during a running command (FS-03.A48's
+  credentialed half) and one refused model switch where policy allows staging it. Automated
+  assembly proofs and fake-runtime tests passed 2026-10-06; a release CI `assemble.sh` run is
+  also still owed.
+- FS-02.A27: six-tab real-browser shared-stream check; A46's real-browser J14 pass; Sky & Grove
+  with Codex capabilities.
+
+## Blocked on human
+
+None.
+
+## Review findings
+
+None.
+
+## Decisions needing your input
+
+- **API/model compatibility:** TS-03.R3–R4 preserve mixed legacy error envelopes; TS-04.R3 records
+  provider model-ID ownership. Standardizing either is a compatibility change.
+- **Failed pipeline-stage chat:** decide whether a pause after failed launch/resume keeps
+  withholding **Open agent**, matching restart recovery, or permits chat under a wider continuation
+  contract.
+
+## Design consistency notes
+
+- At the next presentation review, decide whether the remaining crisp asymmetric radii on technical
+  surfaces are deliberate under FS-12.R52.
+- When the paused direct-action change resumes, align TS-01.R25 and TS-03.R32 with TS-04.R40 and
+  scope FS-17 section 6's opening sentence to the intended planned boundary.
+- The injected-steer lifetime edge case needs `/investigate-bug` before `/fix`; FilesTab and
+  CommandsTab still copy silently through bare `writeText`.
+
+## Changelog
+
+- **2026-10-07 — Fix: quiet completed turns QT-04/QT-05; unit closed.** The phone admits no live
+  thought after a (re)connect until hydration ends and each open window has re-read past its
+  bumped revision, nor against placeholder data (INV §1/§11). A sliding phone window carries its
+  leading turn's key forward by seq, so thoughts and collapse choices survive the 150-event slide
+  (INV §1/§11). TS-08.R102–R103 updated; both phone regressions fail on the old code. Closure:
+  `make test`, 692 UI tests, UI and binary builds, `-count=1` runtime tests, and the rendered
+  journey (24/24) passed. Nothing in this unit remains open.
+
+- **2026-10-07 — Fix: quiet completed turns QT-03.** The rendered journey now waits for a new
+  root turn end and fails on timeout, requires thoughts/tools/child in expanded activity, archives
+  a real agent and asserts the Archive and dashboard-pane transcripts and disclosures, and adds
+  keyboard, focus-return-on-collapse, reading-above-tail, follow-bottom and reduced-motion checks
+  (INV §17). A fake-ACP `FAKEACP_SHOWCASE_PAUSE_MS` knob (stress-fixture `-showcase-pause-ms`)
+  widens live windows; default timing is unchanged. 24/24 checks passed twice with QT-01/QT-02 in
+  the build; full Go variant via `make test` and 690 UI tests passed. QT-04/QT-05 remain open.
+
+- **2026-10-07 — Review: quiet completed turns, including QT-01/QT-02 fixes.** Accepted the
+  targeted history-admission/last-view cleanup and child terminal-reset fixes; found phone
+  reconnect misassociation and sliding-window identity loss (QT-04/QT-05). QT-03 remains open;
+  concurrent uncommitted journey/fixture/embed edits were preserved and not reviewed as closure.
+  Focused SSE/reasoning/child/projection/phone checks passed (58 tests); the independent
+  transcript/projection/phone audit also passed its 58 tests and TypeScript build. Styles and
+  presentation checks passed (41 tests plus contract audit). Actual-module reproductions prove
+  both phone defects. Fix routing remains medium — Codex Terra or Claude Opus.
+  INV sweep: §1/§2/§4/§7/§8/§10/§11/§13/§16/§17 checked; no applicable changed surface for
+  §3/§5/§6/§9/§12/§14/§15. Local choices remain accepted: boundary-based keys rather than
+  adoption, visible notices, native scroll anchoring pending rendered proof, and the documented
+  real-transcript phone render fallback.
+
+- **2026-10-07 — Fix: quiet completed turns QT-01.** Live thoughts are admitted only after the
+  source's transcript read reconciles (desktop and phone), render only while their slot stays in
+  the owning turn, and drop when the source's last view closes (INV §1/§11; TS-08.R102–R103
+  clarified). SSE-path and render tests fail on the old code. QT-03 remains open.
+
+- **2026-10-07 — Fix: quiet completed turns QT-02.** A child's first terminal activity state now
+  drops any open choice once, closing its nested tool/thought detail while the root turn is live;
+  manual reopening still works (INV §1). QT-01 and QT-03 remain open.
+
+- **2026-10-07 — Fix: Think Tank workspace and live controls review (TW-01–TW-06).** Opening
+  retry now binds its command id (INV §11/§15); legacy create replay compares an explicit title
+  (INV §2/§11); a retained synthesis shows when the transcript is empty or unreadable (INV §1/§10);
+  a failed synthesis read shows Retry (INV §7/§8); clipped membership lists say so (INV §10/§11/§16);
+  ended cards keep the unused total (INV §10). Unit closed; QT-01–QT-03 remain open. The FTS5 Go
+  variant, 684 UI tests and both builds passed; the plain variant passed except
+  `TestOrdinaryStageAgentStopPausesPipelineRun`, which flakes ("a resume is already in progress",
+  roughly 1 in 40 runs) and reproduces at `74c8e84`, before these fixes.
+
+- **2026-10-07 — Review: Think Tank workspace and live controls.** Found command-retry and legacy
+  title replay gaps, a missing-transcript synthesis defect, and smaller read-feedback, clipping and
+  ended-card summary gaps (TW-01–TW-06). Focused Go race checks passed both variants; affected UI
+  and presentation checks passed. The unit stays open; fix routing is medium.
+
+- **2026-10-07 — Work: completed interrupted Think Tank workspace UI and closure.** Anchored
+  standard composer, shared participant picker/mentions, retained addressee cues and stable speech/
+  roster tints shipped. Full Go variants, 676 UI tests, final focused UI/style/build checks and
+  Think Tank race checks passed; 60 real-binary journey checks plus nine annotation/deletion checks
+  passed. The unit is available for independent review; credentialed smokes remain owed.
+
+- **2026-10-07 — Work: Think Tank workspace slice 5 (concurrent openings).** Independent openings
+  now run at the same time, stay hidden until all settle, and publish in member order; failures,
+  Pause, End and restart wait for running peers and need explicit per-opening retry. State/server/
+  messaging in both Go variants, focused `-race` and room UI tests passed.
+
+- **2026-10-07 — Work: Think Tank workspace slice 4 (judge results in chat).** A finalized
+  synthesis is retained once in the judge's own history (survives room deletion) and shows in its
+  live and archived chat with a room link. Also classifies slice 2's turn-limit route as phone-denied
+  (the slice 2 commit had left `TestRemoteRouteInventoryIsClassified` failing).
+
+- **2026-10-07 — Work: Think Tank workspace slice 3 (shared mentions, server).** Shared room
+  messages accept validated participant mention ranges; addressees are snapshotted, visible to all
+  and flagged to the addressee on its next room read. State/MCP/server tests passed.
+
+- **2026-10-07 — Work: Think Tank workspace slice 2 (live turn limits).** Operators can raise a
+  participant's turn ceiling during openings/discussion (paused or held included); exhausted members
+  regain eligibility, nothing resumes or steers, replays are exact and stale/ended changes refuse.
+  State/server tests in both Go variants and room UI tests passed.
+
+- **2026-10-07 — Work: Think Tank workspace slice 1 (titles, title groups).** Rooms carry a fixed
+  short title (legacy rows/API callers get a goal-derived fallback via migration 39); the room
+  header leads with it and the goal moves into a disclosure; new participants/judge launch into the
+  title group. State, server (`ThinkTank` filter) and room UI tests passed; wire fixture regenerated.
+
+- **2026-10-07 — Fix: UI polish UP-01 (INV §8/§10).** The phone Message/Reply composer passes
+  `maxHeight="40vh"`, so a long draft caps near 40% of the viewport and scrolls inside while text
+  and Send behave as before (FS-02.R66, TS-08.R88). AgentScreen test asserts the cap; restores
+  specified behavior, no specification change. Unit closed. Remote UI tests (48) and the
+  AutoGrowTextarea suite passed; `tsc` clean. Still open: Quiet completed chat turns QT-01–QT-03.
+
+- **2026-10-07 — Review: UI polish.** One must-fix (UP-01); the unit stays open. Plain labels,
+  archived Tasks filtering, icon semantics, header ordering and desktop field sizing match the
+  specs. Focused UI tests: 108/108; styles/presentation: 40/40 plus contract check;
+  isolated loopback fake-ACP `polish-render.mjs`: 17/17, screenshots inspected in all three skins.
+  INV sweep: §1/§2/§3/§4/§8/§10/§13/§17 checked; no applicable surface for
+  §5/§6/§7/§9/§11/§12/§14/§15/§16. Existing submit/persistence paths are unchanged;
+  resize listener cleanup is paired; tests use explicit requirements and DOM/layout observations.
+  The concurrent BU-01 fix and its handoff closure were preserved.
+
+- **2026-10-07 — Fix: 2026-10 provider bundle refresh BU-01 (INV §1/§2).** `markBackgrounded`
+  now reads `collectTasks`, so a tool's background label follows the resume and clone fences:
+  after either boundary it reads "Ran in background", matching the task list (FS-01.R36,
+  TS-08.R86). Resume/clone tool-label tests added; restores specified behavior, no specification
+  change. Unit closed. `make test`, `make build`, UI tests (661) and UI build passed.
+  Still open: Quiet completed chat turns QT-01–QT-03; UI polish review.
+
+- **2026-10-07 — Review: post-release test synchronization.** Reviewed `32da712` and
+  `eadab5a`: held-context prompt delivery is observed before the no-new-turn baseline, and
+  New Agent options wait for the rendered default model before changing runtime controls.
+  Existing provider-count, persistence, launch-payload and runtime-control assertions remain
+  intact; no product or specification change, findings, or unresolved local choices. Unit closed.
+  **Fix model:** trivial/easy — Claude Sonnet or Codex Luna (no open fixes).
+  INV §17 reviewed; classes 1–16 have no applicable changed production surface.
+  Both context integration tests passed three repetitions untagged and once with `sqlite_fts5`;
+  all 26 New Agent tests passed. The adjacent onboarding synchronization was also inspected and
+  its two tests passed, but is outside this unit. Go tests required sandbox-external loopback
+  listeners. Concurrent chat edits were preserved; this review changes only the handoff.
+
+- **2026-10-07 — Implementation: UI polish.** Every text field auto-grows with no grip (composers
+  cap near 40% of the window); Send, Cancel, Collapse and Collapse all are icons; expanded cards put
+  badge and Collapse top-right with the context meter beneath; selectors show plain names with ids
+  only for duplicates; Tasks hides archived projects. Closure: `make test` (one run failed while the
+  stress fixture was being stopped; the rerun passed), `make build`, UI tests/build, style checks and
+  `polish-render.mjs` 17/17.
+
+- **2026-10-06 — Review: quiet completed chat turns.** Three must-fix findings (QT-01–QT-03);
+  unit stays open. Shared boundary keys, conservative final-passage selection, visible approvals,
+  outcomes/background controls and phone/attempt projection wiring otherwise match the specs.
+  Opening-boundary identity and visible notices are sound local choices; native scroll anchoring
+  still needs the required rendered proof. Invariant sweep: 1, 2, 8, 10, 11, 13, 16 and 17
+  reviewed; 3, 4, 5, 6, 7, 9, 12, 14 and 15 have no applicable changed surface.
+  All 117 focused UI tests passed; temporary projection/component probes confirmed QT-01 and
+  QT-02 and were removed. The concurrent field-polish commit also captured the initial review
+  record; this review's final verification receipt is a separate handoff-only commit.
+  Stylelint and all 40 script tests passed, but the presentation audit failed on concurrently
+  added `AutoGrowTextarea.tsx` inline styles outside this unit. Preserved concurrent work;
+  this review changes only the handoff and does not rerun or claim the rendered acceptance gates.
+
+- **2026-10-06 — Work: quiet completed chat turns.** Shared turn projection and `TurnList` across
+  full chat, dashboard pane, Archive, phone and Think Tank attempt activity; live thoughts start
+  open with per-turn/scope collapse; cut-short turns label their response partial. Rendered
+  real-binary journey (fake ACP `activity_showcase`) passed at 1024px/1600px in Core, Sky & Grove
+  and Studio plus reduced motion; phone rendered at 390px from that run's transcript. Invariants:
+  1, 2, 8, 10, 11, 13, 16, 17 applied; others have no changed surface.
+
+- **2026-10-06 — Review: 2026-10 provider bundle refresh.** One must-fix finding (BU-01); unit
+  stays open. Confirmed pins, patch/hash proofs, MCP revision guard, notice persistence/preview
+  exclusion and model-policy error shapes against the installed dependency sources. Confirmed
+  TS-04.R81's local choice to derive background state from the linked task. Invariant sweep:
+  applicable classes 1, 2, 8, 10, 11, 12, 13, 16 and 17 reviewed; classes 3, 4, 5, 6, 7, 9, 14
+  and 15 have no changed surface. Runtime, transcript, CLI, release and messaging suites passed;
+  CLI needed sandbox-external loopback binds. All 104 focused UI tests, style and presentation
+  checks passed. Live-provider smokes and release-CI assembly remain owed as listed above.
+
+- **2026-10-06 — Work: 2026-10 provider bundle refresh.** Pins Claude ACP 0.85.1 (SDK 0.3.286),
+  Codex ACP 2.1.1 with Codex 0.159.3 (steering patch regenerated, still required), go-sdk 1.8.0.
+  AIR shapes Chuck decodes were unchanged. Adds notice rows, steer-backgrounded tool state and
+  model-policy refusal reasons. Closure: `make test`, `make build`, UI test/build/style checks and
+  a focused runtime `-race` pass all passed. TS-06.R32 stays planned until its smokes run.
+
+- **2026-10-06 — Design: quiet completed chat turns.** Human confirmed one per-turn activity
+  disclosure and unchanged ephemeral thought retention. Ready change `quiet-completed-chat-turns.md`
+  is Waiting to start: FS-03.R73–R77/A54–A58 and TS-08.R100–R106 cover open live thoughts,
+  respected manual choices, automatic terminal collapse, last-passage compatibility, actionable
+  attention/background status and shared desktop/dashboard/archive/phone behavior. No protocol,
+  durable-history or retention change; rendered long-chat acceptance remains an implementation
+  gate. No product code changed in this design unit; the provider refresh stays active.
+
+- **2026-10-06 — Design: Think Tank workspace and live controls.** Human confirmed the scope
+  and required the room composer to match standard Chuck chat input. Ready change
+  `think-tank-workspace-and-live-controls.md` is Waiting to start. FS-21.R43–R51/A33–A37,
+  FS-02.R71/A53 and FS-03.R71–R72/A52–A53 cover titled cards, compact chat/tab navigation,
+  anchored shared mentions, speaker tints, concurrent openings, live ceilings, exact judge-chat
+  results and new-agent grouping. TS-14.R22–R28 and TS-08.R96–R99 reuse room admission,
+  finalization, normal launch and shared presentation; independent audits checked pending-design
+  overlap and execution guards. R23 explicitly fences pipeline Stop and failed-opening retries;
+  judge results commit atomically with room synthesis as agent-owned read projections. Integrate
+  shared textarea/icon seams with `ui-polish-fields-icons-labels.md`; keep pipeline-stage work
+  independent and applicable closure guards shared. All new requirements remain planned; no
+  product code changed and the active provider-refresh work remains active.
+
+- **2026-10-06 — Design intake: Think Tank workspace and live controls.** Recorded the requested
+  improvements and proposed experience in `docs/ideas.md` under Ideas being defined: titled
+  single-column room cards before project agents, compact participant chats with a Think Tank tab,
+  anchored shared composer and agent mentions, stable speaker tints, concurrent isolated openings,
+  live ceiling increases, judge-chat synthesis and grouping of newly deployed agents. Awaiting
+  feature-side confirmation of mention scheduling, existing-group preservation, terminal budget
+  behavior and title compatibility. No product code, new TS design or ready change in this unit;
+  the active provider refresh and other specification/code work are preserved.
+
+- **2026-10-06 — Design: Think Tank pipeline stages and task collapse.** Human confirmed the
+  scope; ready change `pipeline-think-tank-stages-and-task-collapse.md` is Waiting to start.
+  FS-14.R81–R86/A48–A52, FS-21.R41–R42/A31–A32 and FS-16.R46–R48/A30–A32 cover fresh same-project
+  rooms, required judge synthesis as direct stage output, retained history/recovery/scoped Stop,
+  readable shared-workspace consent and parent-level collapse. TS-09.R51–R56, TS-14.R19–R21,
+  TS-10.R38 and TS-08.R92–R95 reuse room execution and task result authority, add durable managed
+  stage binding and session collapse choices. Independent read-only seam/review pass resolved output,
+  state and acceptance-retry contracts. All new requirements remain planned; no product code changed
+  in this design unit and the active provider-refresh change stays active.
+
+- **2026-10-06 — Design: UI polish batch.** Ready change `ui-polish-fields-icons-labels.md`
+  (FS-02.R66–R70, TS-08.R88–R91): auto-grow textareas, icon Send/Cancel/Collapse, expanded card
+  header order, duplicate-gated plain labels, archived projects hidden on Tasks. Absorbs the
+  "Finish hiding raw ids" idea.
+
+- **2026-10-06 — Fix: Think Tanks second pass (TT2-01–TT2-08).** Must fix TT2-01 (INV §1, §16): a
+  stopped speaker whose resume fails before its attempt holds the room with a reason after one
+  attempt. Worth fixing: TT2-02 (INV §5) a room change during resume leaves the agent running
+  idle; TT2-03 (INV §16) per-room bounded progression goroutines (cap 4); TT2-04/07 (INV §16)
+  migration 38 adds a byte-counted `activity_bytes` total and the attempts room index; TT2-05
+  (INV §16) live activity refills from the cached tail; TT2-06 (FS-21.R31) judge read omits
+  ceiling fields and the instruction is role-neutral; TT2-08 (INV §1) a store failure at turn end
+  holds the room with recovery text (no regression test: needs a store-failure seam). TS-14 updated.
+
+- **2026-10-06 — Review: Think Tanks second pass.** Human-requested behind-the-scenes review of
+  `46379da..539ab11`: context delivery verified sound; one Must fix (silent resume-failure retry
+  loop) and seven Worth fixing (resume-window stop, serial worker, quadratic capture cap,
+  UI activity refetch storm, judge framing, missing attempts index, store-failure stuck attempt).
+  Focused `-race` ThinkTank state/server tests pass.
+
+- **2026-10-06 — Release: `v0.10.0` published.** 39 commits after `v0.9.0`: the Chuck rename, Think
+  Tanks, phone streamed-reply and Manage-refusal fixes, notification stale-agent coverage and the
+  Claude 5.5 alias-row fix. The operator package (Think Tank reference already added), README and
+  pins already matched the range. `make test`, UI suite (625) and `make dist VERSION=0.10.0` pass.
+  Released before the repository rename at the human's choice. Settled state archived to
+  `HANDOFF-through-2026-10-06`. Release workflow and CI passed; assets verified.
