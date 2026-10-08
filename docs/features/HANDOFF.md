@@ -22,11 +22,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   `pipeline-think-tank-stages-and-task-collapse.md` is waiting to start; its behavior remains planned.
   Other available/resumable design work is in `docs/ideas.md`.
-- **Review units / findings:** Chat links, tables and tabs (`7661d97`..closure commit, 2026-10-08)
+- **Review units / findings:** Clone first-message failure investigation (2026-10-08) has an
+  unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
+  tables and tabs (`7661d97`..closure commit, 2026-10-08)
   awaits `/review`. Notes for the reviewer: one right-click opens one menu because the anchor
   defers its own menu a microtask and enclosing annotation menus claim it (`lib/linkActions.ts`);
   table cells reset `overflow-wrap` so the dashboard pane's wrap-anywhere rule cannot split short
-  words (found by the rendered check). No findings open.
+  words (found by the rendered check).
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
   intermittently returns 409 "a resume is already in progress" (pre-existing at `74c8e84`);
   synchronization fix remains separate work.
@@ -78,7 +80,53 @@ The tag already points at verified `ddf8dda`; do not retag or recut a new versio
 
 ## Review findings
 
-None.
+### Clone first-message failure — investigation 2026-10-08
+
+**Report (verbatim):** “cloning a chat gave it a generic name (Atlas), when I sent the agent a
+message it didn't work - returned Internal Error. Looking in the console I saw Failed to load
+resource: the server responded with a status of 409 (Conflict)”
+
+Reported provider, failed URL/body, agent id, version and reproduction environment are unknown.
+Investigation checkout: main, clean at startup; macOS. The local installed server is v0.11.0,
+but it cannot be identified as the reported server: its two current sessions are Codex, neither
+is Atlas, and neither `.chuck/dashboard.log` nor the legacy `.agentdeck/dashboard.log` contains
+a clone request or a structured 409 access-log entry. No correlated provider diagnostic was supplied.
+An optional request for provider and Network URL/body was sent; no answer at closure.
+
+Naming is **confirmed works as specified** under FS-01.R4/R36: `clone.go:72` omits Name;
+`launch.go:331` calls `suggestName`, whose first unused suggestion is Atlas. R36 does not carry
+the source display name. This is independent of sending and is not a fix finding.
+
+- **Must fix — probable field behavior; root cause undetermined; fix complexity medium.**
+  The reported first message to a successful clone fails instead of continuing its conversation
+  (FS-01.R36). `internal/server/sessions.go:27` accepts chat input via SendPromptOrHold;
+  `chat.go:484` queues busy input rather than returning ErrTurnInFlight. A provider prompt RPC
+  failure happens asynchronously at `chat.go:776` after the HTTP 202 and emits a protocol error.
+  Thus the reported 409 cannot yet be attributed to that provider error: the exact request/body
+  must identify whether it is a prompt/wake conflict or an unrelated control request. Do not
+  change clone ownership or add retries based on the status alone. Capture the target id,
+  failed route/code, transcript error and bounded provider diagnostic, then reproduce clone →
+  first prompt on the reported provider and add the resulting regression. Native clone dates
+  to `2c9bb8e` (2026-09-22); no evidence pins a regression to that change. Existing fake-provider
+  tests `TestCloneForksTheConversationIntoANewAgent` and
+  `TestForkLaunchCopiesHistoryThroughTheBoundary` pass; the latter sends and completes a clone
+  turn. They do not reproduce the field failure or prove live-provider compatibility.
+- **Worth fixing — confirmed observability gap; fix complexity easy.**
+  `internal/runtime/jsonrpc.go:24–31` retains RPC code/data but Error() returns only Message;
+  `internal/runtime/chat.go:776–790` emits only that string for a live-process session/prompt
+  failure and logs no correlated diagnostic. A generic “Internal Error” therefore loses RPC
+  classification/context at the user-visible boundary, while the captured provider stderr ring
+  is not consulted on this path. This prevents determining whether a successful fork is rejected
+  by the provider on its next turn. Add a bounded, sanitized diagnostic at the existing failure
+  seam identifying agent, backend, operation and RPC code, plus allowlisted provider reason when
+  present (workflow §12.5, TS-04.R12, INV §8/§11). Never dump raw Data, prompt text or stderr.
+  Verify with a fake peer returning a generic message plus code/detail: the transcript remains
+  safe and the diagnostic identifies the failure without secrets.
+
+**Fix model:** medium — Codex Terra or Claude Opus.
+
+No product code, specifications or tests changed. Focused fake-provider tests passed with loopback
+permission after the sandbox blocked the test listener. No live provider turn was started.
 
 ## Decisions needing your input
 
