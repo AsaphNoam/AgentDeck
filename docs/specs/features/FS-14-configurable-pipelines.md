@@ -715,7 +715,61 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   supplied data and accepts no partial stage result; correcting a judge submission does not spend
   another completed synthesis contribution.
 
+### 4.9 Shared orchestrator instructions
+
+- **R87 (planned)** — A pipeline template has an optional **Shared orchestrator instructions**
+  text field beside its standing orchestrator role in the template editor. Operators can define
+  naming, grouping, delegation and other run-wide conventions once, independently of stage
+  objectives. Template reads/writes, hand-editable JSON and Chucky drafts/proposals preserve the
+  field. It accepts at most 16,000 Unicode code points; oversized text produces a field-named
+  validation error, retains the editor draft and saves/starts nothing. Missing or whitespace-only
+  text means no additional instructions. Starting a run freezes this text with the template;
+  later edits affect future runs only. It is template semantics, not another run-start override.
+- **R88 (planned)** — Chuck adds the frozen shared instructions to the standing instructions
+  of each run-created standing orchestrator and dedicated stage coordinator. Claude receives them
+  through Chuck's addition to its native system prompt; Codex receives them through Chuck's
+  developer instructions. They are not sent as an initial ordinary message or repeated in stage
+  assignments. Normal resume, wait/wake, native-session recovery, runtime switching and a fresh
+  replacement standing orchestrator preserve the same guidance without accumulating copies.
+  Stage objectives, inputs, outputs and reporting instructions continue to arrive through the
+  existing durable assignment contract.
+- **R89 (planned)** — The instructions are shared defaults; the standing block explicitly permits
+  an exception stated in a stage assignment to override those defaults. They supplement the
+  selected role and project context without changing saved roles/projects, permissions, project
+  access or Chuck's stage/result authority. Naming and grouping remain agent guidance, not
+  server-enforced rules. Ordinary delegated workers and Think Tank participants/judges do not
+  automatically receive this standing block; an orchestrator can pass relevant guidance through
+  ordinary delegation. Frozen agent instructions retain the ordinary session lifecycle, including
+  after the run ends or is deleted; existing sessions and runs started before this feature gain
+  no instructions retroactively.
+
 ## 5. Acceptance criteria
+
+- **A53 (planned)** (R87) — Enter naming/grouping guidance once, save/reopen the template, then
+  start a run containing standing and dedicated stages without copying that guidance into their
+  objectives. CRUD, serialized API/CLI round trips and Chucky proposal preview/approval retain
+  the exact text. Editing an approved proposal invalidates its existing confirmation. Missing,
+  empty and whitespace-only fields preserve existing behavior; 16,000 code points pass and
+  16,001 fail by field before save/start, with the editor draft intact. *Verify:* canonical
+  validator and producer-derived HTTP/proposal/CLI fixtures, editor interaction tests and a
+  rendered template-edit → save → reopen → start journey in all three desktop appearances.
+- **A54 (planned)** (R88–R89) — Inspect actual launch/provider parameters for a standing owner and
+  dedicated coordinator: the shared block occurs once in Claude's native-preset system addition
+  and Codex's developer instructions, beside the existing role/project/Chuck guidance. Initial
+  and later stage messages and durable assignments contain no copy of the block. An explicit
+  stage exception is allowed by the standing block. Ordinary workers and room participants/judges
+  receive no automatic block; saved role/project files and permissions remain unchanged.
+  *Verify:* server launch/task-dispatch integration and adapter-schema/serialized runtime tests;
+  a bounded packaged Claude/Codex probe checks standing-guidance adoption separately from fake
+  delivery proof, without claiming naming/grouping compliance from prompt emission alone.
+- **A55 (planned)** (R87–R89) — Start with guidance A, change the saved template to B, and exercise
+  next-stage dispatch, Continue/Retry, wait/wake, server restart/native resume, failed-load fresh
+  session fallback, runtime switch and explicit standing replacement. The original run's
+  orchestrators retain A once; a new run receives B. End/delete the original run and resume its
+  retained agent: its frozen prompt remains available. Sessions/runs without the field stay
+  unchanged, and no recovery silently omits guidance after a stored-context read failure.
+  *Verify:* frozen-session and pipeline integration/fault tests with provider-boundary capture;
+  native-context-loss supervision remains covered by the existing recovery contract.
 
 - **A52 (planned)** (R86) — Lose the post-publication kick and fail stage acceptance before commit.
   Reconciliation accepts the same synthesis once without another judge turn; persistent failure
@@ -1024,6 +1078,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
+**Confirmed shared standing instructions, 2026-10-08.** R87–R89/A53–A55 are approved but
+unshipped. The operator explicitly chose Claude system/Codex developer instructions over ordinary
+conversation messages or repetition in stage assignments. TS-09 and TS-11 define delivery and
+freezing. No new run-page setup panel, live instruction editing, prompt templating/interpolation,
+automatic worker/room inheritance or naming/grouping enforcement is included.
+
 **Confirmed run-page direction, 2026-09-23.** R79 removed the setup and latest-value panels
 from the human run page on 2026-09-23. The frozen template, assignments, input values, and
 current named-value projection remain durable and available through the existing API; run and agent
@@ -1124,6 +1184,9 @@ the technical delivery contract; the expanded change is ready to implement.
 
 ## 7. Traceability
 
+- Shared orchestrator instructions: TS-09.R57–R60 and TS-11.R20; existing provider delivery is
+  TS-04.R69 and the Codex developer-instruction merge. Implementation and A53–A55 evidence are
+  pending in `docs/ready-changes/shared-pipeline-orchestrator-instructions.md`.
 - Existing agent identity, launch, stop, crash, and backend/model rules: FS-01.
 - Existing card/group and notification presentation: FS-02.
 - Role/project/backend configuration timing: FS-04 and FS-09.

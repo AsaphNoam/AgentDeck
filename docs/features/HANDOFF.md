@@ -20,6 +20,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
 - **Active change:** Think Tank pipeline stages and task collapse (see below).
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
+  `shared-pipeline-orchestrator-instructions.md` is waiting to start with approved specifications.
   Other available/resumable design work is in `docs/ideas.md`.
 - **Review units / findings:** Clone first-message failure investigation (2026-10-08) has an
   unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
@@ -211,12 +212,14 @@ permission after the sandbox blocked the test listener. No live provider turn wa
 
 ## Changelog
 
-- **2026-10-08 — Shared pipeline instructions in design.** Recorded the request in
-  `docs/ideas.md`: reusable naming, grouping and other every-stage orchestration guidance.
-  Proposed optional template instructions frozen per run and composed into the standing owner's
-  and dedicated coordinators' persistent instructions, following the user's feedback to avoid
-  repetition in stage assignments. Remaining scope/precedence awaits confirmation; no technical
-  specification, ready change or product edit yet.
+- **2026-10-08 — Shared pipeline instruction design ready.** User approved the optional template
+  field as standing Claude system/Codex developer instructions, without ordinary-message bootstrap
+  or stage repetition. Added planned FS-14.R87–R89/A53–A55, TS-09.R57–R60 and TS-11.R20;
+  `shared-pipeline-orchestrator-instructions.md` is waiting to start. Guidance freezes into newly
+  launched owner/coordinator session prompts and survives recovery/replacement; stage exceptions
+  are explicit, roles/permissions are preserved and workers/rooms have no automatic inheritance.
+  Removed the source idea; the separate Think Tank implementation remains active. Documentation,
+  twin-skill and whitespace checks passed; no product code edited by this design.
 
 - **2026-10-08 — Chat links, tables and tabs finished.** Web links open in new tabs with Open in
   new tab/Copy link on right-click, composed with annotation menus; Markdown tables get dividers,

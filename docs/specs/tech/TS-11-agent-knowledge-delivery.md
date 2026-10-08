@@ -249,6 +249,20 @@ tool definitions own exact arguments/results. No persona, repository instruction
 configuration duplication. The fixed activation instruction points at current room tools; mutable
 room goal, phase and turn data are fetched rather than frozen into launch configuration.
 
+**R20 (planned) — Pipeline guidance belongs to the frozen agent prompt.** For FS-14.R87–R89,
+the server's ordinary base launch composer accepts only the bounded per-run instructions resolved
+under TS-09.R58 and appends the labelled block under TS-09.R59 once for a newly created standing
+owner or dedicated coordinator. Unlike the current product-managed knowledge overlay, this is
+user-authored, constant configuration for that agent and persists in `LaunchSpec.SystemPrompt`.
+`applyKnowledgeOverlay` continues to own only product operating context, package discovery and tool
+approval composition; it neither rereads live templates nor moves pipeline guidance into its
+runtime-only suffix. Resume/wake/switch and native-session fallback preserve the ordinary frozen
+base, while switch primers remain process-only. Existing Claude native-preset append and Codex
+developer-instruction delivery carry the resulting composed prompt unchanged. No new provider
+capability, regular-message bootstrap, role-file migration or provider-global config write is used.
+Refresh the pipeline authoring reference for the optional field when shipping; FS-14.A54–A55
+exercise actual provider parameters and frozen recovery independently of the composition helper.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:

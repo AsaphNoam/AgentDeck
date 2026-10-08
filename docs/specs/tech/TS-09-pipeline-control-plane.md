@@ -603,6 +603,51 @@ unchanged by them.
   without adding room routes to the remote allowlist. Closure follows TS-06 plus FS-14.A48–A51,
   FS-14.A52, FS-21.A31–A32 and FS-16.A32, including independent serialized and fault/race tests.
 
+### 2.13 Frozen orchestrator standing instructions
+
+- **R57 (planned)** — Extend the version-2 template with optional string
+  `orchestrator_instructions`, defaulting to empty when absent. Reuse `MaxInstructionRunes`
+  (16,000 Unicode code points) and the existing template/proposal byte limits; canonical validation
+  rejects oversized values by this field name, without clipping. Whitespace-only values render
+  no block; other text is preserved without interpolation. Config JSON, Go/UI schemas, editor,
+  HTTP/CLI, Chucky drafts/proposals and canonical proposal digests carry the same field. The run's
+  existing immutable `TemplateSnapshot` freezes it; no new run-start override, SQLite column,
+  template version/reset or duplicate instruction store is required. Pre-feature templates and
+  run snapshots decode to empty instructions.
+- **R58 (planned)** — Resolve shared guidance before a fresh orchestrator process launch through
+  the ordinary task dispatcher and server lifecycle composition seam. One bounded server-owned
+  resolver identifies a standing stage task or an explicitly bound dedicated coordinator from
+  durable task/stage provenance, then reads that run's frozen template. Pipeline lineage alone
+  cannot qualify an ordinary descendant. Do not infer eligibility from names, groups, role names
+  or agent-authored assignment text; exclude room-managed tasks. A private launch option carries
+  the resolved text into base prompt composition; callers cannot supply an arbitrary replacement
+  system prompt through task/start APIs. A known participant's missing/corrupt binding or snapshot,
+  or a storage read failure, fails its launch through existing actionable task-start errors before
+  starting a process, rather than silently launching without instructions. No live template read,
+  transcript scan, unbounded descendant walk or new pipeline-owned launcher is permitted.
+- **R59 (planned)** — Compose one labelled **Pipeline orchestration instructions** block after
+  the existing frozen project/role/resource prompt, before product-managed runtime overlays. The
+  block states that these are shared defaults and explicit stage-assignment exceptions may override
+  them while Chuck's authority, access and permission contracts still apply. Persist this constant
+  per-agent addition in `LaunchSpec.SystemPrompt` through ordinary session metadata; do not put it
+  only in `RuntimeSystemPromptSuffix`, where it would be lost, or change saved role/project files.
+  Fresh standing replacements and freshly launched bound coordinators resolve the same run
+  snapshot. Normal resume/wake/switch and fresh-native-session fallback reuse the frozen session
+  prompt, without another append or dependency on a retained run record. Assignment rendering,
+  `get_assigned_task`, activation text and ordinary prompt sends do not copy the shared block.
+  Existing-agent task targets retain their own frozen prompt and receive only normal assignments;
+  borrowing an agent never rewrites its standing configuration.
+- **R60 (planned)** — Ship FS-14.A53–A55 with producer-serialized template/proposal round trips,
+  bounded validator tests and actual task-dispatch-to-provider parameter captures. Verify Claude
+  native-preset append and Codex developer-instruction merge for new/load, preserving native and
+  pre-existing instructions; verify no duplication across lifecycle cycles, no block in stage
+  messages and no automatic worker/room inheritance. Corrupt/read-failure tests must distinguish
+  absent optional text from unavailable stored context. Refresh progressively linked pipeline
+  authoring knowledge to describe the optional field and standing-versus-stage distinction, not
+  duplicate provider protocol. Run focused checks while implementing and the applicable TS-06
+  closure matrix once after the last relevant edit; keep live provider adoption evidence separate
+  from fake/serialized delivery proof.
+
 ## 3. Interfaces & data shapes
 
 **Planned version-2 shapes (R35–R50):**
@@ -619,6 +664,11 @@ pipeline_stage_tasks: (run_id,stage_index,attempt_number) UNIQUE, task_id UNIQUE
                       assignment digest/version, closure state, coordinator_task_id?, coordinator_revision
 pipeline_values: run/stage/name -> source task's immutable output (projection, not another result)
 ```
+
+R57's planned additive template field is `orchestrator_instructions?: string`; omission means
+empty. It is part of the frozen template, not runtime assignments or task instructions. R59 freezes
+the composed block into ordinary session `system_prompt` metadata; no additional persistence shape
+is needed. Think Tank stage/runtime shapes continue to follow R51–R56 independently.
 
 Run states remain queued/running/paused/completed/stopped, with durable finishing/stopping phases
 for outstanding closure. Active-stage execution state is projected from its task; it is not stored
@@ -681,6 +731,10 @@ new durable run revision or a structured validation/conflict result.
 
 ## 4. Invariants
 
+- **INV §3:** R59's constant per-agent pipeline guidance freezes in base session metadata;
+  transient activation inputs, switch primers and product knowledge overlays remain separate.
+- **INV §16/§17:** R57–R60 bound instructions/provenance reads and verify delivery at independent
+  serialization/provider boundaries instead of equating prompt construction with agent compliance.
 - **INV §2:** manual and pipeline launch/resume/stop use shared lifecycle services; config, prompt,
   registration, and cleanup are not recomposed inside the pipeline package.
 - **INV §4:** stage-agent registrations are torn down by the ordinary generation-scoped helper on
@@ -707,6 +761,11 @@ new durable run revision or a structured validation/conflict result.
 
 ## 5. Deviations & open decisions
 
+- **Shared standing instructions (planned).** R57–R60 extend R36/R6 and distinguish constant
+  run-wide guidance from R39's per-stage assignment prohibition on system-prompt mutation. Stage
+  objectives and activation data remain assignment-only; shared guidance is frozen once per newly
+  launched orchestrator. The user approved provider standing-instruction delivery on 2026-10-08.
+
 - **Replacement contract.** R35–R50 supersede old R1–R14/R20/R24/R27–R28/R33–R34 wherever they
   require stage-specific processes, duplicate reports, routes/revisits, old state tables, per-stage
   runtime setup, creator-derived projections, or stage grouping. R15–R19/R21–R23/R25–R26/R29–R32
@@ -725,6 +784,12 @@ new durable run revision or a structured validation/conflict result.
 
 ## 6. Traceability
 
+- Shared standing guidance: FS-14.R87–R89/A53–A55, TS-11.R20, TS-04.R69; canonical template
+  model/limits/validation in `internal/pipeline/{types,limits,validate}.go`, shared fresh task launch
+  in `internal/server/task_dispatcher.go`, durable stage/task bindings in
+  `internal/state/pipeline_tasks.go`, prompt composition in `internal/server/launch.go`, frozen
+  resume/switch in `internal/server/{resume,switch}.go`, and provider delivery/session metadata in
+  `internal/runtime/{runtime,chat}.go`. Implementation and acceptance evidence are pending.
 - Product behavior and acceptance: FS-14.R1–R32 and FS-14.A1–A12.
 - Existing lifecycle/composition: TS-01.R4–R9; FS-01.
 - Persistence and migrations: TS-02.R1–R8, R12, R17.
