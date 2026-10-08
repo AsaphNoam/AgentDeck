@@ -393,11 +393,12 @@ Requirements are user-observable.
   sound, notification, automatic expansion or layout shift is added.
 
 - **R60 — Chat cleanup is shared across appearances.** FS-03.R78–R80's web-link
-  actions, table readability and Commands-tab removal apply in Core, Sky & Grove and Studio.
-  They supersede only the earlier requirements in this specification that preserve Commands
-  in agent conversations. Other actions, tab conditions, reading hierarchy and archive behavior
-  remain intact. Quiet table row boundaries and comfortable column spacing remain subordinate
-  to message text; wide-table overflow stays local. No new appearance, preference or motion.
+  actions, table readability and Commands-tab removal apply in Core, Sky & Grove and Studio on
+  desktop. The phone uses Core only under FS-20.R16 and TS-08.R73. These requirements supersede
+  only the earlier requirements in this specification that preserve Commands in agent
+  conversations. Other actions, tab conditions, reading hierarchy and archive behavior remain
+  intact. Quiet table row boundaries and comfortable column spacing remain subordinate to message
+  text; wide-table overflow stays local. No new appearance, preference or motion.
 
 ## 3. States & transitions
 
@@ -605,9 +606,10 @@ Requirements are user-observable.
   pulse. Repeat with reduced motion and confirm static salience. *Verify:* focused badge/card state
   tests plus real-browser motion and reduced-motion checks; a static screenshot cannot prove pace.
 
-- **A32** (R60) — FS-03.A59–A61's rendered checks cover all three appearances:
-  table spacing/dividers/overflow, readable link menus and remaining tab reachability at desktop,
-  expanded-pane and phone sizes. *Verify:* presentation/style audit and focused browser journey.
+- **A32** (R60) — FS-03.A59–A61's rendered checks cover table spacing/dividers/overflow,
+  readable link menus and remaining tab reachability in all three desktop appearances at desktop,
+  expanded-pane and archive surfaces. The phone check is Core only under FS-20.R16 and TS-08.R73.
+  *Verify:* presentation/style audit and focused browser journey.
 
 ## 6. Deviations & open decisions
 

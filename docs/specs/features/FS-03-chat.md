@@ -635,8 +635,9 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   separators between rows, a clear header boundary and increased horizontal cell padding.
   Preserve column alignment and selectable content. Wide tables scroll inside their reading
   surface without page overflow, clipping or unreadable column compression. Apply this in full
-  chat, expanded panes, archived chat, the phone and the shared rendered-Markdown file viewer,
-  across all three appearances. Source Markdown stays unchanged; no table editing, sorting or
+  chat, expanded panes, archived chat and the shared rendered-Markdown file viewer across all
+  three desktop appearances. The phone uses Core only, as specified by FS-20.R16 and TS-08.R73.
+  Source Markdown stays unchanged; no table editing, sorting or
   new Markdown dialect is introduced.
 - **R80 — Commands leaves the agent conversation tabs.** Full chat and expanded panes
   no longer offer Commands; Transcript, Files and conditional Think Tank and Terminal remain.
@@ -1082,12 +1083,15 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   with selected text. The conversation stays open, Copy link yields its destination, and selection
   copy/annotation still work. Check modifier/middle click, clipboard refusal, local-file viewer,
   fragment/mail behavior and dangerous URLs remaining inert. On the phone, tap a web link.
-  *Verify:* focused renderer/menu tests and a real-browser interaction check.
+  *Verify:* focused renderer/menu tests and a real-browser interaction check. Exercise desktop
+  links in all three appearances; on the Core-only phone, tap the link and prove a separate page
+  opens while the conversation remains unchanged.
 - **A60** (R79) — Read a multi-row table with headers, left/center/right alignment,
-  long links and inline code at 1024px/wider desktop, in a narrow pane, archived chat, rendered
-  file viewer and at 390px phone width in Core, Sky & Grove and Studio. Dividers and increased
-  padding are perceptible; cells remain selectable, alignment is preserved and wide content
-  scrolls locally without page overflow. *Verify:* real-browser rendered checks and focused
+  long links and inline code at 1024px/wider desktop, in a narrow pane, archived chat and rendered
+  file viewer in Core, Sky & Grove and Studio. At 390px, check the Core-only phone experience
+  under FS-20.R16 and TS-08.R73. Dividers and increased padding are perceptible; cells remain
+  selectable, alignment is preserved and wide content scrolls locally without page overflow.
+  *Verify:* real-browser rendered checks and focused
   GFM structure/alignment and presentation checks.
 - **A61** (R80) — Full chat, expanded pane and phone offer no Commands tab;
   remaining views work, `?tab=commands` opens Transcript, and command activity survives reload.

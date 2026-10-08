@@ -1224,8 +1224,9 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   tests cover FS-03.A59–A61, FS-05.A23 and FS-20.A14, including annotation/link menu coexistence,
   clipboard failure, dangerous URLs remaining blocked and unchanged file-link classification.
   FS-12.A32 and FS-03.A60 require the working tree's real-browser rendered checks across Core,
-  Sky & Grove and Studio at the supported desktop floor, wider desktop, narrow pane and phone
-  width, plus archive and rendered file viewer. Component tests alone cannot prove spacing,
+  Sky & Grove and Studio at the supported desktop floor, wider desktop and narrow pane, plus
+  archive and rendered file viewer. Phone-width checks exercise Core only under FS-20.R16 and
+  TS-08.R73. Component tests alone cannot prove spacing,
   separators, actual new-tab navigation or contained overflow. Run the applicable TS-06 closure
   matrix, style/presentation checks and `make embed` after final implementation edits; never edit
   generated dist. No credentialed provider smoke is added for this presentation-only change.

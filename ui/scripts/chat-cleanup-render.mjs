@@ -157,6 +157,31 @@ async function tableMetrics(scope) {
   });
 }
 
+async function exerciseTableScroll(scope) {
+  const wrap = scope.locator(".markdown-table").first();
+  await wrap.waitFor();
+  return wrap.evaluate((el) => {
+    el.style.scrollBehavior = "auto";
+    el.scrollLeft = 0;
+    const before = el.scrollLeft;
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    el.scrollLeft = maxScrollLeft;
+    return {
+      overflowX: getComputedStyle(el).overflowX,
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+      before,
+      after: el.scrollLeft,
+      maxScrollLeft,
+    };
+  });
+}
+
+function tableScrollPass(proof) {
+  return ["auto", "scroll"].includes(proof.overflowX) &&
+    proof.scrollWidth > proof.clientWidth && proof.maxScrollLeft > 0 && proof.after > proof.before;
+}
+
 function isTransparent(color) {
   return !color || color === "transparent" || /rgba\([^)]*,\s*0\s*\)/.test(color);
 }
@@ -213,7 +238,20 @@ async function runDesktopChat(browser, skin, width, height) {
 
   const overflowOk = await noPageOverflow(page);
   record(`${label}: no page overflow`, overflowOk, `doc scrollWidth vs innerWidth`);
-  record(`${label}: markdown-table scrollWidth vs clientWidth`, true, `${metrics.scrollWidth} vs ${metrics.clientWidth}`);
+  const scrollProof = await exerciseTableScroll(page);
+  record(`${label}: full-chat table overflows and scrolls locally`, tableScrollPass(scrollProof), JSON.stringify(scrollProof));
+
+  if (skin === "" && width === 1024) {
+    const hiddenMutation = await page.addStyleTag({ content: ".markdown-table { overflow-x: hidden !important; }" });
+    const hiddenProof = await exerciseTableScroll(page);
+    record(`${label}: scroll receipt rejects hidden overflow`, !tableScrollPass(hiddenProof), JSON.stringify(hiddenProof));
+    await hiddenMutation.evaluate((el) => el.remove());
+
+    const compressedMutation = await page.addStyleTag({ content: ".markdown-table table { width: 100% !important; table-layout: fixed !important; } .markdown-table th, .markdown-table td { max-width: 0 !important; min-width: 0 !important; overflow-wrap: anywhere !important; word-break: break-all !important; }" });
+    const compressedProof = await exerciseTableScroll(page);
+    record(`${label}: scroll receipt rejects compressed cells`, !tableScrollPass(compressedProof), JSON.stringify(compressedProof));
+    await compressedMutation.evaluate((el) => el.remove());
+  }
 
   await page.screenshot({ path: join(OUT_DIR, `chat-${skinLabel(skin)}-${width}.png`), fullPage: true });
 
@@ -262,6 +300,8 @@ async function runDesktopChat(browser, skin, width, height) {
   if (viewerShown) {
     const viewerMetrics = await tableMetrics(viewer);
     record(`${label}: file viewer rendered table matches transcript table styling`, viewerMetrics.headerBorderWidth >= 1 && viewerMetrics.rowBorderWidth >= 1 && viewerMetrics.tdPaddingLeft >= 12, JSON.stringify(viewerMetrics));
+    const viewerScrollProof = await exerciseTableScroll(viewer);
+    record(`${label}: file viewer table overflows and scrolls locally`, tableScrollPass(viewerScrollProof), JSON.stringify(viewerScrollProof));
     record(`${label}: no page overflow with file viewer open`, await noPageOverflow(page));
     await page.screenshot({ path: join(OUT_DIR, `chat-file-${skinLabel(skin)}-${width}.png`), fullPage: true });
   }
@@ -324,6 +364,8 @@ async function runArchive(browser, skin) {
   }
   const metrics = await tableMetrics(page);
   record(`${label}: table styled`, metrics.headerBorderWidth >= 1 && metrics.rowBorderWidth >= 1 && metrics.tdPaddingLeft >= 12, JSON.stringify(metrics));
+  const scrollProof = await exerciseTableScroll(page);
+  record(`${label}: archived table overflows and scrolls locally`, tableScrollPass(scrollProof), JSON.stringify(scrollProof));
 
   const webLink = page.locator('a[href="https://example.com/docs"]').first();
   const target = await webLink.getAttribute("target");
@@ -374,6 +416,22 @@ async function runPhone(browser) {
   const webLink = page.locator('a[href="https://example.com/docs"]').first();
   const target = await webLink.getAttribute("target");
   record("phone: web link target _blank", target === "_blank", target);
+  const conversation = page.getByRole("list", { name: "Conversation" });
+  const beforeTap = await conversation.innerText();
+  const [popup] = await Promise.all([context.waitForEvent("page"), webLink.tap()]);
+  await popup.waitForLoadState().catch(() => {});
+  record("phone: tapping web link opens a new page", popup.url() === "https://example.com/docs", popup.url());
+  record("phone: link tap leaves conversation unchanged", page.url().endsWith("/agent/a1") && await conversation.innerText() === beforeTap, page.url());
+  await popup.close();
+
+  await webLink.evaluate((el) => el.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, { capture: true, once: true }));
+  const blockedPopupPromise = context.waitForEvent("page", { timeout: 1000 }).catch(() => null);
+  const [blockedPopup] = await Promise.all([blockedPopupPromise, webLink.tap()]);
+  record("phone: tap receipt rejects prevented activation", blockedPopup === null, blockedPopup?.url() || "no new page");
+  if (blockedPopup) await blockedPopup.close();
 
   await page.screenshot({ path: join(OUT_DIR, "phone-core.png"), fullPage: true });
   record("phone: no uncaught page errors", errors.length === 0, errors.join(" | "));

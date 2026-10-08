@@ -27,9 +27,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   lineage and acceptance-recovery findings below, including FS-14 §6's four recorded gaps.
   Clone first-message failure investigation (2026-10-08) has an
   unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
-  tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) remains open for three
-  verification/specification findings below; no product defect found. Fix model: trivial/easy —
-  Claude Sonnet or Codex Luna.
+  tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) is closed after its three
+  verification/specification findings were fixed; closure evidence is in the changelog.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
   intermittently returns 409 "a resume is already in progress" (pre-existing at `74c8e84`);
   synchronization fix remains separate work.
@@ -188,39 +187,6 @@ No additional consent/collapse UI defect found. INV §1–§11/§13–§17 have 
 findings above cover §1/§2/§4/§5/§7–§10/§15/§16, and the other applicable classes have no separate
 finding. INV §12 has no applicable changed external-command invocation.
 
-### Chat links, tables and tabs — review 2026-10-08 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-Reviewed implementation `7661d97`..`70614c8` against its design/spec delta at `da63ac6`.
-
-- **Worth fixing** — desktop overflow receipt cannot fail; fix complexity easy (INV §17).
-  `ui/scripts/chat-cleanup-render.mjs:216` records the full-chat table width check with literal
-  `true`. A compressed or clipped table therefore still earns a passing receipt at both desktop
-  sizes, contrary to FS-03.A60/TS-08.R110. Dashboard/phone width comparisons do not prove this
-  full-chat surface. Assert overflow for the deliberately wide fixture and exercise `scrollLeft`
-  to prove the content is accessible; apply equivalent checks to the archive and file viewer.
-  Confirm the check fails when the wrapper's overflow is changed to hidden or cells are compressed.
-- **Worth fixing** — phone link navigation is not exercised; fix complexity easy (INV §10/§17).
-  `ui/scripts/chat-cleanup-render.mjs:374–376` checks only `target="_blank"`; it never taps the
-  link. FS-03.A59 and FS-20.A14 explicitly require a phone tap opening separately. A handler
-  preventing activation would pass this receipt. Tap the existing stubbed destination, assert a
-  new page and unchanged conversation, and retain the attribute check as supporting evidence.
-- **Worth fixing** — cleanup specs overpromise phone appearances; fix complexity easy (INV §10).
-  FS-03.R79/A60 and FS-12.R60/A32 combine phone coverage with all three appearances without the
-  existing phone exception. FS-20.R16 and TS-08.R73 keep the phone Core-only;
-  `ui/src/remote/main.tsx` and `ui/src/styles/remote.css` implement that contract. The Core-only
-  phone check is appropriate to the shipped architecture, but the new acceptance wording is
-  contradictory. State the desktop three-appearance matrix and Core-only phone coverage explicitly;
-  do not introduce phone skins to satisfy this cleanup's accidental promise.
-
-88 focused UI tests, all 41 style/presentation checks and the browser script's 161 reported checks
-passed. Browser report: `/tmp/chuck-review-chat-cleanup/report.json` (stubbed APIs, no provider);
-the findings qualify that report's acceptance coverage. No product code/specs changed. The shared
-link-menu claim, local-file behavior, stable renderer map, tab fallback and retained backend
-tracking are sound on inspection. INV §2/§8/§10/§13/§17 have applicable surfaces; §10/§17 findings
-are above and the other applicable classes have no finding. Classes §1/§3–§7/§9/§11–§12/§14–§16
-have no applicable changed surface (no lifecycle, persistence, runtime/protocol, HTTP route,
-external CLI, durable side effect or unbounded retained collection change).
-
 ### Clone first-message failure — investigation 2026-10-08 — **Fix model:** medium — Codex Terra or Claude Opus.
 
 **Report (verbatim):** “cloning a chat gave it a generic name (Atlas), when I sent the agent a
@@ -285,6 +251,14 @@ permission after the sandbox blocked the test listener. No live provider turn wa
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-08 — Chat links, tables and tabs review findings closed (INV §10/§17).**
+  Replaced the full-chat overflow literal with measured overflow and scroll movement, with matching
+  archive/file-viewer checks and hidden-overflow/compressed-cell mutation proofs. The phone journey
+  taps the link, checks separate-page navigation and unchanged conversation, and catches prevented
+  activation. Clarified desktop three-appearance coverage versus Core-only phone coverage in FS-03,
+  FS-12 and TS-08. `make check-specs`, script syntax and `git diff --check` passed; the stubbed
+  browser journey passed all 175 checks. No product code changed. Ready for parent commit.
 
 - **2026-10-08 — Think Tank stage implementation reviewed.** Recorded six open Stop, lineage,
   context-admission and acceptance-recovery findings; four were already declared deviations.
