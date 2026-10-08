@@ -18,11 +18,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
-- **Active change:** Think Tank pipeline stages and task collapse (see below).
+- **Active change:** None.
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   `shared-pipeline-orchestrator-instructions.md` is waiting to start with approved specifications.
   Other available/resumable design work is in `docs/ideas.md`.
-- **Review units / findings:** Clone first-message failure investigation (2026-10-08) has an
+- **Review units / findings:** Think Tank pipeline stages, readable workspace consent and
+  collapsible tasks (`fb715a1`..closure, finished 2026-10-08) awaits review; its recorded gaps are
+  in FS-14 §6. Clone first-message failure investigation (2026-10-08) has an
   unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
   tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) remains open for three
   verification/specification findings below; no product defect found. Fix model: trivial/easy —
@@ -34,54 +36,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-**Think Tank pipeline stages, readable workspace consent and collapsible tasks** —
-[`pipeline-think-tank-stages-and-task-collapse.md`](../ready-changes/pipeline-think-tank-stages-and-task-collapse.md),
-in progress since 2026-10-08. Slices (each closes with focused tests, spec status and a commit):
-
-1. Shared-workspace warning contrast (FS-14.R85, TS-08.R94) — UI/CSS only.
-2. Tasks parent-lineage collapse (FS-16.R46–R47, TS-08.R92–R93) — `ui/src/features/tasks`.
-3. Think Tank stage template/config + start assignments (TS-09.R51): types, validator, API/CLI.
-4. State: schema, stage/room binding, shared room-create helper with stage context (TS-09.R52/R56,
-   TS-14.R19, TS-10.R38).
-5. Judge synthesis → stage result acceptance + pending-action retry (TS-09.R53, TS-14.R21, FS-14.R86).
-6. Stop/closure/pin and recovery guards (TS-09.R54, TS-14.R20, FS-21.R42).
-7. Projections + UI: editor/start, run/task/room rows and links (TS-09.R55, TS-08.R95, FS-16.R48).
-8. Proposal/CLI/help/operator knowledge, fixtures, rendered journeys, closure matrix.
-
-Done: slice 1 — `.pipeline-warning` now uses technical text/muted tokens (computed contrast
-11.9–13.2:1 text, 6.4–7.5:1 code across appearances); R85 stays planned until slice 8's
-real-browser A51 pass (modal + inline start, focus/pending/refusal).
-Slice 2 is delegated (worktree branch; integrate by cherry-pick, then verify `ui` tests).
-Done: slice 3 — `pipeline.ThinkTankStage`, validator, `think_tank_assignments` start validation
-frozen into the one assignments map under `think_tank:<stage>:participant:<id>` /
-`think_tank:<stage>:judge` keys (stripped from `RunDetail.Assignments`, exposed as
-`ThinkTankAssignments`); phone start fills room slots.
-Done: slices 4–5 — migration 45 (stage `execution_kind`/`room_id`/`source_entry_seq`; room
-`pipeline_*` origin + `stage_context`); `insertPipelineStageRowsTx` shared by start/advance creates
-the running `think_tank` task + room (via `createThinkTankTx`, shared with standalone) in the stage
-tx; stage context is the room's first `stage_context` entry; `Lifecycle.RoomLaunchConfig` composes
-slot configs; later ordinary stages reuse `lastStandingAgent`. `AcceptThinkTankStageOutput` (room
-authority) + `commitStageResultTx` (shared writes); `pipeline/rooms.go` accepts on the post-finalize
-kick and in the room loop sweep, retries 3× then pauses `accept_room_output`, which run Retry
-re-attempts; judge submit refuses >64,000 runes in pipeline rooms. Restart task recovery skips room
-tasks. Tests: `internal/pipeline/rooms_test.go`.
-Done: slice 6 — `requirePipelineRoomOpenTx` guards room claims/controls/messages (`openThinkTankTx`,
-`BeginThinkTankAttempt`, non-record inputs); Stop calls `Lifecycle.StopRoom` →
-`ClosePipelineThinkTank` + guarded turn cancel, and run cleanup waits for room turns
-(`roomSettled`); run row pins room deletion; generic Continue/Retry/Replace return
-`room_recovery_required`; `SyncRoomPhase` (from `publishThinkTankUpdate`) pauses/resumes the run
-on room hold/pause/judge failure. Oversized produced context pauses the run when the room is
-created (not before accepting the feeding stage — recorded deviation for review).
-Not done (review note): setup-claimed-before-Stop idle runtimes are not torn down; tasks created
-in room turns are not attributed as stage descendants.
-Seams for slice 4–6: `Manager.Start` (manager.go:52) / `advanceTaskStage` (actions.go:105) create
-stage tasks; `AcceptPipelineStageTaskResult` (state/pipeline_tasks.go:146) is the result tx;
-`reconcileTaskStageRelease` (reconcile.go:101); `CreateThinkTank` (state/think_tanks.go:485);
-judge synthesis → `insertThinkTankResultTx` (think_tank_turns.go:290); server room loop
-`dispatchThinkTanks`/`launchReservedThinkTankAgent` (server/think_tanks.go:67/398); latest schema
-migration version 45 (state/schema.go). Next: integrate slice 2, then slice 7.
+None. Think Tank pipeline stages, readable workspace consent and collapsible tasks finished
+2026-10-08 (`fb715a1`..this closure commit); rendered evidence is reproducible with
+`cd ui && node scripts/think-tank-stage-render.mjs [outDir]` (318 checks, stubbed API, no server).
+Recorded gaps for review are in FS-14 §6 (Stop does not tear down setup runtimes claimed before
+it; room-turn tasks are not attributed as stage descendants; produced-value context overflow is
+caught when the room is created; acceptance retry count is in memory). Key seams:
+`pipeline/rooms.go`, `state.AcceptThinkTankStageOutput`/`commitStageResultTx`,
+`insertPipelineStageRowsTx`, `requirePipelineRoomOpenTx`, `server.projectRoomTask`.
 
 ## Acceptance gates still owed
+
+- FS-14.A50 / FS-21.A31: bounded packaged Claude/Codex Think Tank pipeline-stage probe (room
+  stage start → fresh participants → judge → accepted output → next stage). Fake-provider
+  end-to-end (`TestPipelineThinkTankStageEndToEnd`) and the 318-check rendered pass are no live
+  receipt. FS-14.A49 restart/race matrix and FS-21.A32 live Stop-cancel race remain planned.
 
 - FS-21 / TS-06.R33: bounded credentialed Claude/Codex Think Tank smoke (room read/submit,
   addressed input, approval/denial, private Send/Steer, native resume, end-only judge and retained
@@ -217,6 +186,15 @@ permission after the sandbox blocked the test listener. No live provider turn wa
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-08 — Think Tank pipeline stages, readable consent and task collapse finished.**
+  Pipelines can run a stage as a fresh same-project room whose published judge synthesis becomes
+  the stage output; shared-workspace consent and run-hero text are readable in all appearances;
+  Tasks collapse per parent lineage. FS-14.R81–R86/A48/A50–A52, FS-16.R46–R48/A30–A32,
+  FS-21.R41–R42/A31, TS-08.R92–R95, TS-09.R51–R56, TS-10.R38, TS-14.R19–R21 shipped (FS-16,
+  TS-08, TS-10 now Current). Rendered pass fixed collapsed rows staying visible and hero text
+  contrast. A timing-dependent mail activation test now waits for confirmed read state.
+  `make test`, focused `-race`, 720 UI tests, UI build, `make build` and 318 rendered checks passed.
 
 - **2026-10-08 — Shared pipeline instruction design ready.** User approved the optional template
   field as standing Claude system/Codex developer instructions, without ordinary-message bootstrap

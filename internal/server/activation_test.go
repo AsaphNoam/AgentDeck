@@ -134,9 +134,18 @@ func TestCoalescedMailProducesOnePromptAndIsNeverReplayed(t *testing.T) {
 	}
 
 	// Provider completion confirms delivery and projects the ordinary read state.
-	msgs, err := srv.stateStore.ListMessages(id, true, 0)
-	if err != nil || len(msgs) != 0 {
-		t.Fatalf("ListMessages unread = %d, %v; want confirmed inline mail read", len(msgs), err)
+	// The prompt is logged before the turn's completion is processed, so wait
+	// for the confirmation rather than racing it under load.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		msgs, err := srv.stateStore.ListMessages(id, true, 0)
+		if err == nil && len(msgs) == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("ListMessages unread = %d, %v; want confirmed inline mail read", len(msgs), err)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	holdPrompts(t, srv, promptLog, 1)
 

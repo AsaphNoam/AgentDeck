@@ -1,6 +1,6 @@
 # FS-16 — Dependent work and armed starts
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks` · **Journeys:** —
 **Absorbed:** —
 
@@ -327,20 +327,20 @@ Requirements are user- and agent/API-observable. R-item numbering is continuous 
   can link to that control without firing it. No new authoring API, graph editor, creator-grouping
   mode, scheduling behavior, permission, retention policy or phone flow is introduced.
 
-- **R46 (planned)** — In Tasks, every parent with retained delegated descendants has a separate
+- **R46 (shipped 2026-10-08)** — In Tasks, every parent with retained delegated descendants has a separate
   **Collapse tasks / Expand tasks** disclosure at any delegation level. Collapsing a stage leaves
   its own row visible and hides its descendants, without collapsing task details or changing work.
   The parent shows the hidden-task count, unfinished count and attention/cleanup summary; new hidden
   attention stays visible there. Expanding restores descendants and their existing nested choices.
   All levels initially expand. Choices survive refresh and route navigation in the current browser
   session, keyed by project/task identity; they do not alter execution or server state.
-- **R47 (planned)** — Collapse follows recorded parent-task lineage, never dependency edges,
+- **R47 (shipped 2026-10-08)** — Collapse follows recorded parent-task lineage, never dependency edges,
   visual indentation or shared creator/run identity. A task remains reachable exactly once even
   when prerequisites cross a collapsed branch: visible boundary links identify the hidden source
   and offer revealing its ancestor path. Missing parents and invalid lineage do not silently hide
   work. A task under active inspection or mutation stays visible until that interaction finishes;
   collapsing its ancestor preserves detail drafts and returns focus to the disclosure when eligible.
-- **R48 (planned)** — A Think Tank pipeline stage is represented by one room-backed stage task,
+- **R48 (shipped 2026-10-08)** — A Think Tank pipeline stage is represented by one room-backed stage task,
   whose execution and result source are labelled **Think Tank**. It has no synthetic assigned agent
   and no ordinary task launch slot. FS-14.R83's published judge synthesis supplies its host-recorded
   success and named output; Stop supplies cancellation. Only the pipeline creates this task kind.
@@ -680,22 +680,25 @@ Each names the verification that demonstrates it.
   indentation, focus retention and no page-level horizontal overflow. Implementation records the
   incumbent and resulting views; this design does not claim rendered acceptance.
 
-- **A30 (planned)** (R46–R47) — Collapse a pipeline stage with coordinator → worker → reviewer
+- **A30 (shipped 2026-10-08)** (R46–R47) — Collapse a pipeline stage with coordinator → worker → reviewer
   descendants, independently collapse a nested parent, refresh and navigate away/back, then expand
   the stage. The stage remains visible, counts/attention update and nested choices/detail drafts
   survive. Collapse never changes tasks or hides a pending mutation. *Verify:* projection/component
   tests and a rendered keyboard/mouse journey in all appearances at 1024px and a wider desktop.
-- **A31 (planned)** (R47) — Exercise dependency joins/cross-branch links, unavailable parents,
+- **A31 (shipped 2026-10-08)** (R47) — Exercise dependency joins/cross-branch links, unavailable parents,
   invalid lineage, same-name tasks across projects and group membership changes. Each task remains
   reachable once; revealing a hidden prerequisite expands only its ancestor path. *Verify:* bounded
   projection fixtures and interaction tests, with representative cases in A30's rendered journey.
-- **A32 (planned)** (R48) — A room-backed stage appears once in Tasks with its true execution
+- **A32 (shipped 2026-10-08)** (R48) — A room-backed stage appears once in Tasks with its true execution
   source, room/run links and published result. No standing-agent activation or task-runtime slot is
   consumed; ordinary create/report/repair cannot impersonate that authority. *Verify:* serialized
   task HTTP/MCP refusal tests, Go-produced UI fixture and FS-14.A48's integration journey.
 
 ## 6. Deviations & open decisions
 
+- **Collapse and room-backed stage tasks (shipped 2026-10-08).** R46–R48 shipped; tasks created
+  during room-owned turns are not yet recorded as stage descendants (FS-14 §6). Invalid lineage —
+  a cycle or a chain that never reaches a root — always renders visible.
 - **Work-in-motion redesign.** R41–R45 and A27–A29 shipped 2026-10-03. Rendered acceptance used
   the real UI against the Go-marshalled task fixture in all three skins at 1024px and 1440px; a
   live multi-agent journey through the built binary was not run. Optional collapsing of long

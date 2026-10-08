@@ -219,12 +219,12 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   applicable. Live goal/membership editing, autonomous agent room creation,
   configurable full-file snapshots, export, and new phone room UI are outside this change.
 
-- **R41 (planned)** — A pipeline-owned room under FS-14.R81–R84 uses the same attributed
+- **R41 (shipped 2026-10-08)** — A pipeline-owned room under FS-14.R81–R84 uses the same attributed
   discussion, fresh end-only judge and explicit failure recovery as a standalone room. Its origin
   identifies the run/stage and all new agents use that run's project. The room page links to its
   run and exposes its phase and recovery controls. Stage context is durable shared room data,
   available to every participant and judge; it is not copied private provider history.
-- **R42 (planned)** — Pipeline Stop overrides R25/R32's normal non-stopping behavior only for
+- **R42 (shipped 2026-10-08)** — Pipeline Stop overrides R25/R32's normal non-stopping behavior only for
   the room's owned execution. It suppresses future setup/participant/judge work, preserves already
   committed contributions, and never cancels unrelated private turns. A pipeline-pinned room cannot
   be deleted while retained run history needs it. Run deletion removes only the pin. Standalone
@@ -494,7 +494,7 @@ completion; R37 defines partial opening publication and pending input on End.
   pending judge starts and verify no delayed judge activation. Cancel confirmation and change
   nothing. *Verified by:* room delete/lifecycle integration tests and a rendered deletion journey.
 
-- **A31 (planned)** (R41) — A pipeline-created room shows attributed stage inputs, same-project
+- **A31 (shipped 2026-10-08)** (R41) — A pipeline-created room shows attributed stage inputs, same-project
   fresh participants and required fresh judge, with links in both directions. A failed judge is
   retried without participant discussion reopening; published synthesis supplies FS-14.A48's
   output. *Verify:* server/state integration tests and FS-14.A50's rendered journey.
@@ -544,6 +544,10 @@ completion; R37 defines partial opening publication and pending input on End.
   transcript/projection and UI tests plus the rendered judge/Archive journey in A33.
 
 ## 6. Deviations & open decisions
+
+**Pipeline-owned rooms, 2026-10-08.** R41–R42 and A31 shipped. A32 stays planned until a
+fake-provider race test cancels a live room turn on Stop while an unrelated private turn survives;
+the fence and room closure are covered by state/manager tests.
 
 R43–R51/A33–A37 are the 2026-10-06 confirmed Think Tank workspace/live-control upgrade, including
 the explicit requirement to match the standard Chuck chat input. Implementation and automated/

@@ -530,7 +530,7 @@ unchanged by them.
 
 ### 2.12 Room-backed pipeline stages
 
-- **R51 (planned)** — Extend version-2 stage `coordination` with `think_tank` and an optional
+- **R51 (shipped 2026-10-08)** — Extend version-2 stage `coordination` with `think_tank` and an optional
   `think_tank` config containing ordered participants `{id,role,limit,may_leave}`, `openings`, and
   `judge_role`. Each participant id is unique within its stage; repeated roles are valid. This kind
   requires exactly one output (implicitly mandatory, no new `required` field), excludes
@@ -542,7 +542,7 @@ unchanged by them.
   before side effects. Defaults normalize absent coordination exactly as before. Frozen version-2
   ordinary templates/runs need no reset or rewrite; older clients receive an unsupported-kind
   diagnostic rather than this stage being treated as ordinary. New collections serialize non-null.
-- **R52 (planned)** — Keep one stage task/result authority. Extend `pipeline_stage_tasks` with
+- **R52 (shipped 2026-10-08)** — Keep one stage task/result authority. Extend `pipeline_stage_tasks` with
   execution kind and room binding (unique task→room and room→stage execution), and reserve room setup
   intent/identities plus the binding in the stage-creation transaction before any agent launch.
   Factor `CreateThinkTank`'s existing transaction helper for that caller; both standalone and pipeline
@@ -551,7 +551,7 @@ unchanged by them.
   child. Reuse server room dispatch/launch/resume; do not create a second room executor or provider
   interface. First-stage rooms require no standing-agent launch; the standing agent is launched on
   the first ordinary stage and reused across subsequent ordinary stages as before.
-- **R53 (planned)** — Adapt committed judge completion to the common task-result transaction.
+- **R53 (shipped 2026-10-08)** — Adapt committed judge completion to the common task-result transaction.
   Separate authority validation (ordinary caller/handle versus trusted bound room/synthesis) from
   shared immutable task-result, output, value-projection and closure writes. The room branch checks
   current stage/task/room binding, finalized judge attempt and synthesis entry, open run/stage and
@@ -566,7 +566,7 @@ unchanged by them.
   failure pauses with **Retry output acceptance**. The existing revision-guarded run `/retry`
   endpoint recognizes this pending action and retries acceptance of that entry only, never room
   judging or ordinary stage execution. No partial result/value or successful outcome is installed.
-- **R54 (planned)** — Extend the shared closure helper with room obligations. In the Stop
+- **R54 (shipped 2026-10-08)** — Extend the shared closure helper with room obligations. In the Stop
   transaction fence future room claims and commit room-owned cancel intent before external effects;
   cancel matching active room generation/turn only, using the guarded runtime cancellation seam.
   Setup already claimed before Stop is allowed to settle registration, then its newly created idle
@@ -575,7 +575,7 @@ unchanged by them.
   until settled, with existing bounded cleanup retry. Completed-room stage release never stops
   unrelated private work. Stage/run pin guards room deletion; terminal-and-clean run deletion
   removes only pipeline association/pin and leaves room context, task results and source provenance.
-- **R55 (planned)** — Project room phase, room id, current actor, failure/recovery eligibility and
+- **R55 (shipped 2026-10-08)** — Project room phase, room id, current actor, failure/recovery eligibility and
   source synthesis in run/task detail through the existing REST/read and invalidation seams.
   Before result acceptance, the run is `running` during setup/discussion/judge or a private-work
   wait, and `paused` for explicit room pause/failure. Output acceptance keeps `running` until
@@ -589,7 +589,7 @@ unchanged by them.
   separately from the original frozen assignment and displayed as actually applied. Partial setup
   reuses reserved identities. Startup holds uncertain room attempts under TS-14.R14 and reconciles
   already finalized synthesis idempotently. An archived project cannot resume/start owned work.
-- **R56 (planned)** — Add forward-only SQLite schema support without deleting existing data.
+- **R56 (shipped 2026-10-08)** — Add forward-only SQLite schema support without deleting existing data.
   Reuse TS-14's 2–32 participants, ceilings 1–1,000, request/output and per-room concurrency bounds;
   pipeline metadata obeys existing template/title/value limits. Stage context is bounded to 256 KiB
   encoded UTF-8, admitted before capture; known input/goal/objective overflow rejects Start, and
@@ -761,6 +761,11 @@ new durable run revision or a structured validation/conflict result.
 
 ## 5. Deviations & open decisions
 
+- **Think Tank stages (shipped 2026-10-08).** R51–R56 shipped with FS-14 §6's recorded gaps:
+  Stop does not tear down setup runtimes claimed before it, room-turn tasks are not attributed as
+  stage descendants, produced-value context overflow is caught at room creation, and the automatic
+  acceptance retry count is in memory. Room slots are frozen in the one assignments map under
+  `think_tank:<stage>:participant:<id>` / `think_tank:<stage>:judge` keys.
 - **Shared standing instructions (planned).** R57–R60 extend R36/R6 and distinguish constant
   run-wide guidance from R39's per-stage assignment prohibition on system-prompt mutation. Stage
   objectives and activation data remain assignment-only; shared guidance is frozen once per newly

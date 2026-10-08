@@ -45,9 +45,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 - [`shared-pipeline-orchestrator-instructions.md`](shared-pipeline-orchestrator-instructions.md)
   — define shared naming/grouping guidance once and freeze it into orchestrators' standing prompts.
-- [`pipeline-think-tank-stages-and-task-collapse.md`](pipeline-think-tank-stages-and-task-collapse.md)
-  — Think Tank pipeline stages whose judge synthesis is the output, readable workspace consent,
-  and per-parent task-level collapse.
 - [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
   by default with a backend-level bundle choice, scoped runtime feedback, local model refresh and
   explicitly capped compatibility work.

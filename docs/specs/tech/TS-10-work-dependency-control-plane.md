@@ -1,6 +1,6 @@
 # TS-10 — Work dependency control plane
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/state`, `internal/server`, `internal/messaging`, `ui/src/features/tasks`
 **Absorbed:** —
 
@@ -373,7 +373,7 @@ parallel copy of them.
   that coordinator's delegated scope under TS-05.R22. Neither operation changes the standing stage
   assignee, accepted reports, or immutable parent lineage. A cancelled/closed stage refuses it.
 
-- **R38 (planned)** — FS-16.R48 adds a pipeline-managed `think_tank` task target, created only
+- **R38 (shipped 2026-10-08)** — FS-16.R48 adds a pipeline-managed `think_tank` task target, created only
   by the stage transaction and bound to exactly one room. Public task-create validation rejects
   that target; it has no assigned provider identity, execution handle or ordinary task-budget claim.
   Project setup/active discussion/closing/judge as `running`; paused or private-work waiting as

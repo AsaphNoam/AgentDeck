@@ -669,7 +669,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ### 4.8 Think Tank stages and readable start consent
 
-- **R81 (planned)** — A template may select a **Think Tank** stage instead of standing/dedicated
+- **R81 (shipped 2026-10-08)** — A template may select a **Think Tank** stage instead of standing/dedicated
   agent coordination. It defines at least two participant entries (roles may repeat), each participant's finite
   contribution ceiling and departure permission, optional independent openings, a required judge
   role, and exactly one declared text output, which must contain the judge's synthesis. Templates remain
@@ -677,14 +677,14 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   fast-mode assignments through the existing runtime summary/customization flow. Start validation
   and the frozen run snapshot include every assignment. Existing templates keep their current
   behavior; switching a draft's stage kind preserves unrelated stages and names invalid fields.
-- **R82 (planned)** — On reaching a Think Tank stage, Chuck creates one durable room and fresh
+- **R82 (shipped 2026-10-08)** — On reaching a Think Tank stage, Chuck creates one durable room and fresh
   participant agents in the run's project, then a fresh judge only after discussion ends. The room
   receives the run goal, stage objective and declared bound inputs as attributed stage context.
   Ordinary room ceilings, departures, independent openings, user input, permissions and end-only
   judging apply. A person can inspect/open the room from the stage row and run page. No standing
   orchestrator evaluation turn is required for this stage; existing/cross-project participants are
   supported only in standalone rooms. No additional project access or permission skipping is granted.
-- **R83 (planned)** — Only the successfully published final judge synthesis completes a Think Tank
+- **R83 (shipped 2026-10-08)** — Only the successfully published final judge synthesis completes a Think Tank
   stage. Its complete text becomes the configured named output; the durable stage result identifies
   the room and judge contribution as its source. Completion means synthesis was produced, not that
   participants agreed or that the recommendation passed a quality check. Participant reports,
@@ -692,7 +692,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   pipeline. Existing cleanup and human approval gates still precede the next stage. This specializes
   R63/R71/R75 and the ordinary stage-report authority only for Think Tank stages; the standing
   orchestrator remains the run's owner and receives durable stage output on its next ordinary stage.
-- **R84 (planned)** — Setup, participant, judge and output-acceptance failures hold the current
+- **R84 (shipped 2026-10-08)** — Setup, participant, judge and output-acceptance failures hold the current
   stage with a visible reason and applicable recovery action (R86 for output acceptance). Judge retry never reopens
   discussion. Restart retains the same room and committed history and holds uncertain room work for
   explicit recovery, without duplicate setup, synthesis acceptance or progression. Stop run fences
@@ -702,12 +702,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   pin without deleting the room, agents, transcripts, tasks or accepted output history. Standalone
   room lifecycle remains unchanged. Generic stage Continue/Retry/Replace cannot bypass room recovery
   or replace its configured participants.
-- **R85 (planned)** — The shared-workspace warning, conflicting agent/run labels and confirmation
+- **R85 (shipped 2026-10-08)** — The shared-workspace warning, conflicting agent/run labels and confirmation
   control are readable in Core, Sky & Grove and Studio, including hover, focus and disabled states.
   Fixing their contrast preserves the existing warning text, explicit acknowledgement, conflict
   detection, retained start draft and idempotent run start. It does not introduce workspace isolation.
 
-- **R86 (planned)** — A published synthesis awaiting stage acceptance is shown as **Accepting
+- **R86 (shipped 2026-10-08)** — A published synthesis awaiting stage acceptance is shown as **Accepting
   judge output**, not running discussion or failed judging. Transient acceptance failures retry
   automatically with bounded cleanup-style recovery. Exhausted/non-recoverable acceptance shows
   its reason and **Retry output acceptance**, which reuses that exact published entry without
@@ -771,13 +771,13 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   *Verify:* frozen-session and pipeline integration/fault tests with provider-boundary capture;
   native-context-loss supervision remains covered by the existing recovery contract.
 
-- **A52 (planned)** (R86) — Lose the post-publication kick and fail stage acceptance before commit.
+- **A52 (shipped 2026-10-08)** (R86) — Lose the post-publication kick and fail stage acceptance before commit.
   Reconciliation accepts the same synthesis once without another judge turn; persistent failure
   exposes Retry output acceptance and replay mutates no earlier output. Oversized stage context
   and synthesis refuse before side effects/staging with a field-named error and preserve data.
   *Verify:* boundary/fault-injection state/server tests and the failure state in A50's rendered pass.
 
-- **A48 (planned)** (R81–R83) — Save a mixed ordinary → Think Tank → ordinary template, start it
+- **A48 (shipped 2026-10-08)** (R81–R83) — Save a mixed ordinary → Think Tank → ordinary template, start it
   through Setup → Review with participant/judge runtime defaults and one override, and verify the
   snapshot and launched identities agree. A fake-provider room preserves disagreement, publishes
   its judge synthesis once, and the next stage receives the exact named text. No standing-owner
@@ -791,12 +791,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   remain durable. A retained room refuses deletion; deleting its terminal run preserves readable
   room history and outputs and permits ordinary eligible room deletion. *Verify:* state/server
   race and fault-injection tests and a rendered recovery journey.
-- **A50 (planned)** (R82–R84) — Inspect the active room, a held failure, judge synthesis and retained
+- **A50 (shipped 2026-10-08)** (R82–R84) — Inspect the active room, a held failure, judge synthesis and retained
   completed stage at 1024px and a wider desktop in all three appearances. Identify the room phase,
   required action, source and completion meaning without reconstructing an agent transcript.
   *Verify:* focused real-browser start → room → judge → next-stage → retained-history journey;
   bounded packaged Claude/Codex room/judge probe remains an implementation acceptance gate.
-- **A51 (planned)** (R85) — Trigger the real shared-workspace warning from both modal and inline
+- **A51 (shipped 2026-10-08)** (R85) — Trigger the real shared-workspace warning from both modal and inline
   start flows in all three appearances; read the warning, conflicts and button and exercise keyboard
   focus, pending/disabled state, refusal and confirmed retry. Exactly one run starts only after the
   acknowledgement. *Verify:* start-form interaction tests and a real-browser contrast check.
@@ -1077,6 +1077,18 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   *Verify by* run-start component tests and FS-12.A24's rendered pass.
 
 ## 6. Deviations & open decisions
+
+**Think Tank stages shipped with known gaps, 2026-10-08.** R81–R86 shipped with these recorded
+deviations: (1) participant setup already claimed before Stop settles its launch, but Stop does not
+then tear down that fresh idle runtime; (2) tasks created during room-owned turns are not recorded
+as stage descendants (FS-16.R48's last sentence); (3) produced values that would overflow a later
+room's 256 KiB stage context are detected when that room is created — the run pauses naming the
+field — not before the producing stage's result is accepted (TS-09.R56); (4) the automatic
+output-acceptance retry count (three) is in memory and restarts after a Chuck restart, while the
+held `accept_room_output` state itself is durable. A49's restart/race fault-injection matrix
+remains planned beyond the state/manager tests that shipped. No desktop inline start form exists
+(starts use the modal), so A51 exercised the modal start and the run-page attention warning. The
+bounded packaged Claude/Codex room/judge probe for A50 is owed.
 
 **Confirmed shared standing instructions, 2026-10-08.** R87–R89/A53–A55 are approved but
 unshipped. The operator explicitly chose Claude system/Codex developer instructions over ordinary

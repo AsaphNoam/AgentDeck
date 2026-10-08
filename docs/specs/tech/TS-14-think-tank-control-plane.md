@@ -158,7 +158,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   Implementation closure follows TS-06.R5 and §4's focused matrix; fake peers cannot satisfy
   credentialed provider acceptance.
 
-- **R19 (planned)** — Pipeline room creation reuses R2's normalized setup/reservation and ordinary
+- **R19 (shipped 2026-10-08)** — Pipeline room creation reuses R2's normalized setup/reservation and ordinary
   launch composition with every member/judge new and project fixed to the run. A shared transactional
   create helper accepts trusted pipeline origin plus bounded immutable stage context; standalone
   create cannot set that origin. Persist goal/objective, declared inputs/output contract and run/stage
@@ -169,7 +169,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   using R7/R17's byte limits, UTF-8 continuation and read receipts; every participant and judge reads
   it before submitting. Keep stage data outside frozen provider/system prompts. Origin provides
   provenance and recovery linkage, not private-transcript or cross-project authority.
-- **R20 (planned)** — A pipeline origin adds the run/stage-open check to setup claims, room
+- **R20 (shipped 2026-10-08)** — A pipeline origin adds the run/stage-open check to setup claims, room
   activation admission, resume/retry and judge reservation, atomically with the relevant state claim.
   Shared state methods behind every existing room mutation (including End, messages and annotations)
   enforce the relevant origin/closure guard; stale actions return the existing typed conflict without
@@ -180,7 +180,7 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   abandon unstarted slots/judge, cancel only the captured room-owned turn, then release its ownership.
   Unpublished cancelled contributions are not invented or charged; retain failed activity honestly.
   TS-09.R54 owns convergence before run stop. R13's standalone End/completion behavior is preserved.
-- **R21 (planned)** — A successful finalized judge contribution remains canonical room data;
+- **R21 (shipped 2026-10-08)** — A successful finalized judge contribution remains canonical room data;
   TS-09.R53 consumes its immutable entry through the task result authority after commit. Stage output
   acceptance is independently idempotent and recoverable if a post-commit kick fails; it does not
   rerun the judge. Required synthesis output limits are returned in pipeline judge context and
@@ -366,6 +366,10 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
 
 ## 5. Deviations & open decisions
 
+- **Pipeline rooms (shipped 2026-10-08).** R19's attributed stage context is the room's first
+  `stage_context` entry, so the existing paged read, delivery and read receipts carry it rather
+  than a separate section. R20's Stop leaves setup already claimed to settle but does not then
+  stop that fresh idle runtime (FS-14 §6).
 - The human selected SQLite authority and explicit room tools after reviewing canonical-file and
   automatic-assistant-publication alternatives. No material technical choice remains open here.
 - Current normalized assistant output is a delta without publication intent. Explicit submission
