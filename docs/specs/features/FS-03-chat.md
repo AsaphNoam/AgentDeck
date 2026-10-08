@@ -631,7 +631,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   normal browser modifier/middle-click behavior remain usable. Clipboard failure shows the
   existing Copy failed feedback. Local-file links retain R51–R55's viewer behavior; fragments
   and mail links retain existing behavior. No action sends agent input or changes the transcript.
-- **R79 (planned) — Markdown tables are readable.** Rendered GFM tables have faint horizontal
+- **R79 — Markdown tables are readable.** Rendered GFM tables have faint horizontal
   separators between rows, a clear header boundary and increased horizontal cell padding.
   Preserve column alignment and selectable content. Wide tables scroll inside their reading
   surface without page overflow, clipping or unreadable column compression. Apply this in full

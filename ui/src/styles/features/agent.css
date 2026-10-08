@@ -409,6 +409,34 @@
   padding: 0 var(--ad-space-1);
 }
 
+/* Rendered Markdown tables everywhere the shared renderer runs: faint row
+   dividers, a clear header boundary and roomier cells. A wide table scrolls
+   inside its own box (FS-03.R79, TS-08.R108). */
+.markdown-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-table table {
+  border-collapse: collapse;
+}
+
+.markdown-table :is(th, td) {
+  padding: var(--ad-space-2) var(--ad-space-3);
+  vertical-align: top;
+}
+
+/* GFM column alignment arrives as inline style and still wins over this default. */
+.markdown-table th {
+  border-bottom: var(--ad-border-thin) solid var(--ad-border-strong);
+  text-align: start;
+  white-space: nowrap;
+}
+
+.markdown-table tbody tr + tr {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+}
+
 .user-message {
   background: var(--ad-highlight);
   border: var(--ad-border-thin) solid var(--ad-border-strong);

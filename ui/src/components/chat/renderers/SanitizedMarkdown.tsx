@@ -87,6 +87,12 @@ export function SanitizedMarkdown({ text, onOpenFile }: { text: string; onOpenFi
       if (match[1] === "mermaid" && fenceIsClosed(textRef.current, node)) return <MermaidDiagram source={value} />;
       return <CodeBlock language={match[1]}>{value}</CodeBlock>;
     },
+    // A wide table scrolls inside its own box instead of widening the reading
+    // surface; the GFM table markup itself is unchanged (FS-03.R79, TS-08.R108).
+    table({ node, ...rest }) {
+      void node;
+      return <div className="markdown-table"><table {...rest} /></div>;
+    },
     // A link whose target is a local path opens the file viewer instead of
     // navigating the browser, which today leaves the conversation entirely
     // (FS-03.R51). A web link opens in a new tab (FS-03.R78); `mailto`, fragments

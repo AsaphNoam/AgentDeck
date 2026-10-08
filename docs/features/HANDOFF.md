@@ -36,7 +36,7 @@ phone `AgentScreen`, removed `CommandsTab`, `getTrackedCommands`, `TrackedComman
 the `tracked-list` `commands` contract variant; server tracking/API untouched. (2) Web links —
 done: `SanitizedMarkdown` `WebLink`, `lib/linkActions.ts`; every `AnnotationContextMenu` caller
 passes `link: claimWebLink(mouse)`; tests in `renderers/webLinks.test.tsx`. (3) Table dividers,
-padding and contained overflow — next. (4) Real-browser rendered checks (TS-08.R110; A59–A61,
+padding and contained overflow — done (`.markdown-table` wrapper + agent.css). (4) next: Real-browser rendered checks (TS-08.R110; A59–A61,
 A14, FS-12.A32 still planned) and closure matrix with `make embed`. Focused checks: `cd ui && npx vitest run <files>`, `npm run check:styles`, `npx tsc -b`.
 
 ## Acceptance gates still owed

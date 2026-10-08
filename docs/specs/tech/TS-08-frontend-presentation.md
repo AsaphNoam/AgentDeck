@@ -1203,7 +1203,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   surfaces without annotations must still expose the link actions to a right-click. Reuse one
   link-action construction path across those surfaces (INV §2/§8). Opening from the menu happens
   synchronously from user activation and provides no opener access. Add no persistence or API.
-- **R108 (planned) — Table presentation uses existing tokens and semantic markup.** Keep GFM's
+- **R108 — Table presentation uses existing tokens and semantic markup.** Keep GFM's
   table/thead/tbody/tr/th/td structure and alignment. Extend the existing Markdown presentation
   styles with semantic border and spacing tokens for faint horizontal separators, header boundary
   and increased cell padding. Use contained horizontal overflow for wide tables; any minimal table

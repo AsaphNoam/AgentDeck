@@ -378,3 +378,18 @@ describe("file links in assistant Markdown", () => {
     expect(onOpenFile).not.toHaveBeenCalled();
   });
 });
+
+// FS-03.R79/A60: tables keep GFM structure, alignment and selectable cells inside
+// the shared scroll box; spacing and dividers are proven in the rendered check.
+describe("Markdown tables", () => {
+  it("wraps a GFM table without changing its structure or alignment", () => {
+    const { container } = renderAssistant("| Name | Count | Note |\n|:--|:-:|--:|\n| `go` | 2 | [ref](https://example.com/a/very/long/link) |\n| ui | 3 | ok |");
+
+    const table = container.querySelector(".markdown-table > table");
+    expect(table).not.toBeNull();
+    expect([...table!.querySelectorAll("thead th")].map((cell) => (cell as HTMLElement).style.textAlign)).toEqual(["left", "center", "right"]);
+    expect(table!.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(table!.querySelector("td code")?.textContent).toBe("go");
+    expect(screen.getByRole("link", { name: "ref" })).toHaveAttribute("target", "_blank");
+  });
+});
