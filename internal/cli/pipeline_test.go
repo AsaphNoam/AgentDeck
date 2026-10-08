@@ -24,6 +24,13 @@ func TestParsePipelineCLIValues(t *testing.T) {
 	if _, err := parseStageAssignments([]string{"work=codex"}); err == nil {
 		t.Fatal("invalid assignment succeeded")
 	}
+	rooms, err := parseRoomAssignments([]string{"debate.pro=codex/gpt", "debate.judge=claude/opus"}, []string{"debate=claude/sonnet"})
+	if err != nil || rooms["debate"].Participants["judge"].Model != "opus" || rooms["debate"].Judge.Model != "sonnet" || rooms["debate"].Participants["pro"].Backend != "codex" {
+		t.Fatalf("rooms = %+v err=%v", rooms, err)
+	}
+	if _, err := parseRoomAssignments([]string{"debate=codex/gpt"}, nil); err == nil {
+		t.Fatal("room participant without stage.participant succeeded")
+	}
 }
 
 // FS-14.A1: CLI commands remain thin clients over the same REST contract.

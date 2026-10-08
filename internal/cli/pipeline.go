@@ -46,7 +46,7 @@ func newPipelineCmd() *cobra.Command {
 	runs := &cobra.Command{Use: "run", Short: "Start and control pipeline runs"}
 	var startTemplate, startName, startProject, startGoal, startRequestID string
 	var orchestratorBackend, orchestratorModel, orchestratorEffort string
-	var startInputs, startStages []string
+	var startInputs, startStages, roomParticipants, roomJudges []string
 	var orchestratorFast, acknowledge bool
 	start := &cobra.Command{Use: "start", Short: "Start a configured pipeline run", RunE: func(*cobra.Command, []string) error {
 		inputs, err := parseKeyValues(startInputs)
@@ -65,10 +65,14 @@ func newPipelineCmd() *cobra.Command {
 		// stage coordinators are sent separately and never become stage owners.
 		standing := pipeline.RuntimeAssignment{Backend: orchestratorBackend, Model: orchestratorModel, Effort: orchestratorEffort, Fast: orchestratorFast}
 		assignments["standing"] = standing
+		rooms, err := parseRoomAssignments(roomParticipants, roomJudges)
+		if err != nil {
+			return err
+		}
 		body := struct {
 			pipeline.StartRequest
 			Acknowledge bool `json:"acknowledge_shared_workspace"`
-		}{StartRequest: pipeline.StartRequest{RequestID: startRequestID, TemplateID: startTemplate, DisplayName: startName, Project: startProject, Goal: startGoal, Inputs: inputs, Assignments: assignments, Orchestrator: standing, DedicatedAssignments: dedicatedAssignments(assignments)}, Acknowledge: acknowledge}
+		}{StartRequest: pipeline.StartRequest{RequestID: startRequestID, TemplateID: startTemplate, DisplayName: startName, Project: startProject, Goal: startGoal, Inputs: inputs, Assignments: assignments, Orchestrator: standing, DedicatedAssignments: dedicatedAssignments(assignments), ThinkTankAssignments: rooms}, Acknowledge: acknowledge}
 		return runPipelineRequest(http.MethodPost, "/api/pipeline-runs", body)
 	}}
 	start.Flags().StringVar(&startTemplate, "template", "", "saved template id")
@@ -82,12 +86,14 @@ func newPipelineCmd() *cobra.Command {
 	start.Flags().StringVar(&startRequestID, "request-id", "", "idempotency request id")
 	start.Flags().StringSliceVar(&startInputs, "input", nil, "named input as name=value (repeatable)")
 	start.Flags().StringSliceVar(&startStages, "stage", nil, "runtime as stage=backend/model (repeatable)")
+	start.Flags().StringSliceVar(&roomParticipants, "room-participant", nil, "Think Tank participant runtime as stage.participant=backend/model (repeatable)")
+	start.Flags().StringSliceVar(&roomJudges, "room-judge", nil, "Think Tank judge runtime as stage=backend/model (repeatable)")
 	start.Flags().BoolVar(&acknowledge, "ack-shared-workspace", false, "acknowledge active work sharing the project directory")
 	_ = start.MarkFlagRequired("template")
 	_ = start.MarkFlagRequired("project")
 	_ = start.MarkFlagRequired("goal")
-	_ = start.MarkFlagRequired("backend")
-	_ = start.MarkFlagRequired("model")
+	// --backend/--model are required by the server only when an ordinary stage
+	// needs the standing owner; a Think Tank-only run has none (TS-09.R52).
 	runs.AddCommand(start)
 	runs.AddCommand(&cobra.Command{Use: "show <run_id>", Args: cobra.ExactArgs(1), RunE: func(_ *cobra.Command, args []string) error {
 		return runPipelineRequest(http.MethodGet, "/api/pipeline-runs/"+args[0], nil)
@@ -182,6 +188,46 @@ func parseStageAssignments(values []string) (map[string]pipeline.RuntimeAssignme
 			return nil, fmt.Errorf("invalid stage=backend/model assignment %q", value)
 		}
 		out[stage] = pipeline.RuntimeAssignment{Backend: backend, Model: model}
+	}
+	return out, nil
+}
+
+// parseRoomAssignments builds think_tank_assignments from
+// --room-participant stage.participant=backend/model and
+// --room-judge stage=backend/model (TS-09.R51).
+func parseRoomAssignments(participants, judges []string) (map[string]pipeline.ThinkTankAssignment, error) {
+	out := map[string]pipeline.ThinkTankAssignment{}
+	slot := func(stage string) pipeline.ThinkTankAssignment {
+		room, ok := out[stage]
+		if !ok {
+			room = pipeline.ThinkTankAssignment{Participants: map[string]pipeline.RuntimeAssignment{}}
+		}
+		return room
+	}
+	parsed, err := parseStageAssignments(participants)
+	if err != nil {
+		return nil, err
+	}
+	for key, runtime := range parsed {
+		stage, participant, ok := strings.Cut(key, ".")
+		if !ok || stage == "" || participant == "" {
+			return nil, fmt.Errorf("invalid stage.participant=backend/model room participant %q", key)
+		}
+		room := slot(stage)
+		room.Participants[participant] = runtime
+		out[stage] = room
+	}
+	parsed, err = parseStageAssignments(judges)
+	if err != nil {
+		return nil, err
+	}
+	for stage, runtime := range parsed {
+		room := slot(stage)
+		room.Judge = runtime
+		out[stage] = room
+	}
+	if len(out) == 0 {
+		return nil, nil
 	}
 	return out, nil
 }
