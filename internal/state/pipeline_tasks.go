@@ -103,7 +103,7 @@ func insertPipelineStageRowsTx(tx *sql.Tx, p CreatePipelineStageTaskParams, now 
 	return roomID, nil
 }
 
-const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, ''), p.execution_kind, p.room_id`
+const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, ''), p.execution_kind, p.room_id, p.source_entry_seq`
 
 // latestStageOrder is the run cursor's definition: the newest attempt of the
 // newest stage. The per-stage partial unique index names the open attempt of one
@@ -562,7 +562,7 @@ func readPipelineStageTaskTx(tx *sql.Tx, runID string, stageIndex, attempt int) 
 func scanPipelineStageTask(row interface{ Scan(...any) error }) (PipelineStageTask, error) {
 	var v PipelineStageTask
 	var created, closed string
-	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed, &v.ExecutionKind, &v.RoomID); err != nil {
+	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed, &v.ExecutionKind, &v.RoomID, &v.SourceEntrySeq); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return PipelineStageTask{}, ErrNotFound
 		}

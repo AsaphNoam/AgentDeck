@@ -53,6 +53,9 @@ func (s *Server) publishThinkTankUpdate(d state.ThinkTankDetail) {
 	// recovery resumes it, and a settled stop or published synthesis re-drives
 	// the run's reconciliation (TS-09.R53–R55).
 	if runID := d.Room.PipelineRunID; runID != "" && s.pipelineMgr != nil {
+		if task, err := s.stateStore.ReadTask(d.Room.PipelineTaskID); err == nil {
+			s.publishTaskUpdate(task)
+		}
 		go func() {
 			ctx := context.Background()
 			if err := s.pipelineMgr.SyncRoomPhase(ctx, runID); err != nil {
@@ -66,21 +69,23 @@ func (s *Server) publishThinkTankUpdate(d state.ThinkTankDetail) {
 }
 
 type thinkTankSummaryWire struct {
-	Version       int        `json:"version"`
-	RoomID        string     `json:"room_id"`
-	Title         string     `json:"title"`
-	Goal          string     `json:"goal"`
-	OriginProject string     `json:"origin_project"`
-	Phase         string     `json:"phase"`
-	Control       string     `json:"control"`
-	Hold          string     `json:"hold,omitempty"`
-	EndReason     string     `json:"end_reason,omitempty"`
-	JudgeStatus   string     `json:"judge_status,omitempty"`
-	Participants  []string   `json:"participants"`
-	Revision      int64      `json:"revision"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	EndedAt       *time.Time `json:"ended_at,omitempty"`
+	Version       int    `json:"version"`
+	RoomID        string `json:"room_id"`
+	Title         string `json:"title"`
+	Goal          string `json:"goal"`
+	OriginProject string `json:"origin_project"`
+	// Pipeline names a pipeline-owned room's run and stage (FS-21.R41).
+	Pipeline     *thinkTankPipelineWire `json:"pipeline,omitempty"`
+	Phase        string                 `json:"phase"`
+	Control      string                 `json:"control"`
+	Hold         string                 `json:"hold,omitempty"`
+	EndReason    string                 `json:"end_reason,omitempty"`
+	JudgeStatus  string                 `json:"judge_status,omitempty"`
+	Participants []string               `json:"participants"`
+	Revision     int64                  `json:"revision"`
+	CreatedAt    time.Time              `json:"created_at"`
+	UpdatedAt    time.Time              `json:"updated_at"`
+	EndedAt      *time.Time             `json:"ended_at,omitempty"`
 	// ActiveAgentID names the agent taking the room's running turn, so that
 	// agent's own conversation can identify the room turn (FS-03.R69).
 	// It names a sole running attempt only; concurrent openings leave it empty
@@ -124,6 +129,9 @@ func thinkTankSummaryFor(d state.ThinkTankDetail) thinkTankSummaryWire {
 		Participants: names, Revision: r.Revision, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt, EndedAt: r.EndedAt,
 	}
 	out.Roster, out.JudgeEnabled = []thinkTankRosterWire{}, r.JudgeConfig != ""
+	if r.PipelineRunID != "" {
+		out.Pipeline = &thinkTankPipelineWire{RunID: r.PipelineRunID, StageID: r.PipelineStageID, TaskID: r.PipelineTaskID}
+	}
 	for _, m := range d.Members {
 		w := thinkTankRosterWire{AgentID: m.AgentID, Name: m.AgentName, Project: m.Project, Role: m.Role,
 			State: m.State, Limit: m.Cap, Completed: m.Completed, Exists: true}
@@ -301,5 +309,19 @@ func (s *Server) thinkTankDetailWire(d state.ThinkTankDetail) thinkTankDetailWir
 	}
 	out.Deletable = d.Active == nil && r.JudgeStatus != state.ThinkTankJudgeLaunching &&
 		(r.Phase == state.ThinkTankPhaseEnded || r.Control == state.ThinkTankPaused)
+	if r.PipelineRunID != "" {
+		// A retained run pins its room (TS-09.R54).
+		if _, err := s.stateStore.ReadPipelineRun(r.PipelineRunID); err == nil {
+			out.Deletable = false
+			out.Pipeline.Pinned = true
+		}
+	}
 	return out
+}
+
+type thinkTankPipelineWire struct {
+	RunID   string `json:"run_id"`
+	StageID string `json:"stage_id"`
+	TaskID  string `json:"task_id"`
+	Pinned  bool   `json:"pinned"`
 }

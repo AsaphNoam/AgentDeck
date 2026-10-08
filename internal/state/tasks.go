@@ -1611,6 +1611,8 @@ type PipelineStageTask struct {
 	// for a room-backed stage bound to RoomID (TS-09.R52).
 	ExecutionKind string `json:"execution_kind"`
 	RoomID        string `json:"room_id,omitempty"`
+	// SourceEntrySeq is the accepted synthesis entry (TS-09.R53).
+	SourceEntrySeq int64 `json:"source_entry_seq,omitempty"`
 }
 
 const (

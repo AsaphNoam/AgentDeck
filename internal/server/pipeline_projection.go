@@ -29,20 +29,25 @@ type pipelineRunControls struct {
 }
 
 type pipelineStageTaskDetail struct {
-	TaskID         string                    `json:"task_id"`
-	RunID          string                    `json:"run_id"`
-	StageID        string                    `json:"stage_id"`
-	StageIndex     int                       `json:"stage_index"`
-	AttemptNumber  int                       `json:"attempt_number"`
-	State          string                    `json:"state"`
-	AssignmentText string                    `json:"assignment_text"`
-	StandingOwner  pipelineStageOwner        `json:"standing_owner"`
-	Coordinator    *pipelineStageCoordinator `json:"coordinator,omitempty"`
-	Result         *pipelineStageResult      `json:"result,omitempty"`
-	Work           []pipelineTaskWork        `json:"work"`
-	Cleanup        *pipelineStageCleanup     `json:"cleanup,omitempty"`
-	CreatedAt      time.Time                 `json:"created_at"`
-	UpdatedAt      time.Time                 `json:"updated_at"`
+	TaskID         string `json:"task_id"`
+	RunID          string `json:"run_id"`
+	StageID        string `json:"stage_id"`
+	StageIndex     int    `json:"stage_index"`
+	AttemptNumber  int    `json:"attempt_number"`
+	State          string `json:"state"`
+	AssignmentText string `json:"assignment_text"`
+	// ExecutionKind is "agent" or "think_tank"; a Think Tank stage carries its
+	// room link/phase and no standing owner (TS-09.R55).
+	ExecutionKind   string                    `json:"execution_kind"`
+	Room            *taskRoomWire             `json:"room,omitempty"`
+	AttentionReason string                    `json:"attention_reason,omitempty"`
+	StandingOwner   pipelineStageOwner        `json:"standing_owner"`
+	Coordinator     *pipelineStageCoordinator `json:"coordinator,omitempty"`
+	Result          *pipelineStageResult      `json:"result,omitempty"`
+	Work            []pipelineTaskWork        `json:"work"`
+	Cleanup         *pipelineStageCleanup     `json:"cleanup,omitempty"`
+	CreatedAt       time.Time                 `json:"created_at"`
+	UpdatedAt       time.Time                 `json:"updated_at"`
 }
 
 // pipelineStageCleanup is the bounded, in-vocabulary view of a stage task's
@@ -208,7 +213,13 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 			}
 			work = filtered
 		}
-		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, StandingOwner: owner, Work: work, Cleanup: stageCleanupDetail(task), CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		item := pipelineStageTaskDetail{TaskID: task.TaskID, RunID: stage.RunID, StageID: stage.StageID, StageIndex: stage.StageIndex, AttemptNumber: stage.AttemptNumber, State: task.State, AssignmentText: task.Instruction, ExecutionKind: stage.ExecutionKind, StandingOwner: owner, Work: work, Cleanup: stageCleanupDetail(task), CreatedAt: stage.CreatedAt, UpdatedAt: task.UpdatedAt}
+		if stage.RoomID != "" {
+			// One room projection shared with Tasks (TS-10.R38, INV §2).
+			projected := taskDetailResponse{Task: task}
+			s.projectRoomTask(&projected)
+			item.Room, item.State, item.AttentionReason = projected.Room, projected.State, projected.AttentionReason
+		}
 		if stage.CoordinatorTaskID != "" {
 			coordinator, readErr := s.stateStore.ReadTask(stage.CoordinatorTaskID)
 			if readErr != nil {
@@ -238,6 +249,17 @@ func (s *Server) pipelineTaskRunProjection(detail pipeline.RunDetail) ([]pipelin
 		controls.Retry = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Retries the interrupted assignment on the same standing owner."}
 		controls.Replace = pipelineRunControl{Eligible: detail.Run.State == "paused" && current.State == state.TaskInterrupted, Reason: "Replaces only the interrupted standing owner and retains stage work."}
 		controls.RepairCleanup = pipelineRunControl{Eligible: pipeline.CleanupRepairable(detail.Run.State, detail.Run.PendingAction), Reason: "Retries only the retained cleanup effects."}
+		if current.Room != nil {
+			// A room stage recovers from its room; only the approval gate and
+			// held output acceptance remain run controls (TS-09.R55).
+			roomReason := "Open the Think Tank room to resume or retry it."
+			controls.Continue = pipelineRunControl{Eligible: detail.Run.State == "paused" && detail.Run.PendingAction == "await_approval", Reason: "Approves the accepted judge synthesis."}
+			controls.Retry = pipelineRunControl{Eligible: detail.Run.State == "paused" && detail.Run.PendingAction == "accept_room_output", Reason: "Retry output acceptance of the same published synthesis."}
+			if !controls.Retry.Eligible {
+				controls.Retry.Reason = roomReason
+			}
+			controls.Replace = pipelineRunControl{Eligible: false, Reason: roomReason}
+		}
 	}
 	return out, controls, nil
 }

@@ -332,6 +332,18 @@ func (s *Server) handleFireSignal(w http.ResponseWriter, r *http.Request) {
 type taskDetailResponse struct {
 	state.Task
 	Attachments []state.TaskAttachment `json:"attachments"`
+	// Room is present for a room-backed Think Tank stage task (FS-16.R48).
+	Room *taskRoomWire `json:"room,omitempty"`
+}
+
+// taskRoomWire names a room-backed stage task's execution source and links.
+type taskRoomWire struct {
+	RoomID         string `json:"room_id"`
+	RunID          string `json:"run_id"`
+	StageID        string `json:"stage_id"`
+	Phase          string `json:"phase"`
+	JudgeStatus    string `json:"judge_status"`
+	SourceEntrySeq int64  `json:"source_entry_seq,omitempty"`
 }
 
 func (s *Server) taskDetail(task state.Task) (taskDetailResponse, error) {
@@ -339,7 +351,54 @@ func (s *Server) taskDetail(task state.Task) (taskDetailResponse, error) {
 	if err != nil {
 		return taskDetailResponse{}, err
 	}
-	return taskDetailResponse{Task: task, Attachments: attachments}, nil
+	out := taskDetailResponse{Task: task, Attachments: attachments}
+	if task.TargetKind == state.TargetThinkTank {
+		s.projectRoomTask(&out)
+	}
+	return out, nil
+}
+
+// projectRoomTask derives an unfinished room-backed task's state and reason
+// from its room and run through the shared room phase (TS-10.R38). A finished
+// task keeps its durable outcome.
+func (s *Server) projectRoomTask(out *taskDetailResponse) {
+	stage, err := s.stateStore.ReadPipelineStageTaskByTask(out.TaskID)
+	if err != nil || stage.RoomID == "" {
+		return
+	}
+	wire := &taskRoomWire{RoomID: stage.RoomID, RunID: stage.RunID, StageID: stage.StageID, SourceEntrySeq: stage.SourceEntrySeq}
+	out.Room = wire
+	room, err := s.stateStore.ReadThinkTank(stage.RoomID)
+	if err != nil {
+		return
+	}
+	wire.Phase, wire.JudgeStatus = room.Room.Phase, room.Room.JudgeStatus
+	if out.State == state.TaskFinished {
+		return
+	}
+	run, err := s.stateStore.ReadPipelineRun(stage.RunID)
+	if err != nil {
+		return
+	}
+	projected, reason := roomTaskState(room.Room, run)
+	out.State, out.AttentionReason = projected, reason
+}
+
+// roomTaskState maps room phase onto task vocabulary (TS-10.R38).
+func roomTaskState(room state.ThinkTank, run state.PipelineRunRecord) (string, string) {
+	switch {
+	case run.PendingAction == "accept_room_output":
+		return state.TaskInterrupted, run.AttentionReason
+	case room.JudgeStatus == state.ThinkTankJudgeCompleted:
+		return state.TaskWaiting, "Accepting judge output"
+	case room.JudgeStatus == state.ThinkTankJudgeFailed:
+		return state.TaskInterrupted, "Think Tank judge failed: " + room.JudgeError
+	case room.Hold != "":
+		return state.TaskInterrupted, room.Hold
+	case room.Control == state.ThinkTankPaused:
+		return state.TaskWaiting, "Think Tank paused"
+	}
+	return state.TaskRunning, ""
 }
 
 // publishTaskUpdate publishes after the authoritative commit, never before, and
@@ -427,6 +486,19 @@ type personResultRequest struct {
 	Outcome string `json:"outcome"`
 	Summary string `json:"summary"`
 	Details string `json:"details,omitempty"`
+}
+
+// refuseRoomStageTask keeps generic result, cancel, retry, re-arm and delete
+// controls from bypassing a room-backed stage's pipeline/room authority. Its
+// target kind is immutable, so this pre-read cannot race (FS-16.R48, TS-10.R38).
+func (s *Server) refuseRoomStageTask(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if task, err := s.stateStore.ReadTask(r.PathValue("id")); err == nil && task.TargetKind == state.TargetThinkTank {
+			writeAPIError(w, apiError(runtime.CodeConflict, "this Think Tank stage task is managed by its pipeline run and room; use their controls"))
+			return
+		}
+		next(w, r)
+	}
 }
 
 // handleRecordTaskResult implements POST /api/tasks/{id}/result (FS-16.R22). It
