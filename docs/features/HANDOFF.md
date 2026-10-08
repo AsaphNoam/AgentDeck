@@ -190,9 +190,10 @@ permission after the sandbox blocked the test listener. No live provider turn wa
 
 - **2026-10-08 — Shared pipeline instructions in design.** Recorded the request in
   `docs/ideas.md`: reusable naming, grouping and other every-stage orchestration guidance.
-  Proposed optional template instructions frozen per run and delivered to the standing owner and
-  dedicated coordinators. Feature scope, precedence and Think Tank applicability await the
-  user's confirmation; no technical specification, ready change or product edit yet.
+  Proposed optional template instructions frozen per run and composed into the standing owner's
+  and dedicated coordinators' persistent instructions, following the user's feedback to avoid
+  repetition in stage assignments. Remaining scope/precedence awaits confirmation; no technical
+  specification, ready change or product edit yet.
 
 - **2026-10-08 — Chat links, tables and tabs finished.** Web links open in new tabs with Open in
   new tab/Copy link on right-click, composed with annotation menus; Markdown tables get dividers,

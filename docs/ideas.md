@@ -37,10 +37,11 @@ the relevant feature and technical specifications; it does not change product co
 - **Shared pipeline orchestrator instructions.** Requested 2026-10-08: define naming, grouping and
   other every-stage orchestration guidance once in a pipeline instead of repeating it in each
   stage. Extend FS-14's reusable template and frozen run context. Proposed scope: optional shared
-  instructions delivered to the standing owner and dedicated stage coordinators with every stage
-  assignment, including recovery; stage instructions remain separate. Awaiting confirmation of
-  recipients, conflict precedence and whether planned Think Tank participants/judges are included
-  before technical design. No product code or ready change yet.
+  instructions composed into the standing owner and dedicated stage coordinators' persistent
+  instructions, rather than repeated in every stage assignment, following the user's 2026-10-08
+  feedback. Resume, fresh-session recovery and replacement must preserve the frozen run guidance;
+  stage instructions remain separate. Awaiting remaining scope/precedence confirmation before
+  technical design. No product code or ready change yet.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,
