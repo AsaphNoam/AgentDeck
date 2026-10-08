@@ -286,6 +286,14 @@ function ancestorChain(taskID: string, parentOf: Map<string, string>): string[] 
   return chain;
 }
 
+/** cyclicLineage reports a chain that loops back instead of reaching a root:
+ *  invalid lineage never hides work (FS-16.R47). */
+function cyclicLineage(taskID: string, parentOf: Map<string, string>): boolean {
+  const chain = ancestorChain(taskID, parentOf);
+  const last = chain.length > 0 ? chain[chain.length - 1] : taskID;
+  return parentOf.has(last) && (parentOf.get(last) === taskID || chain.includes(parentOf.get(last)!));
+}
+
 /** rowVisibility is the pure projection TS-08.R92 asks for: which rows a
  *  collapsed ancestor hides, and the descendant summary each parent shows.
  *  A task pinned by active inspection or mutation, or sitting on a pinned
@@ -307,7 +315,7 @@ export function rowVisibility(rows: WorkRow[], collapsed: ReadonlySet<string>, p
 
   const hiddenBy = new Map<string, HiddenBy>();
   for (const task of tasks) {
-    if (extendedPinned.has(task.task_id)) continue;
+    if (extendedPinned.has(task.task_id) || cyclicLineage(task.task_id, parentOf)) continue;
     const chain = ancestorChain(task.task_id, parentOf);
     const ancestorID = chain.find((id) => collapsed.has(id));
     if (ancestorID) hiddenBy.set(task.task_id, { ancestorID, path: chain.slice(0, chain.indexOf(ancestorID) + 1) });

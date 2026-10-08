@@ -175,9 +175,13 @@ describe("rowVisibility", () => {
     const a = make("cyc_a", "cyc_b");
     const b = make("cyc_b", "cyc_a");
     const rows = [a, b].map(row);
-    const visible = rowVisibility(rows, new Set(["cyc_a"]), new Set());
-    expect([...visible.hiddenBy.keys()]).toEqual(["cyc_b"]);
-    expect(visible.descendants.get("cyc_a")).toEqual({ hidden: 1, unfinished: 1, attention: 0, cleanup: 0 });
+    // Invalid lineage never hides work, even with both members collapsed.
+    const visible = rowVisibility(rows, new Set(["cyc_a", "cyc_b"]), new Set());
+    expect([...visible.hiddenBy.keys()]).toEqual([]);
+    // A descendant whose ancestor chain never reaches a root is invalid too.
+    const leaf = make("cyc_leaf", "cyc_a");
+    const withLeaf = rowVisibility([a, b, leaf].map(row), new Set(["cyc_a"]), new Set());
+    expect([...withLeaf.hiddenBy.keys()]).toEqual([]);
   });
 });
 
