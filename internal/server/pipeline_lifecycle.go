@@ -25,6 +25,19 @@ func (s *Server) AcquirePipelineStart(_ context.Context, projectID string) (func
 	return func() { s.releaseProjectStart(projectID) }, nil
 }
 
+// RoomLaunchConfig composes a fresh room slot's opaque launch request through
+// the same composer standalone rooms use, so the room engine launches it like
+// any reserved participant (TS-14.R19, INV §2).
+func (s *Server) RoomLaunchConfig(_ context.Context, execution pipeline.StageExecution) (string, error) {
+	req := launchRequest{Role: execution.Role, Project: execution.Project, Backend: execution.Backend,
+		Model: execution.Model, Effort: execution.Effort, Fast: execution.Fast, Name: execution.AgentName}
+	config, ae := s.thinkTankLaunchConfig(&req, "a pipeline room slot")
+	if ae != nil {
+		return "", &pipeline.ProjectGateError{Code: ae.Code, Message: ae.Message}
+	}
+	return config, nil
+}
+
 // ValidateStage checks the same chat role/project/backend/model boundary before
 // a run snapshot is committed, without registering or starting a process.
 func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecution) error {
@@ -230,6 +243,11 @@ func (s *Server) IsRunning(agentID string) bool {
 
 func (s *Server) PublishPipelineUpdate(update pipeline.PipelineUpdate) {
 	s.eventBus.Publish("pipeline_update", nil, update)
+	// A committed room-backed stage is launched by the room engine; kick it
+	// rather than waiting for the sweep (TS-09.R52).
+	if update.State == "running" {
+		s.kickThinkTanks()
+	}
 	// A run that has reached a terminal state has already registered its outcome
 	// in the commit that made it terminal, so the arms waiting on it can be
 	// released now. Evaluation reads that registration rather than this

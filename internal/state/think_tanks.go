@@ -66,6 +66,10 @@ const (
 	ThinkTankEntryAnnotation     = "annotation"
 	ThinkTankEntrySynthesis      = "synthesis"
 	ThinkTankEntryMissingOpening = "missing_opening"
+	// ThinkTankEntryStageContext is a pipeline room's attributed stage
+	// context, published first so every participant and the judge read it
+	// through the ordinary paged context read (TS-14.R19).
+	ThinkTankEntryStageContext = "stage_context"
 
 	ThinkTankEndOperator           = "operator"
 	ThinkTankEndParticipantsLeft   = "participants_left"
@@ -148,9 +152,62 @@ type ThinkTank struct {
 	JudgeStatus  string
 	JudgeAgentID string
 	JudgeError   string
+	// Pipeline origin is trusted host data set only by the stage transaction;
+	// standalone rooms leave it empty (TS-14.R19).
+	PipelineRunID   string
+	PipelineStageID string
+	PipelineTaskID  string
+	// StageContext is the room-owned encoded ThinkTankStageContext.
+	StageContext string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	EndedAt      *time.Time
+}
+
+// ThinkTankStageContext is the attributed stage data every participant and the
+// judge read before contributing. It is durable room data, so run deletion does
+// not erase what participants received (TS-14.R19).
+type ThinkTankStageContext struct {
+	RunID      string                `json:"run_id"`
+	RunName    string                `json:"run_name"`
+	StageID    string                `json:"stage_id"`
+	StageTitle string                `json:"stage_title"`
+	Goal       string                `json:"goal"`
+	Objective  string                `json:"objective"`
+	Inputs     []ThinkTankStageInput `json:"inputs"`
+	Output     ThinkTankStageOutput  `json:"output"`
+}
+
+type ThinkTankStageInput struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// ThinkTankStageOutput is the judge's synthesis contract: the named output and
+// its limit, enforced before staging (TS-14.R21).
+type ThinkTankStageOutput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	MaxRunes    int    `json:"max_runes"`
+}
+
+// ThinkTankMaxStageContextBytes bounds encoded stage context (TS-09.R56).
+const ThinkTankMaxStageContextBytes = 256 << 10
+
+// EncodeThinkTankStageContext refuses oversized context instead of truncating
+// required data (TS-09.R56).
+func EncodeThinkTankStageContext(c ThinkTankStageContext) (string, error) {
+	if c.Inputs == nil {
+		c.Inputs = []ThinkTankStageInput{}
+	}
+	raw, err := json.Marshal(c)
+	if err != nil {
+		return "", err
+	}
+	if len(raw) > ThinkTankMaxStageContextBytes {
+		return "", thinkTankInvalid("stage context exceeds %d bytes", ThinkTankMaxStageContextBytes)
+	}
+	return string(raw), nil
 }
 
 type ThinkTankMember struct {
@@ -370,6 +427,12 @@ type ThinkTankCreate struct {
 	Openings      bool
 	JudgeConfig   string
 	Members       []ThinkTankMember
+	// Pipeline origin and stage context; only the stage transaction sets them
+	// (TS-14.R19). Omitted from standalone intents so their replay is unchanged.
+	PipelineRunID   string `json:",omitempty"`
+	PipelineStageID string `json:",omitempty"`
+	PipelineTaskID  string `json:",omitempty"`
+	StageContext    string `json:",omitempty"`
 }
 
 func validateThinkTankCreate(c ThinkTankCreate) error {
@@ -483,18 +546,33 @@ func thinkTankCreateIntent(c ThinkTankCreate) string {
 // launch effect (TS-14.R2). An exact replay of CommandID returns the original
 // room; a different request under the same id is a conflict.
 func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
-	c.Title = foldThinkTankWhitespace(c.Title)
-	if err := validateThinkTankCreate(c); err != nil {
-		return ThinkTankDetail{}, err
-	}
+	// Standalone creation cannot claim a pipeline origin (TS-14.R19).
+	c.PipelineRunID, c.PipelineStageID, c.PipelineTaskID, c.StageContext = "", "", "", ""
 	tx, err := s.db.Begin()
 	if err != nil {
 		return ThinkTankDetail{}, fmt.Errorf("state: begin create think tank: %w", err)
 	}
 	defer tx.Rollback()
+	d, err := createThinkTankTx(tx, c)
+	if err != nil {
+		return ThinkTankDetail{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ThinkTankDetail{}, fmt.Errorf("state: commit create think tank: %w", err)
+	}
+	return d, nil
+}
+
+// createThinkTankTx is the one room-creation transaction body shared by
+// standalone and pipeline-stage creation (TS-09.R52, INV §2).
+func createThinkTankTx(tx *sql.Tx, c ThinkTankCreate) (ThinkTankDetail, error) {
+	c.Title = foldThinkTankWhitespace(c.Title)
+	if err := validateThinkTankCreate(c); err != nil {
+		return ThinkTankDetail{}, err
+	}
 	intent := thinkTankCreateIntent(c)
 	var existing, savedIntent string
-	err = tx.QueryRow(`SELECT room_id, create_intent FROM think_tanks WHERE command_id = ?`, c.CommandID).Scan(&existing, &savedIntent)
+	err := tx.QueryRow(`SELECT room_id, create_intent FROM think_tanks WHERE command_id = ?`, c.CommandID).Scan(&existing, &savedIntent)
 	if err == nil {
 		d, err := readThinkTankDetail(tx, existing)
 		if err != nil {
@@ -554,10 +632,12 @@ func (s *Store) CreateThinkTank(c ThinkTankCreate) (ThinkTankDetail, error) {
 	now := formatTime(timeNow())
 	if _, err := tx.Exec(`
 INSERT INTO think_tanks(room_id, command_id, title, goal, origin_project, openings, phase, control,
-  judge_config, judge_status, created_at, updated_at, create_intent)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  judge_config, judge_status, created_at, updated_at, create_intent,
+  pipeline_run_id, pipeline_stage_id, pipeline_task_id, stage_context)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		roomID, c.CommandID, title, c.Goal, c.OriginProject, c.Openings, phase, ThinkTankRunning,
-		c.JudgeConfig, judgeStatus, now, now, intent); err != nil {
+		c.JudgeConfig, judgeStatus, now, now, intent,
+		c.PipelineRunID, c.PipelineStageID, c.PipelineTaskID, c.StageContext); err != nil {
 		return ThinkTankDetail{}, fmt.Errorf("state: insert think tank: %w", err)
 	}
 	for i, m := range c.Members {
@@ -574,14 +654,38 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			return ThinkTankDetail{}, fmt.Errorf("state: insert think tank member: %w", err)
 		}
 	}
-	d, err := readThinkTankDetail(tx, roomID)
-	if err != nil {
-		return ThinkTankDetail{}, err
+	if c.StageContext != "" {
+		body, err := renderThinkTankStageContext(c.StageContext)
+		if err != nil {
+			return ThinkTankDetail{}, err
+		}
+		if _, err := insertThinkTankEntryTx(tx, ThinkTankEntry{RoomID: roomID, Kind: ThinkTankEntryStageContext,
+			AgentName: "Pipeline", Project: c.OriginProject, Body: body}); err != nil {
+			return ThinkTankDetail{}, err
+		}
 	}
-	if err := tx.Commit(); err != nil {
-		return ThinkTankDetail{}, fmt.Errorf("state: commit create think tank: %w", err)
+	return readThinkTankDetail(tx, roomID)
+}
+
+// renderThinkTankStageContext is the attributed text every participant and the
+// judge read first. The judge's required output and its limit are part of it.
+func renderThinkTankStageContext(encoded string) (string, error) {
+	var c ThinkTankStageContext
+	if err := json.Unmarshal([]byte(encoded), &c); err != nil {
+		return "", fmt.Errorf("state: decode stage context: %w", err)
 	}
-	return d, nil
+	var b strings.Builder
+	fmt.Fprintf(&b, "Pipeline stage context — run %q (%s), stage %q (%s).\n\nRun goal:\n%s\n\nStage objective:\n%s\n",
+		c.RunName, c.RunID, c.StageTitle, c.StageID, c.Goal, c.Objective)
+	if len(c.Inputs) > 0 {
+		b.WriteString("\nStage inputs:\n")
+		for _, in := range c.Inputs {
+			fmt.Fprintf(&b, "- %s:\n%s\n", in.Name, in.Value)
+		}
+	}
+	fmt.Fprintf(&b, "\nRequired output %q: %s\nThe judge's published synthesis becomes this output exactly; it must be at most %d characters. Completion means a synthesis was produced, not that participants agreed.\n",
+		c.Output.Name, c.Output.Description, c.Output.MaxRunes)
+	return b.String(), nil
 }
 
 func participantsOf(members []ThinkTankMember) []ThinkTankMember {
@@ -603,7 +707,7 @@ type thinkTankQueryer interface {
 
 const thinkTankColumns = `room_id, command_id, title, goal, origin_project, openings, phase, control, hold,
   end_reason, rotation, revision, judge_config, judge_status, judge_agent_id, judge_error,
-  created_at, updated_at, ended_at`
+  created_at, updated_at, ended_at, pipeline_run_id, pipeline_stage_id, pipeline_task_id, stage_context`
 
 func scanThinkTank(row interface{ Scan(...any) error }) (ThinkTank, error) {
 	var r ThinkTank
@@ -611,7 +715,8 @@ func scanThinkTank(row interface{ Scan(...any) error }) (ThinkTank, error) {
 	var ended sql.NullString
 	if err := row.Scan(&r.RoomID, &r.CommandID, &r.Title, &r.Goal, &r.OriginProject, &r.Openings, &r.Phase,
 		&r.Control, &r.Hold, &r.EndReason, &r.Rotation, &r.Revision, &r.JudgeConfig, &r.JudgeStatus,
-		&r.JudgeAgentID, &r.JudgeError, &created, &updated, &ended); err != nil {
+		&r.JudgeAgentID, &r.JudgeError, &created, &updated, &ended,
+		&r.PipelineRunID, &r.PipelineStageID, &r.PipelineTaskID, &r.StageContext); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ThinkTank{}, ErrNotFound
 		}

@@ -683,6 +683,11 @@ func (s *Server) recoverTasks(ctx context.Context) error {
 		if task.State == state.TaskWaiting || task.PendingRelease || task.PendingYield {
 			continue
 		}
+		// A room-backed stage task has no runtime of its own: its room holds
+		// uncertain work for explicit recovery (TS-10.R38, TS-14.R14).
+		if task.TargetKind == state.TargetThinkTank {
+			continue
+		}
 		if task.State == state.TaskRunning {
 			// Its agent is an unowned orphan now, which the ordinary reconciliation
 			// sweep reaps. Nothing is resumed on a guess and no outcome is invented.

@@ -173,6 +173,18 @@ func (s *Store) StageThinkTankTurn(callerAgentID, token, disposition, message, r
 	if !utf8.ValidString(message) {
 		return ThinkTankAttempt{}, thinkTankInvalid("message is not valid UTF-8")
 	}
+	// A pipeline judge's synthesis becomes a named stage value, so it also
+	// meets that limit before staging; the judge may correct and resubmit
+	// without spending another contribution (TS-09.R56, FS-14.R86).
+	if a.Turn == ThinkTankTurnJudge && utf8.RuneCountInString(message) > MaxStageValueRunes {
+		var pipelineRun string
+		if err := tx.QueryRow(`SELECT pipeline_run_id FROM think_tanks WHERE room_id = ?`, a.RoomID).Scan(&pipelineRun); err != nil {
+			return ThinkTankAttempt{}, fmt.Errorf("state: read room origin: %w", err)
+		}
+		if pipelineRun != "" {
+			return ThinkTankAttempt{}, thinkTankInvalid("synthesis output exceeds the pipeline's %d-character named output limit; shorten it and submit again", MaxStageValueRunes)
+		}
+	}
 	switch disposition {
 	case ThinkTankReply:
 		if strings.TrimSpace(message) == "" {

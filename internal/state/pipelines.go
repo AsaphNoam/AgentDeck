@@ -243,35 +243,7 @@ VALUES (?, ?, ?, ?, ?, ?)`, run.RunID, value.Name, value.Value, value.SourceKind
 		if p.RunID != run.RunID || p.ExpectedRevision != run.Revision || p.StageIndex != 0 || p.AttemptNumber != 1 || p.StageID != run.CurrentStageID {
 			return PipelineRunRecord{}, false, ErrPipelineStageConflict
 		}
-		now := run.CreatedAt
-		p.Task.CreatedAt, p.Task.UpdatedAt, p.Task.Revision, p.Task.State = now, now, 1, TaskReady
-		p.Task.AttentionReason, p.Task.ReadyAt = "", &now
-		if err := insertTaskRowTx(tx, p.Task); err != nil {
-			return PipelineRunRecord{}, false, fmt.Errorf("state: insert initial pipeline stage task: %w", err)
-		}
-		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
-			return PipelineRunRecord{}, false, err
-		}
-		coordinatorID := ""
-		if p.Coordinator != nil {
-			c := *p.Coordinator
-			c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
-			// A managed coordinator is armed until its standing owner is confirmed,
-			// so it deliberately carries no ready time (TS-09.R49).
-			c.AttentionReason, c.ReadyAt = "", nil
-			if err := insertTaskRowTx(tx, c); err != nil {
-				return PipelineRunRecord{}, false, err
-			}
-			if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, "1", formatTime(now)); err != nil {
-				return PipelineRunRecord{}, false, err
-			}
-			coordinatorID = c.TaskID
-		}
-		outputJSON, err := json.Marshal(p.OutputValues)
-		if err != nil {
-			return PipelineRunRecord{}, false, err
-		}
-		if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at) VALUES (?, 0, 1, ?, ?, ?, ?, ?, ?)`, p.RunID, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
+		if _, err := insertPipelineStageRowsTx(tx, p, run.CreatedAt); err != nil {
 			return PipelineRunRecord{}, false, err
 		}
 	}

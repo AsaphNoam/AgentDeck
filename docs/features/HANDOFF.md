@@ -54,14 +54,25 @@ Slice 2 is delegated (worktree branch; integrate by cherry-pick, then verify `ui
 Done: slice 3 — `pipeline.ThinkTankStage`, validator, `think_tank_assignments` start validation
 frozen into the one assignments map under `think_tank:<stage>:participant:<id>` /
 `think_tank:<stage>:judge` keys (stripped from `RunDetail.Assignments`, exposed as
-`ThinkTankAssignments`); phone start fills room slots. `validateStart` still adds a temporary
-`not_runnable` diagnostic per room stage — remove it in slice 4.
+`ThinkTankAssignments`); phone start fills room slots.
+Done: slices 4–5 — migration 45 (stage `execution_kind`/`room_id`/`source_entry_seq`; room
+`pipeline_*` origin + `stage_context`); `insertPipelineStageRowsTx` shared by start/advance creates
+the running `think_tank` task + room (via `createThinkTankTx`, shared with standalone) in the stage
+tx; stage context is the room's first `stage_context` entry; `Lifecycle.RoomLaunchConfig` composes
+slot configs; later ordinary stages reuse `lastStandingAgent`. `AcceptThinkTankStageOutput` (room
+authority) + `commitStageResultTx` (shared writes); `pipeline/rooms.go` accepts on the post-finalize
+kick and in the room loop sweep, retries 3× then pauses `accept_room_output`, which run Retry
+re-attempts; judge submit refuses >64,000 runes in pipeline rooms. Restart task recovery skips room
+tasks. Tests: `internal/pipeline/rooms_test.go`.
+Still owed in slice 6: Stop fencing/cancel of owned room work, room pin vs deletion, generic
+Continue/Retry/Replace rejection for room stages, setup/judge failure → run paused projection,
+room-turn task attribution, producer-derived context check before accepting a feeding stage.
 Seams for slice 4–6: `Manager.Start` (manager.go:52) / `advanceTaskStage` (actions.go:105) create
 stage tasks; `AcceptPipelineStageTaskResult` (state/pipeline_tasks.go:146) is the result tx;
 `reconcileTaskStageRelease` (reconcile.go:101); `CreateThinkTank` (state/think_tanks.go:485);
 judge synthesis → `insertThinkTankResultTx` (think_tank_turns.go:290); server room loop
 `dispatchThinkTanks`/`launchReservedThinkTankAgent` (server/think_tanks.go:67/398); latest schema
-migration version 44 (state/schema.go). Next: slice 4.
+migration version 45 (state/schema.go). Next: slice 6.
 
 ## Acceptance gates still owed
 

@@ -92,6 +92,9 @@ type StageExecution struct {
 type Lifecycle interface {
 	AcquirePipelineStart(context.Context, string) (func(), error)
 	ValidateStage(context.Context, StageExecution) error
+	// RoomLaunchConfig composes a fresh Think Tank slot's opaque launch
+	// request (Role/Project/runtime/AgentName) without launching anything.
+	RoomLaunchConfig(context.Context, StageExecution) (string, error)
 	LaunchStage(context.Context, StageExecution) error
 	ContinueStage(context.Context, StageExecution) error
 	StopStage(context.Context, string) error

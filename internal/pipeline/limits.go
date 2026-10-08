@@ -14,7 +14,7 @@ const (
 	MaxDescriptionRunes = 1000
 	MaxInstructionRunes = 16000
 	MaxGoalRunes        = 16000
-	MaxValueRunes       = 64000
+	MaxValueRunes       = state.MaxStageValueRunes
 	MaxProposalRecords  = 100
 	MaxListPage         = 100
 	MaxDelegatedAgents  = 20

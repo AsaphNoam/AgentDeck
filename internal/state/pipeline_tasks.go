@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+	"unicode/utf8"
 )
 
 // ErrPipelineStageConflict means a run cursor, stage association, or standing
@@ -26,9 +29,81 @@ type CreatePipelineStageTaskParams struct {
 	// OutputValues maps task-result local names to frozen pipeline value keys.
 	OutputValues map[string]string
 	Coordinator  *Task
+	// Room makes this a room-backed think_tank stage: the room, its reserved
+	// identities and the binding commit with the stage task, before any launch
+	// (TS-09.R52). The pipeline origin fields are filled here, not by callers.
+	Room *ThinkTankCreate
 }
 
-const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, '')`
+// insertPipelineStageRowsTx is the one stage-task construction shared by run
+// start and later stage creation (INV §2): task, lineage, optional managed
+// coordinator or room, and the stage association. It returns the bound room id.
+func insertPipelineStageRowsTx(tx *sql.Tx, p CreatePipelineStageTaskParams, now time.Time) (string, error) {
+	p.Task.CreatedAt, p.Task.UpdatedAt, p.Task.Revision = now, now, 1
+	p.Task.State, p.Task.Arms = TaskReady, nil
+	p.Task.AttentionReason, p.Task.ReadyAt = "", &now
+	kind := StageExecutionAgent
+	if p.Room != nil {
+		// A room-backed task is never admitted by the task dispatcher: it has no
+		// assignee, handle or slot, and its phase comes from the room (TS-10.R38).
+		kind = StageExecutionThinkTank
+		p.Task.TargetKind, p.Task.State, p.Task.ReadyAt = TargetThinkTank, TaskRunning, nil
+		p.Task.Role, p.Task.Backend, p.Task.Model, p.Task.Effort, p.Task.Fast = "", "", "", "", false
+		if p.Coordinator != nil {
+			return "", fmt.Errorf("state: a room-backed stage has no coordinator")
+		}
+	}
+	if err := insertTaskRowTx(tx, p.Task); err != nil {
+		return "", fmt.Errorf("state: insert pipeline stage task: %w", err)
+	}
+	attempt := fmt.Sprintf("%d", p.AttemptNumber)
+	if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, attempt, formatTime(now)); err != nil {
+		return "", fmt.Errorf("state: insert pipeline task lineage: %w", err)
+	}
+	coordinatorID := ""
+	if p.Coordinator != nil {
+		c := *p.Coordinator
+		c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
+		// A managed coordinator is armed until its standing owner is confirmed,
+		// so it deliberately carries no ready time (TS-09.R49).
+		c.AttentionReason, c.ReadyAt = "", nil
+		if err := insertTaskRowTx(tx, c); err != nil {
+			return "", err
+		}
+		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, attempt, formatTime(now)); err != nil {
+			return "", err
+		}
+		coordinatorID = c.TaskID
+	}
+	roomID := ""
+	if p.Room != nil {
+		c := *p.Room
+		c.PipelineRunID, c.PipelineStageID, c.PipelineTaskID = p.RunID, p.StageID, p.Task.TaskID
+		if c.StageContext == "" {
+			return "", thinkTankInvalid("a pipeline room requires stage context")
+		}
+		d, err := createThinkTankTx(tx, c)
+		if err != nil {
+			return "", err
+		}
+		if d.Room.PipelineTaskID != p.Task.TaskID {
+			return "", ErrPipelineStageConflict
+		}
+		roomID = d.Room.RoomID
+	}
+	outputJSON, err := json.Marshal(p.OutputValues)
+	if err != nil {
+		return "", fmt.Errorf("state: encode stage output contract: %w", err)
+	}
+	if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at, execution_kind, room_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now), kind, roomID); err != nil {
+		return "", fmt.Errorf("state: insert pipeline stage association: %w", err)
+	}
+	return roomID, nil
+}
+
+const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, ''), p.execution_kind, p.room_id`
 
 // latestStageOrder is the run cursor's definition: the newest attempt of the
 // newest stage. The per-stage partial unique index names the open attempt of one
@@ -120,7 +195,7 @@ LIMIT 1`, taskID, agentID).Scan(&one)
 // still-standing release intent is what bounds the window.
 func (s *Store) AcceptedPipelineStageTaskReport(agentID string) (PipelineStageTask, Task, error) {
 	stage, err := scanPipelineStageTask(s.db.QueryRow(`
-SELECT p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, '')
+SELECT `+pipelineStageTaskColumns+`
 FROM pipeline_stage_tasks p JOIN tasks t ON t.task_id = p.task_id
 WHERE t.assigned_agent_id = ? AND t.state = ? AND t.outcome <> '' AND t.pending_release = 1
 ORDER BY p.stage_index DESC, p.attempt_number DESC
@@ -195,46 +270,177 @@ WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &t
 			}
 		}
 	}
+	if err := commitStageResultTx(tx, stageResultCommit{
+		RunID: runID, TaskID: taskID, TaskState: taskState, Revision: revision, Source: "agent",
+		PendingRelease: true, Result: result, Declared: declared,
+	}); err != nil {
+		return PipelineRunRecord{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: commit pipeline task result: %w", err)
+	}
+	return s.ReadPipelineRun(runID)
+}
+
+// stageResultCommit is one already-authorized stage result. Authority is
+// validated by the caller's own branch (ordinary handle or trusted room
+// synthesis); these writes are shared (TS-09.R53, INV §2).
+type stageResultCommit struct {
+	RunID, TaskID, TaskState, Source string
+	Revision                         int64
+	PendingRelease                   bool
+	SourceEntrySeq                   int64
+	Result                           TaskResult
+	Declared                         map[string]string
+}
+
+// commitStageResultTx writes the immutable task result, named outputs, value
+// projection, closure fence and run projection once.
+func commitStageResultTx(tx *sql.Tx, c stageResultCommit) error {
+	result, taskID, runID, revision, declared := c.Result, c.TaskID, c.RunID, c.Revision, c.Declared
 	now := timeNow()
 	stamp := formatTime(now)
-	if _, err := tx.Exec(`UPDATE tasks SET state = ?, outcome = ?, outcome_source = 'agent', outcome_summary = ?, outcome_details = ?, attention_reason = '', pending_release = 1, finished_at = ?, revision = revision + 1, updated_at = ? WHERE task_id = ? AND state = ?`, TaskFinished, result.Outcome, result.Summary, result.Details, stamp, stamp, taskID, taskState); err != nil {
-		return PipelineRunRecord{}, fmt.Errorf("state: finish stage task: %w", err)
+	res, err := tx.Exec(`UPDATE tasks SET state = ?, outcome = ?, outcome_source = ?, outcome_summary = ?, outcome_details = ?, attention_reason = '', pending_release = ?, finished_at = ?, revision = revision + 1, updated_at = ? WHERE task_id = ? AND state = ?`, TaskFinished, result.Outcome, c.Source, result.Summary, result.Details, c.PendingRelease, stamp, stamp, taskID, c.TaskState)
+	if err != nil {
+		return fmt.Errorf("state: finish stage task: %w", err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrPipelineStageConflict
 	}
 	if err := RegisterWorkResultTx(tx, WorkResult{SourceKind: SourceTask, SourceID: taskID, Outcome: result.Outcome, Summary: result.Summary}, now); err != nil {
-		return PipelineRunRecord{}, err
+		return err
 	}
 	if err := insertTaskResultOutputs(tx, taskID, result.Outputs); err != nil {
-		return PipelineRunRecord{}, err
+		return err
 	}
 	for name, valueKey := range declared {
 		if value, ok := result.Outputs[name]; ok {
 			if _, err := tx.Exec(`INSERT INTO pipeline_values(run_id, name, value, source_kind, source_attempt_id, updated_at) VALUES (?, ?, ?, 'stage_task', ?, ?) ON CONFLICT(run_id, name) DO UPDATE SET value = excluded.value, source_kind = excluded.source_kind, source_attempt_id = excluded.source_attempt_id, updated_at = excluded.updated_at`, runID, valueKey, value, taskID, stamp); err != nil {
-				return PipelineRunRecord{}, fmt.Errorf("state: store stage output: %w", err)
+				return fmt.Errorf("state: store stage output: %w", err)
 			}
 		}
 	}
-	if _, err := tx.Exec(`UPDATE pipeline_stage_tasks SET state = 'closing', closure_revision = ?, closed_at = ? WHERE task_id = ? AND state = 'open'`, revision+1, stamp, taskID); err != nil {
-		return PipelineRunRecord{}, err
+	res, err = tx.Exec(`UPDATE pipeline_stage_tasks SET state = 'closing', closure_revision = ?, closed_at = ?, source_entry_seq = ? WHERE task_id = ? AND state = 'open'`, revision+1, stamp, c.SourceEntrySeq, taskID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return err
+	} else if n != 1 {
+		return ErrPipelineStageConflict
 	}
 	attention := ""
 	if result.Outcome == OutcomeFailure || result.Outcome == OutcomeBlocked {
 		attention = result.Outcome
 	}
 	// The same fence again as the write's own condition, so a Stop that commits
-	// between the read above and this statement loses nothing.
-	res, err := tx.Exec(`UPDATE pipeline_runs SET state = 'finishing', pending_action = 'release_stage_task', attention_reason = ?, revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ? AND state NOT IN ('stopping', 'stopped', 'completed')`, attention, stamp, runID, revision)
+	// between the caller's read and this statement loses nothing.
+	res, err = tx.Exec(`UPDATE pipeline_runs SET state = 'finishing', pending_action = 'release_stage_task', attention_reason = ?, revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ? AND state NOT IN ('stopping', 'stopped', 'completed')`, attention, stamp, runID, revision)
 	if err != nil {
-		return PipelineRunRecord{}, err
+		return err
 	}
 	if n, err := res.RowsAffected(); err != nil {
-		return PipelineRunRecord{}, err
+		return err
 	} else if n != 1 {
+		return ErrPipelineStageConflict
+	}
+	return nil
+}
+
+// ErrThinkTankOutputRefused is a non-recoverable synthesis acceptance refusal:
+// the published text cannot become the named output as it stands (TS-09.R53).
+var ErrThinkTankOutputRefused = errors.New("state: think tank output refused")
+
+// MaxStageValueRunes mirrors the pipeline named-value limit for room output.
+const MaxStageValueRunes = 64000
+
+// AcceptThinkTankStageOutput is the room branch of stage result acceptance. Host
+// authority is the bound room's finalized judge synthesis, checked inside this
+// transaction with the open run/stage and expected revision; no HTTP or MCP
+// caller supplies it. The exact synthesis becomes the single named output, with
+// the room and entry recorded as its source (TS-09.R53, TS-14.R21).
+func (s *Store) AcceptThinkTankStageOutput(taskID string, expectedRunRevision int64) (PipelineRunRecord, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: begin accept think tank output: %w", err)
+	}
+	defer tx.Rollback()
+	var runID, runState, stageState, kind, roomID, taskState, outputJSON, judgeStatus string
+	var revision int64
+	err = tx.QueryRow(`
+SELECT p.run_id, r.state, p.state, r.revision, p.execution_kind, p.room_id, t.state, p.output_values_json, tt.judge_status
+FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id JOIN tasks t ON t.task_id = p.task_id
+JOIN think_tanks tt ON tt.room_id = p.room_id AND tt.pipeline_task_id = p.task_id
+WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &kind, &roomID, &taskState, &outputJSON, &judgeStatus)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PipelineRunRecord{}, ErrNotFound
+	}
+	if err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: read room output authority: %w", err)
+	}
+	if kind != StageExecutionThinkTank || revision != expectedRunRevision || stageState != "open" || taskState == TaskFinished ||
+		runState == "stopping" || runState == "stopped" || runState == "completed" || judgeStatus != ThinkTankJudgeCompleted {
 		return PipelineRunRecord{}, ErrPipelineStageConflict
 	}
+	var seq int64
+	var body string
+	if err := tx.QueryRow(`SELECT seq, body FROM think_tank_entries WHERE room_id = ? AND kind = ? ORDER BY seq DESC LIMIT 1`, roomID, ThinkTankEntrySynthesis).Scan(&seq, &body); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return PipelineRunRecord{}, ErrPipelineStageConflict
+		}
+		return PipelineRunRecord{}, fmt.Errorf("state: read room synthesis: %w", err)
+	}
+	declared := map[string]string{}
+	if err := json.Unmarshal([]byte(outputJSON), &declared); err != nil {
+		return PipelineRunRecord{}, fmt.Errorf("state: decode stage output contract: %w", err)
+	}
+	if len(declared) != 1 {
+		return PipelineRunRecord{}, fmt.Errorf("%w: the stage must declare exactly one output", ErrThinkTankOutputRefused)
+	}
+	name := ""
+	for n := range declared {
+		name = n
+	}
+	if strings.TrimSpace(body) == "" {
+		return PipelineRunRecord{}, fmt.Errorf("%w: output %s: the synthesis is empty", ErrThinkTankOutputRefused, name)
+	}
+	if utf8.RuneCountInString(body) > MaxStageValueRunes {
+		return PipelineRunRecord{}, fmt.Errorf("%w: output %s: the synthesis exceeds %d characters", ErrThinkTankOutputRefused, name, MaxStageValueRunes)
+	}
+	summary := fmt.Sprintf("Think Tank judge synthesis accepted from room %s entry %d.", roomID, seq)
+	if err := commitStageResultTx(tx, stageResultCommit{
+		RunID: runID, TaskID: taskID, TaskState: taskState, Revision: revision, Source: StageExecutionThinkTank,
+		SourceEntrySeq: seq, Result: TaskResult{Outcome: OutcomeSuccess, Summary: summary, Outputs: map[string]string{name: body}}, Declared: declared,
+	}); err != nil {
+		return PipelineRunRecord{}, err
+	}
 	if err := tx.Commit(); err != nil {
-		return PipelineRunRecord{}, fmt.Errorf("state: commit pipeline task result: %w", err)
+		return PipelineRunRecord{}, fmt.Errorf("state: commit think tank output: %w", err)
 	}
 	return s.ReadPipelineRun(runID)
+}
+
+// PendingThinkTankStageOutputs lists open room-backed stages whose judge has
+// completed, for the bounded post-commit recovery sweep (TS-09.R53).
+func (s *Store) PendingThinkTankStageOutputs(limit int) ([]PipelineStageTask, error) {
+	rows, err := s.db.Query(`SELECT `+pipelineStageTaskColumns+` FROM pipeline_stage_tasks p
+JOIN think_tanks tt ON tt.room_id = p.room_id
+WHERE p.execution_kind = ? AND p.state = 'open' AND tt.judge_status = ? LIMIT ?`, StageExecutionThinkTank, ThinkTankJudgeCompleted, limit)
+	if err != nil {
+		return nil, fmt.Errorf("state: list pending room outputs: %w", err)
+	}
+	defer rows.Close()
+	out := []PipelineStageTask{}
+	for rows.Next() {
+		v, err := scanPipelineStageTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 // CreatePipelineStageTask creates exactly one standing-owner task for the
@@ -272,39 +478,16 @@ func (s *Store) CreatePipelineStageTask(p CreatePipelineStageTaskParams) (Pipeli
 	}
 
 	now := timeNow()
-	p.Task.CreatedAt, p.Task.UpdatedAt, p.Task.Revision = now, now, 1
-	p.Task.State, p.Task.Arms = TaskReady, nil
-	p.Task.AttentionReason, p.Task.ReadyAt = "", &now
-	if err := insertTaskRowTx(tx, p.Task); err != nil {
-		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline stage task: %w", err)
+	if _, err := insertPipelineStageRowsTx(tx, p, now); err != nil {
+		return PipelineStageTask{}, Task{}, false, err
 	}
-	if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		p.Task.TaskID, p.ParentTaskID, p.RunID, p.StageID, fmt.Sprintf("%d", p.AttemptNumber), formatTime(now)); err != nil {
-		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline task lineage: %w", err)
+	// A room-backed stage needs no task dispatch: the room engine owns it, so
+	// the run is running from creation (TS-09.R55).
+	runState, pending := "queued", "dispatch_stage_task"
+	if p.Room != nil {
+		runState, pending = "running", ""
 	}
-	coordinatorID := ""
-	if p.Coordinator != nil {
-		c := *p.Coordinator
-		c.State, c.Revision, c.CreatedAt, c.UpdatedAt = TaskArmed, 1, now, now
-		// Armed until its standing owner is confirmed, so no ready time (TS-09.R49).
-		c.AttentionReason, c.ReadyAt = "", nil
-		if err := insertTaskRowTx(tx, c); err != nil {
-			return PipelineStageTask{}, Task{}, false, err
-		}
-		if _, err := tx.Exec(`INSERT INTO task_lineage(task_id, parent_task_id, pipeline_run_id, pipeline_stage_id, creation_attempt_id, created_at) VALUES (?, ?, ?, ?, ?, ?)`, c.TaskID, p.Task.TaskID, p.RunID, p.StageID, fmt.Sprintf("%d", p.AttemptNumber), formatTime(now)); err != nil {
-			return PipelineStageTask{}, Task{}, false, err
-		}
-		coordinatorID = c.TaskID
-	}
-	outputJSON, err := json.Marshal(p.OutputValues)
-	if err != nil {
-		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: encode stage output contract: %w", err)
-	}
-	if _, err := tx.Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, coordinator_task_id, assignment_digest, output_values_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.RunID, p.StageIndex, p.AttemptNumber, p.StageID, p.Task.TaskID, coordinatorID, p.AssignmentDigest, string(outputJSON), formatTime(now)); err != nil {
-		return PipelineStageTask{}, Task{}, false, fmt.Errorf("state: insert pipeline stage association: %w", err)
-	}
-	if _, err := tx.Exec(`UPDATE pipeline_runs SET state = 'queued', pending_action = 'dispatch_stage_task', current_stage_id = ?, revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, p.StageID, formatTime(now), p.RunID, revision); err != nil {
+	if _, err := tx.Exec(`UPDATE pipeline_runs SET state = ?, pending_action = ?, current_stage_id = ?, revision = revision + 1, updated_at = ? WHERE run_id = ? AND revision = ?`, runState, pending, p.StageID, formatTime(now), p.RunID, revision); err != nil {
 		return PipelineStageTask{}, Task{}, false, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -353,7 +536,7 @@ func (s *Store) ListPipelineRunTaskLineage(runID string, limit int) (map[string]
 }
 
 func (s *Store) ListPipelineStageTasks(runID string) ([]PipelineStageTask, error) {
-	rows, err := s.db.Query(`SELECT run_id, stage_index, attempt_number, stage_id, task_id, standing_agent_id, coordinator_task_id, assignment_digest, state, closure_revision, created_at, COALESCE(closed_at, '') FROM pipeline_stage_tasks WHERE run_id = ? ORDER BY stage_index, attempt_number`, runID)
+	rows, err := s.db.Query(`SELECT `+pipelineStageTaskColumns+` FROM pipeline_stage_tasks p WHERE p.run_id = ? ORDER BY p.stage_index, p.attempt_number`, runID)
 	if err != nil {
 		return nil, fmt.Errorf("state: list pipeline stage tasks: %w", err)
 	}
@@ -373,13 +556,13 @@ func (s *Store) ListPipelineStageTasks(runID string) ([]PipelineStageTask, error
 }
 
 func readPipelineStageTaskTx(tx *sql.Tx, runID string, stageIndex, attempt int) (PipelineStageTask, error) {
-	return scanPipelineStageTask(tx.QueryRow(`SELECT run_id, stage_index, attempt_number, stage_id, task_id, standing_agent_id, coordinator_task_id, assignment_digest, state, closure_revision, created_at, COALESCE(closed_at, '') FROM pipeline_stage_tasks WHERE run_id = ? AND stage_index = ? AND attempt_number = ?`, runID, stageIndex, attempt))
+	return scanPipelineStageTask(tx.QueryRow(`SELECT `+pipelineStageTaskColumns+` FROM pipeline_stage_tasks p WHERE p.run_id = ? AND p.stage_index = ? AND p.attempt_number = ?`, runID, stageIndex, attempt))
 }
 
 func scanPipelineStageTask(row interface{ Scan(...any) error }) (PipelineStageTask, error) {
 	var v PipelineStageTask
 	var created, closed string
-	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed); err != nil {
+	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed, &v.ExecutionKind, &v.RoomID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return PipelineStageTask{}, ErrNotFound
 		}

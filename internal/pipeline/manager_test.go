@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -30,6 +31,10 @@ func (f *fakeLifecycle) AcquirePipelineStart(context.Context, string) (func(), e
 	return func() {}, nil
 }
 func (f *fakeLifecycle) ValidateStage(context.Context, StageExecution) error { return nil }
+func (f *fakeLifecycle) RoomLaunchConfig(_ context.Context, execution StageExecution) (string, error) {
+	raw, err := json.Marshal(map[string]any{"role": execution.Role, "project": execution.Project, "backend": execution.Backend, "model": execution.Model, "name": execution.AgentName, "interface": "chat"})
+	return string(raw), err
+}
 func (f *fakeLifecycle) LaunchStage(_ context.Context, execution StageExecution) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -708,6 +713,50 @@ func TestStartValidatesThinkTankAssignments(t *testing.T) {
 	if len(lifecycle.launches) != 0 {
 		t.Fatalf("refused start launched %d agents", len(lifecycle.launches))
 	}
+	// Complete slots start a room-backed stage: one running think_tank task bound
+	// to one room with trusted origin, reserved fresh same-project identities,
+	// a judge config and durable stage context, and no launch or standing owner.
+	detail, _, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "room-start", TemplateID: "debate", Project: "app", Goal: "Decide the plan",
+		ThinkTankAssignments: map[string]ThinkTankAssignment{"debate": {
+			Participants: map[string]RuntimeAssignment{"pro": slot, "con": {Backend: "codex", Model: "gpt"}}, Judge: slot,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Start = %v", err)
+	}
+	if detail.Run.State != "running" || detail.Run.PendingAction != "" || len(lifecycle.launches) != 0 {
+		t.Fatalf("room run = %+v launches=%d", detail.Run, len(lifecycle.launches))
+	}
+	if got := detail.ThinkTankAssignments["debate"].Participants["con"]; got.Backend != "codex" {
+		t.Fatalf("frozen room slot = %+v", got)
+	}
+	if _, ok := detail.Assignments[thinkTankJudgeKey("debate")]; ok {
+		t.Fatalf("room slots leaked into ordinary assignments: %+v", detail.Assignments)
+	}
+	stages, err := manager.store.ListPipelineStageTasks(detail.Run.RunID)
+	if err != nil || len(stages) != 1 || stages[0].ExecutionKind != state.StageExecutionThinkTank || stages[0].RoomID == "" || stages[0].StandingAgentID != "" {
+		t.Fatalf("stage tasks = %+v err=%v", stages, err)
+	}
+	task, err := manager.store.ReadTask(stages[0].TaskID)
+	if err != nil || task.TargetKind != state.TargetThinkTank || task.State != state.TaskRunning || task.Backend != "" {
+		t.Fatalf("room task = %+v err=%v", task, err)
+	}
+	room, err := manager.store.ReadThinkTank(stages[0].RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if room.Room.PipelineRunID != detail.Run.RunID || room.Room.PipelineTaskID != task.TaskID || room.Room.JudgeConfig == "" || room.Room.OriginProject != "app" {
+		t.Fatalf("room origin = %+v", room.Room)
+	}
+	var stageContext state.ThinkTankStageContext
+	if err := json.Unmarshal([]byte(room.Room.StageContext), &stageContext); err != nil || stageContext.Goal != "Decide the plan" || stageContext.Output.Name != "synthesis" {
+		t.Fatalf("stage context = %+v err=%v", stageContext, err)
+	}
+	if len(room.Members) != 2 || room.Members[0].Project != "app" || room.Members[0].SetupConfig == "" || room.Members[0].AgentID == "" {
+		t.Fatalf("members = %+v", room.Members)
+	}
+
 	frozen := map[string]RuntimeAssignment{thinkTankParticipantKey("debate", "pro"): slot, thinkTankParticipantKey("debate", "con"): slot, thinkTankJudgeKey("debate"): slot}
 	view := ThinkTankAssignmentsFrom(template, frozen)["debate"]
 	if view.Judge != slot || len(view.Participants) != 2 || view.Participants["con"] != slot {

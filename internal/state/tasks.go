@@ -50,6 +50,10 @@ const (
 
 	TargetAgent  = "agent"
 	TargetLaunch = "launch"
+	// TargetThinkTank is the pipeline-managed room-backed stage task. Only the
+	// stage transaction creates it; it has no assignee, handle or task slot
+	// (TS-10.R38).
+	TargetThinkTank = "think_tank"
 )
 
 // Runtime claim kinds (FS-16.R4). Only created and woke are stopped when the
@@ -1603,7 +1607,16 @@ type PipelineStageTask struct {
 	ClosureRevision   int64      `json:"closure_revision"`
 	CreatedAt         time.Time  `json:"created_at"`
 	ClosedAt          *time.Time `json:"closed_at,omitempty"`
+	// ExecutionKind is "agent" for a standing-owner stage task or "think_tank"
+	// for a room-backed stage bound to RoomID (TS-09.R52).
+	ExecutionKind string `json:"execution_kind"`
+	RoomID        string `json:"room_id,omitempty"`
 }
+
+const (
+	StageExecutionAgent     = "agent"
+	StageExecutionThinkTank = "think_tank"
+)
 
 // RecordAgentTaskResult commits the assignee's result and a durable intent to
 // release its runtime in one transaction, and registers the outcome in the

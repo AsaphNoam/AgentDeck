@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +34,9 @@ type Manager struct {
 	locks              map[string]*runLock
 	attentionMu        sync.Mutex
 	pendingPermissions map[string]map[string]pendingPermission
+	// roomOutputFailures counts automatic acceptance retries per run, guarded
+	// by attentionMu (FS-14.R86).
+	roomOutputFailures map[string]int
 }
 
 // runLock is one run's control mutex plus the count of holders and waiters that
@@ -95,9 +100,18 @@ func (m *Manager) Start(ctx context.Context, request StartRequest) (RunDetail, b
 		return RunDetail{}, false, err
 	}
 	assignmentText, assignmentHash := renderAssignment(run, record.Template, first, values, assignmentContext{Coordinator: coordinatorContext(coordinator, first)})
+	initial := state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Coordinator: coordinator, Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}}
+	if StageCoordination(first) == CoordinationThinkTank {
+		room, err := m.roomStage(ctx, run, first, values, 1, request.Assignments)
+		if err != nil {
+			return RunDetail{}, false, err
+		}
+		initial = roomStageParams(initial, run, first, room)
+		run.State, run.PendingAction = "running", ""
+	}
 	created, replay, err := m.store.CreatePipelineRun(state.CreatePipelineRunParams{
 		Run: run, RequestID: request.RequestID, RequestHash: requestHash, Values: values,
-		InitialStageTask: &state.CreatePipelineStageTaskParams{RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: first.ID, AssignmentDigest: assignmentHash, OutputValues: stageOutputValues(first), Coordinator: coordinator, Task: state.Task{TaskID: taskID, Project: request.Project, DisplayName: first.Title, Instruction: assignmentText, TargetKind: state.TargetLaunch, Role: record.Template.OrchestratorRole, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast, CreatedByKind: "pipeline"}},
+		InitialStageTask: &initial,
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrPipelineRequestConflict) {
@@ -218,6 +232,108 @@ func (m *Manager) OnStageTaskInterrupted(taskID string) error {
 		m.notify(updated, "needs_attention")
 	}
 	return err
+}
+
+// roomStage composes a think_tank stage's room: fresh same-project
+// participants and judge from the frozen run slots, plus durable attributed
+// stage context (FS-14.R82, TS-14.R19). Nothing launches here; the room engine
+// launches the reserved identities after the stage transaction commits.
+func (m *Manager) roomStage(ctx context.Context, run state.PipelineRunRecord, stage Stage, values []state.PipelineValueRecord, attempt int, assignments map[string]RuntimeAssignment) (*state.ThinkTankCreate, error) {
+	if stage.ThinkTank == nil || len(stage.Outputs) != 1 {
+		return nil, controlError("invalid_template", "think_tank stage "+stage.ID+" is not runnable")
+	}
+	stageContext, err := encodeStageContext(run, stage, values)
+	if err != nil {
+		return nil, err
+	}
+	compose := func(role, name string, assignment RuntimeAssignment) (string, error) {
+		if m.lifecycle == nil {
+			return "", controlError("unavailable", "room launches are unavailable")
+		}
+		return m.lifecycle.RoomLaunchConfig(ctx, StageExecution{
+			RunID: run.RunID, RunName: run.DisplayName, StageID: stage.ID, StageTitle: stage.Title, Role: role,
+			Project: run.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort,
+			Fast: assignment.Fast, AgentName: name,
+		})
+	}
+	create := &state.ThinkTankCreate{
+		CommandID:     fmt.Sprintf("pipeline:%s:%s:%d", run.RunID, stage.ID, attempt),
+		Title:         clipText(stage.Title, MaxTitleRunes),
+		Goal:          fmt.Sprintf("Pipeline stage %q of run %q. The stage context carries the run goal, objective and inputs.", clipText(stage.Title, MaxTitleRunes), clipText(run.DisplayName, MaxTitleRunes)),
+		OriginProject: run.Project, Openings: stage.ThinkTank.Openings, StageContext: stageContext,
+	}
+	for _, p := range stage.ThinkTank.Participants {
+		name := clipText(stage.Title, 40) + " · " + p.ID
+		config, err := compose(p.Role, name, assignments[thinkTankParticipantKey(stage.ID, p.ID)])
+		if err != nil {
+			return nil, err
+		}
+		create.Members = append(create.Members, state.ThinkTankMember{AgentName: name, Project: run.Project, Cap: p.Limit, MayLeave: p.MayLeave, SetupConfig: config})
+	}
+	if create.JudgeConfig, err = compose(stage.ThinkTank.JudgeRole, clipText(stage.Title, 40)+" · judge", assignments[thinkTankJudgeKey(stage.ID)]); err != nil {
+		return nil, err
+	}
+	return create, nil
+}
+
+// roomStageParams completes stage-task params for a room-backed stage: the
+// task names Think Tank execution and carries no runtime (TS-10.R38).
+func roomStageParams(p state.CreatePipelineStageTaskParams, run state.PipelineRunRecord, stage Stage, room *state.ThinkTankCreate) state.CreatePipelineStageTaskParams {
+	instruction := fmt.Sprintf("Think Tank stage %q: fresh participants deliberate in a pipeline room and a fresh judge synthesizes. The judge's published synthesis becomes output %q.", stage.Title, stage.Outputs[0].Name)
+	sum := sha256.Sum256([]byte(instruction + "\n" + room.StageContext))
+	p.Task = state.Task{TaskID: p.Task.TaskID, Project: run.Project, DisplayName: stage.Title, Instruction: instruction, CreatedByKind: "pipeline"}
+	p.AssignmentDigest, p.Coordinator, p.Room = hex.EncodeToString(sum[:]), nil, room
+	p.OutputValues = stageOutputValues(stage)
+	return p
+}
+
+// encodeStageContext captures the run goal, stage objective, bound inputs and
+// the synthesis output contract, refusing rather than truncating oversized
+// required context (TS-09.R56).
+func encodeStageContext(run state.PipelineRunRecord, stage Stage, values []state.PipelineValueRecord) (string, error) {
+	byName := map[string]string{}
+	for _, v := range values {
+		byName[v.Name] = v.Value
+	}
+	c := state.ThinkTankStageContext{
+		RunID: run.RunID, RunName: run.DisplayName, StageID: stage.ID, StageTitle: stage.Title,
+		Goal: run.Goal, Objective: stage.Objective, Inputs: []state.ThinkTankStageInput{},
+	}
+	for _, in := range stage.Inputs {
+		c.Inputs = append(c.Inputs, state.ThinkTankStageInput{Name: in.Name, Value: byName[in.Value]})
+	}
+	if len(stage.Outputs) == 1 {
+		c.Output = state.ThinkTankStageOutput{Name: stage.Outputs[0].Name, Description: stage.Outputs[0].Description, MaxRunes: MaxValueRunes}
+	}
+	encoded, err := state.EncodeThinkTankStageContext(c)
+	if err != nil {
+		return "", validationError("stage context is too large", []Diagnostic{{Field: "stages." + stage.ID + ".context", Code: "too_large",
+			Message: fmt.Sprintf("the goal, objective and inputs for this Think Tank stage exceed %d bytes", state.ThinkTankMaxStageContextBytes)}})
+	}
+	return encoded, nil
+}
+
+// frozenAssignments decodes the run's complete frozen assignment map,
+// including the room slots RunDetail exposes separately.
+func frozenAssignments(run state.PipelineRunRecord) map[string]RuntimeAssignment {
+	out := map[string]RuntimeAssignment{}
+	_ = json.Unmarshal(run.Assignments, &out)
+	return out
+}
+
+// lastStandingAgent is the run's standing owner from its most recent ordinary
+// stage, so ordinary stages after a room stage reuse it (TS-09.R52).
+func (m *Manager) lastStandingAgent(runID string) (string, error) {
+	stages, err := m.store.ListPipelineStageTasks(runID)
+	if err != nil {
+		return "", err
+	}
+	for i := len(stages) - 1; i >= 0; i-- {
+		if stages[i].StandingAgentID != "" {
+			return stages[i].StandingAgentID, nil
+		}
+	}
+	return "", nil
 }
 
 func stageOutputValues(stage Stage) map[string]string {
@@ -400,8 +516,19 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 			}
 		}
 		validateSlot(base+".judge", stage, stage.ThinkTank.JudgeRole, slots.Judge)
-		// Temporary until room-backed stage execution lands (TS-09.R52).
-		add("stages."+stage.ID, "not_runnable", "think_tank stages cannot run yet")
+		// Goal, objective and run inputs are known now; a known overflow refuses
+		// Start rather than failing the stage later. Produced values are checked
+		// before the producing stage's result is accepted (TS-09.R56).
+		values := []state.PipelineValueRecord{}
+		for name, value := range request.Inputs {
+			values = append(values, state.PipelineValueRecord{Name: name, Value: value})
+		}
+		if _, err := encodeStageContext(state.PipelineRunRecord{Goal: request.Goal, DisplayName: request.DisplayName}, stage, values); err != nil {
+			var controlled *ControlError
+			if errors.As(err, &controlled) {
+				diagnostics = append(diagnostics, controlled.Diagnostics...)
+			}
+		}
 	}
 	for stageID := range request.ThinkTankAssignments {
 		if !roomStages[stageID] {

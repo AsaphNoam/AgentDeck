@@ -131,20 +131,34 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 	instruction, digest := renderAssignment(run, detail.Template, next, detail.Values, assignmentContext{
 		Coordinator: coordinatorContext(coordinator, next), PriorResults: prior,
 	})
+	// A room stage has no standing owner, so the owner of the latest ordinary
+	// stage is the one reused (TS-09.R52).
+	standing, err := m.lastStandingAgent(run.RunID)
+	if err != nil {
+		return err
+	}
 	targetKind := state.TargetLaunch
-	if current.StandingAgentID != "" {
+	if standing != "" {
 		targetKind = state.TargetAgent
 	}
-	_, _, _, err = m.store.CreatePipelineStageTask(state.CreatePipelineStageTaskParams{
+	params := state.CreatePipelineStageTaskParams{
 		RunID: run.RunID, ExpectedRevision: run.Revision, StageIndex: current.StageIndex + 1,
 		AttemptNumber: 1, StageID: next.ID, AssignmentDigest: digest, ParentTaskID: current.TaskID,
 		OutputValues: stageOutputValues(next), Coordinator: coordinator, Task: state.Task{
 			TaskID: taskID, Project: run.Project, DisplayName: next.Title, Instruction: instruction,
-			TargetKind: targetKind, TargetAgentID: current.StandingAgentID, Role: detail.Template.OrchestratorRole,
+			TargetKind: targetKind, TargetAgentID: standing, Role: detail.Template.OrchestratorRole,
 			Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast,
 			CreatedByKind: "pipeline",
 		},
-	})
+	}
+	if StageCoordination(next) == CoordinationThinkTank {
+		room, err := m.roomStage(context.Background(), run, next, detail.Values, 1, frozenAssignments(run))
+		if err != nil {
+			return err
+		}
+		params = roomStageParams(params, run, next, room)
+	}
+	_, _, _, err = m.store.CreatePipelineStageTask(params)
 	if err == nil {
 		updated, readErr := m.store.ReadPipelineRun(run.RunID)
 		if readErr == nil {
@@ -164,6 +178,15 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 	if run.Revision != expectedRevision {
 		unlock()
 		return RunDetail{}, controlError("revision_conflict", "run changed; refresh before retrying")
+	}
+	// Retry output acceptance reuses the exact published synthesis; it never
+	// reruns the judge or ordinary stage execution (TS-09.R53).
+	if run.State == "paused" && run.PendingAction == pendingAcceptRoomOutput {
+		unlock()
+		if err := m.acceptRoomOutput(ctx, runID, true); err != nil {
+			return RunDetail{}, err
+		}
+		return m.Detail(runID)
 	}
 	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
 		updated, retryErr := m.store.RetryInterruptedPipelineStageTask(runID, current.TaskID, expectedRevision)

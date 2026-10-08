@@ -51,6 +51,9 @@ func (s *Server) startThinkTanks(ctx context.Context) error {
 			case <-s.thinkTankKick:
 			}
 			s.dispatchThinkTanks(ctx)
+			if s.pipelineMgr != nil {
+				s.pipelineMgr.AcceptRoomOutputs(ctx)
+			}
 		}
 	}()
 	return nil
@@ -482,6 +485,15 @@ func (s *Server) finishThinkTankTurn(ev runtime.Event) {
 		return
 	}
 	s.publishThinkTankUpdate(finish.Detail)
+	// A pipeline room's committed synthesis is accepted as its stage output
+	// after this commit; the sweep recovers a missed kick (TS-09.R53).
+	if room := finish.Detail.Room; room.PipelineRunID != "" && room.JudgeStatus == state.ThinkTankJudgeCompleted && s.pipelineMgr != nil {
+		go func() {
+			if err := s.pipelineMgr.AcceptRoomOutput(context.Background(), room.PipelineRunID); err != nil {
+				s.log.Warn("accept pipeline room output", "run", room.PipelineRunID, "err", err)
+			}
+		}()
+	}
 }
 
 func thinkTankStopText(reason string) string {

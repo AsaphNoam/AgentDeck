@@ -681,4 +681,23 @@ ALTER TABLE think_tank_attempts ADD COLUMN retry_command_id TEXT NOT NULL DEFAUL
 CREATE UNIQUE INDEX idx_think_tank_retry_command ON think_tank_attempts(room_id, retry_command_id) WHERE retry_command_id != '';
 `,
 	},
+	{
+		// Think Tank pipeline stages: one stage task/result authority bound to
+		// exactly one room, the room's trusted pipeline origin and its durable
+		// stage context, and the accepted synthesis entry's provenance
+		// (TS-09.R52/R53/R56, TS-14.R19). Forward-only; existing rows keep
+		// ordinary agent execution and standalone origin.
+		version: 45,
+		sql: `
+ALTER TABLE pipeline_stage_tasks ADD COLUMN execution_kind TEXT NOT NULL DEFAULT 'agent';
+ALTER TABLE pipeline_stage_tasks ADD COLUMN room_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE pipeline_stage_tasks ADD COLUMN source_entry_seq INTEGER NOT NULL DEFAULT 0;
+CREATE UNIQUE INDEX idx_pipeline_stage_tasks_room ON pipeline_stage_tasks(room_id) WHERE room_id != '';
+ALTER TABLE think_tanks ADD COLUMN pipeline_run_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE think_tanks ADD COLUMN pipeline_stage_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE think_tanks ADD COLUMN pipeline_task_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE think_tanks ADD COLUMN stage_context TEXT NOT NULL DEFAULT '';
+CREATE INDEX idx_think_tanks_pipeline_run ON think_tanks(pipeline_run_id) WHERE pipeline_run_id != '';
+`,
+	},
 }
