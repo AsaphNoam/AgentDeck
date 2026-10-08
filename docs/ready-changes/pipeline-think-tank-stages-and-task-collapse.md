@@ -1,6 +1,6 @@
 # Think Tank pipeline stages, readable workspace consent and collapsible tasks
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct human request on 2026-10-06; proposed scope confirmed in the same conversation.
 **Relevant requirements:** FS-14.R81–R86/A48–A52; FS-21.R41–R42/A31–A32;
 FS-16.R46–R48/A30–A32; TS-09.R51–R56; TS-14.R19–R21; TS-10.R38; TS-08.R92–R95;

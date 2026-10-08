@@ -330,8 +330,10 @@
 .pipeline-link-button { align-items: center; background: var(--ad-surface-raised); border: var(--ad-border-thin) solid var(--ad-border-strong); border-radius: var(--ad-radius-medium); color: var(--ad-text-primary); display: inline-flex; font-weight: 650; min-height: 36px; padding: var(--ad-space-2) var(--ad-space-3); text-decoration: none; }
 .pipeline-continuation { max-width: 720px; }
 .pipeline-continuation textarea { width: 100%; }
-.pipeline-warning { background: color-mix(in srgb, var(--ad-state-busy) 12%, var(--ad-technical-background)); border: var(--ad-border-thin) solid var(--ad-state-busy); color: inherit; display: grid; gap: var(--ad-space-1); padding: var(--ad-space-3); }
+.pipeline-warning { background: color-mix(in srgb, var(--ad-state-busy) 12%, var(--ad-technical-background)); border: var(--ad-border-thin) solid var(--ad-state-busy); color: var(--ad-technical-text); display: grid; gap: var(--ad-space-1); padding: var(--ad-space-3); }
 .pipeline-warning ul { margin: 0; padding-left: var(--ad-space-6); }
+.pipeline-warning :is(p, li, strong) { color: var(--ad-technical-text); }
+.pipeline-warning code { color: var(--ad-technical-muted); }
 .pipeline-delegate-notice { border-left: var(--ad-space-1) solid var(--ad-state-waiting); color: var(--ad-technical-muted); font-size: 0.82rem; padding-left: var(--ad-space-3); }
 
 .pipeline-timeline { min-width: 0; padding-top: var(--ad-space-4); }

@@ -18,9 +18,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
-- **Active change:** None.
+- **Active change:** Think Tank pipeline stages and task collapse (see below).
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
-  `pipeline-think-tank-stages-and-task-collapse.md` is waiting to start; its behavior remains planned.
   Other available/resumable design work is in `docs/ideas.md`.
 - **Review units / findings:** Clone first-message failure investigation (2026-10-08) has an
   unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
@@ -34,8 +33,23 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Chat links, tables and tabs finished 2026-10-08; rendered evidence is reproducible with
-`cd ui && node scripts/chat-cleanup-render.mjs [outDir]` (161 checks, stubbed API, no server).
+**Think Tank pipeline stages, readable workspace consent and collapsible tasks** —
+[`pipeline-think-tank-stages-and-task-collapse.md`](../ready-changes/pipeline-think-tank-stages-and-task-collapse.md),
+in progress since 2026-10-08. Slices (each closes with focused tests, spec status and a commit):
+
+1. Shared-workspace warning contrast (FS-14.R85, TS-08.R94) — UI/CSS only.
+2. Tasks parent-lineage collapse (FS-16.R46–R47, TS-08.R92–R93) — `ui/src/features/tasks`.
+3. Think Tank stage template/config + start assignments (TS-09.R51): types, validator, API/CLI.
+4. State: schema, stage/room binding, shared room-create helper with stage context (TS-09.R52/R56,
+   TS-14.R19, TS-10.R38).
+5. Judge synthesis → stage result acceptance + pending-action retry (TS-09.R53, TS-14.R21, FS-14.R86).
+6. Stop/closure/pin and recovery guards (TS-09.R54, TS-14.R20, FS-21.R42).
+7. Projections + UI: editor/start, run/task/room rows and links (TS-09.R55, TS-08.R95, FS-16.R48).
+8. Proposal/CLI/help/operator knowledge, fixtures, rendered journeys, closure matrix.
+
+Done: slice 1 — `.pipeline-warning` now uses technical text/muted tokens (computed contrast
+11.9–13.2:1 text, 6.4–7.5:1 code across appearances); R85 stays planned until slice 8's
+real-browser A51 pass (modal + inline start, focus/pending/refusal). Next: slice 2.
 
 ## Acceptance gates still owed
 
@@ -69,12 +83,10 @@ None. Chat links, tables and tabs finished 2026-10-08; rendered evidence is repr
 
 ## Blocked on human
 
-No human decision is needed. Publication is blocked by GitHub HTTP 500 on release creation and
-workflow rerun (2026-10-07); reads and git push work, and GitHub's public status reports operational.
-When the API recovers, rerun release `37655214991` with `gh run rerun 37655214991 --failed`, verify
-its archive/manifest/installer assets, then set the notes from
-[`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`.
-The tag already points at verified `ddf8dda`; do not retag or recut a new version.
+No human decision is needed. The v0.11.0 release published its three assets after the rerun, but
+its body is still empty (checked 2026-10-08): set the notes from
+[`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`
+when publication is authorized. Do not retag or recut a new version.
 
 ## Review findings
 
