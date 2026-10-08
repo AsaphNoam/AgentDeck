@@ -123,6 +123,7 @@ export function entryLabel(entry: ThinkTankEntry): string {
     case "annotation": return "Annotations";
     case "synthesis": return "Synthesis";
     case "missing_opening": return "No opening submitted";
+    case "stage_context": return "Pipeline stage context";
     default: return "";
   }
 }

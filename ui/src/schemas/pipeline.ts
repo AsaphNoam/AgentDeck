@@ -30,8 +30,18 @@ export const pipelineStageSchema = z.object({
   objective: z.string(),
   inputs: z.array(pipelineStageInputSchema),
   outputs: z.array(pipelineStageOutputSchema),
-  coordination: z.enum(["standing", "dedicated"]).optional().default("standing"),
+  coordination: z.enum(["standing", "dedicated", "think_tank"]).optional().default("standing"),
   dedicated_role: z.string().optional().default(""),
+  think_tank: z.object({
+    participants: z.array(z.object({
+      id: z.string(),
+      role: z.string(),
+      limit: z.number().int(),
+      may_leave: z.boolean().optional().default(false),
+    })),
+    openings: z.boolean().optional().default(false),
+    judge_role: z.string(),
+  }).optional(),
   approval_after_success: z.boolean().optional().default(false),
 });
 
@@ -66,6 +76,19 @@ export const pipelineStartRequestSchema = z.object({
   inputs: z.record(z.string()),
   orchestrator: pipelineRuntimeAssignmentSchema,
   dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema),
+  think_tank_assignments: z.record(z.object({
+    participants: z.record(pipelineRuntimeAssignmentSchema),
+    judge: pipelineRuntimeAssignmentSchema,
+  })).optional(),
+});
+
+export const pipelineStageRoomSchema = z.object({
+  room_id: z.string(),
+  run_id: z.string(),
+  stage_id: z.string(),
+  phase: z.string().optional().default(""),
+  judge_status: z.string().optional().default(""),
+  source_entry_seq: z.number().int().optional().default(0),
 });
 
 export const pipelineRunSchema = z.object({
@@ -114,6 +137,9 @@ export const pipelineStageTaskSchema = z.object({
   attempt_number: z.number().int(),
   state: z.string(),
   assignment_text: z.string(),
+  execution_kind: z.string().optional().default("agent"),
+  room: pipelineStageRoomSchema.optional(),
+  attention_reason: z.string().optional().default(""),
   standing_owner: z.object({
     agent_id: z.string().optional().default(""),
     name: z.string().optional().default(""),
@@ -160,6 +186,10 @@ export const pipelineRunDetailSchema = z.object({
   dedicated_assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
   stage_tasks: z.array(pipelineStageTaskSchema),
   assignments: z.record(pipelineRuntimeAssignmentSchema).optional().default({}),
+  think_tank_assignments: z.record(z.object({
+    participants: z.record(pipelineRuntimeAssignmentSchema),
+    judge: pipelineRuntimeAssignmentSchema,
+  })).optional().default({}),
   values: z.array(pipelineValueSchema),
   diagnostics: z.array(pipelineDiagnosticSchema),
   controls: z.object({

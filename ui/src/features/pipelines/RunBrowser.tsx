@@ -114,12 +114,15 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
         <div className="pipeline-run-kicker"><code>{run.run_id}</code><span className={`pipeline-state pipeline-state-${run.state}`}>{run.final_outcome || run.state}</span></div>
         <div className="pipeline-run-title"><div><h2>{run.display_name || data.template.title}</h2><p>{run.goal}</p></div><div className="pipeline-live-stage"><small>{terminal ? "Final position" : "Current stage"}</small><strong>{stage?.title ?? (run.current_stage_id || "Complete")}</strong>{stage && <span>Stage {stageIndex + 1} of {stages.length}</span>}{nextStage && <span>Next: {nextStage.title}</span>}</div></div>
         <p className="pipeline-run-context">{run.project} · {data.template.title}</p>
-        {currentTask && <div className="pipeline-owner-strip"><div><small>Standing owner</small><strong>{currentTask.standing_owner.name || currentTask.standing_owner.agent_id || "Starting"}</strong><span>{humanize(currentTask.standing_owner.state || currentTask.state)}</span></div>{currentTask.coordinator && <div><small>Stage coordinator</small><strong>{currentTask.coordinator.name || currentTask.coordinator.agent_id || "Starting"}</strong><span>{currentTask.coordinator.report_summary ? "Reports to standing owner" : humanize(currentTask.coordinator.state || "assigned")}</span></div>}</div>}
+        {currentTask?.room && <div className="pipeline-owner-strip"><div><small>Think Tank stage</small><strong>{roomPhaseLabel(currentTask)}</strong><span>{currentTask.attention_reason || "The judge's published synthesis becomes this stage's output."}</span></div></div>}
+        {currentTask && !currentTask.room && <div className="pipeline-owner-strip"><div><small>Standing owner</small><strong>{currentTask.standing_owner.name || currentTask.standing_owner.agent_id || "Starting"}</strong><span>{humanize(currentTask.standing_owner.state || currentTask.state)}</span></div>{currentTask.coordinator && <div><small>Stage coordinator</small><strong>{currentTask.coordinator.name || currentTask.coordinator.agent_id || "Starting"}</strong><span>{currentTask.coordinator.report_summary ? "Reports to standing owner" : humanize(currentTask.coordinator.state || "assigned")}</span></div>}</div>}
         {run.attention_reason && <div className="pipeline-warning"><strong>Needs attention</strong><p>{humanize(run.attention_reason)}</p>{recovered && <p>{restarted ? "The stage agent was stopped when Chuck restarted" : "The stage agent is not running after this failure"}, so its chat can no longer report against this run. Retry the stage to run it again with a fresh agent.</p>}</div>}
         <div className="pipeline-run-actions" data-slot="actions">
-          {run.current_agent_id && !recovered && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
+          {currentTask?.room && <Link className="pipeline-link-button" to={`/think-tank/${currentTask.room.room_id}`}>Open Think Tank</Link>}
+          {run.current_agent_id && !recovered && !currentTask?.room && <Link className="pipeline-link-button" to={`/agent/${run.current_agent_id}`}>Open agent</Link>}
           {canContinue && <div className="pipeline-action-choice"><button type="button" disabled={busy || (continuationRequired && !continuation.trim())} onClick={() => control("continue")}>{continuationRequired ? "Continue stage" : "Approve and continue"}</button>{continuationRequired && <small>{continuation.trim() ? "Continue sends this input to the standing owner." : "Continue needs new input for this stage."}</small>}</div>}
-          {canRetry && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button><small>Retry starts a fresh agent with bounded summaries of prior attempts.</small></div>}
+          {canRetry && currentTask?.room && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => control("retry")}>Retry output acceptance</button><small>{data.controls.retry.reason}</small></div>}
+          {canRetry && !currentTask?.room && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => control("retry")}>Retry stage</button><small>Retry starts a fresh agent with bounded summaries of prior attempts.</small></div>}
           {data.controls.replace.eligible && <div className="pipeline-action-choice"><button type="button" disabled={busy || !orchestratorRuntime.backend || !orchestratorRuntime.model} onClick={() => replaceOwner.mutate({ id: run.run_id, revision: run.revision, orchestrator: orchestratorRuntime }, { onError: (reason) => setError(messageOf(reason)) })}>Replace standing owner</button><small>{data.controls.replace.reason || "Cancels the unfinished assignment and retains stage work for the replacement."}</small></div>}
           {data.controls.repair_cleanup.eligible && <div className="pipeline-action-choice"><button type="button" disabled={busy} onClick={() => repairCleanup.mutate({ id: run.run_id, revision: run.revision }, { onError: (reason) => setError(messageOf(reason)) })}>Repair cleanup</button><small>{data.controls.repair_cleanup.reason || "Retries only the recorded cleanup work."}</small></div>}
           {!terminal && data.controls.stop.eligible && <button type="button" className="btn-danger" disabled={busy} onClick={() => control("stop")}>Stop run</button>}
@@ -139,14 +142,29 @@ export function RunDetail({ runID, onDeleted }: { runID: string; onDeleted: () =
   );
 }
 
+/** roomPhaseLabel names a Think Tank stage's phase without reading a transcript
+ *  (FS-14.A50, R86). */
+function roomPhaseLabel(task: PipelineRunDetail["stage_tasks"][number]) {
+  const room = task.room;
+  if (!room) return "";
+  if (task.result) return task.result.outcome === "success" ? "Judge synthesis accepted" : humanize(task.result.outcome);
+  if (task.attention_reason === "Accepting judge output") return "Accepting judge output";
+  if (task.state === "interrupted") return "Needs room recovery";
+  if (task.state === "waiting") return "Paused";
+  if (room.judge_status && room.judge_status !== "waiting" && room.phase === "ended") return "Judge synthesizing";
+  return room.phase === "setup" ? "Setting up participants" : room.phase === "openings" ? "Independent openings" : "Discussion";
+}
+
 function StageTask({ task, title, current }: { task: PipelineRunDetail["stage_tasks"][number]; title: string; current: boolean }) {
   const outcome = task.result?.outcome || task.state;
+  const room = task.room;
   return <li className={current ? "pipeline-timeline-item pipeline-timeline-current" : "pipeline-timeline-item"} data-slot="attempt">
     <span className="pipeline-timeline-line" aria-hidden="true" />
     <details open={current}>
-      <summary><span className="pipeline-stage-number">{task.stage_index + 1}</span><span className="pipeline-attempt-identity"><strong>{title}</strong><small>{task.standing_owner.name || task.standing_owner.agent_id || "Standing owner"} · attempt {task.attempt_number}</small></span><span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span><span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span></summary>
+      <summary><span className="pipeline-stage-number">{task.stage_index + 1}</span><span className="pipeline-attempt-identity"><strong>{title}</strong><small>{room ? `Think Tank · ${roomPhaseLabel(task)}` : `${task.standing_owner.name || task.standing_owner.agent_id || "Standing owner"} · attempt ${task.attempt_number}`}</small></span><span className={`pipeline-state pipeline-state-${outcome}`}>{humanize(outcome)}</span><span className="pipeline-disclosure-chevron" aria-hidden="true">⌄</span></summary>
       <div className="pipeline-attempt-body">
-        {task.result?.summary ? <p className="pipeline-result-summary">{task.result.summary}</p> : <p className="pipeline-unreported">{current ? "The standing owner has not accepted a stage outcome yet." : "No stage outcome was recorded."}</p>}
+        {room && <p className="pipeline-room-source"><Link to={`/think-tank/${room.room_id}`}>Open Think Tank room</Link>{room.source_entry_seq > 0 && <span> · Output is the judge's synthesis (room entry {room.source_entry_seq}). Completion means a synthesis was produced, not that participants agreed.</span>}</p>}
+        {task.result?.summary ? <p className="pipeline-result-summary">{task.result.summary}</p> : <p className="pipeline-unreported">{room ? (task.attention_reason || "The room has not published a judge synthesis yet.") : current ? "The standing owner has not accepted a stage outcome yet." : "No stage outcome was recorded."}</p>}
         {task.coordinator && <section><h4>Coordinator report to standing owner</h4><p>{task.coordinator.report_summary || "No coordinator report recorded."}</p></section>}
         {task.result?.details && <section><h4>Result details</h4><pre>{task.result.details}</pre></section>}
         {Object.entries(task.result?.outputs ?? {}).map(([name, value]) => <section key={name}><h4>Output · {name}</h4><pre>{value}</pre></section>)}

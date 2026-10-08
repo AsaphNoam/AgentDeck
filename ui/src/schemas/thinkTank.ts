@@ -38,6 +38,13 @@ export const thinkTankSummarySchema = z.object({
   title: z.string().optional().default(""),
   goal: z.string(),
   origin_project: z.string(),
+  /** A pipeline-owned room's run and stage (FS-21.R41). */
+  pipeline: z.object({
+    run_id: z.string(),
+    stage_id: z.string(),
+    task_id: z.string(),
+    pinned: z.boolean().optional().default(false),
+  }).optional(),
   phase: z.enum(THINK_TANK_PHASES),
   control: z.enum(["running", "pause_requested", "paused", "end_requested"]),
   hold: z.string().optional().default(""),
@@ -98,7 +105,7 @@ export const thinkTankDetailSchema = thinkTankSummarySchema.extend({
 
 export const thinkTankEntrySchema = z.object({
   seq: z.number(),
-  kind: z.enum(["opening", "reply", "departure", "closing", "user", "annotation", "synthesis", "missing_opening"]),
+  kind: z.enum(["opening", "reply", "departure", "closing", "user", "annotation", "synthesis", "missing_opening", "stage_context"]),
   agent_id: z.string().optional().default(""),
   agent_name: z.string().optional().default(""),
   project: z.string().optional().default(""),

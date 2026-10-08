@@ -645,7 +645,8 @@
         "stage",
         "inputs",
         "actions",
-        "workspace"
+        "workspace",
+        "think-tank"
       ],
       "states": [],
       "variants": []
@@ -710,7 +711,8 @@
         "user",
         "annotation",
         "synthesis",
-        "missing_opening"
+        "missing_opening",
+        "stage_context"
       ],
       "speaker_slots": [
         "0", "1", "2", "3", "4", "5", "6", "7",

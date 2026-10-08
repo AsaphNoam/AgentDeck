@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -19,7 +19,7 @@ const server = setupServer(
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => server.resetHandlers());
+afterEach(() => { cleanup(); server.resetHandlers(); });
 afterAll(() => server.close());
 
 describe("TemplateEditor focused workspace", () => {
@@ -38,5 +38,22 @@ describe("TemplateEditor focused workspace", () => {
     const firstStage = [...container.querySelectorAll<HTMLButtonElement>(".pipeline-stage-nav-item")].find((button) => button.querySelector("strong")?.textContent === "Stage 1")!;
     fireEvent.click(firstStage);
     expect(container.querySelector<HTMLInputElement>(".pipeline-stage-card input")).toHaveValue("work");
+  });
+
+  // FS-14.R81: switching one stage to Think Tank seeds a two-participant room
+  // and judge, and switching back drops only that stage's room config.
+  it("switches a stage to Think Tank and back without touching other stages", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><TemplateEditor seed={{ id: "maximum", template }} /></MemoryRouter></QueryClientProvider>);
+    await screen.findByText("Stage 32");
+    fireEvent.click(screen.getByRole("radio", { name: "Think Tank" }));
+    expect(screen.getAllByLabelText("Participant id")).toHaveLength(2);
+    expect(screen.getByLabelText("Judge role")).toHaveValue("implementer");
+    expect(screen.getByText("Think Tank · 2 participants")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add participant" }));
+    expect(screen.getAllByLabelText("Participant id")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("radio", { name: "Standing owner" }));
+    expect(screen.queryByLabelText("Participant id")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Standing owner").length).toBeGreaterThan(30);
   });
 });

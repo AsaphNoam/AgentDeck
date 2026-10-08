@@ -50,7 +50,7 @@ export const taskSchema = z.object({
   project: z.string(),
   display_name: z.string(),
   instruction: z.string(),
-  target_kind: z.enum(["agent", "launch"]),
+  target_kind: z.enum(["agent", "launch", "think_tank"]),
   target_agent_id: z.string().optional().default(""),
   role: z.string().optional().default(""),
   backend: z.string().optional().default(""),
@@ -90,6 +90,15 @@ export const taskSchema = z.object({
   outputs: z.record(z.string(), z.string()).nullable().optional().transform((value) => value ?? {}),
   arms: z.array(taskArmSchema).nullable().optional().default([]),
   attachments: z.array(taskAttachmentSchema).nullable().optional().default([]),
+  // A room-backed Think Tank stage task's room and run (FS-16.R48).
+  room: z.object({
+    room_id: z.string(),
+    run_id: z.string(),
+    stage_id: z.string(),
+    phase: z.string().optional().default(""),
+    judge_status: z.string().optional().default(""),
+    source_entry_seq: z.number().int().optional().default(0),
+  }).optional(),
 });
 
 export const taskListSchema = z.object({ tasks: z.array(taskSchema) });
@@ -115,7 +124,9 @@ export const WORK_RESULT_OUTCOMES: Record<"task" | "pipeline_run", readonly { va
 /** taskActions is the one FS-16.R22/R23 eligibility matrix the desktop Tasks
  *  view and the phone render controls from (INV §2). Retry eligibility is the
  *  server's own projection. */
-export function taskActions(task: Pick<Task, "state" | "retry_eligible">) {
+export function taskActions(task: Pick<Task, "state" | "retry_eligible"> & { target_kind?: Task["target_kind"] }) {
+  // A Think Tank stage task is controlled by its run and room (FS-16.R48).
+  if (task.target_kind === "think_tank") return { cancel: false, retry: false, recordResult: false, rearm: false };
   return {
     cancel: task.state !== "finished",
     retry: task.retry_eligible,

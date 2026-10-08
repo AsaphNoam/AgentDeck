@@ -130,6 +130,34 @@ describe("RunStartForm", () => {
     });
   });
 
+  // FS-14.A48: a room-only template needs no standing owner; every participant
+  // and the judge get explicit defaults, and one override survives to Start.
+  it("submits every Think Tank participant and judge slot", async () => {
+    server.use(http.get("/api/pipelines", () => HttpResponse.json([{ id: "debate", valid: true, diagnostics: [], template: {
+      ...template, title: "Debate",
+      stages: [{ id: "deliberate", title: "Deliberate", objective: "Decide.", coordination: "think_tank", inputs: [], outputs: [{ name: "decision", value: "decision", description: "Synthesis" }],
+        think_tank: { participants: [{ id: "pro", role: "implementer", limit: 2 }, { id: "con", role: "reviewer", limit: 2 }], openings: false, judge_role: "reviewer" } }],
+    } }])));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 0 } } });
+    render(<QueryClientProvider client={client}><RunStartForm stepMode onCancel={() => {}} onStarted={() => {}} /></QueryClientProvider>);
+
+    await screen.findByRole("option", { name: "Debate" });
+    fireEvent.change(screen.getByLabelText("Template"), { target: { value: "debate" } });
+    fireEvent.change(screen.getByLabelText("Run goal"), { target: { value: "Pick" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review" })).toBeEnabled());
+    expect(screen.queryByText(/Standing owner/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Deliberate Think Tank · judge (reviewer)").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Customize runtimes"));
+    fireEvent.change(screen.getAllByLabelText("Backend")[1], { target: { value: "alternate" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    await waitFor(() => expect(starts).toHaveLength(1));
+    expect(starts[0]).toMatchObject({ think_tank_assignments: { deliberate: {
+      participants: { pro: { backend: "codex", model: "gpt-5.6-sol" }, con: { backend: "alternate", model: "opus" } },
+      judge: { backend: "codex", model: "gpt-5.6-sol" },
+    } } });
+  });
+
   it("opens the runtime controls when the defaults leave an assignment missing", async () => {
     server.use(http.get("/api/backends", () => HttpResponse.json({
       version: 2,

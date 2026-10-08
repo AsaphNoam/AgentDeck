@@ -18,6 +18,10 @@ import type {
 import type { Backend } from "../../schemas/backends";
 import { displayLabel, displayLabels } from "../../lib/labels";
 
+type Assignment = PipelineStartRequest["orchestrator"];
+type RoomAssignments = NonNullable<PipelineStartRequest["think_tank_assignments"]>;
+type RuntimeSlot = { key: string; label: string; editLabel?: string; field: string; value: Assignment; set: (value: Assignment) => void };
+
 function requestID() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? `ui_${crypto.randomUUID()}`
@@ -76,6 +80,7 @@ export function RunStartForm({
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [orchestrator, setOrchestrator] = useState<PipelineStartRequest["orchestrator"]>({ backend: "", model: "", effort: "", fast: false });
   const [dedicatedAssignments, setDedicatedAssignments] = useState<PipelineStartRequest["dedicated_assignments"]>({});
+  const [roomAssignments, setRoomAssignments] = useState<RoomAssignments>({});
   const [proposal, setProposal] = useState<typeof proposalSeed>();
   const [pendingRequest, setPendingRequest] = useState<PipelineStartRequest | null>(null);
   const [conflicts, setConflicts] = useState<PipelineWorkspaceConflict[]>([]);
@@ -106,6 +111,7 @@ export function RunStartForm({
     setInputs({ ...payload.inputs });
     setOrchestrator(structuredClone(payload.orchestrator));
     setDedicatedAssignments(structuredClone(payload.dedicated_assignments));
+    setRoomAssignments(structuredClone(payload.think_tank_assignments ?? {}));
     setProposal(proposalSeed);
     setRuntimeSource("proposal");
     setPendingRequest(null);
@@ -120,7 +126,7 @@ export function RunStartForm({
     const field = diagnostics[0]?.field;
     if (!field) return;
     setStep(0);
-    if (field.startsWith("orchestrator") || field.startsWith("dedicated_assignments.")) setRuntimeOpen(true);
+    if (field.startsWith("orchestrator") || field.startsWith("assignments.") || field.startsWith("dedicated_assignments.") || field.startsWith("think_tank_assignments.")) setRuntimeOpen(true);
   }, [diagnostics]);
 
   useEffect(() => {
@@ -143,18 +149,19 @@ export function RunStartForm({
   useEffect(() => {
     if (!template || proposal) return;
     setInputs((current) => Object.fromEntries(template.inputs.map((input) => [input.name, current[input.name] ?? ""])));
-    setOrchestrator((current) => {
-      const backendID = current.backend || defaultBackend;
+    // Configured defaults fill only absent selections (FS-14.R80).
+    const seed = (current?: Assignment): Assignment => {
+      const backendID = current?.backend || defaultBackend;
       const backend = backends.data?.backends[backendID];
-      const model = current.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
-      return { backend: backendID, model, effort: current.effort || backend?.models[model]?.default_effort || "", fast: current.fast ?? false };
-    });
-    setDedicatedAssignments((current) => Object.fromEntries(template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => {
-      const backendID = current[stage.id]?.backend || defaultBackend;
-      const backend = backends.data?.backends[backendID];
-      const model = current[stage.id]?.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
-      return [stage.id, { backend: backendID, model, effort: current[stage.id]?.effort || backend?.models[model]?.default_effort || "", fast: current[stage.id]?.fast ?? false }];
-    })));
+      const model = current?.model || backend?.default_model || Object.keys(backend?.models ?? {})[0] || "";
+      return { backend: backendID, model, effort: current?.effort || backend?.models[model]?.default_effort || "", fast: current?.fast ?? false };
+    };
+    setOrchestrator((current) => seed(current));
+    setDedicatedAssignments((current) => Object.fromEntries(template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => [stage.id, seed(current[stage.id])])));
+    setRoomAssignments((current) => Object.fromEntries(template.stages.filter((stage) => stage.coordination === "think_tank" && stage.think_tank).map((stage) => [stage.id, {
+      participants: Object.fromEntries(stage.think_tank!.participants.map((participant) => [participant.id, seed(current[stage.id]?.participants[participant.id])])),
+      judge: seed(current[stage.id]?.judge),
+    }])));
     if (backends.data) setSeededTemplate(template);
   }, [backends.data, defaultBackend, proposal, template]);
 
@@ -178,6 +185,7 @@ export function RunStartForm({
     inputs,
     orchestrator,
     dedicated_assignments: dedicatedAssignments,
+    ...(Object.keys(roomAssignments).length > 0 ? { think_tank_assignments: roomAssignments } : {}),
   });
 
   const submit = (acknowledge: boolean) => {
@@ -208,7 +216,44 @@ export function RunStartForm({
 
   const missingInputs = template?.inputs.filter((input) => input.required && !inputs[input.name]?.trim()) ?? [];
   const requiredMissing = template ? missingInputs.length > 0 : true;
-  const assignmentsMissing = !orchestrator.backend || !orchestrator.model || (template?.stages.some((stage) => stage.coordination === "dedicated" && (!dedicatedAssignments[stage.id]?.backend || !dedicatedAssignments[stage.id]?.model)) ?? true);
+  // Every runtime slot the run freezes: the standing owner when an ordinary
+  // stage needs one, each dedicated coordinator, and each Think Tank
+  // participant and judge (FS-14.R81, TS-08.R95).
+  const blank: Assignment = { backend: "", model: "", effort: "", fast: false };
+  const setRoomSlot = (stageID: string, participantID: string | null, value: Assignment) => setRoomAssignments((current) => {
+    const room = current[stageID] ?? { participants: {}, judge: blank };
+    return { ...current, [stageID]: participantID === null ? { ...room, judge: value } : { ...room, participants: { ...room.participants, [participantID]: value } } };
+  });
+  const slots: RuntimeSlot[] = template ? [
+    ...(template.stages.some((stage) => stage.coordination !== "think_tank")
+      ? [{ key: "orchestrator", label: `Standing owner · ${template.orchestrator_role}`, field: "orchestrator", value: orchestrator, set: setOrchestrator }]
+      : []),
+    ...template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => ({
+      key: stage.id,
+      label: `${stage.title} coordinator · ${stage.dedicated_role}`,
+      editLabel: `${stage.title} · coordinator ${stage.dedicated_role}`,
+      field: `dedicated_assignments.${stage.id}`,
+      value: dedicatedAssignments[stage.id] ?? blank,
+      set: (value: Assignment) => setDedicatedAssignments((current) => ({ ...current, [stage.id]: value })),
+    })),
+    ...template.stages.filter((stage) => stage.coordination === "think_tank" && stage.think_tank).flatMap((stage) => [
+      ...stage.think_tank!.participants.map((participant) => ({
+        key: `${stage.id}:${participant.id}`,
+        label: `${stage.title} Think Tank · ${participant.id} (${participant.role})`,
+        field: `think_tank_assignments.${stage.id}.participants.${participant.id}`,
+        value: roomAssignments[stage.id]?.participants[participant.id] ?? blank,
+        set: (value: Assignment) => setRoomSlot(stage.id, participant.id, value),
+      })),
+      {
+        key: `${stage.id}:judge`,
+        label: `${stage.title} Think Tank · judge (${stage.think_tank!.judge_role})`,
+        field: `think_tank_assignments.${stage.id}.judge`,
+        value: roomAssignments[stage.id]?.judge ?? blank,
+        set: (value: Assignment) => setRoomSlot(stage.id, null, value),
+      },
+    ]),
+  ] : [];
+  const assignmentsMissing = !template || slots.some((slot) => !slot.value.backend || !slot.value.model);
   // FS-14.R80: defaults that cannot fill every assignment expose the controls
   // that must be set, instead of leaving the blocker behind a closed disclosure.
   useEffect(() => {
@@ -228,16 +273,12 @@ export function RunStartForm({
         : missingInputs.length > 0
           ? `Fill the required named input${missingInputs.length === 1 ? "" : "s"}: ${missingInputs.map((input) => input.name).join(", ")}`
           : null;
-  const blocker = setupBlocker ?? (assignmentsMissing ? "Customize runtimes for the standing owner and every dedicated coordinator." : null);
+  const hasRoom = template?.stages.some((stage) => stage.coordination === "think_tank") ?? false;
+  const blocker = setupBlocker ?? (assignmentsMissing
+    ? `Customize runtimes for the standing owner and every dedicated coordinator${hasRoom ? ", Think Tank participant and judge" : ""}.`
+    : null);
 
-  const runtimeRows = template ? [
-    { key: "orchestrator", label: `Standing owner · ${template.orchestrator_role}`, value: orchestrator },
-    ...template.stages.filter((stage) => stage.coordination === "dedicated").map((stage) => ({
-      key: stage.id,
-      label: `${stage.title} coordinator · ${stage.dedicated_role}`,
-      value: dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false },
-    })),
-  ] : [];
+  const runtimeRows = slots;
   const runtimeSourceLabel = runtimeSource === "proposal"
     ? "Proposal selections"
     : runtimeSource === "defaults"
@@ -285,8 +326,7 @@ export function RunStartForm({
       {template && <details className="pipeline-disclosure pipeline-runtime-customize" open={runtimeOpen} onToggle={(event) => setRuntimeOpen(event.currentTarget.open)}>
         <summary>Customize runtimes</summary>
         <div className="pipeline-disclosure-body"><div className="pipeline-runtime-list">
-          <RuntimeAssignment label={`Standing owner · ${template.orchestrator_role}`} field="orchestrator" value={orchestrator} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setRuntimeSource("selected"); setOrchestrator(value); }} />
-          {template.stages.filter((stage) => stage.coordination === "dedicated").map((stage, index) => <RuntimeAssignment key={stage.id} label={`${stage.title} · coordinator ${stage.dedicated_role}`} field={`dedicated_assignments.${stage.id}`} number={index + 2} value={dedicatedAssignments[stage.id] ?? { backend: "", model: "", effort: "", fast: false }} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setRuntimeSource("selected"); setDedicatedAssignments((current) => ({ ...current, [stage.id]: value })); }} />)}
+          {slots.map((slot, index) => <RuntimeAssignment key={slot.key} label={slot.editLabel ?? slot.label} field={slot.field} number={index + 1} value={slot.value} backends={backends.data?.backends} entries={backendEntries} onChange={(value) => { edit(); setRuntimeSource("selected"); slot.set(value); }} />)}
         </div></div>
       </details>}</div>}
 

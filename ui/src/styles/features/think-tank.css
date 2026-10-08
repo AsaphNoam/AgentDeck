@@ -122,6 +122,10 @@
   border-inline-start-color: var(--ad-state-done);
 }
 
+.think-tank-entry[data-variant="stage_context"] {
+  border-inline-start-color: var(--ad-border-strong);
+}
+
 .think-tank-entry[data-variant="departure"],
 .think-tank-entry[data-variant="missing_opening"] {
   background: transparent;

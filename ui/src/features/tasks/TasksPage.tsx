@@ -143,7 +143,9 @@ function TaskRowView({ row, open, onToggle, onSignal, hidden, collapseInfo, hidd
       )}
       <p className="task-row-meta" data-slot="metadata">
         <span>created by <Creator task={task} /></span>
-        {assigned ? <span>assigned to <AgentLabel id={assigned} /></span> : task.target_kind === "launch" ? <span>launches {task.role}</span> : null}
+        {task.room
+          ? <span>runs as Think Tank · <Link to={`/think-tank/${task.room.room_id}`}>room</Link> · <Link to={`/pipelines/runs/${encodeURIComponent(task.room.run_id)}`}>run</Link></span>
+          : assigned ? <span>assigned to <AgentLabel id={assigned} /></span> : task.target_kind === "launch" ? <span>launches {task.role}</span> : null}
       </p>
       {open && <TaskDetail id={detailID} row={row} onSignal={onSignal} onBusyChange={onBusyChange} hiddenBy={hiddenBy} onReveal={onReveal} />}
     </li>

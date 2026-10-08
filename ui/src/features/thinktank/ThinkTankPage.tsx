@@ -185,7 +185,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
   return (
     <section className="think-tank" data-ui="think-tank" data-state={room.phase}>
       <PageHeader
-        eyebrow={<>Think Tank · <Link to={`/project/${encodeURIComponent(room.origin_project)}`}>{originTitle}</Link></>}
+        eyebrow={<>Think Tank · <Link to={`/project/${encodeURIComponent(room.origin_project)}`}>{originTitle}</Link>{room.pipeline && <> · <Link to={`/pipelines/runs/${encodeURIComponent(room.pipeline.run_id)}`}>Pipeline run · stage {room.pipeline.stage_id}</Link></>}</>}
         title={<span className="think-tank-title">{roomTitle(room)}</span>}
         description={<span className="think-tank-phase"><Badge variant={ended ? "neutral" : "info"}>{phaseLabel(room.phase)}</Badge>{room.openings && <span>Independent openings</span>}{room.judge.enabled && <span>Final synthesis</span>}</span>}
         actions={
@@ -219,7 +219,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
                   className="think-tank-entry"
                   data-slot="entry"
                   data-variant={entry.input_id ? "user" : entry.kind}
-                  data-speaker-slot={entry.input_id || entry.kind === "departure" || entry.kind === "missing_opening" ? undefined : speakerSlot(room.members.find((m) => m.agent_id === entry.agent_id))}
+                  data-speaker-slot={entry.input_id || entry.kind === "departure" || entry.kind === "missing_opening" || entry.kind === "stage_context" ? undefined : speakerSlot(room.members.find((m) => m.agent_id === entry.agent_id))}
                   onContextMenu={(mouse) => annotateEntry(mouse, entry)}
                 >
                   <header className="think-tank-entry-meta">
