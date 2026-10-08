@@ -24,11 +24,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   Other available/resumable design work is in `docs/ideas.md`.
 - **Review units / findings:** Clone first-message failure investigation (2026-10-08) has an
   unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
-  tables and tabs (`7661d97`..closure commit, 2026-10-08)
-  awaits `/review`. Notes for the reviewer: one right-click opens one menu because the anchor
-  defers its own menu a microtask and enclosing annotation menus claim it (`lib/linkActions.ts`);
-  table cells reset `overflow-wrap` so the dashboard pane's wrap-anywhere rule cannot split short
-  words (found by the rendered check).
+  tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) remains open for three
+  verification/specification findings below; no product defect found. Fix model: trivial/easy —
+  Claude Sonnet or Codex Luna.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
   intermittently returns 409 "a resume is already in progress" (pre-existing at `74c8e84`);
   synchronization fix remains separate work.
@@ -80,7 +78,40 @@ The tag already points at verified `ddf8dda`; do not retag or recut a new versio
 
 ## Review findings
 
-### Clone first-message failure — investigation 2026-10-08
+### Chat links, tables and tabs — review 2026-10-08 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+Reviewed implementation `7661d97`..`70614c8` against its design/spec delta at `da63ac6`.
+
+- **Worth fixing** — desktop overflow receipt cannot fail; fix complexity easy (INV §17).
+  `ui/scripts/chat-cleanup-render.mjs:216` records the full-chat table width check with literal
+  `true`. A compressed or clipped table therefore still earns a passing receipt at both desktop
+  sizes, contrary to FS-03.A60/TS-08.R110. Dashboard/phone width comparisons do not prove this
+  full-chat surface. Assert overflow for the deliberately wide fixture and exercise `scrollLeft`
+  to prove the content is accessible; apply equivalent checks to the archive and file viewer.
+  Confirm the check fails when the wrapper's overflow is changed to hidden or cells are compressed.
+- **Worth fixing** — phone link navigation is not exercised; fix complexity easy (INV §10/§17).
+  `ui/scripts/chat-cleanup-render.mjs:374–376` checks only `target="_blank"`; it never taps the
+  link. FS-03.A59 and FS-20.A14 explicitly require a phone tap opening separately. A handler
+  preventing activation would pass this receipt. Tap the existing stubbed destination, assert a
+  new page and unchanged conversation, and retain the attribute check as supporting evidence.
+- **Worth fixing** — cleanup specs overpromise phone appearances; fix complexity easy (INV §10).
+  FS-03.R79/A60 and FS-12.R60/A32 combine phone coverage with all three appearances without the
+  existing phone exception. FS-20.R16 and TS-08.R73 keep the phone Core-only;
+  `ui/src/remote/main.tsx` and `ui/src/styles/remote.css` implement that contract. The Core-only
+  phone check is appropriate to the shipped architecture, but the new acceptance wording is
+  contradictory. State the desktop three-appearance matrix and Core-only phone coverage explicitly;
+  do not introduce phone skins to satisfy this cleanup's accidental promise.
+
+88 focused UI tests, all 41 style/presentation checks and the browser script's 161 reported checks
+passed. Browser report: `/tmp/chuck-review-chat-cleanup/report.json` (stubbed APIs, no provider);
+the findings qualify that report's acceptance coverage. No product code/specs changed. The shared
+link-menu claim, local-file behavior, stable renderer map, tab fallback and retained backend
+tracking are sound on inspection. INV §2/§8/§10/§13/§17 have applicable surfaces; §10/§17 findings
+are above and the other applicable classes have no finding. Classes §1/§3–§7/§9/§11–§12/§14–§16
+have no applicable changed surface (no lifecycle, persistence, runtime/protocol, HTTP route,
+external CLI, durable side effect or unbounded retained collection change).
+
+### Clone first-message failure — investigation 2026-10-08 — **Fix model:** medium — Codex Terra or Claude Opus.
 
 **Report (verbatim):** “cloning a chat gave it a generic name (Atlas), when I sent the agent a
 message it didn't work - returned Internal Error. Looking in the console I saw Failed to load
@@ -97,7 +128,8 @@ Naming is **confirmed works as specified** under FS-01.R4/R36: `clone.go:72` omi
 `launch.go:331` calls `suggestName`, whose first unused suggestion is Atlas. R36 does not carry
 the source display name. This is independent of sending and is not a fix finding.
 
-- **Must fix — probable field behavior; root cause undetermined; fix complexity medium.**
+- **Must fix** — probable field behavior; root cause undetermined; fix complexity medium
+  (no invariant class) — field route and root cause remain unidentified.
   The reported first message to a successful clone fails instead of continuing its conversation
   (FS-01.R36). `internal/server/sessions.go:27` accepts chat input via SendPromptOrHold;
   `chat.go:484` queues busy input rather than returning ErrTurnInFlight. A provider prompt RPC
@@ -111,7 +143,7 @@ the source display name. This is independent of sending and is not a fix finding
   tests `TestCloneForksTheConversationIntoANewAgent` and
   `TestForkLaunchCopiesHistoryThroughTheBoundary` pass; the latter sends and completes a clone
   turn. They do not reproduce the field failure or prove live-provider compatibility.
-- **Worth fixing — confirmed observability gap; fix complexity easy.**
+- **Worth fixing** — confirmed observability gap; fix complexity easy.
   `internal/runtime/jsonrpc.go:24–31` retains RPC code/data but Error() returns only Message;
   `internal/runtime/chat.go:776–790` emits only that string for a live-process session/prompt
   failure and logs no correlated diagnostic. A generic “Internal Error” therefore loses RPC
@@ -122,8 +154,6 @@ the source display name. This is independent of sending and is not a fix finding
   present (workflow §12.5, TS-04.R12, INV §8/§11). Never dump raw Data, prompt text or stderr.
   Verify with a fake peer returning a generic message plus code/detail: the transcript remains
   safe and the diagnostic identifies the failure without secrets.
-
-**Fix model:** medium — Codex Terra or Claude Opus.
 
 No product code, specifications or tests changed. Focused fake-provider tests passed with loopback
 permission after the sandbox blocked the test listener. No live provider turn was started.
