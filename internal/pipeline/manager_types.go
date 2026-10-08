@@ -24,6 +24,41 @@ type StartRequest struct {
 	Assignments          map[string]RuntimeAssignment `json:"assignments,omitempty"`
 	Orchestrator         RuntimeAssignment            `json:"orchestrator"`
 	DedicatedAssignments map[string]RuntimeAssignment `json:"dedicated_assignments"`
+	// ThinkTankAssignments supplies every room slot's runtime, keyed by stage id
+	// (TS-09.R51).
+	ThinkTankAssignments map[string]ThinkTankAssignment `json:"think_tank_assignments,omitempty"`
+}
+
+// ThinkTankAssignment is one think_tank stage's run-time slots: participants
+// keyed by template participant id, plus the judge.
+type ThinkTankAssignment struct {
+	Participants map[string]RuntimeAssignment `json:"participants"`
+	Judge        RuntimeAssignment            `json:"judge"`
+}
+
+// Think Tank slots share the run's one frozen assignment map under keys that
+// cannot collide with a stage-id slug or the standing key.
+func thinkTankParticipantKey(stageID, participantID string) string {
+	return "think_tank:" + stageID + ":participant:" + participantID
+}
+
+func thinkTankJudgeKey(stageID string) string { return "think_tank:" + stageID + ":judge" }
+
+// ThinkTankAssignmentsFrom rebuilds the public per-stage shape from a frozen
+// assignment map.
+func ThinkTankAssignmentsFrom(template Template, assignments map[string]RuntimeAssignment) map[string]ThinkTankAssignment {
+	out := map[string]ThinkTankAssignment{}
+	for _, stage := range template.Stages {
+		if StageCoordination(stage) != CoordinationThinkTank || stage.ThinkTank == nil {
+			continue
+		}
+		slot := ThinkTankAssignment{Participants: map[string]RuntimeAssignment{}, Judge: assignments[thinkTankJudgeKey(stage.ID)]}
+		for _, p := range stage.ThinkTank.Participants {
+			slot.Participants[p.ID] = assignments[thinkTankParticipantKey(stage.ID, p.ID)]
+		}
+		out[stage.ID] = slot
+	}
+	return out
 }
 
 type StageExecution struct {
@@ -94,6 +129,8 @@ type RunDetail struct {
 	Template    Template                     `json:"template"`
 	Inputs      map[string]string            `json:"inputs"`
 	Assignments map[string]RuntimeAssignment `json:"assignments"`
+	// ThinkTankAssignments is the frozen per-stage room slot view.
+	ThinkTankAssignments map[string]ThinkTankAssignment `json:"think_tank_assignments"`
 	// Attempts is retained only while decoding/resetting historical v1 state.
 	// Live API responses project stage tasks instead.
 	Attempts    []state.PipelineAttemptRecord `json:"-"`

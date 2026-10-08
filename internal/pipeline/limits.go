@@ -24,6 +24,11 @@ const (
 	// assignment carries. A long run must not grow its handoff without limit
 	// (TS-09.R39, INV §16).
 	MaxPriorStageResults = 8
+	// Think Tank stages reuse the room bounds rather than a second set
+	// (TS-09.R56).
+	MinThinkTankParticipants  = state.ThinkTankMinParticipants
+	MaxThinkTankParticipants  = state.ThinkTankMaxParticipants
+	MaxThinkTankContributions = state.ThinkTankMaxTurnLimit
 )
 
 // The report bounds are the shared work-result limits, not a second set: one

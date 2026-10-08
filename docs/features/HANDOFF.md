@@ -49,7 +49,19 @@ in progress since 2026-10-08. Slices (each closes with focused tests, spec statu
 
 Done: slice 1 — `.pipeline-warning` now uses technical text/muted tokens (computed contrast
 11.9–13.2:1 text, 6.4–7.5:1 code across appearances); R85 stays planned until slice 8's
-real-browser A51 pass (modal + inline start, focus/pending/refusal). Next: slice 2.
+real-browser A51 pass (modal + inline start, focus/pending/refusal).
+Slice 2 is delegated (worktree branch; integrate by cherry-pick, then verify `ui` tests).
+Done: slice 3 — `pipeline.ThinkTankStage`, validator, `think_tank_assignments` start validation
+frozen into the one assignments map under `think_tank:<stage>:participant:<id>` /
+`think_tank:<stage>:judge` keys (stripped from `RunDetail.Assignments`, exposed as
+`ThinkTankAssignments`); phone start fills room slots. `validateStart` still adds a temporary
+`not_runnable` diagnostic per room stage — remove it in slice 4.
+Seams for slice 4–6: `Manager.Start` (manager.go:52) / `advanceTaskStage` (actions.go:105) create
+stage tasks; `AcceptPipelineStageTaskResult` (state/pipeline_tasks.go:146) is the result tx;
+`reconcileTaskStageRelease` (reconcile.go:101); `CreateThinkTank` (state/think_tanks.go:485);
+judge synthesis → `insertThinkTankResultTx` (think_tank_turns.go:290); server room loop
+`dispatchThinkTanks`/`launchReservedThinkTankAgent` (server/think_tanks.go:67/398); latest schema
+migration version 44 (state/schema.go). Next: slice 4.
 
 ## Acceptance gates still owed
 

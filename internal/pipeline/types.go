@@ -21,12 +21,14 @@ type ValueDecl struct {
 }
 
 type Stage struct {
-	ID                   string `json:"id"`
-	Title                string `json:"title"`
-	Objective            string `json:"objective"`
-	Coordination         string `json:"coordination,omitempty"`
-	DedicatedRole        string `json:"dedicated_role,omitempty"`
-	ApprovalAfterSuccess bool   `json:"approval_after_success,omitempty"`
+	ID            string `json:"id"`
+	Title         string `json:"title"`
+	Objective     string `json:"objective"`
+	Coordination  string `json:"coordination,omitempty"`
+	DedicatedRole string `json:"dedicated_role,omitempty"`
+	// ThinkTank configures a think_tank coordination stage (TS-09.R51).
+	ThinkTank            *ThinkTankStage `json:"think_tank,omitempty"`
+	ApprovalAfterSuccess bool            `json:"approval_after_success,omitempty"`
 	// Legacy fields remain decodable so hand-edited v1 files can receive a
 	// useful diagnostic instead of silently losing data.
 	Role        string             `json:"role,omitempty"`
@@ -35,6 +37,45 @@ type Stage struct {
 	Outputs     []StageOutput      `json:"outputs"`
 	MaxVisits   int                `json:"max_visits,omitempty"`
 	Transitions OutcomeTransitions `json:"transitions,omitempty"`
+}
+
+// ThinkTankStage is a model-neutral room configuration: runtimes are supplied
+// per run by think_tank_assignments, never stored in the template.
+type ThinkTankStage struct {
+	Participants []ThinkTankParticipant `json:"participants"`
+	Openings     bool                   `json:"openings,omitempty"`
+	JudgeRole    string                 `json:"judge_role"`
+}
+
+type ThinkTankParticipant struct {
+	ID       string `json:"id"`
+	Role     string `json:"role"`
+	Limit    int    `json:"limit"`
+	MayLeave bool   `json:"may_leave,omitempty"`
+}
+
+const (
+	CoordinationStanding  = "standing"
+	CoordinationDedicated = "dedicated"
+	CoordinationThinkTank = "think_tank"
+)
+
+// StageCoordination normalizes an absent coordination to standing.
+func StageCoordination(st Stage) string {
+	if st.Coordination == "" {
+		return CoordinationStanding
+	}
+	return st.Coordination
+}
+
+// firstOrdinaryStage is the stage that first needs the standing owner.
+func firstOrdinaryStage(t Template) (Stage, bool) {
+	for _, stage := range t.Stages {
+		if StageCoordination(stage) != CoordinationThinkTank {
+			return stage, true
+		}
+	}
+	return Stage{}, false
 }
 
 type StageInput struct {
@@ -89,6 +130,13 @@ func NormalizeTemplate(t Template) Template {
 		}
 		if t.Stages[i].Outputs == nil {
 			t.Stages[i].Outputs = []StageOutput{}
+		}
+		if tt := t.Stages[i].ThinkTank; tt != nil {
+			copied := *tt
+			if copied.Participants == nil {
+				copied.Participants = []ThinkTankParticipant{}
+			}
+			t.Stages[i].ThinkTank = &copied
 		}
 	}
 	return t

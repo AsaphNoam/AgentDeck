@@ -287,6 +287,12 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 	for stageID, assignment := range request.DedicatedAssignments {
 		request.Assignments[stageID] = assignment
 	}
+	for stageID, slots := range request.ThinkTankAssignments {
+		for participantID, assignment := range slots.Participants {
+			request.Assignments[thinkTankParticipantKey(stageID, participantID)] = assignment
+		}
+		request.Assignments[thinkTankJudgeKey(stageID)] = slots.Judge
+	}
 	diagnostics := []Diagnostic{}
 	add := func(field, code, message string) {
 		diagnostics = appendBounded(diagnostics, Diagnostic{Field: field, Code: code, Message: message})
@@ -362,15 +368,50 @@ func (m *Manager) validateStart(ctx context.Context, request *StartRequest) (Tem
 			}
 		}
 	}
-	if len(record.Template.Stages) > 0 {
-		assignment := standingAssignment(request.Assignments, record.Template.Stages[0].ID)
+	validateSlot := func(field string, stage Stage, role string, assignment RuntimeAssignment) {
 		if assignment.Backend == "" || assignment.Model == "" {
-			add("assignments.standing", "required", "the standing orchestrator requires a configured backend and model")
-		} else if m.lifecycle != nil {
-			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: record.Template.Stages[0].ID, StageTitle: record.Template.Stages[0].Title, Role: record.Template.OrchestratorRole, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
-				add("assignments.standing", "unavailable", err.Error())
+			add(field, "required", "this slot requires a configured backend and model")
+			return
+		}
+		if m.lifecycle != nil {
+			if err := m.lifecycle.ValidateStage(ctx, StageExecution{StageID: stage.ID, StageTitle: stage.Title, Role: role, Project: request.Project, Backend: assignment.Backend, Model: assignment.Model, Effort: assignment.Effort, Fast: assignment.Fast}); err != nil {
+				add(field, "unavailable", err.Error())
 			}
 		}
+	}
+	// Every room slot is explicit; missing and extra slots refuse before side
+	// effects (TS-09.R51).
+	roomStages := map[string]bool{}
+	for _, stage := range record.Template.Stages {
+		if StageCoordination(stage) != CoordinationThinkTank || stage.ThinkTank == nil {
+			continue
+		}
+		roomStages[stage.ID] = true
+		base := "think_tank_assignments." + stage.ID
+		slots := request.ThinkTankAssignments[stage.ID]
+		known := map[string]bool{}
+		for _, p := range stage.ThinkTank.Participants {
+			known[p.ID] = true
+			validateSlot(base+".participants."+p.ID, stage, p.Role, slots.Participants[p.ID])
+		}
+		for participantID := range slots.Participants {
+			if !known[participantID] {
+				add(base+".participants."+participantID, "unknown", "participant is not declared by the stage")
+			}
+		}
+		validateSlot(base+".judge", stage, stage.ThinkTank.JudgeRole, slots.Judge)
+		// Temporary until room-backed stage execution lands (TS-09.R52).
+		add("stages."+stage.ID, "not_runnable", "think_tank stages cannot run yet")
+	}
+	for stageID := range request.ThinkTankAssignments {
+		if !roomStages[stageID] {
+			add("think_tank_assignments."+stageID, "unknown", "stage is not a think_tank stage")
+		}
+	}
+	// The standing owner launches on the first ordinary stage; a run of only
+	// room stages needs none (TS-09.R52).
+	if stage, ok := firstOrdinaryStage(record.Template); ok {
+		validateSlot("assignments.standing", stage, record.Template.OrchestratorRole, standingAssignment(request.Assignments, record.Template.Stages[0].ID))
 	}
 	if len(diagnostics) > 0 {
 		return record, validationError("run cannot start", diagnostics)
@@ -399,6 +440,12 @@ func (m *Manager) Detail(runID string) (RunDetail, error) {
 	}
 	if detail.Assignments == nil {
 		detail.Assignments = map[string]RuntimeAssignment{}
+	}
+	detail.ThinkTankAssignments = ThinkTankAssignmentsFrom(detail.Template, detail.Assignments)
+	for key := range detail.Assignments {
+		if strings.HasPrefix(key, "think_tank:") {
+			delete(detail.Assignments, key)
+		}
 	}
 	detail.Attempts, err = m.store.ListPipelineAttempts(runID)
 	if err != nil {

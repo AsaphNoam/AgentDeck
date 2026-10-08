@@ -664,3 +664,53 @@ func TestRunListAndStartupIsolateMalformedRunDetail(t *testing.T) {
 		t.Fatalf("recovered run = %+v err=%v", run, err)
 	}
 }
+
+// Room slots are explicit at start: missing and undeclared slots refuse before
+// side effects, and the frozen map round-trips to the public shape (TS-09.R51).
+func TestStartValidatesThinkTankAssignments(t *testing.T) {
+	manager, lifecycle, _ := pipelineManagerFixture(t)
+	template := Template{
+		Version: 2, Title: "Deliberate", OrchestratorRole: "orchestrator", Inputs: []ValueDecl{},
+		Stages: []Stage{{
+			ID: "debate", Title: "Debate", Objective: "Weigh it.", Coordination: CoordinationThinkTank,
+			ThinkTank: &ThinkTankStage{JudgeRole: "reviewer", Participants: []ThinkTankParticipant{
+				{ID: "pro", Role: "implementer", Limit: 2}, {ID: "con", Role: "implementer", Limit: 2},
+			}},
+			Inputs: []StageInput{}, Outputs: []StageOutput{{Name: "synthesis", Value: "synthesis", Description: "Judge synthesis"}},
+		}},
+	}
+	if record, err := manager.templates.Create("debate", template); err != nil || !record.Valid {
+		t.Fatalf("create template = %+v err=%v", record, err)
+	}
+	slot := RuntimeAssignment{Backend: "claude", Model: "sonnet"}
+	_, _, err := manager.Start(context.Background(), StartRequest{
+		RequestID: "room-slots", TemplateID: "debate", Project: "app", Goal: "Decide",
+		ThinkTankAssignments: map[string]ThinkTankAssignment{"debate": {
+			Participants: map[string]RuntimeAssignment{"pro": slot, "ghost": slot},
+		}},
+	})
+	var controlled *ControlError
+	if !errors.As(err, &controlled) {
+		t.Fatalf("Start error = %#v", err)
+	}
+	fields := map[string]bool{}
+	for _, d := range controlled.Diagnostics {
+		fields[d.Field] = true
+	}
+	for _, want := range []string{"think_tank_assignments.debate.participants.con", "think_tank_assignments.debate.participants.ghost", "think_tank_assignments.debate.judge"} {
+		if !fields[want] {
+			t.Errorf("diagnostics %+v missing %s", controlled.Diagnostics, want)
+		}
+	}
+	if fields["assignments.standing"] {
+		t.Errorf("a room-only run must not require a standing owner: %+v", controlled.Diagnostics)
+	}
+	if len(lifecycle.launches) != 0 {
+		t.Fatalf("refused start launched %d agents", len(lifecycle.launches))
+	}
+	frozen := map[string]RuntimeAssignment{thinkTankParticipantKey("debate", "pro"): slot, thinkTankParticipantKey("debate", "con"): slot, thinkTankJudgeKey("debate"): slot}
+	view := ThinkTankAssignmentsFrom(template, frozen)["debate"]
+	if view.Judge != slot || len(view.Participants) != 2 || view.Participants["con"] != slot {
+		t.Fatalf("round trip = %+v", view)
+	}
+}

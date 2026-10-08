@@ -68,19 +68,21 @@ func ValidateTemplate(id string, t Template, roles map[string]bool) []Diagnostic
 		if st.Role != "" {
 			add(b+".role", "legacy_field", "stage role is replaced by orchestrator_role")
 		}
-		c := st.Coordination
-		if c == "" {
-			c = "standing"
+		c := StageCoordination(st)
+		if c != CoordinationStanding && c != CoordinationDedicated && c != CoordinationThinkTank {
+			add(b+".coordination", "invalid_coordination", "coordination must be standing, dedicated or think_tank")
 		}
-		if c != "standing" && c != "dedicated" {
-			add(b+".coordination", "invalid_coordination", "coordination must be standing or dedicated")
-		}
-		if c == "dedicated" {
+		if c == CoordinationDedicated {
 			if !config.ValidSlug(st.DedicatedRole) || !roles[st.DedicatedRole] {
 				add(b+".dedicated_role", "unknown_role", "dedicated_role must name an existing configured role")
 			}
 		} else if st.DedicatedRole != "" {
 			add(b+".dedicated_role", "unexpected", "dedicated_role requires dedicated coordination")
+		}
+		if c == CoordinationThinkTank {
+			validateThinkTankStage(&d, b, st, roles)
+		} else if st.ThinkTank != nil {
+			add(b+".think_tank", "unexpected", "think_tank requires think_tank coordination")
 		}
 		if st.MaxVisits != 0 {
 			add(b+".max_visits", "legacy_field", "max_visits and cyclic routing are not supported in version 2")
@@ -128,6 +130,43 @@ func ValidateTemplate(id string, t Template, roles map[string]bool) []Diagnostic
 	}
 	return d
 }
+
+// validateThinkTankStage checks a think_tank stage's room configuration and its
+// single mandatory synthesis output (FS-14.R81, TS-09.R51/R56).
+func validateThinkTankStage(d *[]Diagnostic, b string, st Stage, roles map[string]bool) {
+	add := func(f, c, m string) { *d = appendBounded(*d, Diagnostic{Field: f, Code: c, Message: m}) }
+	if len(st.Outputs) != 1 {
+		add(b+".outputs", "think_tank_output", "a think_tank stage declares exactly one output for the judge's synthesis")
+	}
+	tt := st.ThinkTank
+	if tt == nil {
+		add(b+".think_tank", "required", "think_tank coordination requires a think_tank configuration")
+		return
+	}
+	if !config.ValidSlug(tt.JudgeRole) || !roles[tt.JudgeRole] {
+		add(b+".think_tank.judge_role", "unknown_role", "judge_role must name an existing configured role")
+	}
+	if len(tt.Participants) < MinThinkTankParticipants || len(tt.Participants) > MaxThinkTankParticipants {
+		add(b+".think_tank.participants", "participant_count",
+			fmt.Sprintf("a think_tank stage needs %d to %d participants", MinThinkTankParticipants, MaxThinkTankParticipants))
+	}
+	ids := map[string]bool{}
+	for i, p := range tt.Participants {
+		f := fmt.Sprintf("%s.think_tank.participants.%d", b, i)
+		validateName(d, f+".id", p.ID)
+		if ids[p.ID] {
+			add(f+".id", "duplicate", "participant ids must be unique within the stage")
+		}
+		ids[p.ID] = true
+		if !config.ValidSlug(p.Role) || !roles[p.Role] {
+			add(f+".role", "unknown_role", "role must name an existing configured role")
+		}
+		if p.Limit < 1 || p.Limit > MaxThinkTankContributions {
+			add(f+".limit", "out_of_range", fmt.Sprintf("limit must be between 1 and %d contributions", MaxThinkTankContributions))
+		}
+	}
+}
+
 func validateName(d *[]Diagnostic, f, v string) {
 	if !config.ValidSlug(v) {
 		*d = appendBounded(*d, Diagnostic{Field: f, Code: "invalid_name", Message: "must be a lowercase slug up to 63 characters"})

@@ -58,7 +58,7 @@ var remoteAllowed = map[string][]string{
 	"POST /api/sessions/{id}/annotations": {"annotations", "overall_instruction", "target"},
 
 	"GET /api/pipeline-runs":                      nil,
-	"POST /api/pipeline-runs":                     {"request_id", "template_id", "display_name", "project", "goal", "inputs", "orchestrator", "dedicated_assignments", "acknowledge_shared_workspace"},
+	"POST /api/pipeline-runs":                     {"request_id", "template_id", "display_name", "project", "goal", "inputs", "orchestrator", "dedicated_assignments", "think_tank_assignments", "acknowledge_shared_workspace"},
 	"GET /api/pipeline-runs/{id}":                 nil,
 	"POST /api/pipeline-runs/{id}/continue":       nil,
 	"POST /api/pipeline-runs/{id}/retry":          nil,
@@ -526,6 +526,10 @@ func (s *Server) remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 		var request struct {
 			Orchestrator         json.RawMessage            `json:"orchestrator"`
 			DedicatedAssignments map[string]json.RawMessage `json:"dedicated_assignments"`
+			ThinkTankAssignments map[string]struct {
+				Participants map[string]json.RawMessage `json:"participants"`
+				Judge        json.RawMessage            `json:"judge"`
+			} `json:"think_tank_assignments"`
 		}
 		if err == nil {
 			err = json.Unmarshal(body, &request)
@@ -538,7 +542,17 @@ func (s *Server) remotePipelineRuntimeFilter(next http.Handler) http.Handler {
 			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "runtime assignment not allowed from a phone")
 			return
 		}
+		raws := []json.RawMessage{}
 		for _, raw := range request.DedicatedAssignments {
+			raws = append(raws, raw)
+		}
+		for _, slots := range request.ThinkTankAssignments {
+			raws = append(raws, slots.Judge)
+			for _, raw := range slots.Participants {
+				raws = append(raws, raw)
+			}
+		}
+		for _, raw := range raws {
 			if !allowedAssignment(raw) {
 				writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "runtime assignment not allowed from a phone")
 				return
@@ -574,13 +588,27 @@ func (s *Server) withDefaultPipelineRuntimes(body []byte) []byte {
 	}
 	assignment := pipeline.RuntimeAssignment{Backend: target.BackendID, Model: target.ModelID, Effort: effort}
 	dedicated := map[string]pipeline.RuntimeAssignment{}
+	rooms := map[string]pipeline.ThinkTankAssignment{}
 	for _, stage := range record.Template.Stages {
-		if stage.Coordination == "dedicated" {
+		switch pipeline.StageCoordination(stage) {
+		case pipeline.CoordinationDedicated:
 			dedicated[stage.ID] = assignment
+		case pipeline.CoordinationThinkTank:
+			if stage.ThinkTank == nil {
+				continue
+			}
+			slots := pipeline.ThinkTankAssignment{Participants: map[string]pipeline.RuntimeAssignment{}, Judge: assignment}
+			for _, p := range stage.ThinkTank.Participants {
+				slots.Participants[p.ID] = assignment
+			}
+			rooms[stage.ID] = slots
 		}
 	}
 	fields["orchestrator"], _ = json.Marshal(assignment)
 	fields["dedicated_assignments"], _ = json.Marshal(dedicated)
+	if len(rooms) > 0 {
+		fields["think_tank_assignments"], _ = json.Marshal(rooms)
+	}
 	filled, err := json.Marshal(fields)
 	if err != nil {
 		return body

@@ -301,6 +301,41 @@ func TestRemotePipelineStartUsesMacDefaults(t *testing.T) {
 	}
 }
 
+// A phone start fills every Think Tank slot with the Mac's default and refuses a
+// phone-chosen room runtime (TS-09.R51, TS-13.R5).
+func TestRemotePipelineStartFillsThinkTankSlots(t *testing.T) {
+	s := testServer(t, true)
+	template := apiTemplate()
+	template.Stages = append(template.Stages, pipeline.Stage{
+		ID: "debate", Title: "Debate", Objective: "Weigh it.", Coordination: pipeline.CoordinationThinkTank,
+		ThinkTank: &pipeline.ThinkTankStage{JudgeRole: "implementer", Participants: []pipeline.ThinkTankParticipant{
+			{ID: "pro", Role: "implementer", Limit: 1}, {ID: "con", Role: "implementer", Limit: 1},
+		}},
+		Inputs: []pipeline.StageInput{}, Outputs: []pipeline.StageOutput{{Name: "synthesis", Value: "synthesis", Description: "Synthesis"}},
+	})
+	if record, err := s.pipelineTemplates.Create("room-stage", template); err != nil || !record.Valid {
+		t.Fatalf("create = %+v err=%v", record, err)
+	}
+	var filled struct {
+		Rooms map[string]pipeline.ThinkTankAssignment `json:"think_tank_assignments"`
+	}
+	if err := json.Unmarshal(s.withDefaultPipelineRuntimes([]byte(`{"template_id":"room-stage"}`)), &filled); err != nil {
+		t.Fatal(err)
+	}
+	room := filled.Rooms["debate"]
+	if room.Judge.Backend == "" || room.Participants["pro"] != room.Judge || room.Participants["con"] != room.Judge {
+		t.Fatalf("filled room slots = %+v", room)
+	}
+
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "n"}))
+	token := pairTestDevice(t, s, "d1", "n")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/pipeline-runs", `{"request_id":"phone-room","template_id":"room-stage","project":"p","goal":"g","think_tank_assignments":{"debate":{"participants":{"pro":{"backend":"codex","model":"m"}}}}}`, token))
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
+		t.Fatalf("phone-chosen room runtime = %d %s", rec.Code, rec.Body)
+	}
+}
+
 // Every tailnet mutation body is bounded before its handler runs, including
 // actions with no field filter (TS-13.R5/R6, INV §16).
 func TestRemoteMutationBodyIsBounded(t *testing.T) {
