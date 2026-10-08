@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -213,4 +214,91 @@ func hasValue(values []state.PipelineValueRecord, name string) bool {
 		}
 	}
 	return false
+}
+
+// FS-14.A49 / FS-21.A32 — Stop fences every later room claim and message; the
+// retained run pins its room; deleting the terminal run releases the pin.
+func TestRoomStageStopFencesAndPins(t *testing.T) {
+	manager, _, detail := mixedRoomFixture(t, false)
+	runID := detail.Run.RunID
+	finishOrdinaryStage(t, manager, runID, "a_owner", map[string]string{"options": "A or B"})
+	room, _, _ := manager.currentStageTask(runID)
+	roomDetail, err := manager.store.ReadThinkTank(room.RoomID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ := manager.store.ReadPipelineRun(runID)
+	if _, err := manager.Stop(context.Background(), runID, run.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.ClaimThinkTankMemberSetup(room.RoomID, roomDetail.Members[0].AgentID); !errors.Is(err, state.ErrThinkTankConflict) {
+		t.Fatalf("setup claim after Stop = %v", err)
+	}
+	if _, _, err := manager.store.AddThinkTankMessage(room.RoomID, "cmd-1", "hello", nil); !errors.Is(err, state.ErrThinkTankConflict) {
+		t.Fatalf("message after Stop = %v", err)
+	}
+	if err := manager.store.DeleteThinkTank(room.RoomID); !errors.Is(err, state.ErrThinkTankConflict) {
+		t.Fatalf("delete pinned room = %v", err)
+	}
+	if err := manager.Reconcile(context.Background(), runID); err != nil {
+		t.Fatal(err)
+	}
+	stopped, _ := manager.store.ReadPipelineRun(runID)
+	if stopped.State != "stopped" {
+		t.Fatalf("run after cleanup = %+v", stopped)
+	}
+	task, _ := manager.store.ReadTask(room.TaskID)
+	if task.State != state.TaskFinished || task.Outcome != state.OutcomeCancelled {
+		t.Fatalf("room task after Stop = %+v", task)
+	}
+	if err := manager.store.DeletePipelineRun(runID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.store.ClosePipelineThinkTank(room.RoomID); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.store.DeleteThinkTank(room.RoomID); err != nil {
+		t.Fatalf("delete after run deletion = %v", err)
+	}
+}
+
+// TS-09.R55 — generic stage controls refuse a room-backed stage; a room hold
+// pauses the run with the room's reason and recovery resumes it.
+func TestRoomStageControlsAndPhaseProjection(t *testing.T) {
+	manager, _, detail := mixedRoomFixture(t, false)
+	runID := detail.Run.RunID
+	finishOrdinaryStage(t, manager, runID, "a_owner", map[string]string{"options": "A or B"})
+	room, _, _ := manager.currentStageTask(runID)
+	if _, err := manager.store.SetThinkTankHold(room.RoomID, "Setup failed for Debate · pro."); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.SyncRoomPhase(context.Background(), runID); err != nil {
+		t.Fatal(err)
+	}
+	run, _ := manager.store.ReadPipelineRun(runID)
+	if run.State != "paused" || !strings.Contains(run.AttentionReason, "Setup failed") {
+		t.Fatalf("held room run = %+v", run)
+	}
+	for name, call := range map[string]func() error{
+		"continue": func() error { _, err := manager.Continue(context.Background(), runID, run.Revision, "go"); return err },
+		"retry":    func() error { _, err := manager.Retry(context.Background(), runID, run.Revision); return err },
+		"replace": func() error {
+			_, err := manager.Replace(context.Background(), runID, run.Revision, RuntimeAssignment{Backend: "claude", Model: "sonnet"})
+			return err
+		},
+	} {
+		var controlled *ControlError
+		if err := call(); !errors.As(err, &controlled) || controlled.Code != "room_recovery_required" {
+			t.Errorf("%s on room stage = %v", name, err)
+		}
+	}
+	if _, err := manager.store.DB().Exec(`UPDATE think_tanks SET hold = '' WHERE room_id = ?`, room.RoomID); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.SyncRoomPhase(context.Background(), runID); err != nil {
+		t.Fatal(err)
+	}
+	if run, _ := manager.store.ReadPipelineRun(runID); run.State != "running" || run.AttentionReason != "" {
+		t.Fatalf("recovered room run = %+v", run)
+	}
 }

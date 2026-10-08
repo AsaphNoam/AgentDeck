@@ -31,6 +31,7 @@ func (f *fakeLifecycle) AcquirePipelineStart(context.Context, string) (func(), e
 	return func() {}, nil
 }
 func (f *fakeLifecycle) ValidateStage(context.Context, StageExecution) error { return nil }
+func (f *fakeLifecycle) StopRoom(context.Context, string) error              { return nil }
 func (f *fakeLifecycle) RoomLaunchConfig(_ context.Context, execution StageExecution) (string, error) {
 	raw, err := json.Marshal(map[string]any{"role": execution.Role, "project": execution.Project, "backend": execution.Backend, "model": execution.Model, "name": execution.AgentName, "interface": "chat"})
 	return string(raw), err

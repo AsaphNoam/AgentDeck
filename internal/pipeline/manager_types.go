@@ -95,6 +95,9 @@ type Lifecycle interface {
 	// RoomLaunchConfig composes a fresh Think Tank slot's opaque launch
 	// request (Role/Project/runtime/AgentName) without launching anything.
 	RoomLaunchConfig(context.Context, StageExecution) (string, error)
+	// StopRoom closes a stopped run's stage room and cancels only that room's
+	// in-flight turn (TS-09.R54).
+	StopRoom(context.Context, string) error
 	LaunchStage(context.Context, StageExecution) error
 	ContinueStage(context.Context, StageExecution) error
 	StopStage(context.Context, string) error

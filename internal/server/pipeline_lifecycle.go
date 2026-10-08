@@ -38,6 +38,26 @@ func (s *Server) RoomLaunchConfig(_ context.Context, execution pipeline.StageExe
 	return config, nil
 }
 
+// StopRoom closes a stopped run's stage room, then cancels each of that room's
+// own running turns through the guarded generation/turn seam, so a newer
+// private turn is never killed (TS-09.R54, FS-21.R42).
+func (s *Server) StopRoom(ctx context.Context, roomID string) error {
+	d, err := s.stateStore.ClosePipelineThinkTank(roomID)
+	if err != nil {
+		return err
+	}
+	s.publishThinkTankUpdate(d)
+	for _, a := range d.Running {
+		if a.TurnID == "" {
+			continue
+		}
+		if _, err := s.registry.CancelGuarded(ctx, a.AgentID, a.Generation, a.TurnID); err != nil {
+			s.log.Warn("cancel pipeline room turn", "room", roomID, "agent", a.AgentID, "err", err)
+		}
+	}
+	return nil
+}
+
 // ValidateStage checks the same chat role/project/backend/model boundary before
 // a run snapshot is committed, without registering or starting a process.
 func (s *Server) ValidateStage(_ context.Context, execution pipeline.StageExecution) error {

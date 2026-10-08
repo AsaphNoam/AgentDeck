@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -48,6 +49,20 @@ func thinkTankUpdateFor(d state.ThinkTankDetail) thinkTankUpdate {
 
 func (s *Server) publishThinkTankUpdate(d state.ThinkTankDetail) {
 	s.eventBus.Publish("think_tank_update", nil, thinkTankUpdateFor(d))
+	// A pipeline room's phase projects onto its run: hold/failure pauses it,
+	// recovery resumes it, and a settled stop or published synthesis re-drives
+	// the run's reconciliation (TS-09.R53–R55).
+	if runID := d.Room.PipelineRunID; runID != "" && s.pipelineMgr != nil {
+		go func() {
+			ctx := context.Background()
+			if err := s.pipelineMgr.SyncRoomPhase(ctx, runID); err != nil {
+				s.log.Debug("sync pipeline room phase", "run", runID, "err", err)
+			}
+			if err := s.pipelineMgr.Reconcile(ctx, runID); err != nil {
+				s.log.Debug("reconcile pipeline room run", "run", runID, "err", err)
+			}
+		}()
+	}
 }
 
 type thinkTankSummaryWire struct {

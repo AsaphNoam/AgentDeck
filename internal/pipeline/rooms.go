@@ -20,6 +20,10 @@ const (
 	roomOutputSweepLimit  = 64
 )
 
+// errRoomRecovery is the typed refusal of generic stage Continue/Retry/Replace
+// for a room-backed stage: recovery belongs to the room (TS-09.R55).
+var errRoomRecovery = controlError("room_recovery_required", "this Think Tank stage recovers from its room: open the room to resume, retry setup or retry the judge")
+
 // AcceptRoomOutputs is the bounded durable recovery for a missed post-commit
 // kick: every open room-backed stage whose judge completed is accepted once.
 // SQLite CAS, not delivery of this call, prevents duplicate acceptance.
@@ -106,6 +110,66 @@ func (m *Manager) acceptRoomOutput(ctx context.Context, runID string, explicit b
 	m.publish(paused)
 	m.notify(paused, "needs_attention")
 	return nil
+}
+
+// SyncRoomPhase projects an open room stage's intervention state onto its
+// run: an explicit room pause, hold or judge failure pauses the run with the
+// room's reason; room recovery returns it to running. Revision-guarded; never
+// touches an output-acceptance hold, approval gate or stopping run (TS-09.R55).
+func (m *Manager) SyncRoomPhase(_ context.Context, runID string) error {
+	unlock := m.lockRun(runID)
+	defer unlock()
+	run, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		return err
+	}
+	if (run.State != "running" && run.State != "paused") || run.PendingAction != "" {
+		return nil
+	}
+	current, found, err := m.currentStageTask(runID)
+	if err != nil || !found || current.RoomID == "" || current.State != "open" {
+		return err
+	}
+	room, err := m.store.ReadThinkTank(current.RoomID)
+	if err != nil {
+		return err
+	}
+	reason := roomAttention(room.Room)
+	want := "running"
+	if reason != "" {
+		want = "paused"
+	}
+	if run.State == want && run.AttentionReason == reason {
+		return nil
+	}
+	updated, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
+		State: want, PendingAction: "", CurrentStageID: current.StageID, AttentionReason: reason,
+	})
+	if errors.Is(err, state.ErrPipelineConflict) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	m.publish(updated)
+	if want == "paused" {
+		m.notify(updated, "needs_attention")
+	}
+	return nil
+}
+
+// roomAttention is the bounded run attention reason for a room needing a
+// person, or "" while it can progress on its own.
+func roomAttention(room state.ThinkTank) string {
+	switch {
+	case room.JudgeStatus == state.ThinkTankJudgeFailed:
+		return clipText("Think Tank judge failed: "+room.JudgeError, MaxDescriptionRunes)
+	case room.Hold != "":
+		return clipText("Think Tank needs attention: "+room.Hold, MaxDescriptionRunes)
+	case room.Control == state.ThinkTankPaused:
+		return "Think Tank paused"
+	}
+	return ""
 }
 
 func (m *Manager) noteRoomOutputFailure(runID string) int {

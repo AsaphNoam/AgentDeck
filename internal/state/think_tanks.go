@@ -667,6 +667,28 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	return readThinkTankDetail(tx, roomID)
 }
 
+// requirePipelineRoomOpenTx is the origin guard joined to every claim and
+// mutation of a pipeline room: its stage must still be open and its run not
+// stopping or terminal. Standalone rooms always pass (TS-14.R20).
+func requirePipelineRoomOpenTx(tx *sql.Tx, roomID string) error {
+	var open int
+	err := tx.QueryRow(`
+SELECT CASE WHEN t.pipeline_run_id = '' THEN 1 ELSE EXISTS (
+  SELECT 1 FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id
+  WHERE p.room_id = t.room_id AND p.state = 'open' AND r.state NOT IN ('stopping', 'stopped', 'completed')) END
+FROM think_tanks t WHERE t.room_id = ?`, roomID).Scan(&open)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("state: read pipeline room origin: %w", err)
+	}
+	if open != 1 {
+		return thinkTankConflict("this room's pipeline stage is closed")
+	}
+	return nil
+}
+
 // renderThinkTankStageContext is the attributed text every participant and the
 // judge read first. The judge's required output and its limit are part of it.
 func renderThinkTankStageContext(encoded string) (string, error) {
@@ -975,7 +997,7 @@ func bumpThinkTankTx(tx *sql.Tx, roomID string) error {
 // ClaimThinkTankMemberSetup fences setup launch effects against Pause/End/Delete.
 // Delete refuses the claimed slot until its ordinary launch outcome commits.
 func (s *Store) ClaimThinkTankMemberSetup(roomID, agentID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase != ThinkTankPhaseSetup || d.Room.Control != ThinkTankRunning || d.Room.Hold != "" {
 			return thinkTankConflict("room setup is no longer runnable")
 		}
@@ -1040,6 +1062,17 @@ func setThinkTankHoldTx(tx *sql.Tx, roomID, reason string) error {
 // thinkTankTx runs fn over a fresh detail read, then settles phase transitions
 // and bumps the revision in the same transaction. fn returning
 // errNoThinkTankChange commits nothing and returns the unchanged detail.
+// openThinkTankTx is thinkTankTx for a claim or control that a closed pipeline
+// stage must refuse atomically with the change (TS-14.R20).
+func (s *Store) openThinkTankTx(roomID string, fn func(*sql.Tx, ThinkTankDetail) error) (ThinkTankDetail, error) {
+	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		if err := requirePipelineRoomOpenTx(tx, roomID); err != nil {
+			return err
+		}
+		return fn(tx, d)
+	})
+}
+
 func (s *Store) thinkTankTx(roomID string, fn func(*sql.Tx, ThinkTankDetail) error) (ThinkTankDetail, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -1074,7 +1107,7 @@ func (s *Store) thinkTankTx(roomID string, fn func(*sql.Tx, ThinkTankDetail) err
 // PauseThinkTank requests a pause. An active turn finishes first; the room is
 // then paused (FS-21.R18).
 func (s *Store) PauseThinkTank(roomID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase == ThinkTankPhaseEnded {
 			return thinkTankConflict("discussion has ended")
 		}
@@ -1093,7 +1126,7 @@ func (s *Store) PauseThinkTank(roomID string) (ThinkTankDetail, error) {
 // failed attempt is not replayed: the next opportunity is a new attempt with a
 // new token (TS-14.R14).
 func (s *Store) ResumeThinkTank(roomID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Control == ThinkTankEndRequested {
 			return thinkTankConflict("discussion is ending")
 		}
@@ -1125,7 +1158,7 @@ func unretriedOpeningHold(d ThinkTankDetail) string {
 // A paused room stays paused; other unresolved failures keep the hold.
 // Without failed openings this is the ordinary turn retry (Resume).
 func (s *Store) RetryThinkTankOpening(roomID, attemptID, commandID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if commandID != "" {
 			var bound string
 			err := tx.QueryRow(`SELECT attempt_id FROM think_tank_attempts WHERE room_id = ? AND retry_command_id = ?`,
@@ -1214,7 +1247,7 @@ func (s *Store) IncreaseThinkTankTurnLimit(c ThinkTankLimitChange) (ThinkTankDet
 	if c.Limit <= c.Expected {
 		return ThinkTankDetail{}, thinkTankInvalid("the new turn limit must be higher than the current one")
 	}
-	return s.thinkTankTx(c.RoomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(c.RoomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		var agent string
 		var expected, limit int
 		err := tx.QueryRow(`SELECT agent_id, expected, turn_limit FROM think_tank_limit_commands WHERE room_id = ? AND command_id = ?`,
@@ -1272,7 +1305,7 @@ func setThinkTankControlTx(tx *sql.Tx, roomID, control string) error {
 // finishes normally first; otherwise discussion ends now without waiting on
 // any participant's private work (FS-21.R32).
 func (s *Store) EndThinkTank(roomID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase == ThinkTankPhaseEnded || d.Room.Control == ThinkTankEndRequested {
 			return errNoThinkTankChange
 		}
@@ -1287,6 +1320,37 @@ func (s *Store) EndThinkTank(roomID string) (ThinkTankDetail, error) {
 // partial set with explicit missing markers; pending input publishes and every
 // user input no completed participant turn followed is marked undiscussed
 // (FS-21.R37). The judge becomes ready when configured.
+// ThinkTankEndPipelineStopped records a pipeline Stop's room closure.
+const ThinkTankEndPipelineStopped = "pipeline_stopped"
+
+// ClosePipelineThinkTank is the room side of pipeline Stop: unlike normal End
+// it suppresses future setup and judging. Committed contributions and queued
+// input are retained; an in-flight turn is cancelled by the caller and settles
+// through ordinary failure (TS-14.R20, FS-21.R42).
+func (s *Store) ClosePipelineThinkTank(roomID string) (ThinkTankDetail, error) {
+	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+		if d.Room.PipelineRunID == "" {
+			return thinkTankConflict("only a pipeline room closes with its run")
+		}
+		if d.Room.Phase == ThinkTankPhaseEnded && d.Room.EndReason == ThinkTankEndPipelineStopped {
+			return errNoThinkTankChange
+		}
+		if err := endThinkTankTx(tx, d, ThinkTankEndPipelineStopped); err != nil {
+			return err
+		}
+		judge := d.Room.JudgeStatus
+		switch judge {
+		case ThinkTankJudgeWaiting, ThinkTankJudgeReady, ThinkTankJudgeFailed:
+			judge = ThinkTankJudgeNone
+		}
+		if _, err := tx.Exec(`UPDATE think_tanks SET end_reason = ?, judge_status = ? WHERE room_id = ?`,
+			ThinkTankEndPipelineStopped, judge, roomID); err != nil {
+			return fmt.Errorf("state: close pipeline think tank: %w", err)
+		}
+		return nil
+	})
+}
+
 func endThinkTankTx(tx *sql.Tx, d ThinkTankDetail, reason string) error {
 	roomID := d.Room.RoomID
 	if _, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ? WHERE room_id = ? AND role = ? AND setup_state IN ('pending', 'failed')`,
@@ -1657,6 +1721,17 @@ func (s *Store) DeleteThinkTank(roomID string) error {
 	}
 	if d.Active != nil {
 		return thinkTankConflict("a room turn is active")
+	}
+	// A retained pipeline run pins its stage room; deleting the terminal run
+	// releases the pin without deleting the room (TS-09.R54, FS-21.R42).
+	if d.Room.PipelineRunID != "" {
+		var pinned int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM pipeline_runs WHERE run_id = ?`, d.Room.PipelineRunID).Scan(&pinned); err != nil {
+			return fmt.Errorf("state: read room pipeline pin: %w", err)
+		}
+		if pinned > 0 {
+			return thinkTankConflict("this room belongs to a retained pipeline run; delete the run first")
+		}
 	}
 	if d.Room.Phase != ThinkTankPhaseEnded && d.Room.Control != ThinkTankPaused {
 		return thinkTankConflict("pause or end the room before deleting it")

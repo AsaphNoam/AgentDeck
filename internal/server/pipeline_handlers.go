@@ -451,7 +451,7 @@ func writePipelineError(w http.ResponseWriter, err error) {
 		writeAPIError(w, apiError(gate.Code, gate.Message))
 	case errors.As(err, &controlled):
 		code := runtime.CodeValidation
-		if controlled.Code == "revision_conflict" || controlled.Code == "request_conflict" || controlled.Code == "stale_assignment" || controlled.Code == "invalid_state" {
+		if controlled.Code == "revision_conflict" || controlled.Code == "request_conflict" || controlled.Code == "stale_assignment" || controlled.Code == "invalid_state" || controlled.Code == "room_recovery_required" {
 			code = runtime.CodeConflict
 		}
 		ae := apiError(code, controlled.Message)

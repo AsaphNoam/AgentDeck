@@ -79,10 +79,33 @@ func (m *Manager) settleCleanup(runID, stageID, attempt string) (bool, error) {
 	}
 }
 
+// roomSettled reports whether the run's current stage room still has an
+// in-flight turn; a cancelled room turn keeps the run stopping until it
+// settles (TS-09.R54).
+func (m *Manager) roomSettled(runID string) (bool, error) {
+	current, found, err := m.currentStageTask(runID)
+	if err != nil || !found || current.RoomID == "" {
+		return err == nil, err
+	}
+	room, err := m.store.ReadThinkTank(current.RoomID)
+	if errors.Is(err, state.ErrNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return len(room.Running) == 0, nil
+}
+
 func (m *Manager) reconcileRunCleanup(run state.PipelineRunRecord) error {
 	settled, err := m.settleCleanup(run.RunID, "", "")
 	if err != nil {
 		return err
+	}
+	if settled {
+		if settled, err = m.roomSettled(run.RunID); err != nil {
+			return err
+		}
 	}
 	if !settled {
 		return nil

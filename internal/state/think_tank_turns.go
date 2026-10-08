@@ -31,6 +31,9 @@ func (s *Store) BeginThinkTankAttempt(b ThinkTankBegin) (ThinkTankAttempt, error
 		return ThinkTankAttempt{}, fmt.Errorf("state: begin think tank attempt: %w", err)
 	}
 	defer tx.Rollback()
+	if err := requirePipelineRoomOpenTx(tx, b.RoomID); err != nil {
+		return ThinkTankAttempt{}, err
+	}
 	d, err := readThinkTankDetail(tx, b.RoomID)
 	if err != nil {
 		return ThinkTankAttempt{}, err
@@ -509,6 +512,13 @@ FROM think_tank_inputs WHERE room_id = ? AND command_id = ?`, roomID, commandID)
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
+		// Messages to a closed pipeline stage's room stay closed; retained
+		// annotation records remain available (TS-14.R20).
+		if !record {
+			if err := requirePipelineRoomOpenTx(tx, roomID); err != nil {
+				return err
+			}
+		}
 		if d.Room.Phase == ThinkTankPhaseEnded && !record {
 			return thinkTankConflict("discussion has ended")
 		}
@@ -558,7 +568,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, id, roomID, commandID, kind, body, context, format
 // ReserveThinkTankJudge persists the fresh judge's reserved identity before
 // its launch effects (TS-14.R2, R13).
 func (s *Store) ReserveThinkTankJudge(roomID, agentID, agentName, project string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase != ThinkTankPhaseEnded || d.Room.JudgeStatus != ThinkTankJudgeReady {
 			return thinkTankConflict("the judge is not ready to launch")
 		}
@@ -604,7 +614,7 @@ WHERE room_id = ? AND agent_id = ?`, setup, launchErr, name, name, roomID, d.Roo
 // repaired launch settings. The retry launches a fresh judge; the failed one
 // stays an ordinary agent. Discussion is not reopened (FS-21.R36).
 func (s *Store) RetryThinkTankJudge(roomID, judgeConfig string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.JudgeStatus != ThinkTankJudgeFailed {
 			return thinkTankConflict("the judge has not failed")
 		}
@@ -620,7 +630,7 @@ WHERE room_id = ?`, ThinkTankJudgeReady, judgeConfig, roomID)
 // RetryThinkTankSetup returns failed new-participant slots to pending and
 // clears the setup hold; ready slots are never relaunched (TS-14.R2).
 func (s *Store) RetryThinkTankSetup(roomID string) (ThinkTankDetail, error) {
-	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
+	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase != ThinkTankPhaseSetup {
 			return thinkTankConflict("the room is not in setup")
 		}

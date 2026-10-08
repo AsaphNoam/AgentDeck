@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"unicode/utf8"
 
@@ -40,6 +41,8 @@ func (m *Manager) Continue(ctx context.Context, runID string, expectedRevision i
 		switch {
 		case run.State == "paused" && run.PendingAction == "await_approval" && task.Outcome == state.OutcomeSuccess:
 			continueErr = m.advanceTaskStage(run, detail, current, stage)
+		case current.RoomID != "":
+			continueErr = errRoomRecovery
 		case run.State == "paused" && run.PendingAction == "" && (task.Outcome == state.OutcomeFailure || task.Outcome == state.OutcomeBlocked):
 			if strings.TrimSpace(input) == "" || utf8.RuneCountInString(input) > MaxValueRunes {
 				continueErr = validationError("continuation input is required", []Diagnostic{{Field: "input", Code: "invalid", Message: "input is required and must fit the pipeline value limit"}})
@@ -153,6 +156,20 @@ func (m *Manager) advanceTaskStage(run state.PipelineRunRecord, detail RunDetail
 	}
 	if StageCoordination(next) == CoordinationThinkTank {
 		room, err := m.roomStage(context.Background(), run, next, detail.Values, 1, frozenAssignments(run))
+		var refused *ControlError
+		if errors.As(err, &refused) && len(refused.Diagnostics) > 0 {
+			// Produced values overflowed the room's stage context: hold the run
+			// with the field named rather than truncating (TS-09.R56).
+			paused, pauseErr := m.store.UpdatePipelineRunCAS(run.RunID, run.Revision, state.PipelineRunUpdate{
+				State: "paused", PendingAction: "", CurrentStageID: stage.ID,
+				AttentionReason: clipText(refused.Diagnostics[0].Field+": "+refused.Diagnostics[0].Message, MaxDescriptionRunes),
+			})
+			if pauseErr == nil {
+				m.publish(paused)
+				m.notify(paused, "needs_attention")
+			}
+			return pauseErr
+		}
 		if err != nil {
 			return err
 		}
@@ -189,6 +206,10 @@ func (m *Manager) Retry(ctx context.Context, runID string, expectedRevision int6
 		return m.Detail(runID)
 	}
 	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
+		if current.RoomID != "" {
+			unlock()
+			return RunDetail{}, errRoomRecovery
+		}
 		updated, retryErr := m.store.RetryInterruptedPipelineStageTask(runID, current.TaskID, expectedRevision)
 		if retryErr != nil {
 			unlock()
@@ -225,6 +246,9 @@ func (m *Manager) Replace(ctx context.Context, runID string, expectedRevision in
 	current, found, err := m.currentStageTask(runID)
 	if err != nil || !found {
 		return RunDetail{}, controlError("invalid_state", "there is no current stage task to replace")
+	}
+	if current.RoomID != "" {
+		return RunDetail{}, errRoomRecovery
 	}
 	task, err := m.store.ReadTask(current.TaskID)
 	if err != nil {
@@ -299,6 +323,13 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 		if stopErr != nil {
 			return RunDetail{}, stopErr
 		}
+		// The committed stop already fences every room claim; now close the
+		// stage room and cancel only its own in-flight turn (TS-09.R54).
+		if current.RoomID != "" && m.lifecycle != nil {
+			if err := m.lifecycle.StopRoom(ctx, current.RoomID); err != nil {
+				slog.Warn("pipeline: stop stage room", "run", runID, "room", current.RoomID, "err", err)
+			}
+		}
 		return m.Detail(runID)
 	} else if stageErr != nil {
 		unlock()
@@ -326,6 +357,11 @@ func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDe
 	settled, err := m.settleCleanup(runID, "", "")
 	if err != nil {
 		return RunDetail{}, err
+	}
+	if settled {
+		if settled, err = m.roomSettled(runID); err != nil {
+			return RunDetail{}, err
+		}
 	}
 	if !settled {
 		return RunDetail{}, controlError("cleanup_pending", "run cleanup still has unfinished task effects")

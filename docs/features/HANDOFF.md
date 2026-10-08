@@ -65,15 +65,21 @@ authority) + `commitStageResultTx` (shared writes); `pipeline/rooms.go` accepts 
 kick and in the room loop sweep, retries 3× then pauses `accept_room_output`, which run Retry
 re-attempts; judge submit refuses >64,000 runes in pipeline rooms. Restart task recovery skips room
 tasks. Tests: `internal/pipeline/rooms_test.go`.
-Still owed in slice 6: Stop fencing/cancel of owned room work, room pin vs deletion, generic
-Continue/Retry/Replace rejection for room stages, setup/judge failure → run paused projection,
-room-turn task attribution, producer-derived context check before accepting a feeding stage.
+Done: slice 6 — `requirePipelineRoomOpenTx` guards room claims/controls/messages (`openThinkTankTx`,
+`BeginThinkTankAttempt`, non-record inputs); Stop calls `Lifecycle.StopRoom` →
+`ClosePipelineThinkTank` + guarded turn cancel, and run cleanup waits for room turns
+(`roomSettled`); run row pins room deletion; generic Continue/Retry/Replace return
+`room_recovery_required`; `SyncRoomPhase` (from `publishThinkTankUpdate`) pauses/resumes the run
+on room hold/pause/judge failure. Oversized produced context pauses the run when the room is
+created (not before accepting the feeding stage — recorded deviation for review).
+Not done (review note): setup-claimed-before-Stop idle runtimes are not torn down; tasks created
+in room turns are not attributed as stage descendants.
 Seams for slice 4–6: `Manager.Start` (manager.go:52) / `advanceTaskStage` (actions.go:105) create
 stage tasks; `AcceptPipelineStageTaskResult` (state/pipeline_tasks.go:146) is the result tx;
 `reconcileTaskStageRelease` (reconcile.go:101); `CreateThinkTank` (state/think_tanks.go:485);
 judge synthesis → `insertThinkTankResultTx` (think_tank_turns.go:290); server room loop
 `dispatchThinkTanks`/`launchReservedThinkTankAgent` (server/think_tanks.go:67/398); latest schema
-migration version 45 (state/schema.go). Next: slice 6.
+migration version 45 (state/schema.go). Next: integrate slice 2, then slice 7.
 
 ## Acceptance gates still owed
 
