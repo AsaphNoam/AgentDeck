@@ -582,7 +582,10 @@
         "links",
         "detail",
         "history",
-        "authoring"
+        "authoring",
+        "controls",
+        "collapse-toggle",
+        "boundary"
       ],
       "states": [
         "armed",

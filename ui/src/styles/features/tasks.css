@@ -95,23 +95,43 @@
   position: absolute;
 }
 
+.task-row-controls {
+  align-items: start;
+  display: flex;
+  gap: var(--ad-space-2);
+  justify-content: space-between;
+}
+
 .task-row-summary {
   background: transparent;
   border: 0;
   color: inherit;
   cursor: pointer;
   display: grid;
+  flex: 1 1 auto;
   font: inherit;
   gap: var(--ad-space-1);
   justify-content: stretch;
   justify-items: start;
+  min-width: 0;
   padding: 0;
   text-align: start;
-  width: 100%;
 }
 
 .task-row-summary .task-row-top {
   justify-content: flex-start;
+}
+
+/* Collapse toggle is a sibling control, never nested in the detail button,
+ * so it is independently reachable with its own accessible state. */
+.task-collapse-toggle {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.task-link-boundary {
+  color: var(--ad-text-muted);
 }
 
 .task-links {

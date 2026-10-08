@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
 import { Badge, Button, PageHeader } from "../../components/ui";
@@ -9,7 +9,11 @@ import type { Task } from "../../schemas/task";
 import { taskActions } from "../../schemas/task";
 import { useAgentStore } from "../../store/agentStore";
 import { CreateTaskForm, FireSignalForm, RearmForm, RecordResultForm, errorMessage } from "./taskForms";
-import { needsAttention, projectWork, taskReason, taskStatus, type ProjectWork, type TaskLink, type WorkGroup, type WorkRow } from "./taskWork";
+import {
+  needsAttention, projectWork, rowVisibility, taskReason, taskStatus,
+  type DescendantSummary, type HiddenBy, type ProjectWork, type RowVisibility, type TaskLink, type WorkGroup, type WorkRow,
+} from "./taskWork";
+import { collapsedIdsForProject, pruneProject, setCollapsed } from "./collapseStore";
 
 export { needsAttention };
 
@@ -47,24 +51,93 @@ function linkText(link: TaskLink): ReactNode {
   return <>after {name} → {link.outcomes.join(" or ")} ({mark})</>;
 }
 
-function TaskRowView({ row, open, onToggle, onSignal }: { row: WorkRow; open: boolean; onToggle: () => void; onSignal: (project: string, name: string) => void }) {
+/** LinkItem renders a recorded relationship, and — when it crosses a collapsed
+ *  branch — the boundary the row's source sits behind plus a way to reveal
+ *  just that ancestor path, never the whole tree (FS-16.R47, TS-08.R92). */
+function LinkItem({ link, hiddenBy, onReveal }: { link: TaskLink; hiddenBy: Map<string, HiddenBy>; onReveal: (path: string[]) => void }) {
+  const hidden = link.kind === "prerequisite" ? hiddenBy.get(link.sourceID) : undefined;
+  return (
+    <span data-variant={link.kind}>
+      {linkText(link)}
+      {hidden && (
+        <span className="task-link-boundary" data-slot="boundary">
+          {" "}· hidden under a collapsed stage{" "}
+          <Button size="small" variant="ghost" onClick={() => onReveal(hidden.path)}>Reveal</Button>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function descendantSummaryText(summary: DescendantSummary): string {
+  const parts = [plural(summary.hidden, "task")];
+  if (summary.unfinished > 0) parts.push(`${summary.unfinished} unfinished`);
+  if (summary.attention > 0) parts.push(`${summary.attention} need${summary.attention === 1 ? "s" : ""} attention`);
+  if (summary.cleanup > 0) parts.push(`${summary.cleanup} in cleanup`);
+  return parts.join(" · ");
+}
+
+/** CollapseToggle is a sibling of the row's own detail disclosure, never
+ *  nested inside it, so expanding details and collapsing descendants stay
+ *  independent interactions (FS-16.R46, TS-08.R92). */
+function CollapseToggle({ taskID, collapsed, summary, childIDs, onToggle }: {
+  taskID: string; collapsed: boolean; summary: DescendantSummary; childIDs: string[]; onToggle: () => void;
+}) {
+  return (
+    <Button
+      id={`task-collapse-toggle-${taskID}`}
+      size="small"
+      variant="ghost"
+      className="task-collapse-toggle"
+      data-slot="collapse-toggle"
+      aria-expanded={!collapsed}
+      aria-controls={childIDs.map((id) => `task-row-${id}`).join(" ")}
+      onClick={onToggle}
+    >
+      {collapsed ? "Expand tasks" : "Collapse tasks"} · {descendantSummaryText(summary)}
+    </Button>
+  );
+}
+
+function TaskRowView({ row, open, onToggle, onSignal, hidden, collapseInfo, hiddenBy, onReveal, onBusyChange }: {
+  row: WorkRow;
+  open: boolean;
+  onToggle: () => void;
+  onSignal: (project: string, name: string) => void;
+  hidden: boolean;
+  collapseInfo?: { collapsed: boolean; summary: DescendantSummary; childIDs: string[]; onToggleCollapse: () => void };
+  hiddenBy: Map<string, HiddenBy>;
+  onReveal: (path: string[]) => void;
+  onBusyChange: (taskID: string, busy: boolean) => void;
+}) {
   const { task } = row;
   const status = taskStatus(task);
   const reason = taskReason(row);
   const assigned = assigneeID(task);
   const detailID = `task-detail-${task.task_id}`;
   return (
-    <li className={`task-row task-depth-${row.depth}`} data-slot="task" data-state={task.state}>
-      <button type="button" className="task-row-summary" aria-expanded={open} aria-controls={detailID} onClick={onToggle}>
-        <span className="task-row-top" data-slot="metadata">
-          <span className="task-name">{task.display_name}</span>
-          <Badge className="task-state" variant={status.tone} indicator>{status.label}</Badge>
-        </span>
-        {reason && <span className={needsAttention(task) ? "task-attention" : "task-waiting"} data-slot={needsAttention(task) ? "attention" : "waiting"}>{reason}</span>}
-      </button>
+    <li id={`task-row-${task.task_id}`} className={`task-row task-depth-${row.depth}`} data-slot="task" data-state={task.state} hidden={hidden}>
+      <div className="task-row-controls" data-slot="controls">
+        <button type="button" className="task-row-summary" aria-expanded={open} aria-controls={detailID} onClick={onToggle}>
+          <span className="task-row-top" data-slot="metadata">
+            <span className="task-name">{task.display_name}</span>
+            <Badge className="task-state" variant={status.tone} indicator>{status.label}</Badge>
+          </span>
+          {reason && <span className={needsAttention(task) ? "task-attention" : "task-waiting"} data-slot={needsAttention(task) ? "attention" : "waiting"}>{reason}</span>}
+        </button>
+        {collapseInfo && (
+          <CollapseToggle
+            taskID={task.task_id}
+            collapsed={collapseInfo.collapsed}
+            summary={collapseInfo.summary}
+            childIDs={collapseInfo.childIDs}
+            onToggle={collapseInfo.onToggleCollapse}
+          />
+        )}
+      </div>
       {(row.links.length > 0 || row.next.length > 0) && (
         <p className="task-links" data-slot="links">
-          {row.links.map((link, index) => <span key={`${link.kind}:${link.sourceID}:${index}`} data-variant={link.kind}>{linkText(link)}</span>)}
+          {row.links.map((link, index) => <LinkItem key={`${link.kind}:${link.sourceID}:${index}`} link={link} hiddenBy={hiddenBy} onReveal={onReveal} />)}
           {row.next.length > 0 && <span data-variant="next">leads to {row.next.map((item) => item.display_name).join(", ")}</span>}
         </p>
       )}
@@ -72,7 +145,7 @@ function TaskRowView({ row, open, onToggle, onSignal }: { row: WorkRow; open: bo
         <span>created by <Creator task={task} /></span>
         {assigned ? <span>assigned to <AgentLabel id={assigned} /></span> : task.target_kind === "launch" ? <span>launches {task.role}</span> : null}
       </p>
-      {open && <TaskDetail id={detailID} row={row} onSignal={onSignal} />}
+      {open && <TaskDetail id={detailID} row={row} onSignal={onSignal} onBusyChange={onBusyChange} hiddenBy={hiddenBy} onReveal={onReveal} />}
     </li>
   );
 }
@@ -87,7 +160,14 @@ function useStageOwnership(task: Task): { owned: boolean; known: boolean; failed
   return { owned: run.data.stage_tasks.some((stage) => stage.task_id === task.task_id), known: true, failed: false, runID };
 }
 
-function TaskDetail({ id, row, onSignal }: { id: string; row: WorkRow; onSignal: (project: string, name: string) => void }) {
+function TaskDetail({ id, row, onSignal, onBusyChange, hiddenBy, onReveal }: {
+  id: string;
+  row: WorkRow;
+  onSignal: (project: string, name: string) => void;
+  onBusyChange: (taskID: string, busy: boolean) => void;
+  hiddenBy: Map<string, HiddenBy>;
+  onReveal: (path: string[]) => void;
+}) {
   const { task } = row;
   const cancel = useCancelTask(task.project);
   const retry = useRetryTask(task.project);
@@ -96,9 +176,12 @@ function TaskDetail({ id, row, onSignal }: { id: string; row: WorkRow; onSignal:
   const stage = useStageOwnership(task);
   const actions = taskActions(task);
   const restricted = stage.owned || !stage.known;
+  // A mutation in flight pins the row visible until it settles, success or
+  // not (FS-16.R47) — the collapse view never hides work a person is acting on.
   const act = (run: () => Promise<unknown>) => {
     setError("");
-    run().catch((err: unknown) => setError(errorMessage(err)));
+    onBusyChange(task.task_id, true);
+    run().catch((err: unknown) => setError(errorMessage(err))).finally(() => onBusyChange(task.task_id, false));
   };
   const outputs = Object.entries(task.outputs);
 
@@ -109,7 +192,7 @@ function TaskDetail({ id, row, onSignal }: { id: string; row: WorkRow; onSignal:
         <div className="task-detail-section">
           <strong>Prerequisites and lineage</strong>
           <ul>
-            {row.links.map((link, index) => <li key={`l${index}`}>{linkText(link)}</li>)}
+            {row.links.map((link, index) => <li key={`l${index}`}><LinkItem link={link} hiddenBy={hiddenBy} onReveal={onReveal} /></li>)}
             {row.external.map((wait, index) => wait.kind === "signal" ? (
               <li key={`e${index}`}>
                 signal {wait.name} ({wait.state === "satisfied" ? "fired" : "waiting"})
@@ -153,17 +236,66 @@ function TaskDetail({ id, row, onSignal }: { id: string; row: WorkRow; onSignal:
   );
 }
 
-function GroupView({ group, open, onToggle, onSignal }: { group: WorkGroup; open: Set<string>; onToggle: (id: string) => void; onSignal: (project: string, name: string) => void }) {
+function GroupView({ group, open, onToggle, onSignal, collapsed, pinned, onToggleCollapse, onReveal, onBusyChange }: {
+  group: WorkGroup;
+  open: Set<string>;
+  onToggle: (id: string) => void;
+  onSignal: (project: string, name: string) => void;
+  collapsed: ReadonlySet<string>;
+  pinned: ReadonlySet<string>;
+  onToggleCollapse: (id: string) => void;
+  onReveal: (path: string[]) => void;
+  onBusyChange: (taskID: string, busy: boolean) => void;
+}) {
+  // Pure projection per group (TS-08.R92); recomputed only when its inputs move.
+  const visibility: RowVisibility = useMemo(() => rowVisibility(group.rows, collapsed, pinned), [group.rows, collapsed, pinned]);
+  // After a pin releases and its row actually hides, return focus to the
+  // ancestor's toggle rather than letting it fall back to <body> (TS-08.R92).
+  const previouslyHidden = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const active = document.activeElement;
+    for (const [taskID, info] of visibility.hiddenBy) {
+      if (previouslyHidden.current.has(taskID)) continue;
+      const rowEl = document.getElementById(`task-row-${taskID}`);
+      if (rowEl && active && rowEl.contains(active)) {
+        document.getElementById(`task-collapse-toggle-${info.ancestorID}`)?.focus();
+        break;
+      }
+    }
+    previouslyHidden.current = new Set(visibility.hiddenBy.keys());
+  }, [visibility]);
+
   return (
     <ol className="task-group" data-slot="group" aria-label={group.rows.length > 1 ? `${group.rows.length} related tasks` : undefined}>
-      {group.rows.map((row) => (
-        <TaskRowView key={row.task.task_id} row={row} open={open.has(row.task.task_id)} onToggle={() => onToggle(row.task.task_id)} onSignal={onSignal} />
-      ))}
+      {group.rows.map((row) => {
+        const taskID = row.task.task_id;
+        const children = visibility.directChildren.get(taskID);
+        const summary = visibility.descendants.get(taskID);
+        return (
+          <TaskRowView
+            key={taskID}
+            row={row}
+            open={open.has(taskID)}
+            onToggle={() => onToggle(taskID)}
+            onSignal={onSignal}
+            hidden={visibility.hiddenBy.has(taskID)}
+            hiddenBy={visibility.hiddenBy}
+            onReveal={onReveal}
+            onBusyChange={onBusyChange}
+            collapseInfo={children && summary ? {
+              collapsed: collapsed.has(taskID),
+              summary,
+              childIDs: children.map((child) => child.task_id),
+              onToggleCollapse: () => onToggleCollapse(taskID),
+            } : undefined}
+          />
+        );
+      })}
     </ol>
   );
 }
 
-function ProjectSection({ project, title, query, focused, open, onToggle, onSignal }: {
+function ProjectSection({ project, title, query, focused, open, onToggle, onSignal, busy, onBusyChange }: {
   project: string;
   title: string;
   query: { data?: Task[]; isLoading: boolean; isError: boolean; error: unknown; refetch: () => unknown };
@@ -171,11 +303,53 @@ function ProjectSection({ project, title, query, focused, open, onToggle, onSign
   open: Set<string>;
   onToggle: (id: string) => void;
   onSignal: (project: string, name: string) => void;
+  busy: Set<string>;
+  onBusyChange: (taskID: string, busy: boolean) => void;
 }) {
   const work: ProjectWork | null = useMemo(
     () => query.data ? projectWork(project, query.data, new Set(query.data.filter((task) => open.has(task.task_id)).map((task) => task.task_id))) : null,
     [project, query.data, open],
   );
+  // Collapse choices live in the feature-owned sessionStorage map, keyed by
+  // project/task identity (TS-08.R93); this state mirrors it for rendering.
+  const [collapsed, setCollapsedState] = useState<Set<string>>(() => collapsedIdsForProject(project));
+  const toggleCollapse = (taskID: string) => {
+    setCollapsedState((current) => {
+      const next = new Set(current);
+      const nowCollapsed = !next.has(taskID);
+      if (nowCollapsed) next.add(taskID); else next.delete(taskID);
+      setCollapsed(project, taskID, nowCollapsed);
+      return next;
+    });
+  };
+  const reveal = (path: string[]) => {
+    if (path.length === 0) return;
+    setCollapsedState((current) => {
+      const next = new Set(current);
+      for (const id of path) {
+        next.delete(id);
+        setCollapsed(project, id, false);
+      }
+      return next;
+    });
+  };
+  // A complete project read is the only authority that prunes stale choices —
+  // a loading or filtered view never reads as deletion (TS-08.R93).
+  useEffect(() => {
+    if (!query.data) return;
+    const liveIDs = new Set(query.data.map((task) => task.task_id));
+    pruneProject(project, liveIDs);
+    setCollapsedState((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (liveIDs.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [project, query.data]);
+  const pinned = useMemo(() => new Set([...open, ...busy]), [open, busy]);
   const headingID = `tasks-project-${project}`;
   if (work && query.data!.length === 0 && !focused && !query.isError) return null;
 
@@ -200,14 +374,20 @@ function ProjectSection({ project, title, query, focused, open, onToggle, onSign
       {work && query.data!.length === 0 && <p className="tasks-empty">No tasks in this project. Tasks agents create for dependent work appear here.</p>}
       {work && work.active.length > 0 && (
         <div className="tasks-groups" data-slot="list">
-          {work.active.map((group) => <GroupView key={group.id} group={group} open={open} onToggle={onToggle} onSignal={onSignal} />)}
+          {work.active.map((group) => (
+            <GroupView key={group.id} group={group} open={open} onToggle={onToggle} onSignal={onSignal}
+              collapsed={collapsed} pinned={pinned} onToggleCollapse={toggleCollapse} onReveal={reveal} onBusyChange={onBusyChange} />
+          ))}
         </div>
       )}
       {work && work.history.length > 0 && (
         <details className="tasks-history" data-slot="history">
           <summary>Completed history · {plural(work.history.length, "group")}, {plural(work.history.reduce((total, group) => total + group.rows.length, 0), "task")}</summary>
           <div className="tasks-groups">
-            {work.history.map((group) => <GroupView key={group.id} group={group} open={open} onToggle={onToggle} onSignal={onSignal} />)}
+            {work.history.map((group) => (
+              <GroupView key={group.id} group={group} open={open} onToggle={onToggle} onSignal={onSignal}
+                collapsed={collapsed} pinned={pinned} onToggleCollapse={toggleCollapse} onReveal={reveal} onBusyChange={onBusyChange} />
+            ))}
           </div>
         </details>
       )}
@@ -227,12 +407,21 @@ export function TasksPage() {
   const scope = focus === ALL ? projectNames : [focus];
   const queries = useQueries({ queries: scope.map((project) => taskListOptions(project, projectReads)) });
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<Set<string>>(new Set());
   const [signalOpen, setSignalOpen] = useState(false);
   const [signalDraft, setSignalDraft] = useState({ project: focus, name: "" });
   const toggle = (id: string) => setOpen((current) => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id);
     else next.add(id);
+    return next;
+  });
+  // A mutation in flight pins its task visible through the collapse view
+  // regardless of ancestor state (FS-16.R47).
+  const setBusyState = (taskID: string, isBusy: boolean) => setBusy((current) => {
+    if (isBusy === current.has(taskID)) return current;
+    const next = new Set(current);
+    if (isBusy) next.add(taskID); else next.delete(taskID);
     return next;
   });
   const showSignal = (project: string, name: string) => {
@@ -284,6 +473,8 @@ export function TasksPage() {
           open={open}
           onToggle={toggle}
           onSignal={showSignal}
+          busy={busy}
+          onBusyChange={setBusyState}
         />
       ))}
 

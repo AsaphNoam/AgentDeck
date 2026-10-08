@@ -223,6 +223,121 @@ export function projectWork(project: string, tasks: Task[], pinned: ReadonlySet<
   };
 }
 
+/** Rolled-up state of the descendants a collapsed parent would hide, by
+ *  recorded parent lineage only (FS-16.R46, TS-08.R92). */
+export interface DescendantSummary {
+  hidden: number;
+  unfinished: number;
+  attention: number;
+  cleanup: number;
+}
+
+function emptySummary(): DescendantSummary {
+  return { hidden: 0, unfinished: 0, attention: 0, cleanup: 0 };
+}
+
+/** Why a row is omitted from the visible set: the nearest collapsed ancestor
+ *  and the chain a reveal must expand, nearest first (FS-16.R47). */
+export interface HiddenBy {
+  ancestorID: string;
+  path: string[];
+}
+
+export interface RowVisibility {
+  /** task_id -> descendant summary, present only for rows with retained
+   *  children in this group (whether or not they are currently collapsed). */
+  descendants: Map<string, DescendantSummary>;
+  /** task_id -> why it is hidden; absent ids are visible. */
+  hiddenBy: Map<string, HiddenBy>;
+  /** task_id -> its direct children by recorded lineage, for a toggle's
+   *  aria-controls identity (TS-08.R92). */
+  directChildren: Map<string, Task[]>;
+}
+
+/** childIndex groups a task list by recorded parent lineage only — never by
+ *  dependency edges, indentation or shared creator/run identity (FS-16.R47).
+ *  A parent outside the given list, or a self-reference, is not indexed: a
+ *  missing or invalid parent never manufactures a collapsible relationship. */
+export function childIndex(tasks: Task[]): Map<string, Task[]> {
+  const ids = new Set(tasks.map((task) => task.task_id));
+  const children = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const parentID = task.lineage.parent_task_id;
+    if (!parentID || parentID === task.task_id || !ids.has(parentID)) continue;
+    const list = children.get(parentID);
+    if (list) list.push(task);
+    else children.set(parentID, [task]);
+  }
+  return children;
+}
+
+/** ancestorChain walks recorded parent lineage from a task, nearest first,
+ *  guarded by a visited set so cyclic lineage terminates rather than looping
+ *  (FS-16.R47, TS-08.R92). */
+function ancestorChain(taskID: string, parentOf: Map<string, string>): string[] {
+  const chain: string[] = [];
+  const visited = new Set([taskID]);
+  let current = parentOf.get(taskID);
+  while (current && !visited.has(current)) {
+    chain.push(current);
+    visited.add(current);
+    current = parentOf.get(current);
+  }
+  return chain;
+}
+
+/** rowVisibility is the pure projection TS-08.R92 asks for: which rows a
+ *  collapsed ancestor hides, and the descendant summary each parent shows.
+ *  A task pinned by active inspection or mutation, or sitting on a pinned
+ *  task's ancestor path, stays visible regardless of collapse state (FS-16.R47).
+ *  Bounded iterative traversal with visited guards; no path enumeration and
+ *  no fetch of hidden tasks — everything comes from the already-loaded rows. */
+export function rowVisibility(rows: WorkRow[], collapsed: ReadonlySet<string>, pinned: ReadonlySet<string>): RowVisibility {
+  const tasks = rows.map((row) => row.task);
+  const ids = new Set(tasks.map((task) => task.task_id));
+  const parentOf = new Map<string, string>();
+  for (const task of tasks) {
+    const parentID = task.lineage.parent_task_id;
+    if (parentID && parentID !== task.task_id && ids.has(parentID)) parentOf.set(task.task_id, parentID);
+  }
+  const children = childIndex(tasks);
+
+  const extendedPinned = new Set(pinned);
+  for (const id of pinned) for (const ancestor of ancestorChain(id, parentOf)) extendedPinned.add(ancestor);
+
+  const hiddenBy = new Map<string, HiddenBy>();
+  for (const task of tasks) {
+    if (extendedPinned.has(task.task_id)) continue;
+    const chain = ancestorChain(task.task_id, parentOf);
+    const ancestorID = chain.find((id) => collapsed.has(id));
+    if (ancestorID) hiddenBy.set(task.task_id, { ancestorID, path: chain.slice(0, chain.indexOf(ancestorID) + 1) });
+  }
+
+  const descendants = new Map<string, DescendantSummary>();
+  for (const task of tasks) {
+    const directChildren = children.get(task.task_id);
+    if (!directChildren) continue;
+    const summary = emptySummary();
+    const visited = new Set([task.task_id]);
+    const queue = [...directChildren];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current.task_id)) continue; // cyclic lineage guard
+      visited.add(current.task_id);
+      if (!extendedPinned.has(current.task_id)) {
+        summary.hidden += 1;
+        if (current.state !== "finished") summary.unfinished += 1;
+        if (needsAttention(current)) summary.attention += 1;
+        if (cleanupPending(current)) summary.cleanup += 1;
+      }
+      for (const child of children.get(current.task_id) ?? []) if (!visited.has(child.task_id)) queue.push(child);
+    }
+    descendants.set(task.task_id, summary);
+  }
+
+  return { descendants, hiddenBy, directChildren: children };
+}
+
 export type StatusTone = "info" | "success" | "warning" | "danger" | "neutral";
 
 /** taskStatus names the row's authoritative state and its immediate reason

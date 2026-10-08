@@ -7,6 +7,7 @@ import { http, HttpResponse, delay } from "msw";
 import { setupServer } from "msw/node";
 import { TasksPage, needsAttention } from "./TasksPage";
 import { useAgentStore } from "../../store/agentStore";
+import { resetCollapseStoreForTests } from "./collapseStore";
 import fixture from "./fixtures/taskLists.json";
 
 // Task lists come from the Go-marshalled fixture (internal/server/
@@ -70,11 +71,13 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
   taskLists = { "my-app": wire("my-app"), other: wire("other"), quiet: [] };
   useAgentStore.setState({ agents: {}, order: [], hydrated: true, hydrating: false });
+  resetCollapseStoreForTests();
 });
 afterEach(() => {
   cleanup();
   lastRequest = null;
   server.resetHandlers();
+  resetCollapseStoreForTests();
 });
 afterAll(() => server.close());
 
@@ -88,9 +91,12 @@ function renderPage(initialEntry = "/tasks") {
   return { ...result, client };
 }
 
-/** rowOf returns the list item for a task, by its row's summary button. */
+/** rowOf returns the list item for a task, by its row's summary button. A
+ *  collapsed row stays in the DOM (hidden, not unmounted) so detail drafts
+ *  survive; `hidden: true` finds it there too, the same as any other
+ *  disclosure state this page already reads past (TS-08.R92). */
 async function rowOf(name: string) {
-  const button = await screen.findByRole("button", { name: new RegExp(`^${name}`) });
+  const button = await screen.findByRole("button", { name: new RegExp(`^${name}`), hidden: true });
   return button.closest("li") as HTMLElement;
 }
 
@@ -500,6 +506,115 @@ describe("Create task manually", () => {
   it("uses the configured default role for a new launch task", async () => {
     renderPage("/tasks?project=my-app");
     await waitFor(() => expect((createForm().getByLabelText("Role to launch") as HTMLSelectElement).value).toBe("impl"));
+  });
+});
+
+describe("Per-parent lineage collapse", () => {
+  // A coordinator -> worker -> reviewer delegation chain (FS-16.A30/A31).
+  function chain(): WireTask[] {
+    const template = byID("tk_r");
+    const coordinator: WireTask = { ...template, task_id: "tk_coord", display_name: "Coordinate work", state: "running", arms: [], lineage: { ...template.lineage, parent_task_id: "" } };
+    const worker: WireTask = { ...template, task_id: "tk_worker", display_name: "Do the work", state: "running", arms: [], lineage: { ...template.lineage, parent_task_id: "tk_coord" } };
+    const reviewer: WireTask = { ...template, task_id: "tk_reviewer", display_name: "Review the work", state: "interrupted", attention_reason: "stuck", arms: [], lineage: { ...template.lineage, parent_task_id: "tk_worker" } };
+    return [coordinator, worker, reviewer];
+  }
+
+  it("collapses a stage, hiding descendants and showing hidden/unfinished/attention counts, and expand restores them (FS-16.A30)", async () => {
+    taskLists["my-app"] = chain();
+    renderPage("/tasks?project=my-app");
+    await screen.findByText("Coordinate work");
+    const coordRow = await rowOf("Coordinate work");
+    const toggle = within(coordRow).getByRole("button", { name: /Collapse tasks/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveTextContent("2 tasks");
+    expect(toggle).toHaveTextContent("2 unfinished");
+    expect(toggle).toHaveTextContent("1 needs attention");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent(/^Expand tasks/);
+    expect((await rowOf("Do the work"))).toHaveAttribute("hidden");
+    expect((await rowOf("Review the work"))).toHaveAttribute("hidden");
+    // The stage's own row, and the stage's own detail toggle, are unaffected.
+    expect(coordRow).not.toHaveAttribute("hidden");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect((await rowOf("Do the work"))).not.toHaveAttribute("hidden");
+    expect((await rowOf("Review the work"))).not.toHaveAttribute("hidden");
+  });
+
+  it("collapses a nested parent independently, leaving the outer stage expanded (FS-16.A31)", async () => {
+    taskLists["my-app"] = chain();
+    renderPage("/tasks?project=my-app");
+    const workerRow = await rowOf("Do the work");
+    const toggle = within(workerRow).getByRole("button", { name: /Collapse tasks/ });
+    fireEvent.click(toggle);
+    expect(workerRow).not.toHaveAttribute("hidden");
+    expect((await rowOf("Coordinate work"))).not.toHaveAttribute("hidden");
+    expect((await rowOf("Review the work"))).toHaveAttribute("hidden");
+  });
+
+  it("keeps a task under active inspection visible despite a collapsed ancestor, and returns focus to the controlling toggle once the pin releases", async () => {
+    taskLists["my-app"] = chain();
+    renderPage("/tasks?project=my-app");
+    const reviewerRow = await openTask("Review the work");
+    const workerRow = await rowOf("Do the work");
+    const workerToggle = within(workerRow).getByRole("button", { name: /Collapse tasks/ });
+    fireEvent.click(workerToggle);
+    // Reviewer is pinned by its open detail, so collapsing its parent does not hide it.
+    expect(reviewerRow).not.toHaveAttribute("hidden");
+    // Closing the detail releases the pin; the ancestor is still collapsed, so the
+    // row now hides, and focus returns to the toggle that controls it (TS-08.R92).
+    const reviewerButton = within(reviewerRow).getByRole("button", { name: /^Review the work/ });
+    reviewerButton.focus();
+    fireEvent.click(reviewerButton);
+    expect(reviewerRow).toHaveAttribute("hidden");
+    expect(document.activeElement).toBe(workerToggle);
+  });
+
+  it("preserves a detail draft while its ancestor collapses, since the pinned row never unmounts (TS-08.R93)", async () => {
+    taskLists["my-app"] = chain();
+    renderPage("/tasks?project=my-app");
+    const reviewerRow = await openTask("Review the work");
+    fireEvent.change(within(reviewerRow).getByLabelText("Result summary"), { target: { value: "draft in progress" } });
+    // Collapsing the ancestor while still inspecting reviewer does not reset or
+    // unmount its open detail — the row is pinned visible throughout.
+    const workerRow = await rowOf("Do the work");
+    fireEvent.click(within(workerRow).getByRole("button", { name: /Collapse tasks/ }));
+    expect(reviewerRow).not.toHaveAttribute("hidden");
+    expect(within(reviewerRow).getByLabelText("Result summary")).toHaveValue("draft in progress");
+  });
+
+  it("marks a prerequisite link into a hidden task as a boundary and reveals only its ancestor path", async () => {
+    const [coordinator, worker, reviewer] = chain();
+    const gatekeeper: WireTask = {
+      ...byID("tk_r"), task_id: "tk_gate", display_name: "Gate release", arms: [
+        { arm_id: "tk_gate_arm00", task_id: "tk_gate", kind: "work_result", source_kind: "task", source_id: "tk_reviewer", satisfying_outcomes: ["success"], state: "unsatisfied" },
+      ],
+    };
+    taskLists["my-app"] = [coordinator, worker, reviewer, gatekeeper];
+    renderPage("/tasks?project=my-app");
+    const workerRow = await rowOf("Do the work");
+    fireEvent.click(within(workerRow).getByRole("button", { name: /Collapse tasks/ }));
+    const gateRow = await rowOf("Gate release");
+    expect(within(gateRow).getByText(/hidden under a collapsed stage/)).toBeInTheDocument();
+    fireEvent.click(within(gateRow).getByRole("button", { name: "Reveal" }));
+    expect((await rowOf("Review the work"))).not.toHaveAttribute("hidden");
+    expect(within(await rowOf("Gate release")).queryByText(/hidden under a collapsed stage/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a collapse choice across a refetch and a route remount in the same session (FS-16.R46)", async () => {
+    taskLists["my-app"] = chain();
+    const { client } = renderPage("/tasks?project=my-app");
+    const workerRow = await rowOf("Do the work");
+    fireEvent.click(within(workerRow).getByRole("button", { name: /Collapse tasks/ }));
+    expect((await rowOf("Review the work"))).toHaveAttribute("hidden");
+    await client.invalidateQueries({ queryKey: ["tasks", "my-app"] });
+    expect((await rowOf("Review the work"))).toHaveAttribute("hidden");
+    cleanup();
+    renderPage("/tasks?project=my-app");
+    expect((await rowOf("Review the work"))).toHaveAttribute("hidden");
   });
 });
 

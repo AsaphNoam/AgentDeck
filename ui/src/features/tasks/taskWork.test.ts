@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { taskListSchema } from "../../schemas/task";
+import { taskListSchema, type Task } from "../../schemas/task";
 import fixture from "./fixtures/taskLists.json";
-import { projectWork, taskReason, taskStatus } from "./taskWork";
+import { childIndex, projectWork, rowVisibility, taskReason, taskStatus, type WorkRow } from "./taskWork";
 
 // The fixture is marshalled by Go (internal/server/task_wire_fixture_test.go),
 // so these assertions run against the server's real task wire shape.
@@ -110,6 +110,74 @@ describe("projectWork", () => {
     expect(work.attention).toBe(2);
     expect(work.unfinished).toBe(11);
     expect(work.active[0].attention).toBeGreaterThan(0);
+  });
+});
+
+describe("rowVisibility", () => {
+  const base = tasks("my-app").find((task) => task.task_id === "tk_r")!;
+  const make = (id: string, parentID: string, overrides: Partial<Task> = {}): Task => ({
+    ...base, task_id: id, display_name: id, arms: [], lineage: { ...base.lineage, parent_task_id: parentID }, ...overrides,
+  });
+  const row = (task: Task): WorkRow => ({ task, links: [], external: [], next: [], depth: 0 });
+
+  it("indexes children by recorded parent lineage only, ignoring a missing or self-referential parent", () => {
+    const coordinator = make("coord", "");
+    const worker = make("worker", "coord");
+    const orphan = make("orphan", "tk_missing");
+    const selfRef = make("loop", "loop");
+    const children = childIndex([coordinator, worker, orphan, selfRef]);
+    expect(children.get("coord")!.map((task) => task.task_id)).toEqual(["worker"]);
+    expect(children.has("tk_missing")).toBe(false);
+    expect([...children.values()].flat().map((task) => task.task_id)).not.toContain("loop");
+  });
+
+  // FS-16.A30 — collapsing a stage leaves its own row visible and hides its
+  // descendants, reporting the hidden/unfinished/attention summary.
+  it("collapses a stage to hide its descendants and reports the hidden/unfinished/attention summary", () => {
+    const coordinator = make("coordinator", "");
+    const worker = make("worker", "coordinator", { state: "running" });
+    const reviewer = make("reviewer", "worker", { state: "interrupted", attention_reason: "stuck" });
+    const rows = [coordinator, worker, reviewer].map(row);
+    const visible = rowVisibility(rows, new Set(["coordinator"]), new Set());
+    expect(visible.hiddenBy.has("coordinator")).toBe(false);
+    expect(visible.hiddenBy.get("worker")).toEqual({ ancestorID: "coordinator", path: ["coordinator"] });
+    expect(visible.hiddenBy.get("reviewer")).toEqual({ ancestorID: "coordinator", path: ["worker", "coordinator"] });
+    expect(visible.descendants.get("coordinator")).toEqual({ hidden: 2, unfinished: 2, attention: 1, cleanup: 0 });
+  });
+
+  // FS-16.A31 — a nested parent collapses independently of its own ancestor.
+  it("collapses a nested parent independently, leaving the outer stage expanded", () => {
+    const coordinator = make("coordinator", "");
+    const worker = make("worker", "coordinator", { state: "running" });
+    const reviewer = make("reviewer", "worker");
+    const rows = [coordinator, worker, reviewer].map(row);
+    const visible = rowVisibility(rows, new Set(["worker"]), new Set());
+    expect(visible.hiddenBy.has("coordinator")).toBe(false);
+    expect(visible.hiddenBy.has("worker")).toBe(false);
+    expect(visible.hiddenBy.get("reviewer")).toEqual({ ancestorID: "worker", path: ["worker"] });
+    expect(visible.descendants.get("worker")).toEqual({ hidden: 1, unfinished: 1, attention: 0, cleanup: 0 });
+  });
+
+  it("keeps a pinned task and its ancestor path visible despite collapse, and never hides work behind a missing parent", () => {
+    const coordinator = make("coordinator", "");
+    const worker = make("worker", "coordinator");
+    const reviewer = make("reviewer", "worker", { state: "interrupted", attention_reason: "stuck" });
+    const detached = make("detached", "tk_missing");
+    const rows = [coordinator, worker, reviewer, detached].map(row);
+    const pinned = rowVisibility(rows, new Set(["coordinator"]), new Set(["reviewer"]));
+    expect(pinned.hiddenBy.has("reviewer")).toBe(false);
+    expect(pinned.hiddenBy.has("worker")).toBe(false);
+    expect(pinned.hiddenBy.has("detached")).toBe(false);
+    expect(pinned.descendants.get("coordinator")).toEqual({ hidden: 0, unfinished: 0, attention: 0, cleanup: 0 });
+  });
+
+  it("terminates on cyclic lineage and renders every row reachable exactly once", () => {
+    const a = make("cyc_a", "cyc_b");
+    const b = make("cyc_b", "cyc_a");
+    const rows = [a, b].map(row);
+    const visible = rowVisibility(rows, new Set(["cyc_a"]), new Set());
+    expect([...visible.hiddenBy.keys()]).toEqual(["cyc_b"]);
+    expect(visible.descendants.get("cyc_a")).toEqual({ hidden: 1, unfinished: 1, attention: 0, cleanup: 0 });
   });
 });
 
