@@ -345,7 +345,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   every task route is unreachable from the tailnet. — server tests on attention, push, and the route
   inventory; UI tests.
 
-- **A14 (planned)** (R42) — At phone width, open an agent with recorded command/file activity.
+- **A14** (R42) — At phone width, open an agent with recorded command/file activity.
   Chat, Files and Manage work; Commands is absent, recorded command activity remains inspectable,
   web-link taps open separately and wide tables scroll locally. *Verify:* phone component tests
   and FS-03.A59–A61's focused browser journey. This supersedes only A12's Commands-list check;

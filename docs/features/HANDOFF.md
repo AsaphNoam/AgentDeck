@@ -18,11 +18,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is still `AsaphNoam/AgentDeck`. Installer/updater defaults point at
   `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
-- **Active change:** `agent-chat-links-tables-and-tabs.md` is in progress (see below).
+- **Active change:** None.
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   `pipeline-think-tank-stages-and-task-collapse.md` is waiting to start; its behavior remains planned.
   Other available/resumable design work is in `docs/ideas.md`.
-- **Review units / findings:** None.
+- **Review units / findings:** Chat links, tables and tabs (`7661d97`..closure commit, 2026-10-08)
+  awaits `/review`. Notes for the reviewer: one right-click opens one menu because the anchor
+  defers its own menu a microtask and enclosing annotation menus claim it (`lib/linkActions.ts`);
+  table cells reset `overflow-wrap` so the dashboard pane's wrap-anywhere rule cannot split short
+  words (found by the rendered check). No findings open.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
   intermittently returns 409 "a resume is already in progress" (pre-existing at `74c8e84`);
   synchronization fix remains separate work.
@@ -30,14 +34,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-[`agent-chat-links-tables-and-tabs.md`](../ready-changes/agent-chat-links-tables-and-tabs.md) —
-in progress. Slices: (1) Commands removal — done: `ChatPanel` tab/`initialTab` mapping,
-phone `AgentScreen`, removed `CommandsTab`, `getTrackedCommands`, `TrackedCommand`, its CSS and
-the `tracked-list` `commands` contract variant; server tracking/API untouched. (2) Web links —
-done: `SanitizedMarkdown` `WebLink`, `lib/linkActions.ts`; every `AnnotationContextMenu` caller
-passes `link: claimWebLink(mouse)`; tests in `renderers/webLinks.test.tsx`. (3) Table dividers,
-padding and contained overflow — done (`.markdown-table` wrapper + agent.css). (4) next: Real-browser rendered checks (TS-08.R110; A59–A61,
-A14, FS-12.A32 still planned) and closure matrix with `make embed`. Focused checks: `cd ui && npx vitest run <files>`, `npm run check:styles`, `npx tsc -b`.
+None. Chat links, tables and tabs finished 2026-10-08; rendered evidence is reproducible with
+`cd ui && node scripts/chat-cleanup-render.mjs [outDir]` (161 checks, stubbed API, no server).
 
 ## Acceptance gates still owed
 
@@ -99,6 +97,14 @@ None.
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-08 — Chat links, tables and tabs finished.** Web links open in new tabs with Open in
+  new tab/Copy link on right-click, composed with annotation menus; Markdown tables get dividers,
+  roomier cells and local scrolling on every renderer surface; Commands left desktop and phone
+  agent views (`?tab=commands` opens Transcript) while tracking/API/history stay. FS-03.R78–R80,
+  FS-05.R40, FS-12.R60, FS-20.R42, TS-08.R107–R110 shipped. `make test`, 697 UI tests, style and
+  presentation checks, `make embed`, `make build` and the 161-check rendered script passed in
+  Core, Sky & Grove and Studio.
 
 - **2026-10-07 — Chat cleanup design ready.** User approved web-link new-tab/copy actions,
   local-file viewer preservation, readable tables and Commands-tab removal including phones.

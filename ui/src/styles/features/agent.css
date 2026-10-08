@@ -421,7 +421,10 @@
   border-collapse: collapse;
 }
 
+/* Cells keep whole words even inside surfaces that wrap anywhere, so a narrow
+   pane scrolls the table instead of splitting short words. */
 .markdown-table :is(th, td) {
+  overflow-wrap: normal;
   padding: var(--ad-space-2) var(--ad-space-3);
   vertical-align: top;
 }

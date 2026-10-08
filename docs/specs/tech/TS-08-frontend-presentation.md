@@ -1220,7 +1220,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Chat/phone tab selections are component state, but desktop `initialTab` also accepts `?tab=`.
   Remove commands from its accepted values and map `?tab=commands` to Transcript, never an empty
   content panel. Preserve other valid tab parameters; no browser-storage migration is required.
-- **R110 (planned) — Closure verifies links, tables and every affected tab surface.** Focused
+- **R110 — Closure verifies links, tables and every affected tab surface.** Focused
   tests cover FS-03.A59–A61, FS-05.A23 and FS-20.A14, including annotation/link menu coexistence,
   clipboard failure, dangerous URLs remaining blocked and unchanged file-link classification.
   FS-12.A32 and FS-03.A60 require the working tree's real-browser rendered checks across Core,

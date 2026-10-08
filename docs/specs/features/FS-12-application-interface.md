@@ -1,6 +1,6 @@
 # FS-12 — Core interface design
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src` · **Journeys:** J2–J9, J11, J14
 **Absorbed:** —
 
@@ -392,7 +392,7 @@ Requirements are user-observable.
   prominent static badges. Motion and color are never the sole status signals; no card movement,
   sound, notification, automatic expansion or layout shift is added.
 
-- **R60 (planned) — Chat cleanup is shared across appearances.** FS-03.R78–R80's web-link
+- **R60 — Chat cleanup is shared across appearances.** FS-03.R78–R80's web-link
   actions, table readability and Commands-tab removal apply in Core, Sky & Grove and Studio.
   They supersede only the earlier requirements in this specification that preserve Commands
   in agent conversations. Other actions, tab conditions, reading hierarchy and archive behavior
@@ -605,7 +605,7 @@ Requirements are user-observable.
   pulse. Repeat with reduced motion and confirm static salience. *Verify:* focused badge/card state
   tests plus real-browser motion and reduced-motion checks; a static screenshot cannot prove pace.
 
-- **A32 (planned)** (R60) — FS-03.A59–A61's rendered checks cover all three appearances:
+- **A32** (R60) — FS-03.A59–A61's rendered checks cover all three appearances:
   table spacing/dividers/overflow, readable link menus and remaining tab reachability at desktop,
   expanded-pane and phone sizes. *Verify:* presentation/style audit and focused browser journey.
 

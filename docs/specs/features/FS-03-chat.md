@@ -1077,19 +1077,19 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
   without clipping or unnecessary layout animation. *Verify:* real-binary rendered journey with
   reduced-motion check; source inspection alone cannot satisfy this acceptance item.
 
-- **A59 (planned)** (R78) — In live chat, an expanded pane and archived chat, activate a web link
+- **A59** (R78) — In live chat, an expanded pane and archived chat, activate a web link
   by pointer and keyboard, then exercise both right-click actions, including inside a table and
   with selected text. The conversation stays open, Copy link yields its destination, and selection
   copy/annotation still work. Check modifier/middle click, clipboard refusal, local-file viewer,
   fragment/mail behavior and dangerous URLs remaining inert. On the phone, tap a web link.
   *Verify:* focused renderer/menu tests and a real-browser interaction check.
-- **A60 (planned)** (R79) — Read a multi-row table with headers, left/center/right alignment,
+- **A60** (R79) — Read a multi-row table with headers, left/center/right alignment,
   long links and inline code at 1024px/wider desktop, in a narrow pane, archived chat, rendered
   file viewer and at 390px phone width in Core, Sky & Grove and Studio. Dividers and increased
   padding are perceptible; cells remain selectable, alignment is preserved and wide content
   scrolls locally without page overflow. *Verify:* real-browser rendered checks and focused
   GFM structure/alignment and presentation checks.
-- **A61 (planned)** (R80) — Full chat, expanded pane and phone offer no Commands tab;
+- **A61** (R80) — Full chat, expanded pane and phone offer no Commands tab;
   remaining views work, `?tab=commands` opens Transcript, and command activity survives reload.
   *Verify:* chat/phone component tests and rendered navigation; FS-05.A23 covers tracking.
 
