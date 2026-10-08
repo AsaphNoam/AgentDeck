@@ -343,6 +343,13 @@
   position: relative;
 }
 
+/* A collapsed descendant stays mounted (drafts survive) but must not render:
+   the row's own display would otherwise defeat the hidden attribute
+   (FS-16.R46). */
+.task-row[hidden] {
+  display: none;
+}
+
 .task-row[data-state="interrupted"],
 .task-row[data-state="dependency_failed"] {
   background: var(--ad-surface-emphasis);

@@ -9,12 +9,17 @@
     flex-wrap: wrap;
     gap: var(--ad-space-4);
     margin-block: var(--ad-space-3);
-    color: var(--ad-text-secondary);
+    color: var(--ad-technical-muted);
   }
 
   .pipeline-owner-strip > div {
     display: grid;
     gap: var(--ad-space-1);
+  }
+
+  /* The strip sits on the run hero's technical background (TS-08.R94). */
+  .pipeline-owner-strip strong {
+    color: var(--ad-technical-text);
   }
 
 .pipelines-page {
@@ -326,7 +331,7 @@
 .pipeline-run-context { color: var(--ad-technical-muted); font-family: var(--ad-font-mono); font-size: 0.72rem; margin-top: var(--ad-space-3); overflow-wrap: anywhere; }
 .pipeline-run-actions { align-items: center; display: flex; flex-wrap: wrap; gap: var(--ad-space-2); }
 .pipeline-action-choice { align-items: flex-start; display: flex; flex-direction: column; gap: var(--ad-space-1); max-width: 24rem; }
-.pipeline-action-choice small { color: var(--ad-text-muted); line-height: 1.35; }
+.pipeline-action-choice small { color: var(--ad-technical-muted); line-height: 1.35; }
 .pipeline-link-button { align-items: center; background: var(--ad-surface-raised); border: var(--ad-border-thin) solid var(--ad-border-strong); border-radius: var(--ad-radius-medium); color: var(--ad-text-primary); display: inline-flex; font-weight: 650; min-height: 36px; padding: var(--ad-space-2) var(--ad-space-3); text-decoration: none; }
 .pipeline-continuation { max-width: 720px; }
 .pipeline-continuation textarea { width: 100%; }

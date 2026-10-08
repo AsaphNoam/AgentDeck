@@ -696,16 +696,15 @@ func renderThinkTankStageContext(encoded string) (string, error) {
 	if err := json.Unmarshal([]byte(encoded), &c); err != nil {
 		return "", fmt.Errorf("state: decode stage context: %w", err)
 	}
+	// Paragraph-separated Markdown: the room renders entries as Markdown and
+	// agents read the same text.
 	var b strings.Builder
-	fmt.Fprintf(&b, "Pipeline stage context — run %q (%s), stage %q (%s).\n\nRun goal:\n%s\n\nStage objective:\n%s\n",
+	fmt.Fprintf(&b, "Pipeline stage context for run %q (`%s`), stage %q (`%s`).\n\n**Run goal**\n\n%s\n\n**Stage objective**\n\n%s\n",
 		c.RunName, c.RunID, c.StageTitle, c.StageID, c.Goal, c.Objective)
-	if len(c.Inputs) > 0 {
-		b.WriteString("\nStage inputs:\n")
-		for _, in := range c.Inputs {
-			fmt.Fprintf(&b, "- %s:\n%s\n", in.Name, in.Value)
-		}
+	for _, in := range c.Inputs {
+		fmt.Fprintf(&b, "\n**Input `%s`**\n\n%s\n", in.Name, in.Value)
 	}
-	fmt.Fprintf(&b, "\nRequired output %q: %s\nThe judge's published synthesis becomes this output exactly; it must be at most %d characters. Completion means a synthesis was produced, not that participants agreed.\n",
+	fmt.Fprintf(&b, "\n**Required output `%s`**\n\n%s\n\nThe judge's published synthesis becomes this output exactly and must be at most %d characters. Completion means a synthesis was produced, not that participants agreed.\n",
 		c.Output.Name, c.Output.Description, c.Output.MaxRunes)
 	return b.String(), nil
 }
