@@ -7,16 +7,20 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Release:** `v0.12.0` preparation is in progress. The user confirmed the version and explicitly
-  authorized release/push. Both Go variants passed; 721 UI tests, 41 presentation/style
+- **Release:** `v0.12.0` is tagged at `075cdd5` and published with `main`. The user confirmed the
+  version, waived the pending clone-name review, and authorized pushing all three unpushed commits
+  plus the tag. Both Go variants passed; 721 UI tests, 41 presentation/style
   checks, `go vet`, `make dist VERSION=0.12.0`, FTS5 build-tag proof, shell syntax, and old-name
   checks passed. The embedded operator package already matches the range; no package edits needed.
-  Release preparation is verified; tag/push and GitHub publication confirmation follow. Release notes are in
+  Release run `37935310874` succeeded, including archive and fresh-install verification. The
+  arm64 archive, `manifest.json` (size/checksum verified against the uploaded archive), `install.sh`,
+  and readable release notes are published. General CI `37935311001` also succeeded.
+  Release notes are in
   [`RELEASE-v0.12.0-notes.md`](../archive/state/RELEASE-v0.12.0-notes.md).
 - **Repository:** GitHub remains `AsaphNoam/AgentDeck`. Installer/updater defaults still point
   to `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repo.
-- **Active change:** release preparation for `v0.12.0`; no product change is active.
+- **Active change:** None.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -25,8 +29,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-Release `v0.12.0`: commit preparation, tag, push, confirm GitHub assembly/assets, and
-record publication. The user confirmed version and authorized pushing `main` and the tag.
+None. Release `v0.12.0` is published; manual acceptance gates remain below.
 
 ## Acceptance gates still owed
 
