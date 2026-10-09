@@ -21,8 +21,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Active change:** None.
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
   Other available/resumable design work is in `docs/ideas.md`.
-- **Review units / findings:** Shared pipeline orchestrator instructions (2026-10-09, one
-  commit; see changelog) is available for review. Think Tank pipeline stages, readable workspace consent and
+- **Review units / findings:** Shared pipeline orchestrator instructions (`2020733`, reviewed
+  2026-10-09) remains open with one corrupt-snapshot finding below. Clone keeps its source's name
+  (`3448dae`, 2026-10-09) remains available for review. Think Tank pipeline stages, readable workspace consent and
   collapsible tasks (`fb715a1`..`3d9ab39`, reviewed 2026-10-08) is closed after its six
   lifecycle, lineage and acceptance-recovery findings were fixed. Clone first-message failure
   investigation (2026-10-08): its diagnostic gap is fixed; the field failure stays open, not
@@ -94,6 +95,38 @@ variants did not reproduce it.
 
 ## Review findings
 
+### Shared pipeline orchestrator instructions — review 2026-10-09 — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+Selected unit: `2020733` (shared pipeline orchestrator instructions), clean tree at review start.
+
+- **Must fix** — corrupt snapshot is mistaken for absent optional instructions (INV §7/§11;
+  fix complexity trivial/easy). `internal/server/pipeline_lifecycle.go:49–53` only checks
+  `json.Unmarshal` success before returning `OrchestratorInstructions`. When a stored run snapshot
+  is damaged but remains valid JSON (`null`, `{}`, or `{"version":2}`), a known standing owner or
+  dedicated coordinator resolves empty guidance with no error. `task_dispatcher.go:202–210` then
+  proceeds to launch instead of reporting unavailable context. This violates TS-09.R58/R60 and
+  FS-14.A55: corrupt stored context must be distinguished from a valid pre-feature template with
+  no optional field. Validate the frozen snapshot's structural contract without consulting live
+  templates or role configuration; retain compatibility with valid snapshots omitting the field.
+  Add fault tests for malformed and structurally incomplete snapshots, storage read failure and
+  valid missing/empty guidance, including a dispatcher assertion that invalid context starts no
+  process and reaches actionable failed-start state. A temporary Go overlay probe against the
+  actual store/resolver independently reproduced all three accepted corrupt shapes; it was not
+  added to repository code.
+
+Review evidence: focused pipeline template/proposal tests, three editor tests, server
+`TestPipelineOrchestratorInstructions*`, generic Claude native-preset/Codex developer-instruction
+tests, spec lint and all 72 rendered checks passed. Render artifacts and the failing snapshot
+probe are under `/private/tmp/chuck-orchestrator-review` (temporary supporting evidence).
+The credentialed provider-adoption gate remains owed above. Existing generic frozen-prompt
+switch/provider tests support reuse of the shared lifecycle seam; no separate duplication defect
+was found. The editor's disappearing post-save notice predates this unit, so no finding is added.
+
+Invariant sweep: applicable classes §1–§3, §7–§11 and §13–§17 were checked; the finding above
+matches §7/§11, with missing corruption coverage under §17. §4–§6 and §12 have no applicable
+changed surface (no new registration artifact, concurrent claim, runtime/interface or external
+CLI invocation). No other invariant finding or unrequired parallel mechanism was identified.
+
 ### Clone first-message failure — investigation 2026-10-08 — **Fix model:** medium — Codex Terra or Claude Opus.
 
 **Report (verbatim):** “cloning a chat gave it a generic name (Atlas), when I sent the agent a
@@ -154,6 +187,12 @@ The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-09 — Shared pipeline orchestrator instructions reviewed (`2020733`).** One
+  must-fix corrupt-snapshot validation finding keeps the same unit open; no product/spec edits.
+  Focused automated checks and the 72-check rendered journey passed; a separate temporary
+  store/resolver fault probe failed as expected for `null`, `{}` and an incomplete template.
+  The clone-name review unit remains available independently.
 
 - **2026-10-09 — Shared pipeline orchestrator instructions shipped (FS-14.R87–R89/A53–A55,
   TS-09.R57–R60, TS-11.R20).** Optional template `orchestrator_instructions` (16,000-code-point
