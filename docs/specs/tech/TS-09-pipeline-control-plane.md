@@ -605,7 +605,7 @@ unchanged by them.
 
 ### 2.13 Frozen orchestrator standing instructions
 
-- **R57 (planned)** — Extend the version-2 template with optional string
+- **R57 (shipped 2026-10-09)** — Extend the version-2 template with optional string
   `orchestrator_instructions`, defaulting to empty when absent. Reuse `MaxInstructionRunes`
   (16,000 Unicode code points) and the existing template/proposal byte limits; canonical validation
   rejects oversized values by this field name, without clipping. Whitespace-only values render
@@ -614,7 +614,7 @@ unchanged by them.
   existing immutable `TemplateSnapshot` freezes it; no new run-start override, SQLite column,
   template version/reset or duplicate instruction store is required. Pre-feature templates and
   run snapshots decode to empty instructions.
-- **R58 (planned)** — Resolve shared guidance before a fresh orchestrator process launch through
+- **R58 (shipped 2026-10-09)** — Resolve shared guidance before a fresh orchestrator process launch through
   the ordinary task dispatcher and server lifecycle composition seam. One bounded server-owned
   resolver identifies a standing stage task or an explicitly bound dedicated coordinator from
   durable task/stage provenance, then reads that run's frozen template. Pipeline lineage alone
@@ -625,7 +625,7 @@ unchanged by them.
   or a storage read failure, fails its launch through existing actionable task-start errors before
   starting a process, rather than silently launching without instructions. No live template read,
   transcript scan, unbounded descendant walk or new pipeline-owned launcher is permitted.
-- **R59 (planned)** — Compose one labelled **Pipeline orchestration instructions** block after
+- **R59 (shipped 2026-10-09)** — Compose one labelled **Pipeline orchestration instructions** block after
   the existing frozen project/role/resource prompt, before product-managed runtime overlays. The
   block states that these are shared defaults and explicit stage-assignment exceptions may override
   them while Chuck's authority, access and permission contracts still apply. Persist this constant
@@ -637,7 +637,7 @@ unchanged by them.
   `get_assigned_task`, activation text and ordinary prompt sends do not copy the shared block.
   Existing-agent task targets retain their own frozen prompt and receive only normal assignments;
   borrowing an agent never rewrites its standing configuration.
-- **R60 (planned)** — Ship FS-14.A53–A55 with producer-serialized template/proposal round trips,
+- **R60 (shipped 2026-10-09)** — Ship FS-14.A53–A55 with producer-serialized template/proposal round trips,
   bounded validator tests and actual task-dispatch-to-provider parameter captures. Verify Claude
   native-preset append and Codex developer-instruction merge for new/load, preserving native and
   pre-existing instructions; verify no duplication across lifecycle cycles, no block in stage
@@ -665,7 +665,7 @@ pipeline_stage_tasks: (run_id,stage_index,attempt_number) UNIQUE, task_id UNIQUE
 pipeline_values: run/stage/name -> source task's immutable output (projection, not another result)
 ```
 
-R57's planned additive template field is `orchestrator_instructions?: string`; omission means
+R57's additive template field is `orchestrator_instructions?: string`; omission means
 empty. It is part of the frozen template, not runtime assignments or task instructions. R59 freezes
 the composed block into ordinary session `system_prompt` metadata; no additional persistence shape
 is needed. Think Tank stage/runtime shapes continue to follow R51–R56 independently.

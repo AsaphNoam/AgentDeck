@@ -82,6 +82,10 @@ type launchOptions struct {
 	// Fork makes the start a native fork of another agent's conversation
 	// (Clone, FS-01.R36). One-shot launch input; never persisted.
 	Fork *runtime.ForkPlan
+	// OrchestratorInstructions is server-resolved run guidance for a pipeline
+	// orchestrator; it is frozen into the base prompt and never caller-supplied
+	// (TS-09.R58–R59, TS-11.R20).
+	OrchestratorInstructions string
 }
 
 const maxAgentNameRunes = 256
@@ -364,7 +368,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 		Generation:         generation,
 		Cwd:                cwd,
 		AddDirs:            addDirs,
-		SystemPrompt:       joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir)),
+		SystemPrompt:       joinSystemPrompt(project.ContextPrompt, role.SystemPrompt, projectResourcesInstruction(resourceDir), pipelineOrchestrationBlock(options.OrchestratorInstructions)),
 		BackendType:        backend.Type,
 		ModelID:            acpModelID,
 		Effort:             resolvedEffort,

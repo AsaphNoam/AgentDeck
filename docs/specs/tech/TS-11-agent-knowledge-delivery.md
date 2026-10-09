@@ -249,7 +249,7 @@ tool definitions own exact arguments/results. No persona, repository instruction
 configuration duplication. The fixed activation instruction points at current room tools; mutable
 room goal, phase and turn data are fetched rather than frozen into launch configuration.
 
-**R20 (planned) — Pipeline guidance belongs to the frozen agent prompt.** For FS-14.R87–R89,
+**R20 (shipped 2026-10-09) — Pipeline guidance belongs to the frozen agent prompt.** For FS-14.R87–R89,
 the server's ordinary base launch composer accepts only the bounded per-run instructions resolved
 under TS-09.R58 and appends the labelled block under TS-09.R59 once for a newly created standing
 owner or dedicated coordinator. Unlike the current product-managed knowledge overlay, this is

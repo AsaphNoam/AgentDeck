@@ -4,11 +4,14 @@ package pipeline
 // pipelines/{id}.json. Its immutable id comes from the filename and therefore
 // is not duplicated in this document.
 type Template struct {
-	Version          int         `json:"version"`
-	Title            string      `json:"title"`
-	OrchestratorRole string      `json:"orchestrator_role"`
-	Inputs           []ValueDecl `json:"inputs"`
-	Stages           []Stage     `json:"stages"`
+	Version          int    `json:"version"`
+	Title            string `json:"title"`
+	OrchestratorRole string `json:"orchestrator_role"`
+	// OrchestratorInstructions are shared standing guidance frozen into each
+	// run-created orchestrator's system prompt (TS-09.R57–R59).
+	OrchestratorInstructions string      `json:"orchestrator_instructions,omitempty"`
+	Inputs                   []ValueDecl `json:"inputs"`
+	Stages                   []Stage     `json:"stages"`
 	// Executor is retained solely to diagnose old documents. It is not valid
 	// in version 2 templates.
 	Executor string `json:"executor,omitempty"`

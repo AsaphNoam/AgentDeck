@@ -20,9 +20,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repository.
 - **Active change:** None.
 - **Work units:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
-  `shared-pipeline-orchestrator-instructions.md` is waiting to start with approved specifications.
   Other available/resumable design work is in `docs/ideas.md`.
-- **Review units / findings:** Think Tank pipeline stages, readable workspace consent and
+- **Review units / findings:** Shared pipeline orchestrator instructions (2026-10-09, one
+  commit; see changelog) is available for review. Think Tank pipeline stages, readable workspace consent and
   collapsible tasks (`fb715a1`..`3d9ab39`, reviewed 2026-10-08) is closed after its six
   lifecycle, lineage and acceptance-recovery findings were fixed. Clone first-message failure
   investigation (2026-10-08): its diagnostic gap is fixed; the field failure stays open, not
@@ -59,6 +59,8 @@ The six review findings are closed. Key seams: `pipeline/rooms.go`,
 - FS-02.A46: real-browser toast click and manual macOS desktop-notification click; automated
   component/SSE coverage passes. FS-02.A27: six-tab shared-stream check, A46's real-browser J14
   pass, and Sky & Grove with Codex capabilities.
+- FS-14.A54: bounded packaged Claude/Codex probe that a standing owner/dedicated coordinator
+  adopts the shared orchestrator instructions; fake-provider delivery capture is no live receipt.
 - FS-18.A12 / TS-11.R17: six manual role scenarios plus role-free follow-ups on pinned Claude
   and Codex. FS-18.A13: credentialed fresh/resumed Claude native-preset adoption; pinned adapter
   0.85.1 source proves object `_meta.systemPrompt` requests preset append, not its live adoption.
@@ -152,6 +154,22 @@ The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-09 — Shared pipeline orchestrator instructions shipped (FS-14.R87–R89/A53–A55,
+  TS-09.R57–R60, TS-11.R20).** Optional template `orchestrator_instructions` (16,000-code-point
+  field-named bound, omitempty so old digests are stable) freezes with the run snapshot.
+  `startLaunchedTask` resolves it via `pipelineOrchestratorInstructions` →
+  `state.PipelineOrchestratorTemplateSnapshot` (stage task with agent execution, or coordinator
+  located by its lineage parent's binding; indexed keys only) and composes one labelled block into
+  `LaunchSpec.SystemPrompt`; a pipeline-created task with missing binding/snapshot or a read error
+  fails its start. Editor textarea beside the orchestrator role; knowledge reference updated.
+  Evidence: `TestPipelineOrchestratorInstructions*` (session/new + session/load capture, frozen
+  prompt, no assignment copy, eligibility), template/proposal tests, editor test,
+  `ui/scripts/orchestrator-instructions-render.mjs` (72 checks, three appearances). `make test`
+  (both Go variants), `make build`, 721 UI tests and UI build passed. Reviewer note: dedicated
+  switch/failed-load/run-deletion tests for this block were not added (shared frozen-prompt path);
+  the editor's post-save refetch clears the "Template saved." notice almost immediately
+  (pre-existing). New review unit.
 
 - **2026-10-09 — Clone keeps its source's name (FS-01.R39).** User-requested: a clone is named
   "<source name> Copy" (source shortened to fit 256 characters; an unnamed source still gets the

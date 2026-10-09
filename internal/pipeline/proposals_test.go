@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -141,6 +142,41 @@ func TestApprovedTemplateProposalIsConsumedByItsExactSave(t *testing.T) {
 // INV §7 / TS-09.R15: one corrupt payload cannot be rendered for exact approval,
 // but it must not abort the approval list either. Before the fix a single
 // undecodable record failed ListProposals and hid every valid proposal.
+// FS-14.A53: a Chucky template proposal carries shared orchestrator
+// instructions exactly through its serialized payload, the digest binds them,
+// and an absent field keeps a pre-feature proposal's identity.
+func TestTemplateProposalCarriesOrchestratorInstructionsInItsDigest(t *testing.T) {
+	manager, _, _ := pipelineManagerFixture(t)
+	template := Template{
+		Version: 2, Title: "Guided", OrchestratorRole: "orchestrator", Inputs: []ValueDecl{},
+		Stages: []Stage{{ID: "work", Title: "Work", Objective: "Implement it.", Inputs: []StageInput{}, Outputs: []StageOutput{}}},
+	}
+	plain, err := templateProposalIdentity("guided", NormalizeTemplate(template))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if encoded, _ := json.Marshal(plain.Payload); strings.Contains(string(encoded), `"orchestrator_instructions"`) {
+		t.Fatalf("absent instructions serialized: %s", encoded)
+	}
+	template.OrchestratorInstructions = "Name branches by stage.\n"
+	guided, err := manager.ProposeTemplate("guided", template)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if guided.Digest == plain.Digest {
+		t.Fatal("instructions did not change the proposal digest")
+	}
+	collections, err := manager.ListProposals()
+	if err != nil || len(collections.Pending) != 1 {
+		t.Fatalf("pending = %+v err=%v", collections.Pending, err)
+	}
+	encoded, _ := json.Marshal(collections.Pending[0].Payload)
+	var payload templateProposalPayload
+	if err := json.Unmarshal(encoded, &payload); err != nil || payload.Template.OrchestratorInstructions != template.OrchestratorInstructions {
+		t.Fatalf("durable payload = %s err=%v", encoded, err)
+	}
+}
+
 func TestListProposalsIsolatesAnUndecodableRecord(t *testing.T) {
 	manager, _, _ := pipelineManagerFixture(t)
 	valid, err := manager.ProposeRun(context.Background(), runProposalRequest(""))

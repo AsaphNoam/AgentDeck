@@ -31,6 +31,7 @@ func ValidateTemplate(id string, t Template, roles map[string]bool) []Diagnostic
 	if !config.ValidSlug(t.OrchestratorRole) || !roles[t.OrchestratorRole] {
 		add("orchestrator_role", "unknown_role", "orchestrator_role must name an existing configured role")
 	}
+	validateText(&d, "orchestrator_instructions", t.OrchestratorInstructions, false, MaxInstructionRunes)
 	if len(t.Inputs) > MaxDeclarations {
 		add("inputs", "too_many", fmt.Sprintf("at most %d run inputs are allowed", MaxDeclarations))
 	}

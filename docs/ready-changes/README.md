@@ -43,8 +43,6 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
-- [`shared-pipeline-orchestrator-instructions.md`](shared-pipeline-orchestrator-instructions.md)
-  — define shared naming/grouping guidance once and freeze it into orchestrators' standing prompts.
 - [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
   by default with a backend-level bundle choice, scoped runtime feedback, local model refresh and
   explicitly capped compatibility work.

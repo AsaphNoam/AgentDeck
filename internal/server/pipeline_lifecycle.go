@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/AsaphNoam/Chuck/internal/config"
 	"github.com/AsaphNoam/Chuck/internal/pipeline"
@@ -23,6 +25,44 @@ func (s *Server) AcquirePipelineStart(_ context.Context, projectID string) (func
 		return nil, &pipeline.ProjectGateError{Code: ae.Code, Message: ae.Message}
 	}
 	return func() { s.releaseProjectStart(projectID) }, nil
+}
+
+// errPipelineOrchestratorContext marks a stored binding or snapshot that cannot
+// supply a known orchestrator's frozen guidance; retrying cannot repair it.
+var errPipelineOrchestratorContext = errors.New("pipeline orchestrator context is unavailable")
+
+// pipelineOrchestratorInstructions resolves the frozen shared guidance for a
+// fresh standing owner or dedicated coordinator launch (TS-09.R58). Only the
+// pipeline's own creator kinds are eligible, so person/agent-created work never
+// reads a run; a known participant whose context cannot be read fails closed.
+func (s *Server) pipelineOrchestratorInstructions(task state.Task) (string, error) {
+	if task.CreatedByKind != "pipeline" && task.CreatedByKind != "pipeline_coordinator" {
+		return "", nil
+	}
+	snapshot, err := s.stateStore.PipelineOrchestratorTemplateSnapshot(task.TaskID)
+	if errors.Is(err, state.ErrNotFound) {
+		return "", fmt.Errorf("%w: no stage binding", errPipelineOrchestratorContext)
+	}
+	if err != nil {
+		return "", err
+	}
+	var template pipeline.Template
+	if err := json.Unmarshal(snapshot, &template); err != nil {
+		return "", fmt.Errorf("%w: unreadable template snapshot", errPipelineOrchestratorContext)
+	}
+	return template.OrchestratorInstructions, nil
+}
+
+// pipelineOrchestrationBlock labels operator-authored shared guidance for the
+// frozen base prompt; whitespace-only text adds nothing (TS-09.R59).
+func pipelineOrchestrationBlock(instructions string) string {
+	if strings.TrimSpace(instructions) == "" {
+		return ""
+	}
+	return "Pipeline orchestration instructions\n" +
+		"The pipeline operator set these shared defaults for every orchestrator in this run. " +
+		"An exception stated explicitly in a stage assignment overrides them; Chuck's stage and result authority, project access and permissions still apply.\n\n" +
+		instructions
 }
 
 // RoomLaunchConfig composes a fresh room slot's opaque launch request through

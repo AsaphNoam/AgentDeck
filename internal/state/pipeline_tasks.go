@@ -743,6 +743,32 @@ func scanPipelineStageTask(row interface{ Scan(...any) error }) (PipelineStageTa
 	return v, nil
 }
 
+// PipelineOrchestratorTemplateSnapshot returns the frozen template of the run
+// whose agent-executed stage task or dedicated coordinator binding is taskID
+// (TS-09.R58). Lineage only locates the coordinator's binding row by key; an
+// ordinary descendant and a room-backed stage return ErrNotFound.
+func (s *Store) PipelineOrchestratorTemplateSnapshot(taskID string) (json.RawMessage, error) {
+	if taskID == "" {
+		return nil, ErrNotFound
+	}
+	var snapshot string
+	err := s.db.QueryRow(`SELECT r.template_snapshot_json FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id
+		WHERE p.task_id = ? AND p.execution_kind = ?
+		UNION ALL
+		SELECT r.template_snapshot_json FROM task_lineage l
+		JOIN pipeline_stage_tasks p ON p.task_id = l.parent_task_id AND p.coordinator_task_id = l.task_id
+		JOIN pipeline_runs r ON r.run_id = p.run_id
+		WHERE l.task_id = ?
+		LIMIT 1`, taskID, StageExecutionAgent, taskID).Scan(&snapshot)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("state: read pipeline orchestrator template: %w", err)
+	}
+	return json.RawMessage(snapshot), nil
+}
+
 // BindPipelineStageTaskStandingAgent records the dispatcher-confirmed identity.
 // A non-empty different identity is never silently substituted.
 func (s *Store) BindPipelineStageTaskStandingAgent(taskID, agentID string) error {

@@ -185,6 +185,15 @@ export function TemplateEditor({
             {!roles.data?.[draft.orchestrator_role] && <option value={draft.orchestrator_role}>{draft.orchestrator_role || "Select role"}</option>}
           </select>
         </label>
+        <label className="form-field">
+          <span>Shared orchestrator instructions</span>
+          <AutoGrowTextarea
+            rows={2}
+            value={draft.orchestrator_instructions ?? ""}
+            placeholder="Optional run-wide conventions for the standing owner and dedicated coordinators, such as naming and grouping. A stage objective can state an exception."
+            onChange={(event) => mutate((next) => { next.orchestrator_instructions = event.target.value; })}
+          />
+        </label>
       </div>
 
       <details className="pipeline-disclosure pipeline-editor-inputs" data-slot="inputs">

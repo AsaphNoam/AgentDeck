@@ -49,6 +49,7 @@ export const pipelineTemplateSchema = z.object({
   version: z.literal(2),
   title: z.string(),
   orchestrator_role: z.string(),
+  orchestrator_instructions: z.string().optional(),
   inputs: z.array(pipelineValueDeclSchema),
   stages: z.array(pipelineStageSchema),
 });

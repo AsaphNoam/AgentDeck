@@ -3,6 +3,7 @@ package pipeline
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/AsaphNoam/Chuck/internal/config"
@@ -160,6 +161,36 @@ func TestTemplateValidationThinkTankStage(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("%s: diagnostics = %+v, want field %s", name, diagnostics, tc.field)
+		}
+	}
+}
+
+// FS-14.A53: shared orchestrator instructions round-trip exactly, are optional,
+// and are bounded by field at 16,000 code points without clipping.
+func TestTemplateOrchestratorInstructionsRoundTripAndBound(t *testing.T) {
+	service, _ := newTemplateStore(t)
+	roles := map[string]bool{"implementer": true, "reviewer": true}
+	template := validTemplate()
+	template.OrchestratorInstructions = "  Name branches by stage.\nGroup agents by stage.  "
+	if _, err := service.Create("guided", template); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := service.Read("guided"); err != nil || got.Template.OrchestratorInstructions != template.OrchestratorInstructions {
+		t.Fatalf("Read = %+v err %v", got.Template.OrchestratorInstructions, err)
+	}
+	template.OrchestratorInstructions = strings.Repeat("é", MaxInstructionRunes)
+	if d := ValidateTemplate("guided", template, roles); len(d) != 0 {
+		t.Fatalf("at limit = %+v", d)
+	}
+	template.OrchestratorInstructions += "é"
+	d := ValidateTemplate("guided", template, roles)
+	if len(d) != 1 || d[0].Field != "orchestrator_instructions" || d[0].Code != "too_long" {
+		t.Fatalf("over limit = %+v", d)
+	}
+	for _, empty := range []string{"", " \n\t"} {
+		template.OrchestratorInstructions = empty
+		if d := ValidateTemplate("guided", template, roles); len(d) != 0 {
+			t.Fatalf("%q = %+v", empty, d)
 		}
 	}
 }
