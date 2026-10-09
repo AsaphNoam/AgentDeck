@@ -243,7 +243,7 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   behavior remain under FS-05.R40. Web links and tables follow FS-03.R78–R79; no new phone file
   access, annotation or custom touch-menu behavior is introduced.
 
-- **R43 (planned) — The companion adopts the Figma mobile composition.** The `/mobile`
+- **R43 — The companion adopts the Figma mobile composition.** The `/mobile`
   study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`) governs the phone's
   visual overhaul: a quiet Chuck companion header with a Home/This phone navigation menu,
   a connected-workspace introduction, separated attention cards, compact project and agent rows,
@@ -365,7 +365,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   and FS-03.A59–A61's focused browser journey. This supersedes only A12's Commands-list check;
   its file-access and route-restriction checks remain owed.
 
-- **A15 (planned)** (R43) — Compare Home, project, populated permission conversation,
+- **A15** (R43) — Compare Home, project, populated permission conversation,
   Files/Manage, pipeline progress/recovery, This phone, pairing and setup sheets against the
   Figma `/mobile` reference at 390px, with 360px/430px long-content and offline checks.
   Core, Sky & Grove and Studio retain the common geometry and distinct existing palettes;

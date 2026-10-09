@@ -20,7 +20,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub remains `AsaphNoam/AgentDeck`. Installer/updater defaults still point
   to `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repo.
-- **Active change:** Figma mobile companion overhaul (FS-20.R43/A15, TS-08.R111).
+- **Active change:** None.
+- **Waiting for review — mobile companion overhaul:** Figma Make `/mobile` composition across
+  Home/project, Chat/Files/Manage, pipeline history, pairing, This phone and setup/confirmation
+  sheets (FS-20.R43/A15, TS-08.R111). Core, Sky & Grove and Studio follow the desktop's durable
+  preference through the existing semantic palette seam. Source commits `50e0d97` and `ad9d94b`
+  plus this closure's generated embed/spec updates form one review unit. All 724 UI tests,
+  41 presentation/style checks, TypeScript, specification checks, both Go test variants, `go vet`
+  and `make dist` passed. Source-build Go tests require `CHUCK_RUNTIME_ROOT=` here because Chuck
+  supplies the packaged runtime to its child processes; the initial ambient-runtime credential
+  probe failure passed with that intended source-build environment.
+  Actual paired-phone and independent rendered comparison passed all three palettes, 360px long
+  content, 390px composition and 430px settings; desktop matrix passed at 1024/1280 in all themes.
+  Genuine fake-provider pending permission, opaque viewport setup/Stop sheets, and an unchanged
+  draft across phone-listener disconnect/reconnect passed without page errors. Reference sources,
+  prototype renders, matrix and actual phone receipts are in shared project resources
+  `mobile-design/` (`runs/final` for width/palette captures, `runs/verified-final` for corrected
+  interaction receipts; earlier permission/offline/full-page sheet captures are superseded).
+  Existing real-tailnet, Android/iPhone and credentialed-provider acceptance gates remain owed.
 - **Waiting for review:** Think Tank room page no longer shows the per-message "tools and changes"
   disclosure between published contributions (FS-21.R39/A19, TS-14.R15, TS-08.R104, FS-03.R77);
   live and unfinished-turn activity still renders. Done without a design stage at the user's
@@ -33,28 +50,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-**In progress — Figma mobile companion overhaul.** User requested `/work` implementing the
-`/mobile` design in Figma Make `OykxmXqZnnyA67QA1lv3AU`, keeping all Chuck theme palettes.
-Clean `main` at startup. Specification delta: FS-20.R43/A15 and TS-08.R111 (planned).
-Slices: (1) phone shell/Home/project and shared theme application; (2) conversation/Files/Manage,
-pipeline, phone settings/pairing and sheets; (3) focused behavior/style checks, reference comparison,
-three-appearance rendered mobile and desktop matrix, closure/embed and review handoff.
-Source slices are implemented: shell/Home/project and theme bridge; chat, Files/Manage,
-pipeline history, phone/pairing and Radix sheets. Focused remote tests (53), TypeScript,
-stylelint/presentation contract and UI build passed; `make check-specs` passed.
-Rendered correction slice: fixed tab wrapping and stretched Send, aligned the conversation
-identity/permission order with the reference, collapsed phone-name editing, finished notification
-and connection panels, and added pipeline Stop/Replace sheets. Focused 53 tests, TypeScript and
-presentation contract pass. Exact Make prototype six-screen reference is rendered at 390×844.
-Desktop development matrix passed at 1024/1280 across all three palettes without phone CSS leakage.
-`make dist` is running to refresh the final embedded UI; real paired-phone final pass follows.
-Current slice: compare exact Make prototype screenshots with real paired phone, repair material
-layout issues, then run the full closure matrix once. Shared reference sources/screenshots live in
-`/Users/mcnoam/.chuck/project-resources/agentdeck-20261007t221535z/mobile-design/`.
-Direction: experienced operator away from the Mac, attention first then configured projects;
-quiet header, restrained typography, separated attention and compact rows; real agent permission
-and pipeline stage state lead. Preserve remote security, all existing controls/refusals/drafts,
-eight-character pairing and native iPhone install requirements. No decorative motion.
+None. The Figma mobile companion overhaul is complete and available for review above.
 
 ## Acceptance gates still owed
 

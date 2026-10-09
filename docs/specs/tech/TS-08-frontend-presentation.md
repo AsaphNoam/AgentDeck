@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -1231,7 +1231,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   matrix, style/presentation checks and `make embed` after final implementation edits; never edit
   generated dist. No credentialed provider smoke is added for this presentation-only change.
 
-- **R111 (planned) — Mobile composition shares Chuck's appearance seam.** FS-20.R43's
+- **R111 — Mobile composition shares Chuck's appearance seam.** FS-20.R43's
   phone layout lives in `styles/features/phone.css` and feature-owned `remote/` composition.
   `remote.css` statically imports the existing finite skin styles after shared construction;
   the paired phone applies the same `applyAppearance` allowlist to its read-only `/api/config`
