@@ -283,3 +283,78 @@ The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
   archived the settled pre-release handoff and retained manual gates above. Main/tag pushed;
   macOS assembly/install proofs passed, but GitHub release creation/rerun returns HTTP 500.
   Release notes are preserved for publication recovery; the release is not published yet.
+
+## Settled closures moved from the live handoff — 2026-10-09
+
+- **Review closed — Settings composition (FS-12.R62/A34, TS-08.R113):** every Settings tab
+  adopts the Figma Make `Settings` study: 180px left section list with soft done-tinted selection,
+  mono eyebrow + section title (Theme, Configured backends, Dependent work) via the new
+  `SettingsHeader`, softly raised role/project/phone rows with text actions (destructive in error
+  color; roles without an override read "Inherit global"), one raised card per backend with ruled
+  mono-labelled groups and ruled model rows, ruled Notifications/Tasks lists, and three equal theme
+  cards whose `preview-sky` band holds the action bar and signal over three surfaces (skin rules
+  unchanged, no contract change). Primary actions use `--ad-action-primary` with a pressed edge.
+  Excluded: study sample data, prototype notes, Appearance default tab, concept theme, invented
+  backend fields; sub-1024px layout (below the desktop floor). Remote's `window.confirm` revoke is
+  pre-existing and untouched. 730 UI tests, presentation/style checks, UI build, `make test`
+  (`CHUCK_RUNTIME_ROOT=`), `make build` and `make embed` passed. Real-browser captures of all seven
+  tabs in Core, Sky & Grove and Studio at 1024/1280 (fake-backend fixture: roles with/without
+  override, active/archived long-name project, four backends) show no overflow or page errors.
+  Harness and captures: shared project resources `settings-design/` (`harness/`, `runs/final`);
+  Make source in `settings-design/App.tsx`. Independent review of `22dd186` found no confirmed
+  defects. Source/spec review passed all 730 UI tests and 41 presentation/style checks. The
+  invariant sweep found no violations: applicable classes §3, §8, §10, §13 and §17 passed;
+  §1–2, §4–7, §9, §11–12 and §14–16 have no applicable changed surface. No unresolved local
+  choices or open fixes remain; no fix-model recommendation is needed.
+  Independent approved Chromium execution used the working UI, the built real binary, a fresh
+  review-owned home and fake backend on loopback only. All seven tabs in all three appearances
+  at 1024/1280 passed (42 static captures), plus hover, keyboard focus, invalid Tasks/disabled
+  Save, expanded model environment, linked configuration-source effective view, long paired-phone
+  row, rename/disabled Save, pairing code and pending pairing (42 state captures). All captures
+  have zero page errors and horizontal overflow; screenshots were inspected against the study's
+  hierarchy and spacing. Display-safe browser fixtures supplied linked-source and phone states;
+  this closes presentation coverage, not live-provider or real-tailnet/device gates.
+  Evidence and reusable harness: `/private/tmp/settings-independent/` (`static/report.json`,
+  `states/report.json`, screenshots and `harness/`). Review-owned processes shut down; unrelated
+  concurrent dirty-tree work was preserved. This closes the unit without a new review obligation.
+- **Review fixes closed:** mobile companion unit `50e0d97^..d3e737f` and Think Tank disclosure
+  unit `7b76bc4` are closed. Resume refusals stay visible on Files (INV §8); dismissed sheets and
+  confirmations restore opener focus (INV §10); bounded activity rows carry durable publication
+  state so clipped contributions cannot reappear as unfinished (INV §8/§10/§11/§16/§17).
+  Both Go variants, 727 UI tests, 41 presentation checks and UI/Go builds passed in
+  `/private/tmp/chuck-fix-closure`, excluding pre-existing chat presentation edits. Mobile browser
+  Cancel/Close/Escape focus and Files refusal checks passed across all three palettes; receipt:
+  `/private/tmp/mobile-fix-browser-final.log`. The Think Tank regression fails against the old
+  renderer and passes with the fix. Source-build Go checks need `CHUCK_RUNTIME_ROOT=`; the first
+  native-login probe timed out, then focused and full retries passed. Existing real-device and
+  credentialed-provider gates remain owed. These fixes create no new review unit.
+- **Review closed — desktop agent page:** active and archived agent pages adopt the Figma Make
+  `AgentConversation` composition (FS-12.R61/A33, TS-08.R112): breadcrumb with agent id, raised
+  card, monogram/state/role header with labelled context meter, low runtime band with local
+  Discard and a switch-style fast toggle, quiet tabs, ~700px reading column with tinted bubbles,
+  ruled activity, structured permission card (Deny before Approve, shared with the dashboard pane),
+  and an inset composer with `@`/`#` insert buttons and a labelled Send (supersedes FS-02.R67 on
+  this page only). Workspace styles are scoped to `.chat-panel`; the dashboard pane and phone keep
+  their compositions. Sky & Grove's user-tint selector now targets the bubble, not its row.
+  Study data, per-message times, date dividers, Files count and decorative hints were excluded.
+  730 UI tests, presentation checks, UI build, both Go variants (`CHUCK_RUNTIME_ROOT=`) and
+  `make embed` passed; the server package needed one rerun. Real-browser comparison against the
+  rendered study passed in Core, Sky & Grove and Studio at 1024/1280 with fake-backend agents
+  (permission, activity, long name, staged runtime + Discard, `@` picker, live turn, archive,
+  header Copy thread identity). Reference source, renders, harness and receipts: shared project
+  resources `agent-design/` (`runs/final`).
+  Static review of `ea8dfc8` found no confirmed defects; presentation/style checks and all 730 UI
+  tests passed again. Independent rendered review now also passed through bounded approved
+  execution in an approval-capable agent: fresh isolated fake-backend fixture, Core, Sky & Grove
+  and Studio at 1024/1280, 24 static captures without horizontal overflow or page errors, plus
+  activity, permission, runtime staging/Discard, `@`/`#` pickers, live turn, archive and Copy thread
+  identity checks. Fresh screenshots were inspected by the reviewer and sampled by the parent.
+  Evidence: shared project resources `agent-design/runs/independent-20261009/` (`report.json`,
+  three `*-states.json` receipts and screenshots). The native review child's sandbox cannot
+  request escalation; workflow §7/§14.4 now routes that browser work to an approval-capable
+  independent agent. No product code or permission defaults changed. This closes the review unit
+  and its access block; existing credentialed-provider and real-device gates remain owed.
+  The review used `/private/tmp/chuck-agent-page-review` built from `c189d95`, the working UI via
+  Vite, and fresh review-owned `CHUCK_HOME` fixtures. Both review-owned harness sessions shut down;
+  existing processes were preserved. Fresh captures were compared with `agent-design/ref/` study
+  renders.
