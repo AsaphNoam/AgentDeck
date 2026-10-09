@@ -14,6 +14,10 @@ export function SendIcon() {
   return <Icon><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" /></Icon>;
 }
 
+export function BackIcon() {
+  return <Icon><path d="M13 8H3m4-4L3 8l4 4" /></Icon>;
+}
+
 export function StopIcon() {
   return <Icon><rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor" stroke="none" /></Icon>;
 }

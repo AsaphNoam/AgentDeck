@@ -400,6 +400,31 @@ Requirements are user-observable.
   intact. Quiet table row boundaries and comfortable column spacing remain subordinate to message
   text; wide-table overflow stays local. No new appearance, preference or motion.
 
+- **R61 — The full agent page adopts the Figma agent-conversation composition.** The
+  `AgentConversation` study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`) governs
+  the desktop active and archived agent pages: a quiet breadcrumb row above the panel (Back,
+  project / agent, and the stable agent id at the right); one softly raised, rounded panel; an
+  identity header with a monogram tile carrying a state dot, the agent name with its existing
+  live-state label (or Stopped / Archived · read-only), a role · project · speed line, and a
+  labelled context meter at the right; a separate low runtime band; quiet underline tabs; a
+  centred reading column of roughly 700px with right-aligned tinted user bubbles, softly tinted
+  assistant bubbles, a ruled quiet activity column, dark technical blocks and a structured
+  permission card whose primary Approve sits after Deny; and an inset, softly raised composer box
+  whose toolbar carries `@` (file) and `#` (command) insert buttons at the left and the existing
+  actions at the right, where Send shows its text beside the arrow (superseding FS-02.R67's
+  icon-only Send on this page only; Cancel stays an icon and the dashboard pane is unchanged). The runtime band keeps FS-03.R47's two honest
+  groups: backend/model stage a change that reveals "Unapplied changes", **Switch** and a local
+  **Discard** that returns the picker to the current runtime without a request; effort and fast
+  mode (a switch control) apply immediately, with "Effort and speed apply to the next turn" as the
+  idle hint. This supersedes FS-03.R62's shared left reading band only; Back stays first and the
+  header right-click Copy thread identity is unchanged. The insert buttons type the existing
+  trigger at the caret and open the existing picker; they add no new suggestion source. All
+  three appearances share the composition through their semantic palettes. The study's sample
+  data, preview notes, decorative hints, per-message times, date dividers, Files count and
+  turn-boundary captions are excluded; real transcript order, held follow-ups (still in the
+  transcript), annotations, file viewer, Think Tank and Terminal tabs, and archive Resume/Restore
+  behave as before. The dashboard chat pane and the phone keep their own compositions.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -610,6 +635,15 @@ Requirements are user-observable.
   readable link menus and remaining tab reachability in all three desktop appearances at desktop,
   expanded-pane and archive surfaces. The phone check is Core only under FS-20.R16 and TS-08.R73.
   *Verify:* presentation/style audit and focused browser journey.
+
+- **A33** (R61) — Compare the rendered study with real fake-backend agents at 1024px and 1280px in
+  Core, Sky & Grove and Studio: a completed turn with activity, a pending permission, a long agent
+  name, a staged runtime change, a live turn and an archived session. Breadcrumb, header, runtime
+  band, tabs, reading column, bubbles, permission card and composer match the study's hierarchy and
+  spacing without horizontal overflow; Discard restores the current runtime without a request;
+  `@`/`#` open the existing picker; Copy thread identity, file viewer, annotations, held
+  follow-up, Steer/Cancel and Resume still work. The dashboard chat pane and phone are unchanged.
+  *Verify:* focused component tests plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions
 

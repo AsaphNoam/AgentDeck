@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as Tabs from "@radix-ui/react-tabs";
 import { getHeldPrompt, setSessionConfig, switchRuntime } from "../../api/client";
@@ -11,6 +11,9 @@ import { useHeldStore } from "../../store/heldStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useUiStore } from "../../store/uiStore";
 import { ContextBar } from "../grid/ContextBar";
+import { StateBadge } from "../grid/StateBadge";
+import { Badge, VisuallyHidden } from "../ui";
+import { BackIcon } from "../ui/icons";
 import { PointerContextMenu, type PointerMenuState } from "../ui/PointerContextMenu";
 import { Composer } from "./Composer";
 import { TranscriptView } from "./TranscriptView";
@@ -216,12 +219,17 @@ export function ChatPanel() {
     }
   };
 
+  const projectTitle = (agent.project && projects?.[agent.project]?.title) || agent.project;
+  const sessionSettings = (selectedModel?.efforts ?? []).length > 0 || !!currentModel?.fast;
+
   return (
     // data-file-open relaxes the panel's bounded content width in CSS while a file
     // is open. .chat-panel's max-width is set outside the transcript container, so
     // a container query cannot reach it; this is a state attribute of the kind the
     // annotation tray already carries, not a measurement (FS-03.R53, TS-08.R57).
     <section className="chat-panel" data-ui="agent-workspace" data-state="active" data-file-open={openFile ? "true" : undefined} data-variant={agent.interface === "terminal" ? "terminal" : "chat"}>
+      <AgentBreadcrumb backTarget={backTarget} backLabel={projectActive ? "Back to project" : "Back"} project={projectTitle} name={agent.name} agentId={agent.agent_id} />
+      <div className="chat-card">
       <header
         className="chat-header"
         data-slot="header"
@@ -237,67 +245,76 @@ export function ChatPanel() {
           });
         }}
       >
-        <Link to={backTarget}>Back</Link>
-        <div data-slot="identity">
-          <h1>{agent.name}</h1>
-          {editableRuntime ? (
-            <div className="chat-runtime-picker">
-              <fieldset className="chat-runtime-staged">
-                <legend>Runtime</legend>
-              <div className="form-field">
-                <label htmlFor="chat-runtime-backend">Backend</label>
-                <select id="chat-runtime-backend" value={runtime.backend} disabled={!backends || switching} onChange={(event) => setRuntime(resetRuntimeForBackend(backends, event.target.value))}>
-                  {!backends?.backends[runtime.backend] && runtime.backend && <option value={runtime.backend}>{runtime.backend}</option>}
-                  {displayLabels(Object.entries(backends?.backends ?? {}).map(([id, backend]) => [id, backend.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                </select>
-              </div>
-              <div className="form-field">
-                <label htmlFor="chat-runtime-model">Model</label>
-                <select id="chat-runtime-model" value={runtime.model} disabled={!selectedBackend || switching} onChange={(event) => setRuntime(resetRuntimeForModel(backends, runtime.backend, event.target.value))}>
-                  {!selectedModel && runtime.model && <option value={runtime.model}>{runtime.model}</option>}
-                  {displayLabels(Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => [id, model.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-                </select>
-              </div>
-              {runtimeChanged && <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>}
-              </fieldset>
-              {((selectedModel?.efforts ?? []).length > 0 || currentModel?.fast) && (
-                <fieldset className="chat-session-settings">
-                  <legend>Session settings</legend>
-                  {(selectedModel?.efforts ?? []).length > 0 && (
-                    <div className="form-field">
-                      <label htmlFor="chat-runtime-effort">Effort</label>
-                      <select id="chat-runtime-effort" value={runtime.effort} disabled={switching || !!applyingSetting} onChange={(event) => stagedRuntime ? setRuntime((current) => ({ ...current, effort: event.target.value })) : void applySetting({ effort: event.target.value }, "effort")}>
-                        {selectedModel!.efforts!.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {currentModel?.fast && (
-                    // The catalog says this model can go fast, but only the live
-                    // session knows whether it really offers the speed tier — a
-                    // launch that asked for it and did not get it is a case the
-                    // feature deliberately allows (FS-09.R55). Showing an ordinary
-                    // enabled off toggle there would let the person flip a control
-                    // that silently springs back, so the unavailable case names its
-                    // reason and disables the control instead (FS-03.R46, INV §8).
-                    <label className="form-field">
-                      <span>Speed</span>
-                      {agent.fast_available ? (
-                        <span><input type="checkbox" checked={liveFast} disabled={switching || !!applyingSetting || stagedRuntime} onChange={(event) => void applySetting({ fast: event.target.checked }, "fast")} /> {applyingSetting === "fast" ? "Applying…" : "Fast mode — higher provider usage"}</span>
-                      ) : (
-                        <span><input type="checkbox" checked={false} disabled /> Fast mode — this model does not offer it</span>
-                      )}
-                    </label>
-                  )}
-                </fieldset>
-              )}
-              {switchError && <p className="form-error" role="alert">{switchError}</p>}
-            </div>
-          ) : (
-            <><span>{[agent.backend, agent.model, agent.effort].filter(Boolean).join(" · ")}</span><span>{agent.fast ? "Fast mode" : "Normal speed"}</span></>
-          )}
-        </div>
-        <div data-slot="context"><ContextBar value={agent.context_pct} used={agent.context_used} size={agent.context_size} /></div>
+        <AgentIdentity
+          name={agent.name}
+          state={agent.running ? agent.state : "stopped"}
+          status={agent.running ? <StateBadge state={agent.state} /> : <Badge>Stopped</Badge>}
+          details={[agent.role, projectTitle, ...(editableRuntime ? [] : [agent.backend, agent.model, agent.effort]), agent.fast ? "Fast mode" : "Normal speed"]}
+        />
+        <div data-slot="context"><ContextBar detailed value={agent.context_pct} used={agent.context_used} size={agent.context_size} /></div>
       </header>
+      {editableRuntime && (
+        // Two honest groups (FS-03.R47): backend/model stage a change behind
+        // Switch, effort and speed apply on selection (FS-12.R61).
+        <div className="chat-runtime-picker">
+          <fieldset className="chat-runtime-staged">
+            <legend>Runtime</legend>
+            <div className="form-field">
+              <label htmlFor="chat-runtime-backend">Backend</label>
+              <select id="chat-runtime-backend" value={runtime.backend} disabled={!backends || switching} onChange={(event) => setRuntime(resetRuntimeForBackend(backends, event.target.value))}>
+                {!backends?.backends[runtime.backend] && runtime.backend && <option value={runtime.backend}>{runtime.backend}</option>}
+                {displayLabels(Object.entries(backends?.backends ?? {}).map(([id, backend]) => [id, backend.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </div>
+            <div className="form-field">
+              <label htmlFor="chat-runtime-model">Model</label>
+              <select id="chat-runtime-model" value={runtime.model} disabled={!selectedBackend || switching} onChange={(event) => setRuntime(resetRuntimeForModel(backends, runtime.backend, event.target.value))}>
+                {!selectedModel && runtime.model && <option value={runtime.model}>{runtime.model}</option>}
+                {displayLabels(Object.entries(selectedBackend?.models ?? {}).map(([id, model]) => [id, model.name])).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </select>
+            </div>
+          </fieldset>
+          {sessionSettings && (
+            <fieldset className="chat-session-settings">
+              <legend><VisuallyHidden>Session settings</VisuallyHidden></legend>
+              {(selectedModel?.efforts ?? []).length > 0 && (
+                <div className="form-field">
+                  <label htmlFor="chat-runtime-effort">Effort</label>
+                  <select id="chat-runtime-effort" value={runtime.effort} disabled={switching || !!applyingSetting} onChange={(event) => stagedRuntime ? setRuntime((current) => ({ ...current, effort: event.target.value })) : void applySetting({ effort: event.target.value }, "effort")}>
+                    {selectedModel!.efforts!.map((effort) => <option key={effort} value={effort}>{effort}</option>)}
+                  </select>
+                </div>
+              )}
+              {currentModel?.fast && (
+                // The catalog says this model can go fast, but only the live
+                // session knows whether it really offers the speed tier — a
+                // launch that asked for it and did not get it is a case the
+                // feature deliberately allows (FS-09.R55). Showing an ordinary
+                // enabled off toggle there would let the person flip a control
+                // that silently springs back, so the unavailable case names its
+                // reason and disables the control instead (FS-03.R46, INV §8).
+                <label className="chat-fast-toggle">
+                  {agent.fast_available ? (
+                    <><input type="checkbox" checked={liveFast} disabled={switching || !!applyingSetting || stagedRuntime} onChange={(event) => void applySetting({ fast: event.target.checked }, "fast")} /> {applyingSetting === "fast" ? "Applying…" : "Fast mode — higher provider usage"}</>
+                  ) : (
+                    <><input type="checkbox" checked={false} disabled /> Fast mode — this model does not offer it</>
+                  )}
+                </label>
+              )}
+            </fieldset>
+          )}
+          {runtimeChanged ? (
+            <div className="chat-runtime-pending">
+              <span>Unapplied changes</span>
+              <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>
+              <button className="chat-runtime-discard" type="button" disabled={switching} onClick={() => setRuntime(currentRuntime)}>Discard</button>
+            </div>
+          ) : sessionSettings && (
+            <span className="chat-runtime-hint">Effort and speed apply to the next turn</span>
+          )}
+          {switchError && <p className="form-error" role="alert">{switchError}</p>}
+        </div>
+      )}
       <RoomCue agentId={id} />
       <PointerContextMenu menu={headerMenu} onClose={() => setHeaderMenu(null)} />
       <Tabs.Root value={tab} onValueChange={setTab} className="chat-tabs" data-slot="tabs">
@@ -336,6 +353,48 @@ export function ChatPanel() {
           />
         </div>
       )}
+      </div>
     </section>
+  );
+}
+
+// The quiet row above the agent card: Back first, where the agent lives, and its
+// stable id (FS-12.R61). The archived page shares it.
+export function AgentBreadcrumb({ backTarget, backLabel, project, name, agentId }: { backTarget: string; backLabel: string; project?: string; name: string; agentId: string }) {
+  return (
+    <nav className="chat-breadcrumb" aria-label="Agent location">
+      <Link to={backTarget}><BackIcon />{backLabel}</Link>
+      <span className="chat-breadcrumb-path">
+        {project && <>{project}<span className="chat-breadcrumb-slash" aria-hidden="true">/</span></>}
+        {name}
+      </span>
+      <code className="chat-breadcrumb-id">{agentId}</code>
+    </nav>
+  );
+}
+
+// Monogram tile, name with its state label, and a "role · project · …" line.
+export function AgentIdentity({ name, state, status, details }: { name: string; state: string; status: ReactNode; details: Array<string | false | undefined> }) {
+  const parts = details.filter((part): part is string => !!part);
+  return (
+    <div data-slot="identity">
+      <span className={`agent-monogram ${state}`} aria-hidden="true">
+        {(name.match(/[\p{L}\p{N}]/u)?.[0] ?? "·").toUpperCase()}
+        <span className="agent-monogram-dot" />
+      </span>
+      <div className="agent-heading">
+        <div className="agent-heading-line">
+          <h1>{name}</h1>
+          {status}
+        </div>
+        {parts.length > 0 && (
+          <p className="agent-heading-details">
+            {parts.map((part, index) => (
+              <span key={index}>{index > 0 && <span className="agent-heading-sep"> · </span>}{part}</span>
+            ))}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

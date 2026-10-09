@@ -36,6 +36,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   renderer and passes with the fix. Source-build Go checks need `CHUCK_RUNTIME_ROOT=`; the first
   native-login probe timed out, then focused and full retries passed. Existing real-device and
   credentialed-provider gates remain owed. These fixes create no new review unit.
+- **Waiting for review — desktop agent page:** active and archived agent pages adopt the Figma Make
+  `AgentConversation` composition (FS-12.R61/A33, TS-08.R112): breadcrumb with agent id, raised
+  card, monogram/state/role header with labelled context meter, low runtime band with local
+  Discard and a switch-style fast toggle, quiet tabs, ~700px reading column with tinted bubbles,
+  ruled activity, structured permission card (Deny before Approve, shared with the dashboard pane),
+  and an inset composer with `@`/`#` insert buttons and a labelled Send (supersedes FS-02.R67 on
+  this page only). Workspace styles are scoped to `.chat-panel`; the dashboard pane and phone keep
+  their compositions. Sky & Grove's user-tint selector now targets the bubble, not its row.
+  Study data, per-message times, date dividers, Files count and decorative hints were excluded.
+  730 UI tests, presentation checks, UI build, both Go variants (`CHUCK_RUNTIME_ROOT=`) and
+  `make embed` passed; the server package needed one rerun. Real-browser comparison against the
+  rendered study passed in Core, Sky & Grove and Studio at 1024/1280 with fake-backend agents
+  (permission, activity, long name, staged runtime + Discard, `@` picker, live turn, archive,
+  header Copy thread identity). Reference source, renders, harness and receipts: shared project
+  resources `agent-design/` (`runs/final`).
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -123,6 +138,9 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-09 — Implementation:** Desktop agent page matches the Figma Make agent-conversation
+  study across all three appearances; waiting for review.
 
 - **2026-10-09 — Feature design:** Captured quota-limit indication and optional scheduled
   continuation; checked existing notice, prompt-error and same-task wait behavior. Proposed

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getTranscript, restoreAgent, resumeAgent } from "../../api/client";
+import { useProjects } from "../../api/config";
+import { AgentBreadcrumb, AgentIdentity } from "../../components/chat/ChatPanel";
 import { useTranscriptStore } from "../../store/transcriptStore";
 import { useAgentStore } from "../../store/agentStore";
 import { TranscriptView } from "../../components/chat/TranscriptView";
@@ -33,6 +35,8 @@ export function ArchiveAgentPage() {
   const effort = textField(metadata?.effort);
   const fast = metadata?.fast === true;
   const createdAt = textField(metadata?.created_at);
+  const { data: projects } = useProjects();
+  const projectTitle = (project && projects?.[project]?.title) || project;
 
   useEffect(() => {
     void getTranscript(id, true).then((r) => setTranscript(r.agent_id, r.events)).catch(() => settle(id));
@@ -64,15 +68,19 @@ export function ArchiveAgentPage() {
 
   return (
     <section className="chat-panel" data-ui="agent-workspace" data-state="archived" data-file-open={openFile ? "true" : undefined} data-variant="chat">
+      <AgentBreadcrumb backTarget="/archive" backLabel="Back to Archive" project={projectTitle} name={archivedName} agentId={id} />
+      <div className="chat-card">
       <header className="chat-header" data-slot="header">
-        <Link to="/archive">Back to Archive</Link>
-        <div data-slot="identity">
-          <h1>{archivedName}</h1>
-          {(project || backend || model || effort) && <span>{[project, [backend, model, effort, fast ? "Fast mode" : "Normal speed"].filter(Boolean).join(" · ")].filter(Boolean).join(" · ")}</span>}
-          <span className="archive-readonly-label">
-            Archived · read-only{createdAt && <> · <time dateTime={createdAt}>{formatTimestamp(createdAt)}</time></>}
-          </span>
-        </div>
+        <AgentIdentity
+          name={archivedName}
+          state="archived"
+          status={(
+            <span className="archive-readonly-label">
+              Archived · read-only{createdAt && <> · <time dateTime={createdAt}>{formatTimestamp(createdAt)}</time></>}
+            </span>
+          )}
+          details={[projectTitle, backend, model, effort, (backend || model) && (fast ? "Fast mode" : "Normal speed")]}
+        />
         <button
           type="button"
           className="resume-btn"
@@ -86,6 +94,7 @@ export function ArchiveAgentPage() {
       <div data-slot="content"><TranscriptView agentId={id} events={events} sourceActive={false} annotationsEnabled={agent?.interface !== "terminal"} openFile={openFile} onOpenFile={openFileInViewer} /></div>
       {/* No Composer — read-only view */}
       <div />
+      </div>
     </section>
   );
 }

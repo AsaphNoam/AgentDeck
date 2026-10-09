@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
@@ -59,8 +59,8 @@ describe("ArchiveAgentPage switched session identity", () => {
 
     renderArchive("a_switched");
 
-    expect(await screen.findByText("chuck · claude · sonnet · Normal speed")).toBeInTheDocument();
-    expect(screen.queryByText("chuck · codex · gpt-5.6-sol")).not.toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector(".agent-heading-details")).toHaveTextContent(/^chuck · claude · sonnet · Normal speed$/));
+    expect(document.querySelector(".agent-heading-details")).not.toHaveTextContent("codex");
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
   });
@@ -73,7 +73,8 @@ describe("ArchiveAgentPage", () => {
     expect(await screen.findByText("Sure, I'll do that.")).toBeInTheDocument();
     expect(document.querySelectorAll("article.assistant-message")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "Atlas" })).toBeInTheDocument();
-    expect(screen.getByText("chuck · codex · gpt-5.6-sol · Normal speed")).toBeInTheDocument();
+    expect(document.querySelector(".agent-heading-details")).toHaveTextContent(/^chuck · codex · gpt-5\.6-sol · Normal speed$/);
+    expect(screen.getByRole("link", { name: "Back to Archive" })).toHaveAttribute("href", "/archive");
     expect(screen.getByText(/Archived · read-only/)).toBeInTheDocument();
     expect(document.querySelector("time")?.getAttribute("datetime")).toBe("2026-07-24T12:30:00Z");
   });

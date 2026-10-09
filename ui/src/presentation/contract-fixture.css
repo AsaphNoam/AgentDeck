@@ -11,7 +11,7 @@
     gap: var(--ad-space-4);
   }
 
-  .visual-matrix-section > .chat-header {
+  .visual-matrix-section > .chat-card {
     width: 100%;
   }
 

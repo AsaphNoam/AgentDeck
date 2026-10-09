@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Button, IconButton, PageHeader, ProjectColorPicker, Surface } from "../components/ui";
+import { Badge, Button, IconButton, PageHeader, ProjectColorPicker, Surface, VisuallyHidden } from "../components/ui";
+import { AgentIdentity } from "../components/chat/ChatPanel";
 import { CollapseIcon } from "../components/ui/icons";
 import { ContextBar } from "../components/grid/ContextBar";
 import { StateBadge } from "../components/grid/StateBadge";
@@ -111,27 +112,30 @@ export function VisualMatrix() {
 
       <section className="visual-matrix-section">
         <h2>Chat session configuration</h2>
-        <header className="chat-header" data-slot="header">
-          <Link to="/">Back</Link>
-          <div data-slot="identity">
-            <h1>Nova orchestration reviewer</h1>
-            <div className="chat-runtime-picker">
-              <fieldset className="chat-runtime-staged">
-                <legend>Runtime</legend>
-                <label className="form-field"><span>Backend</span><select defaultValue="codex"><option value="codex">Codex (codex)</option></select></label>
-                <label className="form-field"><span>Model</span><select defaultValue="gpt-5"><option value="gpt-5">GPT-5 (gpt-5)</option></select></label>
-                <button className="chat-runtime-switch" type="button">Switch</button>
-              </fieldset>
-              <fieldset className="chat-session-settings">
-                <legend>Session settings</legend>
-                <label className="form-field"><span>Effort</span><select defaultValue="high"><option value="low">low</option><option value="high">high</option></select></label>
-                <label className="form-field"><span>Speed</span><span><input type="checkbox" defaultChecked /> Fast mode — higher provider usage</span></label>
-              </fieldset>
-              <p className="form-error" role="alert">Runtime switch failed; current settings were restored.</p>
+        <div className="chat-card">
+          <header className="chat-header" data-slot="header">
+            <AgentIdentity name="Nova orchestration reviewer" state="busy" status={<StateBadge state="busy" />} details={["reviewer", "Chuck", "Fast mode"]} />
+            <div data-slot="context"><ContextBar detailed value={0.34} used={68000} size={200000} /></div>
+          </header>
+          <div className="chat-runtime-picker">
+            <fieldset className="chat-runtime-staged">
+              <legend>Runtime</legend>
+              <div className="form-field"><label htmlFor="matrix-backend">Backend</label><select id="matrix-backend" defaultValue="codex"><option value="codex">Codex (codex)</option></select></div>
+              <div className="form-field"><label htmlFor="matrix-model">Model</label><select id="matrix-model" defaultValue="gpt-5"><option value="gpt-5">GPT-5 (gpt-5)</option></select></div>
+            </fieldset>
+            <fieldset className="chat-session-settings">
+              <legend><VisuallyHidden>Session settings</VisuallyHidden></legend>
+              <div className="form-field"><label htmlFor="matrix-effort">Effort</label><select id="matrix-effort" defaultValue="high"><option value="low">low</option><option value="high">high</option></select></div>
+              <label className="chat-fast-toggle"><input type="checkbox" defaultChecked /> Fast mode — higher provider usage</label>
+            </fieldset>
+            <div className="chat-runtime-pending">
+              <span>Unapplied changes</span>
+              <button className="chat-runtime-switch" type="button">Switch</button>
+              <button className="chat-runtime-discard" type="button">Discard</button>
             </div>
+            <p className="form-error" role="alert">Runtime switch failed; current settings were restored.</p>
           </div>
-          <div data-slot="context"><ContextBar value={0.34} /></div>
-        </header>
+        </div>
       </section>
 
       <section className="visual-matrix-section" data-ui="dashboard">

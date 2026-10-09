@@ -1244,6 +1244,19 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   geometry through focused tests, the development matrix and actual remote-entry browser review.
   This supersedes the Core-only phone verification clauses in R110 and FS-12.R60/A32.
 
+- **R112 — The agent-page composition is scoped to the full workspace.** FS-12.R61
+  lives in `styles/features/agent.css` under the workspace's `.chat-panel` root, so the shared
+  transcript renderers keep their dashboard-pane and phone presentation. `ChatPanel` and
+  `ArchiveAgentPage` render the breadcrumb and a bordered card inside the existing workspace root;
+  the header keeps `data-slot="header"`/`identity`/`context`, and new parts use implementation
+  classes rather than new public hooks. The status label reuses `StateBadge`; the context meter
+  is `ContextBar`'s `detailed` layout with the same accessible label. `Composer` gains a toolbar
+  that is `display: contents` outside the workspace, so the dashboard composer's geometry is
+  unchanged. Colors map onto semantic tokens (forest to `--ad-state-done`, coral to
+  `--ad-action-primary`, blue tints to `--ad-action-secondary`, attention to
+  `--ad-state-waiting`); no token, skin rule, motion or dependency is added. Verify with focused
+  tests, the presentation checks, the development matrix and the A33 browser comparison.
+
 ## 3. Interfaces & data shapes
 
 ### 3.1 Cascade and file contract

@@ -335,13 +335,36 @@ describe("Composer queued follow-up and steering", () => {
     // Send stays present on a busy agent; Cancel is still offered beside it.
     expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    // FS-02.A49 — both are icon buttons whose tooltip repeats the former text.
+    // FS-02.A49 — both carry the icon and a tooltip repeating the name; on the full
+    // agent page Send also shows its text (FS-12.R61) while Cancel stays an icon.
     for (const name of ["Send", "Cancel"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toHaveAttribute("title", name);
       expect(button.querySelector("svg")).not.toBeNull();
-      expect(button.textContent).toBe("");
+      expect(button.textContent).toBe(name === "Send" ? "Send" : "");
     }
+  });
+
+  it("keeps the dashboard composer's Send icon-only and without insert buttons", () => {
+    render(<Composer agentId="a_dash" busy={false} variant="dashboard" />);
+    expect(screen.getByRole("button", { name: "Send" }).textContent).toBe("");
+    expect(screen.queryByRole("button", { name: "Reference a file" })).toBeNull();
+    expect(screen.getByRole("textbox")).not.toHaveAttribute("placeholder");
+  });
+
+  // FS-12.R61 — @ and # type the existing trigger at the caret and open the
+  // shared picker; a word right before the caret gets a separating space.
+  it("inserts the picker trigger from the toolbar", async () => {
+    render(<Composer agentId="a_insert" busy={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    type(ta, "see");
+    ta.setSelectionRange(3, 3);
+    fireEvent.click(screen.getByRole("button", { name: "Reference a file" }));
+    await waitFor(() => expect(ta.value).toBe("see @"));
+    await waitFor(() => expect(document.activeElement).toBe(ta));
+    expect(ta.selectionStart).toBe(5);
+    fireEvent.click(screen.getByRole("button", { name: "Insert a command" }));
+    await waitFor(() => expect(ta.value).toBe("see @ #"));
   });
 
   it("does not echo a message when an idle-looking submit is held by the server", async () => {

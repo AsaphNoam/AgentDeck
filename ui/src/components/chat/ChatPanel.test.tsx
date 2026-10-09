@@ -139,7 +139,10 @@ it("shows the exact used/total token figure when both raw counts are known", () 
   mocks.useBackends.mockReturnValue({ data: backends });
   renderPanel("a_exact");
 
-  expect(screen.getByText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+  // FS-12.R61 — the header splits the same facts into a labelled meter.
+  const meter = screen.getByLabelText("12,345 / 200,000 tokens · 6% context used");
+  expect(meter).toHaveTextContent("Context usage6%");
+  expect(meter).toHaveTextContent("12,345 / 200,000 tokens");
 });
 
 // A state with no raw pair keeps the existing percentage-only label.
@@ -149,7 +152,8 @@ it("keeps the existing percentage-only label when raw counts are unavailable", (
   mocks.useBackends.mockReturnValue({ data: backends });
   renderPanel("a_pctonly");
 
-  expect(screen.getByText("12% context used")).toBeInTheDocument();
+  expect(screen.getByLabelText("12% context used")).toHaveTextContent("12%");
+  expect(screen.queryByText(/tokens/)).toBeNull();
 });
 
 // FS-12.A28: unsupported live controls leave no empty settings band, while a
@@ -235,7 +239,11 @@ describe("ChatPanel back target", () => {
 
     renderPanel("a_live");
 
-    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/project/app");
+    expect(screen.getByRole("link", { name: "Back to project" })).toHaveAttribute("href", "/project/app");
+    // FS-12.R61 — the breadcrumb names where the agent lives and its stable id.
+    const crumb = screen.getByRole("navigation", { name: "Agent location" });
+    expect(crumb).toHaveTextContent("App/Nova");
+    expect(crumb).toHaveTextContent("a_live");
   });
 
   it("falls back to the projects home when the project is absent from the catalog", () => {
@@ -344,9 +352,27 @@ describe("ChatPanel runtime picker", () => {
 
     renderPanel("a_stopped");
 
-    expect(screen.getByText("claude · sonnet")).toBeInTheDocument();
+    expect(document.querySelector(".agent-heading-details")).toHaveTextContent("claude · sonnet");
+    expect(screen.getByText("Stopped")).toBeInTheDocument();
     expect(screen.queryByLabelText("Backend")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Switch" })).not.toBeInTheDocument();
+  });
+
+  // FS-12.R61 — Discard returns a staged backend/model to the current runtime
+  // locally, without a switch request.
+  it("discards a staged runtime change without a request", () => {
+    mocks.useBackends.mockReturnValue({ data: backends });
+    useAgentStore.setState({ agents: { a_live: liveAgent("a_live") }, order: ["a_live"], hydrated: true, hydrating: false });
+
+    renderPanel("a_live");
+    fireEvent.change(screen.getByLabelText("Backend"), { target: { value: "codex" } });
+    expect(screen.getByText("Unapplied changes")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect((screen.getByLabelText("Backend") as HTMLSelectElement).value).toBe("claude");
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("sonnet");
+    expect(screen.queryByRole("button", { name: "Switch" })).toBeNull();
+    expect(mocks.switchRuntime).not.toHaveBeenCalled();
   });
 
   it("keeps an unavailable current runtime visible until a listed target is chosen", async () => {

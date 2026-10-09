@@ -1,15 +1,16 @@
 @layer ad-features {
+/* The full agent page (FS-12.R61, TS-08.R112): a quiet breadcrumb row above one
+   raised card holding the header, runtime band, tabs, reading column and
+   composer. Rules under .chat-panel stay off the dashboard pane
+   and the phone, which share the transcript renderers. */
 .chat-panel {
-  background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-large);
   display: grid;
-  gap: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--ad-space-4);
+  grid-template-rows: auto minmax(0, 1fr);
   height: calc(100vh - 140px);
   margin: 0 auto;
-  max-width: 1440px;
-  overflow: hidden;
+  max-width: 71rem;
+  min-width: 0;
 }
 
 /* The one thing a container query cannot express: this cap is set outside the
@@ -21,116 +22,379 @@
   max-width: 2000px;
 }
 
-.chat-header {
+.chat-breadcrumb {
   align-items: center;
-  background: var(--ad-surface-panel);
-  border: 0;
-  border-inline-start: 3px solid var(--ad-action-primary);
-  border-radius: 0;
-  display: grid;
-  gap: var(--ad-space-4);
-  grid-template-columns: auto minmax(0, 1fr) minmax(160px, 240px);
-  padding: var(--ad-space-2) var(--ad-space-3);
+  color: var(--ad-text-muted);
+  display: flex;
+  font-size: 0.75rem;
+  gap: var(--ad-space-6);
+  min-width: 0;
 }
 
-.chat-header > div {
+.chat-breadcrumb a {
+  align-items: center;
+  color: var(--ad-text-secondary);
+  display: inline-flex;
+  flex: none;
+  gap: var(--ad-space-2);
+  text-decoration: none;
+}
+
+.chat-breadcrumb a:hover {
+  color: var(--ad-text-primary);
+}
+
+.chat-breadcrumb-path {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-breadcrumb-slash {
+  color: var(--ad-border-strong);
+  margin-inline: var(--ad-space-2);
+  opacity: 0.35;
+}
+
+.chat-breadcrumb-id {
+  background: transparent;
+  border: 0;
+  color: var(--ad-text-muted);
+  flex: none;
+  font-family: var(--ad-font-mono);
+  font-size: 0.75rem;
+  margin-left: auto;
+  padding: 0;
+}
+
+.chat-card {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-large);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.chat-card > .chat-tabs,
+.chat-card > [data-slot="content"] {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.chat-header {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-6);
+  justify-content: space-between;
+  padding: var(--ad-space-6) var(--ad-space-8) calc(var(--ad-space-4) + var(--ad-space-1));
 }
 
 .chat-header [data-slot="identity"] {
   align-items: center;
+  display: flex;
+  gap: var(--ad-space-4);
+  min-width: 0;
+}
+
+.agent-monogram {
+  background: color-mix(in srgb, var(--ad-state-done) 10%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 24%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-state-done);
   display: grid;
-  gap: var(--ad-space-2);
-  grid-template-columns: minmax(0, 1fr);
+  flex: none;
+  font-family: var(--ad-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  height: 2.75rem;
+  place-items: center;
+  position: relative;
+  width: 2.75rem;
+}
+
+.agent-monogram-dot {
+  background: var(--ad-state-unknown);
+  border: var(--ad-border-thick) solid var(--ad-surface-raised);
+  border-radius: var(--ad-radius-round);
+  bottom: -3px;
+  height: 12px;
+  position: absolute;
+  right: -3px;
+  width: 12px;
+}
+
+.agent-monogram.busy .agent-monogram-dot { background: var(--ad-state-busy); }
+.agent-monogram.idle .agent-monogram-dot { background: var(--ad-state-idle); }
+.agent-monogram.waiting_input .agent-monogram-dot { background: var(--ad-state-waiting); }
+.agent-monogram.done .agent-monogram-dot { background: var(--ad-state-done); }
+.agent-monogram.error .agent-monogram-dot { background: var(--ad-state-error); }
+
+.agent-heading {
+  min-width: 0;
+}
+
+.agent-heading-line {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-1) var(--ad-space-3);
 }
 
 .chat-header h1 {
-  font-size: 1.5rem;
-  line-height: 1;
+  font-family: var(--ad-font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.chat-panel[data-state="archived"] .chat-header [data-slot="identity"] {
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--ad-space-1);
+/* The live-state label is the shared badge, set as quiet coloured text with its
+   dot: the header names the state; the dashboard card carries the scan target. */
+.agent-heading-line .ad-badge {
+  background: transparent;
+  border: 0;
+  font-family: var(--ad-font-text);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0;
+  text-transform: capitalize;
+}
+
+.agent-heading-line .archive-readonly-label {
+  font-family: var(--ad-font-text);
+}
+
+.agent-heading-details {
+  color: var(--ad-text-muted);
+  font-size: 0.75rem;
+  margin: var(--ad-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-heading-sep {
+  margin-inline: var(--ad-space-1);
+  opacity: 0.6;
+  white-space: pre;
+}
+
+.chat-header [data-slot="context"] {
+  flex: none;
+  width: 10.5rem;
 }
 
 .chat-header .resume-btn {
-  justify-self: end;
+  flex: none;
 }
 
-.chat-header span:not(.context-bar span) {
+/* The header's labelled context meter (FS-12.R61): heading row, a thin track and
+   the token pair; tone colours match the dashboard meter. */
+.context-meter-detailed {
   color: var(--ad-text-muted);
-  font-family: var(--ad-font-mono);
-  font-size: 0.68rem;
+  display: grid;
+  font-size: 0.7rem;
+  gap: var(--ad-space-2);
 }
 
+.context-meter-summary {
+  display: flex;
+  justify-content: space-between;
+}
+
+.context-meter-summary strong {
+  color: var(--ad-state-done);
+  font-weight: 500;
+}
+
+.context-meter-track {
+  background: color-mix(in srgb, var(--ad-state-done) 12%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-round);
+  height: 5px;
+  overflow: hidden;
+}
+
+.context-meter-track span {
+  background: var(--ad-state-done);
+  border-radius: var(--ad-radius-round);
+  display: block;
+  height: 100%;
+}
+
+.context-meter-detailed.medium .context-meter-track span { background: var(--ad-state-busy); }
+.context-meter-detailed.high .context-meter-track span { background: var(--ad-state-error); }
+.context-meter-detailed.medium .context-meter-summary strong { color: var(--ad-state-busy); }
+.context-meter-detailed.high .context-meter-summary strong { color: var(--ad-state-error); }
+
+.context-meter-detailed em {
+  font-family: var(--ad-font-mono);
+  font-size: 0.65rem;
+  font-style: normal;
+}
+
+/* Runtime band: backend/model stage behind Switch, effort and speed apply now
+   (FS-03.R47). Borderless selects keep the band low. */
 .chat-runtime-picker {
-  align-items: end;
+  align-items: center;
+  background: color-mix(in srgb, var(--ad-surface-panel) 60%, var(--ad-surface-raised));
+  border-top: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-border-default) 50%, var(--ad-surface-raised));
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ad-space-2);
-  max-width: 840px;
-  margin-top: 0;
+  font-size: 0.72rem;
+  gap: var(--ad-space-3) var(--ad-space-4);
+  padding: var(--ad-space-3) var(--ad-space-8);
 }
 
 .chat-runtime-staged,
 .chat-session-settings {
-  align-items: end;
+  align-items: center;
   border: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ad-space-2);
+  gap: var(--ad-space-4);
   margin: 0;
   min-width: 0;
   padding: 0;
 }
 
-.chat-runtime-staged {
-  flex: 1 1 17rem;
-}
-
-.chat-session-settings {
-  flex: 1 1 19rem;
-}
-
-.chat-runtime-staged legend,
-.chat-session-settings legend {
+/* A legend cannot share a flex row, so the visible "Runtime" label floats
+   into it; the session group's legend is visually hidden. */
+.chat-runtime-staged legend {
   color: var(--ad-text-muted);
-  font-family: var(--ad-font-mono);
-  font-size: 0.68rem;
-  padding: 0 var(--ad-space-1);
+  float: left;
+  opacity: 0.8;
+  padding: 0;
+}
+
+.chat-session-settings legend {
+  float: left;
+  padding: 0;
 }
 
 .chat-runtime-picker .form-field {
-  flex: 1 1 6rem;
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
   min-width: 0;
 }
 
-.chat-session-settings .form-field:last-child {
-  flex: 1.6 1 10rem;
+.chat-runtime-picker .form-field label {
+  color: var(--ad-text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
 }
 
 .chat-runtime-picker select {
+  background-color: transparent;
+  border: 0;
+  border-bottom: var(--ad-border-thin) solid transparent;
+  border-radius: 0;
+  color: var(--ad-text-primary);
+  cursor: pointer;
+  font-size: 0.78rem;
+  max-width: 11rem;
+  min-height: 1.75rem;
+  padding: var(--ad-space-1) var(--ad-space-4) var(--ad-space-1) 0;
+}
+
+.chat-runtime-picker select:hover:not(:disabled) {
+  border-bottom-color: var(--ad-border-default);
+}
+
+/* Fast mode is a checkbox drawn as a switch: native semantics, applied on change. */
+.chat-fast-toggle {
+  align-items: center;
+  color: var(--ad-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  gap: var(--ad-space-2);
+}
+
+.chat-fast-toggle input {
+  appearance: none;
+  background: color-mix(in srgb, var(--ad-text-muted) 35%, var(--ad-surface-raised));
+  border: 0;
+  border-radius: var(--ad-radius-round);
+  cursor: inherit;
+  flex: none;
+  height: 14px;
+  margin: 0;
+  padding: var(--ad-border-thick);
+  position: relative;
+  transition: background-color 150ms ease-out;
+  width: 24px;
+}
+
+.chat-fast-toggle input::before {
+  background: var(--ad-surface-raised);
+  border-radius: var(--ad-radius-round);
+  content: "";
+  display: block;
+  height: 10px;
+  transition: transform 150ms ease-out;
+  width: 10px;
+}
+
+.chat-fast-toggle input:checked {
+  background: var(--ad-state-done);
+}
+
+.chat-fast-toggle input:checked::before {
+  transform: translateX(10px);
+}
+
+.chat-fast-toggle input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-fast-toggle input,
+  .chat-fast-toggle input::before {
+    transition: none;
+  }
+}
+
+.chat-runtime-hint {
+  color: var(--ad-text-muted);
+  font-size: 0.65rem;
+  margin-left: auto;
+  opacity: 0.85;
+}
+
+.chat-runtime-pending {
+  align-items: center;
+  color: var(--ad-state-waiting);
+  display: flex;
+  font-size: 0.68rem;
+  gap: var(--ad-space-3);
+  margin-left: auto;
+}
+
+.chat-runtime-pending button {
+  font-size: 0.75rem;
   min-height: 2rem;
-  width: 100%;
+  padding: var(--ad-space-1) var(--ad-space-3);
 }
 
 .chat-runtime-switch {
-  min-height: 2rem;
+  white-space: nowrap;
+}
+
+.chat-runtime-pending .chat-runtime-discard {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ad-text-muted);
 }
 
 .chat-runtime-picker .form-error {
   flex-basis: 100%;
   margin: 0;
-}
-
-@media (min-width: 80rem) {
-  .chat-header [data-slot="identity"] {
-    gap: var(--ad-space-3);
-    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
-  }
 }
 
 .new-agent-runtime {
@@ -189,35 +453,36 @@
   align-items: end;
   border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
   display: flex;
-  gap: var(--ad-space-1);
-  padding: 0 var(--ad-space-2);
+  gap: calc(var(--ad-space-6) + var(--ad-space-1));
+  padding: 0 var(--ad-space-8);
 }
 
 .chat-tabs-list button {
   background: transparent;
-  border: var(--ad-border-thin) solid transparent;
-  border-bottom: 0;
-  border-radius: var(--ad-radius-medium) var(--ad-radius-medium) 0 0;
+  border: 0;
+  border-bottom: var(--ad-border-thick) solid transparent;
+  border-radius: 0;
   color: var(--ad-text-muted);
   font-family: var(--ad-font-text);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   letter-spacing: normal;
-  min-height: 34px;
-  padding: var(--ad-space-2) var(--ad-space-3);
+  margin-bottom: calc(var(--ad-border-thin) * -1);
+  min-height: auto;
+  padding: var(--ad-space-4) 0 var(--ad-space-3);
   text-transform: none;
 }
 
 .chat-tabs-list button:hover:not(:disabled) {
+  background: transparent;
   box-shadow: none;
+  color: var(--ad-text-primary);
   transform: none;
 }
 
 .chat-tabs-list button[data-state="active"] {
-  background: transparent;
-  border-color: transparent;
-  border-bottom: var(--ad-border-thick) solid var(--ad-action-primary);
+  border-bottom-color: var(--ad-state-done);
   color: var(--ad-text-primary);
-  margin-bottom: calc(var(--ad-border-thick) * -1);
+  font-weight: 600;
 }
 
 .chat-tab-content {
@@ -532,26 +797,80 @@
   color: var(--ad-state-error);
 }
 
+/* A pending decision: attention symbol, tool and reason, then Deny before the
+   primary Approve (FS-12.R61). Shared by the agent page and the dashboard pane. */
 .permission-prompt {
-  background: color-mix(in srgb, var(--ad-state-waiting) 8%, var(--ad-surface-panel));
-  border: var(--ad-border-thin) solid var(--ad-state-waiting);
-  border-inline-start-width: 4px;
+  background: color-mix(in srgb, var(--ad-state-waiting) 5%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-waiting) 32%, var(--ad-surface-raised));
   border-radius: var(--ad-radius-large);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ad-space-2);
-  padding: var(--ad-space-4);
+  color: var(--ad-text-secondary);
+  column-gap: var(--ad-space-3);
+  display: grid;
+  font-size: 0.8rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: calc(var(--ad-space-4) + var(--ad-space-1));
+  row-gap: var(--ad-space-1);
 }
 
-.permission-prompt strong,
-.permission-prompt p {
-  flex-basis: 100%;
+.permission-symbol {
+  background: color-mix(in srgb, var(--ad-state-waiting) 16%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-round);
+  color: var(--ad-state-waiting);
+  display: grid;
+  font-weight: 700;
+  grid-row: span 2;
+  height: 26px;
+  place-items: center;
+  width: 26px;
+}
+
+.permission-prompt [data-slot="title"] {
+  color: color-mix(in srgb, var(--ad-state-waiting) 70%, var(--ad-text-primary));
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.permission-prompt [data-slot="reason"],
+.permission-prompt [data-slot="error"] {
+  grid-column: 2;
+  line-height: 1.7;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.permission-prompt [data-slot="actions"] {
+  display: flex;
+  gap: var(--ad-space-2);
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  margin-top: var(--ad-space-3);
+}
+
+.permission-prompt [data-slot="actions"] button {
+  font-size: 0.78rem;
+  min-height: 2.1rem;
+  padding: var(--ad-space-2) var(--ad-space-4);
+}
+
+.permission-prompt .permission-deny {
+  background: var(--ad-surface-raised);
+  border-color: color-mix(in srgb, var(--ad-state-done) 30%, var(--ad-surface-raised));
+  color: var(--ad-state-done);
+}
+
+.permission-prompt .permission-approve {
+  background: var(--ad-action-primary);
+  border-color: var(--ad-action-primary);
+  color: var(--ad-action-primary-ink);
 }
 
 .permission-prompt.resolved {
   align-items: center;
   background: var(--ad-surface-subtle);
   border-color: var(--ad-border-default);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
 }
 
 .permission-chip {
@@ -965,19 +1284,10 @@
   padding: var(--ad-space-2);
 }
 
-.chat-panel > [data-slot="composer"] {
-  background: var(--ad-surface-raised);
-  border-top: var(--ad-border-thin) solid var(--ad-border-default);
-  margin-inline: auto;
-  width: 100%;
-}
-
-.chat-panel > [data-slot="composer"] .composer {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  margin-inline: auto;
-  width: min(100%, 52rem);
+/* Outside the full agent page the toolbar adds no box, so the dashboard
+   composer's grid places its actions exactly as before (TS-08.R112). */
+.composer-toolbar {
+  display: contents;
 }
 
 .composer-input {
@@ -1325,5 +1635,251 @@
 .background-task-error {
   flex-basis: 100%;
   margin: 0;
+}
+
+/* Agent-page reading column (FS-12.R61). Prose and activity share one measure;
+   technical blocks take a wider one; user bubbles sit right, assistant bubbles
+   left, both softly tinted. */
+.chat-panel .transcript-view {
+  --ad-reading-measure: 44rem;
+  --ad-technical-measure: 58rem;
+
+  background: var(--ad-surface-raised);
+  padding: var(--ad-space-6) var(--ad-space-12) var(--ad-space-8);
+}
+
+.chat-panel .transcript-view :is(.transcript-item, .tool-run, .runtime-child, .turn-activity-toggle, .turn-activity-content, .turn-outcome, .background-tasks, .transcript-pending, .transcript-held, .turn-end) {
+  margin-inline: auto;
+  max-width: var(--ad-reading-measure);
+}
+
+.chat-panel .transcript-view .transcript-item:is([data-variant="diff"], [data-variant="tool-result"], [data-variant="unknown"]) {
+  max-width: var(--ad-technical-measure);
+}
+
+.chat-panel .transcript-item {
+  margin-bottom: calc(var(--ad-space-6) + var(--ad-space-1));
+}
+
+.chat-panel .message {
+  color: var(--ad-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.8;
+}
+
+.chat-panel .user-message {
+  background: color-mix(in srgb, var(--ad-action-secondary) 7%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-action-secondary) 15%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium) var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium);
+  font-weight: 400;
+  margin-right: 0;
+  max-width: 93%;
+  padding: calc(var(--ad-space-4) + var(--ad-space-1)) calc(var(--ad-space-4) + var(--ad-space-2));
+  width: fit-content;
+}
+
+.chat-panel .assistant-message {
+  background: color-mix(in srgb, var(--ad-action-secondary) 3%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-border-default) 60%, var(--ad-surface-raised));
+  border-radius: var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium) var(--ad-radius-medium);
+  max-width: none;
+  padding: calc(var(--ad-space-4) + var(--ad-space-1)) calc(var(--ad-space-4) + var(--ad-space-2));
+  width: 100%;
+}
+
+.chat-panel .assistant-message > :first-child {
+  margin-top: 0;
+}
+
+.chat-panel .assistant-message > :last-child {
+  margin-bottom: 0;
+}
+
+/* Activity reads as one quiet ruled column under the turn. */
+.chat-panel :is(.tool-run, .thinking, .runtime-child, .turn-activity-toggle, .background-tasks) {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-text);
+  font-size: 0.75rem;
+  padding-left: var(--ad-space-4);
+}
+
+.chat-panel .turn-activity-toggle {
+  margin-bottom: var(--ad-space-3);
+}
+
+.chat-panel .turn-activity-content {
+  padding-left: var(--ad-space-4);
+}
+
+.chat-panel .turn-activity-content :is(.tool-run, .thinking, .runtime-child, .background-tasks) {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.chat-panel .tool-toggle {
+  font-family: var(--ad-font-text);
+}
+
+.chat-panel .tool-toggle:hover:not(:disabled) {
+  color: var(--ad-text-primary);
+}
+
+.chat-panel .diff-block {
+  border-color: var(--ad-technical-surface);
+  border-radius: var(--ad-radius-small);
+  padding: 0;
+}
+
+.chat-panel .diff-heading {
+  background: var(--ad-technical-surface);
+  border-bottom: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-technical-muted) 25%, var(--ad-technical-surface));
+  margin: 0;
+  padding: var(--ad-space-3) calc(var(--ad-space-4) + var(--ad-space-1));
+}
+
+.chat-panel .diff-block > :not(.diff-heading) {
+  padding: var(--ad-space-3) calc(var(--ad-space-4) + var(--ad-space-1));
+}
+
+.chat-panel .turn-end {
+  border: 0;
+  border-top: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-border-default) 60%, var(--ad-surface-raised));
+  margin-block: var(--ad-space-6) var(--ad-space-6);
+}
+
+.chat-panel .transcript-pending {
+  color: var(--ad-state-done);
+  font-size: 0.78rem;
+}
+
+.chat-panel .jump-to-latest {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 30%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-small);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
+  color: var(--ad-state-done);
+  font-size: 0.72rem;
+}
+
+/* Inset composer box: the textarea above a toolbar of @/# inserts and actions. */
+.chat-card > [data-slot="composer"] {
+  background: var(--ad-surface-raised);
+  padding: var(--ad-space-3) var(--ad-space-8) var(--ad-space-6);
+}
+
+.chat-card > [data-slot="composer"] .composer {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-inline: auto;
+  max-width: 62rem;
+  padding: 0;
+}
+
+.chat-card > [data-slot="composer"] .composer:focus-within {
+  border-color: var(--ad-state-done);
+}
+
+.chat-card > [data-slot="composer"] .composer textarea {
+  background: transparent;
+  min-height: 65px;
+  padding: var(--ad-space-4) calc(var(--ad-space-4) + var(--ad-space-1)) var(--ad-space-1);
+}
+
+.chat-card > [data-slot="composer"] .composer textarea:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+.chat-card > [data-slot="composer"] .composer-toolbar {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+  padding: var(--ad-space-2) var(--ad-space-3) var(--ad-space-3);
+}
+
+.chat-card > [data-slot="composer"] .composer-references {
+  display: flex;
+  gap: var(--ad-space-1);
+}
+
+.chat-card > [data-slot="composer"] .composer-references button {
+  background: transparent;
+  border: 0;
+  color: var(--ad-text-muted);
+  font-size: 1.05rem;
+  min-height: auto;
+  min-width: 0;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.chat-card > [data-slot="composer"] .composer-references button:hover:not(:disabled) {
+  box-shadow: none;
+  color: var(--ad-text-primary);
+  transform: none;
+}
+
+.chat-card > [data-slot="composer"] .composer-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.chat-card > [data-slot="composer"] .composer-actions button {
+  align-self: center;
+  font-size: 0.78rem;
+  min-height: 2.25rem;
+  min-width: 0;
+  padding: var(--ad-space-2) var(--ad-space-4);
+}
+
+.chat-card > [data-slot="composer"] .composer-actions .composer-icon {
+  display: inline-flex;
+  gap: var(--ad-space-2);
+}
+
+.composer-send-label {
+  white-space: nowrap;
+}
+
+.chat-card > [data-slot="composer"] .composer-actions .composer-cancel {
+  padding: var(--ad-space-2);
+}
+
+.chat-card > [data-slot="composer"] :is(.composer-error, .composer-notice) {
+  margin: 0;
+  padding: 0 var(--ad-space-4) var(--ad-space-3);
+}
+
+.chat-card > .terminal-readonly {
+  padding: var(--ad-space-4) var(--ad-space-8);
+}
+
+.chat-card > .archive-error {
+  padding: 0 var(--ad-space-8);
+}
+
+/* The supported desktop floor keeps the same hierarchy with tighter insets. */
+@media (max-width: 1100px) {
+  .chat-header,
+  .chat-runtime-picker,
+  .chat-tabs-list,
+  .chat-card > [data-slot="composer"] {
+    padding-inline: var(--ad-space-6);
+  }
+
+  .chat-panel .transcript-view {
+    padding-inline: var(--ad-space-8);
+  }
+
+  .chat-runtime-hint {
+    display: none;
+  }
 }
 }

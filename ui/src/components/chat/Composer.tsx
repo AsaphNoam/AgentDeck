@@ -160,6 +160,24 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
     }
   };
 
+  // The toolbar's @ and # type the existing trigger at the caret, then let the
+  // shared picker see it exactly as if it had been typed (FS-12.R61).
+  const insertTrigger = (trigger: "@" | "#") => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? text.length;
+    const end = textarea?.selectionEnd ?? start;
+    const token = (start > 0 && !/\s/.test(text[start - 1]) ? " " : "") + trigger;
+    const next = text.slice(0, start) + token + text.slice(end);
+    setText(next);
+    setChatDraft(agentId, next);
+    requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(start + token.length, start + token.length);
+      autocomplete.syncTrigger(textarea);
+    });
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (autocomplete.onKeyDown(event)) return;
     // Picker closed (or showing an empty state): Enter submits, Shift+Enter newlines.
@@ -175,6 +193,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
         <AutoGrowTextarea
           ref={textareaRef}
           maxHeight="40vh"
+          placeholder={variant ? undefined : "Add direction to this session…"}
           value={text}
           onChange={(event) => {
             const next = event.target.value;
@@ -190,9 +209,17 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
       </div>
       {/* Send is always present and is the safe default; Steer appears only where
           the live session advertises it, and never as a disabled control where it
-          does not (FS-03.R50, FS-09.R26). */}
+          does not (FS-03.R50, FS-09.R26). The toolbar is display: contents outside
+          the full agent page, so the dashboard composer keeps its geometry. */}
+      <div className="composer-toolbar">
+      {!variant && (
+        <div className="composer-references">
+          <button type="button" aria-label="Reference a file" title="Reference a file" onClick={() => insertTrigger("@")}>@</button>
+          <button type="button" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
+        </div>
+      )}
       <div className="composer-actions">
-        <button type="submit" className="composer-icon" aria-label="Send" title="Send"><SendIcon /></button>
+        <button type="submit" className="composer-icon" aria-label="Send" title="Send">{!variant && <span className="composer-send-label">Send</span>}<SendIcon /></button>
         {busy && steerable && (
           <button type="button" className="composer-steer" disabled={steering} onClick={() => void steer()}>Steer</button>
         )}
@@ -214,6 +241,7 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
             <StopIcon />
           </button>
         )}
+      </div>
       </div>
       {notice && <p className="composer-notice" role="status">{notice}</p>}
       {error && <p className="composer-error">{error}</p>}

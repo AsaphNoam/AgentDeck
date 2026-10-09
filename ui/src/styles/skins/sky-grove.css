@@ -64,7 +64,7 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--ad-surface-raised) 42%, transparent), transparent 30rem);
 }
 
-:root[data-skin="sky-grove"] [data-ui="transcript"] [data-variant="user"] {
+:root[data-skin="sky-grove"] [data-ui="transcript"][data-variant="user"] {
   background: color-mix(in srgb, var(--ad-action-secondary) 8%, var(--ad-surface-raised));
 }
 
