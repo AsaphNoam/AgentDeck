@@ -41,7 +41,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   renderer and passes with the fix. Source-build Go checks need `CHUCK_RUNTIME_ROOT=`; the first
   native-login probe timed out, then focused and full retries passed. Existing real-device and
   credentialed-provider gates remain owed. These fixes create no new review unit.
-- **Waiting for review — desktop agent page:** active and archived agent pages adopt the Figma Make
+- **Review closed — desktop agent page:** active and archived agent pages adopt the Figma Make
   `AgentConversation` composition (FS-12.R61/A33, TS-08.R112): breadcrumb with agent id, raised
   card, monogram/state/role header with labelled context meter, low runtime band with local
   Discard and a switch-style fast toggle, quiet tabs, ~700px reading column with tinted bubbles,
@@ -57,15 +57,20 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   header Copy thread identity). Reference source, renders, harness and receipts: shared project
   resources `agent-design/` (`runs/final`).
   Static review of `ea8dfc8` found no confirmed defects; presentation/style checks and all 730 UI
-  tests passed again. Saved implementation renders were inspected. Independent live-browser review
-  remains blocked in the review sandbox: loopback listeners return EPERM and Chromium aborts at
-  launch. Keep this unit open until that rendered verification can run; no product code was edited.
-  Investigation confirmed the blocked process was Codex's native review subagent, with
-  `approval_policy: never`, `workspace-write`, and `network_access: false`; its parent recorded
-  `approval_policy: on-request`. Both loopback bind and temporary Chromium render reproduced the
-  failures under the sandbox and passed through approved `require_escalated` execution. Run the
-  outstanding rendered review in an approval-capable independent agent; do not treat the native
-  review child's inability to escalate as a Chuck launch defect. See investigation below.
+  tests passed again. Independent rendered review now also passed through bounded approved
+  execution in an approval-capable agent: fresh isolated fake-backend fixture, Core, Sky & Grove
+  and Studio at 1024/1280, 24 static captures without horizontal overflow or page errors, plus
+  activity, permission, runtime staging/Discard, `@`/`#` pickers, live turn, archive and Copy thread
+  identity checks. Fresh screenshots were inspected by the reviewer and sampled by the parent.
+  Evidence: shared project resources `agent-design/runs/independent-20261009/` (`report.json`,
+  three `*-states.json` receipts and screenshots). The native review child's sandbox cannot
+  request escalation; workflow §7/§14.4 now routes that browser work to an approval-capable
+  independent agent. No product code or permission defaults changed. This closes the review unit
+  and its access block; existing credentialed-provider and real-device gates remain owed.
+  The review used `/private/tmp/chuck-agent-page-review` built from `c189d95`, the working UI via
+  Vite, and fresh review-owned `CHUCK_HOME` fixtures. Both review-owned harness sessions shut down;
+  existing processes were preserved. Fresh captures were compared with `agent-design/ref/` study
+  renders.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -160,9 +165,12 @@ None. Existing live-provider and real-device acceptance gates above remain owed.
   rendered verification; USABILITY-REVIEW §2 explicitly retains blocked visual steps when a
   browser cannot run. No product/spec defect or missing diagnostic was established, so no
   investigation fix unit or fix-model recommendation is required.
-- **Next:** complete the independent rendered review in an approval-capable agent using bounded
-  approved execution, an isolated review-owned home and fake backend. Only permission feasibility
-  was verified here; the desktop visual review remains open. No product code or specs changed.
+- **Resolved:** an independent approval-capable agent completed the rendered review using bounded
+  approved execution, an isolated review-owned home and fake backend. New evidence in shared
+  project resources `agent-design/runs/independent-20261009/` confirms Chromium execution and the
+  desktop state matrix passed without findings. Workflow §7/§14.4 now captures this routing so
+  future visual reviews do not strand browser work in a native review child that cannot escalate.
+  No product code or permission defaults changed.
 
 ## Blocked on human
 
@@ -178,6 +186,11 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-09 — Fix / review closure (INV §10):** Browser verification routes through an
+  approval-capable independent agent with bounded approved execution. The fresh desktop-agent-page
+  rendered review passed in all three appearances at 1024/1280 without findings, closing `ea8dfc8`
+  and its access block. No product or global permission change.
 
 - **2026-10-09 — Investigation:** Native Codex review child cannot request escalation; loopback
   and Chromium failures reproduce in its sandbox and pass via approved parent execution.

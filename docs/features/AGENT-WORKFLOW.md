@@ -180,6 +180,9 @@ the selected unit's review state. Chronology does not constrain selection, and c
 not affect the state of another. If the handoff names no eligible unit, there is nothing to review.
 Read the relevant requirements before the diff.
 
+For material visual changes, complete the independent rendered verification in §14.4, including
+its browser-execution permission routing; a source-only review cannot close that gate.
+
 Check both directions:
 
 - Does the code do what the relevant requirements say?
@@ -480,6 +483,14 @@ Choose viewports from the governing requirements and affected layout rather than
 universal mobile support; always include the supported desktop floor when layout changes. Compare
 Core and Sky & Grove when a shared token, primitive, hook, integration, or feature composition
 changes.
+
+Assign browser execution to an agent that can request the permissions its environment requires.
+Codex's native review child was observed with `approval_policy: never`: it could inspect source
+but could not escalate loopback or Chromium execution on macOS. When that restriction blocks
+rendered review, use an independent approval-capable agent and bounded approved execution for the
+loopback-only harness and browser, retaining the isolated home and fake backend above. Confirm
+execution succeeds before treating the access block as resolved. Do not disable the sandbox
+globally or work around a denied approval; retain the open gate when approved execution is unavailable.
 
 Exercise the important state matrix from the direction, including interaction states that static
 fixtures cannot prove. For motion, observe the transition at normal speed, repeat or interrupt it,
