@@ -444,6 +444,24 @@ Requirements are user-observable.
   backend fields are excluded; Remote joins the same composition; every existing section, editor,
   dialog, validation, save, warning and destructive-confirmation behavior is unchanged.
 
+- **R63 — Think Tank room cards adopt the Figma room-summary composition.** The `RoomSummary`
+  study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`), shown on its project
+  dashboard, governs the room cards before a project's agent grid and in Archive. The section
+  opens with a mono uppercase "Shared rooms / Think Tank" eyebrow over "Thinking together"
+  (Archive: "Retained room history") and a quiet "N rooms · separate from agent sessions" note.
+  Each card is one softly raised, rounded three-column row: a room-symbol tile; the room content;
+  and a ruled budget column whose large mono number is the collective remaining allowance with
+  "turns remaining · Combined ceiling, not a target" (ended: "unused turns · Not a success
+  signal"). Content reads title link with ↗ and a ruled phase label, a state chip at the right
+  (Active ●, Paused Ⅱ, Needs attention !, Ended ■), the state-colored status line, a quiet
+  "GOAL" preview, a ruled roster of every participant in three columns (tinted initials tile,
+  name link with ↗ or plain name when deleted, project · turns left, and Ready/Speaking ●/
+  Exhausted/Departed), then a footer with the room's scope or origin at the left and judge
+  state at the right. The icon tile hides on narrow sections and the card stacks on very narrow
+  ones. All three appearances express the composition through their semantic palettes. The
+  study's sample rooms and copy are excluded; real status, attention, allowance, judge and
+  retained-identity data drive the card, and FS-02.R71/FS-21.R44 behavior is unchanged.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -671,6 +689,14 @@ Requirements are user-observable.
   headings, rows, backend card, ruled lists and theme cards match the study's hierarchy and
   spacing without horizontal overflow; hover, focus, selected, disabled and destructive states
   stay visible; existing editor tests pass unchanged in behavior.
+  *Verify:* focused component tests plus the working tree's real-browser comparison.
+
+- **A35** (R63) — Compare the rendered study with real room cards at 1024px and 1440px in Core,
+  Sky & Grove and Studio: concurrent openings, a speaking participant, a held room, a paused room,
+  an ended room with judge state, a deleted participant and a long title. Section heading, icon
+  tile, title/phase/state row, status, goal, roster, footer and budget column match the study's
+  hierarchy and spacing without horizontal overflow; room and participant links stay separate
+  focusable actions; Archive shows origin, including a removed project.
   *Verify:* focused component tests plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions

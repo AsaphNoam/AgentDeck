@@ -336,80 +336,359 @@
   font-size: 0.85rem;
 }
 
+/* Room cards follow the Figma room-summary study (FS-12.R63, TS-08.R114):
+   a room tile, the room content and a ruled budget column per card. The
+   list is a size container because its width depends on the shell. */
 .think-tank-list {
+  color: var(--ad-text-primary);
+  container: room-list / inline-size;
   display: grid;
   gap: var(--ad-space-3);
-  padding: var(--ad-space-4) 0;
+  padding: var(--ad-space-4) 0 var(--ad-space-6);
 }
 
-/* One wide room card per row: title and state lead, the goal stays quiet,
-   and the full roster wraps with each member's remaining ceiling
-   (FS-02.R71, TS-08.R96). The inline-start rule is the collective cue that
-   separates a room from an agent card; it follows the card's state. */
-.think-tank-card {
-  background: var(--ad-surface-panel);
+.room-list-heading {
+  align-items: end;
+  display: flex;
+  gap: var(--ad-space-4);
+  justify-content: space-between;
+}
+
+.room-list-eyebrow {
+  color: var(--ad-text-secondary);
+  font-family: var(--ad-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.room-list-eyebrow > span,
+.room-list-note {
+  color: var(--ad-text-muted);
+}
+
+.think-tank-list .room-list-heading h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin: var(--ad-space-1) 0 0;
+}
+
+.room-list-note {
+  font-size: 0.6875rem;
+}
+
+.room-card {
+  --ad-room-card-tone: var(--ad-action-secondary);
+  background: var(--ad-surface-raised);
   border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-inline-start: var(--ad-border-thick) solid var(--ad-state-busy);
   border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline);
   display: grid;
-  gap: var(--ad-space-2);
+  gap: var(--ad-space-4);
+  grid-template-columns: 36px minmax(0, 1fr) 150px;
   min-width: 0;
-  padding: var(--ad-space-3) var(--ad-space-4);
+  padding: calc(var(--ad-space-4) + var(--ad-space-1));
 }
 
-.think-tank-card[data-state="attention"] {
-  border-inline-start-color: var(--ad-state-waiting);
+@media (hover: hover) {
+  .room-card:hover {
+    border-color: color-mix(in srgb, var(--ad-border-default) 65%, var(--ad-text-primary));
+  }
 }
 
-.think-tank-card[data-state="paused"],
-.think-tank-card[data-state="waiting"] {
-  border-inline-start-color: var(--ad-border-strong);
+.room-card[data-state="active"],
+.room-card[data-state="waiting"] {
+  --ad-room-card-tone: var(--ad-text-primary);
 }
 
-.think-tank-card[data-state="ended"] {
-  border-inline-start-color: var(--ad-border-default);
+.room-card[data-state="paused"],
+.room-card[data-state="ended"] {
+  --ad-room-card-tone: var(--ad-text-muted);
 }
 
-.think-tank-card-head {
-  align-items: baseline;
+.room-card[data-state="attention"] {
+  --ad-room-card-tone: var(--ad-state-waiting);
+}
+
+.room-card-icon {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-text-primary);
+  display: grid;
+  height: 36px;
+  place-items: center;
+  width: 36px;
+}
+
+.room-card-content {
+  min-width: 0;
+}
+
+.room-card-top {
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2) var(--ad-space-3);
+  justify-content: space-between;
+}
+
+.room-card-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 1rem;
+  gap: var(--ad-space-1) var(--ad-space-3);
+  margin: 0;
   min-width: 0;
 }
 
-.think-tank-card-head h3 {
-  font-size: 1rem;
+.room-card-title > a {
+  color: var(--ad-text-primary);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.room-card-title > a > span {
+  color: var(--ad-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  margin-inline-start: var(--ad-space-2);
+}
+
+.room-card-title > a:hover,
+.room-card-person-name > a:hover {
+  color: var(--ad-action-secondary);
+  text-decoration: underline;
+}
+
+.room-card-phase {
+  border-inline-start: var(--ad-border-thin) solid var(--ad-border-default);
+  color: var(--ad-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  padding-inline-start: var(--ad-space-3);
+}
+
+.room-card-state {
+  align-items: center;
+  background: color-mix(in srgb, var(--ad-room-card-tone) 7%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-room-card-tone);
+  display: flex;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  gap: var(--ad-space-2);
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.room-card[data-state="active"] .room-card-state > span,
+.room-card-roster > li[data-state="speaking"] .room-card-person-state > span {
+  color: var(--ad-state-busy);
+  font-size: 0.5625rem;
+}
+
+.room-card-status,
+.room-card-goal {
+  line-height: 1.6;
   margin: 0;
   overflow-wrap: anywhere;
 }
 
-.think-tank-card-origin,
-.think-tank-card-goal,
-.think-tank-card-totals {
-  color: var(--ad-text-secondary);
-  font-size: 0.85rem;
+.room-card-status {
+  color: var(--ad-room-card-tone);
+  font-size: 0.8125rem;
+  margin-top: var(--ad-space-2);
 }
 
-.think-tank-card-status,
-.think-tank-card-goal,
-.think-tank-card-totals {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.think-tank-card-goal {
+.room-card-goal {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  color: var(--ad-text-muted);
   display: -webkit-box;
-  max-width: 72ch;
+  font-size: 0.75rem;
+  margin-top: var(--ad-space-1);
   overflow: hidden;
 }
 
-.think-tank-card[data-state="attention"] .think-tank-card-status {
+.room-card-goal > span {
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  margin-inline-end: var(--ad-space-2);
+  text-transform: uppercase;
+}
+
+.room-card-roster {
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  display: grid;
+  gap: var(--ad-space-4);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: var(--ad-space-4) 0 0;
+  padding: var(--ad-space-4) 0 0;
+}
+
+.room-card-roster > li {
+  align-items: start;
+  display: flex;
+  gap: var(--ad-space-2);
+  min-width: 0;
+}
+
+.room-card-avatar {
+  background: color-mix(in srgb, var(--ad-action-secondary) 10%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-action-secondary);
+  display: grid;
+  flex-shrink: 0;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  height: 28px;
+  place-items: center;
+  width: 28px;
+}
+
+.room-card-roster > li:nth-child(3n + 2) .room-card-avatar {
+  background: color-mix(in srgb, var(--ad-action-primary) 8%, var(--ad-surface-raised));
+  color: var(--ad-text-muted);
+}
+
+.room-card-roster > li:nth-child(3n) .room-card-avatar {
+  background: var(--ad-surface-subtle);
+  color: var(--ad-text-primary);
+}
+
+.room-card-person {
+  display: grid;
+  min-width: 0;
+}
+
+.room-card-person-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.room-card-person-name > a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.room-card-person-name > a > span {
+  color: var(--ad-text-muted);
+  font-weight: 400;
+}
+
+.room-card-person-meta,
+.room-card-person-state {
+  color: var(--ad-text-muted);
+  font-size: 0.625rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.room-card-roster > li[data-state="speaking"] .room-card-person-state {
+  color: var(--ad-text-primary);
   font-weight: 600;
 }
 
+.room-card-footer {
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.625rem;
+  gap: var(--ad-space-2);
+  justify-content: space-between;
+  line-height: 1.6;
+  margin-top: var(--ad-space-3);
+}
+
+.room-card-footer strong {
+  color: var(--ad-text-primary);
+  font-weight: 500;
+}
+
+.room-card-budget {
+  border-inline-start: var(--ad-border-thin) solid var(--ad-border-default);
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.6875rem;
+  justify-content: center;
+  padding-inline-start: calc(var(--ad-space-4) + var(--ad-space-1));
+}
+
+.room-card-budget-number {
+  color: var(--ad-text-primary);
+  font-family: var(--ad-font-mono);
+  font-size: 1.75rem;
+  letter-spacing: -0.06em;
+  line-height: 1.3;
+}
+
+.room-card-budget > small {
+  font-size: 0.625rem;
+  line-height: 1.6;
+  margin-top: var(--ad-space-2);
+  max-width: 110px;
+}
+
+@container room-list (max-width: 940px) {
+  .room-card {
+    gap: var(--ad-space-3);
+    grid-template-columns: minmax(0, 1fr) 120px;
+  }
+
+  .room-card-icon,
+  .room-card-footer > span:first-child > span {
+    display: none;
+  }
+
+  .room-card-roster {
+    gap: var(--ad-space-2);
+  }
+}
+
+@container room-list (max-width: 600px) {
+  .room-card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--ad-space-4);
+  }
+
+  .room-card-roster {
+    gap: var(--ad-space-3);
+    grid-template-columns: 1fr;
+  }
+
+  .room-card-budget {
+    align-items: center;
+    border-inline-start: 0;
+    border-top: var(--ad-border-thin) solid var(--ad-border-default);
+    flex-direction: row;
+    gap: var(--ad-space-2);
+    padding: var(--ad-space-3) 0 0;
+  }
+
+  .room-card-budget-number {
+    font-size: 1.25rem;
+  }
+
+  .room-card-budget > small {
+    margin: 0 0 0 auto;
+    max-width: 130px;
+  }
+
+  .room-list-note {
+    display: none;
+  }
+}
+
+/* The agent-header room cue keeps the compact pill roster (FS-21.R45). */
 .think-tank-card-roster {
   display: flex;
   flex-wrap: wrap;

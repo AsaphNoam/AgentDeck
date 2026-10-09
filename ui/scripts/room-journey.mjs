@@ -224,7 +224,7 @@ try {
       page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
       page.on("pageerror", (e) => consoleErrors.push(String(e)));
       await page.goto(`${BASE_URL}/project/stress`);
-      await page.getByRole("heading", { name: "Think Tanks" }).waitFor({ timeout: 15000 }).catch(() => {});
+      await page.getByRole("region", { name: "Think Tank rooms" }).waitFor({ timeout: 15000 }).catch(() => {});
       const roomLink = page.getByRole("link", { name: "Release cache council" }).first();
       await roomLink.waitFor({ timeout: 10000 }).catch(() => {});
       record(`origin project shows titled room card (${skin.name}/${viewport.name})`, await roomLink.count() > 0, `url=${page.url()}`);
@@ -379,7 +379,7 @@ try {
         const archiveContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
         const archivePage = await archiveContext.newPage();
         await archivePage.goto(`${BASE_URL}/archive`);
-        await archivePage.getByRole("heading", { name: "Think Tanks" }).waitFor({ timeout: 10000 }).catch(() => {});
+        await archivePage.getByRole("region", { name: "Think Tank rooms" }).waitFor({ timeout: 10000 }).catch(() => {});
         const archivedRoomLink = archivePage.getByRole("link", { name: "Release cache council" }).first();
         await archivedRoomLink.waitFor({ timeout: 10000 }).catch(() => {});
         record("ended room remains discoverable in Archive", await archivedRoomLink.count() > 0, archivePage.url());

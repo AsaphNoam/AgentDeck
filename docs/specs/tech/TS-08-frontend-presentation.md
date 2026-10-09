@@ -1267,6 +1267,17 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   `--ad-action-primary`, destructive text to `--ad-state-error`); no token, skin palette, motion
   or dependency is added. Verify with focused tests, the presentation checks, the development
   matrix and the A34 browser comparison.
+- **R114 — Room cards stay in the `RoomList` projection.** FS-12.R63 refines R96's reading order
+  to title/phase/state → status → goal → roster → scope/judge, with the collective allowance in
+  its own budget column; judge state leaves the status line. It lives in `RoomList` and
+  `styles/features/think-tank.css`; the list, card and roster keep `data-slot="list"`/`card`/
+  `roster` and the card's `data-state` tone, and new parts use implementation classes rather than
+  new public hooks. The phase label replaces the `Badge`. Narrow layouts use a container query on
+  the list rather than viewport breakpoints, because the section width depends on the shell.
+  Colors map onto semantic tokens (accent tints to `--ad-action-secondary`, the live dot to
+  `--ad-state-busy`, attention to `--ad-state-waiting`, room tile to `--ad-surface-subtle`); no
+  token, skin rule, motion or dependency is added. Verify with focused tests, the presentation
+  checks and the A35 browser comparison.
 
 ## 3. Interfaces & data shapes
 

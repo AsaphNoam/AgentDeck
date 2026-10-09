@@ -86,6 +86,14 @@ const cards = [
     hold: "Bea's turn failed: provider error. Retry it, or end the discussion.", total_remaining: 3,
     roster: [roster("a_ari", "Ari", "alpha", 3, 2), roster("a_bea", "Bea", "beta", 3, 1), roster("a_cyd", "Cyd", "gamma", 2, 2, { state: "exhausted", remaining: 0, exists: false })],
   }),
+  summary("tt_d", "Rollout plan for the scoped token broker across every regional gateway", {
+    judge_enabled: true, judge_status: "waiting", total_remaining: 5, active_attempts: [attempt("a_bea", "discussion")],
+    roster: [roster("a_ari", "Ari", "alpha", 3, 1), roster("a_bea", "Bea", "beta", 3, 2), roster("a_cyd", "Cyd", "gamma", 2, 0)],
+  }),
+  summary("tt_e", "Library ending", {
+    control: "paused", total_remaining: 4,
+    roster: [roster("a_ari", "Ari", "alpha", 2, 0), roster("a_bea", "Bea", "beta", 2, 0), roster("a_cyd", "Cyd", "gamma", 2, 2, { state: "exhausted", remaining: 0 })],
+  }),
   summary("tt_c", "Pick a release cadence", {
     phase: "ended", end_reason: "allowance_exhausted", judge_enabled: true, judge_status: "completed", judge_name: "Judge",
     roster: [roster("a_ari", "Ari", "alpha", 2, 2, { state: "exhausted", remaining: 0 }), roster("a_bea", "Bea", "beta", 2, 1, { state: "departed", remaining: 0 })],
@@ -102,7 +110,7 @@ const browser = await chromium.launch();
 let failed = false;
 try {
   for (const skin of ["", "sky-grove", "studio"]) {
-    for (const width of [1024, 1440]) {
+    for (const width of (process.env.ROOM_WIDTHS ?? "1024,1440").split(",").map(Number)) {
       const context = await browser.newContext({ viewport: { width, height: 1100 } });
       await context.addInitScript((hydrated) => {
         window.EventSource = class extends EventTarget {
@@ -134,7 +142,7 @@ try {
       const project = state === "project";
       const matrix = state === "matrix";
       await page.goto(matrix ? "http://localhost:5198/__visual-matrix" : project ? "http://localhost:5198/project/alpha" : "http://localhost:5198/think-tank/tt_demo");
-      const ready = matrix ? page.getByRole("heading", { name: "Presentation matrix" }) : project ? page.getByRole("heading", { name: "Think Tanks" }) : page.getByRole("list", { name: "Discussion" });
+      const ready = matrix ? page.getByRole("heading", { name: "Presentation matrix" }) : project ? page.getByRole("region", { name: "Think Tank rooms" }) : page.getByRole("list", { name: "Discussion" });
       const shown = await ready.waitFor({ timeout: 15_000 }).then(() => true, () => false);
       if (matrix && shown) await page.getByLabel("Fixture appearance").selectOption(skin || "core");
       await page.waitForTimeout(600);

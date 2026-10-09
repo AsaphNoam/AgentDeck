@@ -19,11 +19,11 @@ beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => cleanup());
 afterAll(() => server.close());
 
-function renderList() {
+function renderList(project: string | null = "alpha") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter><RoomList project="alpha" /></MemoryRouter>
+      <MemoryRouter><RoomList project={project ?? undefined} /></MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -39,15 +39,20 @@ describe("RoomList cards", () => {
     expect(screen.getByRole("link", { name: "Cache choice" }).getAttribute("href")).toBe("/think-tank/tt_fixture");
     const roster = within(card as HTMLElement).getByRole("list", { name: "Participants" });
     expect(within(roster).getByRole("link", { name: "Ari" }).getAttribute("href")).toBe("/agent/a_one");
-    expect(within(roster).getByText("2 of 3 left")).toBeTruthy();
+    expect(await within(roster).findByText(/Alpha · 2 turns left/)).toBeTruthy();
+    expect(within(roster).getByText("Speaking")).toBeTruthy();
     expect(within(card as HTMLElement).getByText("Ari is speaking.")).toBeTruthy();
-    expect(within(card as HTMLElement).getByText(/2 turns left in total/)).toBeTruthy();
+    expect(within(card as HTMLElement).getByText("Active")).toBeTruthy();
+    const budget = card.querySelector(".room-card-budget") as HTMLElement;
+    expect(budget.textContent).toContain("2turns remaining");
 
     cleanup();
     rooms = [{ ...summary(), hold: "Ari's turn failed.", roster: summary().roster.map((m) => ({ ...m, exists: m.agent_id === "a_one" })) }];
     renderList();
-    expect(await screen.findByText("Needs attention: Ari's turn failed.")).toBeTruthy();
-    expect(screen.getByText("Gone (deleted)")).toBeTruthy();
+    expect(await screen.findByText("Ari's turn failed.")).toBeTruthy();
+    expect(screen.getByText("Needs attention")).toBeTruthy();
+    expect(screen.getByText("Gone")).toBeTruthy();
+    expect(screen.getByText(/agent deleted/)).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Gone" })).toBeNull();
   });
 
@@ -55,8 +60,18 @@ describe("RoomList cards", () => {
     rooms = [{ ...summary(), phase: "ended" }];
     renderList();
     const card = (await screen.findByRole("link", { name: "Cache choice" })).closest("li")!;
-    expect(within(card as HTMLElement).getByText("2 turns went unused")).toBeTruthy();
-    expect(within(card as HTMLElement).getByText("2 of 3 left")).toBeTruthy();
-    expect(within(card as HTMLElement).queryByText(/left in total/)).toBeNull();
+    const budget = card.querySelector(".room-card-budget") as HTMLElement;
+    expect(budget.textContent).toContain("2unused turns");
+    expect(within(card as HTMLElement).getByText("Ended")).toBeTruthy();
+    expect(within(card as HTMLElement).getByText(/2 turns left/)).toBeTruthy();
+    expect(within(card as HTMLElement).queryByText("turns remaining")).toBeNull();
+  });
+
+  // FS-21.R39: Archive discovery names the origin, including a removed project.
+  it("names a removed origin project outside the project page", async () => {
+    rooms = [{ ...summary(), origin_project: "ghost" }];
+    renderList(null);
+    const card = (await screen.findByRole("link", { name: "Cache choice" })).closest("li")!;
+    expect((await within(card as HTMLElement).findByText(/project removed/)).textContent).toBe("Origin: ghost · project removed");
   });
 });

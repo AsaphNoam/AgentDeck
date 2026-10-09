@@ -188,7 +188,7 @@ export function ArchivePage() {
       )}
       {/* Rooms are fetched separately and never enter the agent archive
           results (FS-05.R39, TS-03.R55). */}
-      <RoomList title="Think Tanks" emptyText="No Think Tanks yet." />
+      <RoomList title="Retained room history" emptyText="No Think Tanks yet." />
     </section>
   );
 }
