@@ -31,10 +31,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   at `/Users/mcnoam/.chuck/project-resources/agentdeck-20261007t221535z/mobile-design/`
   (`runs/final` and corrected `runs/verified-final`). Existing real-tailnet, Android/iPhone and
   credentialed-provider gates remain owed. No product code or specifications changed in review.
-- **Waiting for review:** Think Tank room page no longer shows the per-message "tools and changes"
-  disclosure between published contributions (FS-21.R39/A19, TS-14.R15, TS-08.R104, FS-03.R77);
-  live and unfinished-turn activity still renders. Done without a design stage at the user's
-  request. UI tests (721), UI build and `make check-specs` passed; Go untouched, `make embed` not run.
+- **Reviewed — Think Tank room disclosure, fixes open:** `7b76bc4` removes the per-message
+  "tools and changes" disclosure between published contributions (FS-21.R39/A19, TS-14.R15,
+  TS-08.R104, FS-03.R77), while keeping live and unfinished-turn activity. The review found that
+  a clipped entry window can misclassify activity from an older published attempt as unfinished;
+  see **Review findings**. The focused UI test command is presently blocked by unrelated dirty
+  presentation-contract failures; its 721-test receipt, UI build and `make check-specs` passed
+  before review. Go untouched, `make embed` not run.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -150,6 +153,40 @@ existing run projection; server collections are initialized before serialization
 Review evidence: 53 focused remote tests and 41 presentation checks passed. Browser harness and
 captures are in `/private/tmp/mobile-review.mjs` and `/private/tmp/mobile-review/`; those use
 stubbed APIs and do not replace the outstanding real-device gates.
+
+### Think Tank room disclosure — reviewed 2026-10-09
+
+Unit: `7b76bc4`; finding keeps this unit open.
+
+**Fix model:** medium — Codex Terra or Claude Opus.
+
+- **Must fix — A clipped published contribution can reappear as an “unfinished turn.”**
+  `ui/src/api/thinkTanks.ts:164` retains only the newest `THINK_TANK_ENTRY_WINDOW` entries, while
+  `ui/src/features/thinktank/ThinkTankPage.tsx:182` decides whether activity is unfinished solely
+  from that clipped entry list. In a long-lived room, send enough later room inputs to clip an
+  earlier contribution while its activity remains inside the independently bounded activity window:
+  its attempt id is no longer `placed`, so the page renders its old tool/diff disclosure as
+  `Ari's unfinished turn`. The operator sees stale completed work as unresolved, violating
+  FS-21.R39 and TS-14.R15. Preserve publication knowledge for every attempt represented in the
+  activity window (prefer a bounded server/wire indication over an unbounded client set), and add
+  a regression with a clipped published attempt plus retained activity.
+
+Specification coverage and local choices: the change correctly removes the disclosure immediately
+after a visible published contribution and keeps loose live/unfinished activity attributed and
+inspectable. No additional specification gap found.
+
+Invariant sweep: applicable classes §8 (the stale disclosure misstates turn state), §10 (the
+bounded entries/activity paths no longer compose correctly), §11 (the UI lacks the publication
+state needed for its activity contract), §16 (the fix must retain only a bounded publication
+projection), and §17 (the test omits the clipped-window case) reviewed. Classes §1–§7, §9, and
+§12–§15 have no applicable changed surface: no lifecycle reset, shared artifact construction,
+seeded persistence, registration/teardown, concurrency claim, interface/runtime, record-recovery,
+liveness/storage, external CLI, selector, HTTP/security, or external-effect ordering change.
+
+Review evidence: `git diff --check 7b76bc4^ 7b76bc4` passed. The focused `ThinkTankPage` test run
+could not start because its pretest presentation-contract gate fails on unrelated dirty files
+(`ChatPanel`, `Composer`, and `PermissionPrompt`); preserve and resolve that separate work before
+rerunning the focused suite.
 
 ## Blocked on human
 
