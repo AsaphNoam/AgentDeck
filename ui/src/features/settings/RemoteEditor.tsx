@@ -11,6 +11,7 @@ import {
   type RemoteStatus,
 } from "../../api/remote";
 import { useUiStore } from "../../store/uiStore";
+import { SettingsHeader } from "./SettingsHeader";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -192,11 +193,12 @@ function DeviceRow({ device }: { device: RemoteDevice }) {
       )}
       {draft === null && (
         <div className="remote-actions" data-slot="actions">
-          <button type="button" onClick={() => setDraft(device.name)}>
+          <button type="button" className="config-text-action" onClick={() => setDraft(device.name)}>
             Rename
           </button>
           <button
             type="button"
+            className="config-text-action config-text-action-danger"
             disabled={revoke.isPending}
             onClick={() => {
               if (!window.confirm(`Revoke ${device.name}? It loses access immediately and must pair again.`)) return;
@@ -222,12 +224,7 @@ export function RemoteEditor() {
 
   return (
     <div className="config-editor" data-ui="config-editor" data-variant="remote">
-      <div className="config-editor-header" data-slot="header">
-        <div>
-          <h2>Remote</h2>
-          <p>Supervise and direct Chuck from your phone while this Mac keeps working.</p>
-        </div>
-      </div>
+      <SettingsHeader eyebrow="Remote" title="Remote" description="Supervise and direct Chuck from your phone while this Mac keeps working." />
       {remote.isError && <p className="form-error">{errorText(remote.error)}</p>}
       {status && (
         <>
@@ -247,7 +244,7 @@ export function RemoteEditor() {
           </label>
           <StatusLine status={status} />
           {status.state === "on" && <PairingPanel status={status} />}
-          <h3>Paired phones</h3>
+          <h3 className="config-group-label">Paired phones</h3>
           {status.devices.length === 0 ? (
             <p className="config-empty" data-state="empty">
               No phones are paired.

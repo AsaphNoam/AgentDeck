@@ -116,7 +116,7 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
         <button type="button" className="btn-link" onClick={() => setExpanded((x) => !x)}>
           {showEditor ? "▴ env" : `▾ env (${pairs.length})`}
         </button>
-        <button type="button" className="btn-danger btn-sm" onClick={onRemove}>Remove</button>
+        <button type="button" className="config-text-action config-text-action-danger" onClick={onRemove}>Remove</button>
       </div>
       {showEditor && (
         <div className="model-env-editor">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { configErrorMessage, useConfig, usePutConfig } from "../../api/config";
 import { useUiStore } from "../../store/uiStore";
+import { SettingsHeader } from "./SettingsHeader";
 
 export function TaskConcurrencyEditor() {
   const config = useConfig();
@@ -17,13 +18,9 @@ export function TaskConcurrencyEditor() {
 
   return (
     <div className="config-editor" data-ui="config-editor">
-      <div className="config-editor-header" data-slot="header">
-        <div>
-          <h2>Dependent work</h2>
-          <p>Limit how many agent runtimes tasks may start at once.</p>
-        </div>
-      </div>
+      <SettingsHeader eyebrow="Tasks" title="Dependent work" description="Limit how many agent runtimes tasks may start at once." />
       <form
+        className="task-concurrency-form"
         onSubmit={(event) => {
           event.preventDefault();
           if (!valid || putConfig.isPending) return;
@@ -45,7 +42,7 @@ export function TaskConcurrencyEditor() {
           />
         </label>
         {!valid && <p className="form-error">Enter a positive whole number.</p>}
-        <button type="submit" disabled={!valid || putConfig.isPending || config.isLoading}>
+        <button type="submit" className="ad-button-primary config-primary-action" disabled={!valid || putConfig.isPending || config.isLoading}>
           {putConfig.isPending ? "Saving…" : "Save"}
         </button>
       </form>

@@ -16,6 +16,7 @@ import { BACKEND_TYPE_LABELS, BACKEND_TYPE_OPTIONS } from "../../lib/backendType
 import { ModelRow, type ModelCapability } from "./ModelRow";
 import { ConfigSourcePanel } from "./ConfigSourcePanel";
 import { AddBackendDialog } from "./AddBackendDialog";
+import { SettingsHeader } from "./SettingsHeader";
 
 type Pair = { key: string; value: string };
 
@@ -322,10 +323,9 @@ export function BackendsEditor() {
 
   return (
     <div className="config-editor backends-editor" data-ui="config-editor" data-state={error ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="backends">
-      <div className="config-editor-header" data-slot="header">
-        <h2>Backends</h2>
-        <button type="button" onClick={() => setAddOpen(true)}>Add backend</button>
-      </div>
+      <SettingsHeader eyebrow="Backends" title="Configured backends">
+        <button type="button" className="ad-button-primary config-primary-action" onClick={() => setAddOpen(true)}>Add backend</button>
+      </SettingsHeader>
 
       <AddBackendDialog
         open={addOpen}
@@ -376,7 +376,7 @@ export function BackendsEditor() {
               ))}
             </select>
             {credentials[id] && credChip(credentials[id])}
-            <button type="button" className="btn-danger btn-sm" onClick={() => removeBackend(id)}>
+            <button type="button" className="config-text-action config-text-action-danger" onClick={() => removeBackend(id)}>
               Remove
             </button>
           </div>
@@ -438,7 +438,7 @@ export function BackendsEditor() {
 
           <div className="backend-models-section">
             <div className="backend-models-header">
-              <strong>Models</strong>
+              <strong className="config-group-label">Models</strong>
             </div>
             {(capability.effortUnknown || capability.fastUnknown) && (
               <p className="config-notice model-capability-note" role="status">
@@ -492,7 +492,7 @@ export function BackendsEditor() {
       {error && <p className="form-error">{error}</p>}
 
       <div className="backends-footer" data-slot="actions">
-        <button type="button" onClick={handleSave} disabled={putBackends.isPending}>
+        <button type="button" className="ad-button-primary config-primary-action" onClick={handleSave} disabled={putBackends.isPending}>
           {putBackends.isPending ? "Saving…" : "Save"}
         </button>
       </div>

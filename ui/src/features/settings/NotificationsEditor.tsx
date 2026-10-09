@@ -1,6 +1,7 @@
 import { useConfig, usePutConfig } from "../../api/config";
 import { useUiStore } from "../../store/uiStore";
 import type { NotificationType } from "../../api/types";
+import { SettingsHeader } from "./SettingsHeader";
 
 const notificationTypes: Array<{ type: NotificationType; label: string }> = [
   { type: "done", label: "Done" },
@@ -37,22 +38,22 @@ export function NotificationsEditor() {
 
   return (
     <div className="config-editor notifications-editor" data-ui="config-editor" data-variant="notifications">
-      <div className="config-editor-header" data-slot="header">
-        <h2>Notifications</h2>
+      <SettingsHeader eyebrow="Notifications" title="Notifications" />
+      <div className="notification-desktop">
+        <label className="toggle-row toggle-row-primary">
+          <input
+            type="checkbox"
+            checked={notifications.desktop_enabled}
+            onChange={(event) => save({ ...notifications, desktop_enabled: event.target.checked })}
+          />
+          Desktop notifications
+        </label>
         {"Notification" in window && Notification.permission !== "granted" && (
-          <button type="button" onClick={() => void requestDesktop()}>
+          <button type="button" className="config-secondary-action" onClick={() => void requestDesktop()}>
             Enable desktop
           </button>
         )}
       </div>
-      <label className="toggle-row">
-        <input
-          type="checkbox"
-          checked={notifications.desktop_enabled}
-          onChange={(event) => save({ ...notifications, desktop_enabled: event.target.checked })}
-        />
-        Desktop notifications
-      </label>
       <div className="notification-mutes">
         {notificationTypes.map((item) => (
           <label key={item.type} className="toggle-row">

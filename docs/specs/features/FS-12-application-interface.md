@@ -425,6 +425,25 @@ Requirements are user-observable.
   transcript), annotations, file viewer, Think Tank and Terminal tabs, and archive Resume/Restore
   behave as before. The dashboard chat pane and the phone keep their own compositions.
 
+- **R62 — Settings adopts the Figma settings composition.** The `Settings` study in AgentDeck —
+  Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`) governs the desktop Settings page: a friendly page
+  title over a two-column layout whose narrow left section list (rounded items, soft tinted
+  selection, divided from content by a quiet rule) holds at the 1024px desktop floor; every
+  section opens with a small mono uppercase eyebrow, a readable section title
+  (Theme for Appearance, Configured backends for Backends, Dependent work for Tasks), optional
+  one-line description and its primary action at the right. Roles, projects and paired phones are
+  softly raised rounded rows with name and id, a quiet status chip plus excerpt or working
+  directory, and text-style row actions where destructive actions use the error color; a role
+  with no permission override reads "Inherit global". Each backend is one raised card whose
+  models, environment, provider and configuration-source groups are separated by ruled bands with
+  mono labels rather than nested boxes. Notifications and Tasks are bounded ruled lists/forms;
+  appearance choices are three equal cards with a full-width palette preview over the radio,
+  name and description. Primary actions use the appearance's primary color with a soft pressed
+  edge. All three appearances express the composition through their semantic palettes. The
+  study's sample data, prototype-only notes, Appearance default tab, concept theme and invented
+  backend fields are excluded; Remote joins the same composition; every existing section, editor,
+  dialog, validation, save, warning and destructive-confirmation behavior is unchanged.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -643,6 +662,15 @@ Requirements are user-observable.
   spacing without horizontal overflow; Discard restores the current runtime without a request;
   `@`/`#` open the existing picker; Copy thread identity, file viewer, annotations, held
   follow-up, Steer/Cancel and Resume still work. The dashboard chat pane and phone are unchanged.
+  *Verify:* focused component tests plus the working tree's real-browser comparison.
+
+- **A34** (R62) — Compare the Settings study with every Settings section at 1024px and 1280px in
+  Core, Sky & Grove and Studio using populated fake-backend configuration: roles with and without
+  a permission override, active and archived projects, a backend with models, provider and
+  configuration source, notifications, appearance, tasks validation and remote. Navigation,
+  headings, rows, backend card, ruled lists and theme cards match the study's hierarchy and
+  spacing without horizontal overflow; hover, focus, selected, disabled and destructive states
+  stay visible; existing editor tests pass unchanged in behavior.
   *Verify:* focused component tests plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions

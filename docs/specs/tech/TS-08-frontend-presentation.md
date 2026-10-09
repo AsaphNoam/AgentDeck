@@ -1256,6 +1256,17 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   `--ad-action-primary`, blue tints to `--ad-action-secondary`, attention to
   `--ad-state-waiting`); no token, skin rule, motion or dependency is added. Verify with focused
   tests, the presentation checks, the development matrix and the A33 browser comparison.
+- **R113 — The Settings composition stays in the settings feature stylesheet.** FS-12.R62
+  lives in `styles/features/settings.css`. Section headings share one feature-owned
+  `SettingsHeader` that keeps the existing `config-editor` `data-slot="header"` hook; rows keep
+  `data-slot="item"`/`actions`, and new parts use implementation classes rather than new public
+  hooks. Appearance previews keep their `data-preview-skin` rules and all four preview slots: the
+  `preview-sky` band carries the action bar and signal above three `preview-surface` tiles, so
+  skin palettes need no change. Colors map onto semantic tokens
+  (selection and positive chips to `--ad-state-done` tints, primary actions to
+  `--ad-action-primary`, destructive text to `--ad-state-error`); no token, skin palette, motion
+  or dependency is added. Verify with focused tests, the presentation checks, the development
+  matrix and the A34 browser comparison.
 
 ## 3. Interfaces & data shapes
 

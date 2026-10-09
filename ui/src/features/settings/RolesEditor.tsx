@@ -5,6 +5,7 @@ import { useUiStore } from "../../store/uiStore";
 import type { RoleResponse } from "../../schemas/role";
 import { ConfirmDialog } from "../../components/ui";
 import { RoleForm } from "./RoleForm";
+import { SettingsHeader } from "./SettingsHeader";
 
 type DeleteDialog = { id: string; force?: boolean; agents?: string[]; error?: string };
 
@@ -79,32 +80,31 @@ export function RolesEditor() {
 
   return (
     <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="roles">
-      <div className="config-editor-header" data-slot="header">
-        <h2>Roles</h2>
-        <button onClick={openCreate}>New role</button>
-      </div>
+      <SettingsHeader eyebrow="Roles" title="Roles">
+        <button className="ad-button-primary config-primary-action" onClick={openCreate}>New role</button>
+      </SettingsHeader>
 
       {entries.length === 0 && (
         <p className="config-empty">No roles defined. Create one to get started.</p>
       )}
       <ul className="config-list" data-slot="list">
         {entries.map(([id, role]) => (
-          <li key={id} className="config-list-item" data-slot="item">
-            <div className="config-list-item-main">
+          <li key={id} className="config-list-item config-row-grid" data-slot="item">
+            <div className="config-row-identity">
               <strong>{role.title}</strong>
               <code className="config-slug">{id}</code>
-              {role.skip_permissions != null && (
-                <span className="config-badge">
-                  {role.skip_permissions ? "always skip" : "always prompt"}
-                </span>
-              )}
+            </div>
+            <div className="config-row-detail">
+              <span className={role.skip_permissions == null ? "config-badge config-badge-neutral" : "config-badge"}>
+                {role.skip_permissions == null ? "Inherit global" : role.skip_permissions ? "Always skip" : "Always prompt"}
+              </span>
               {role.system_prompt && (
                 <p className="config-excerpt">{role.system_prompt.slice(0, 80)}</p>
               )}
             </div>
             <div className="config-list-item-actions" data-slot="actions">
-              <button onClick={() => openEdit(id, role)}>Edit</button>
-              <button onClick={() => setDeleting({ id })} className="btn-danger">
+              <button className="config-text-action" onClick={() => openEdit(id, role)}>Edit</button>
+              <button onClick={() => setDeleting({ id })} className="config-text-action config-text-action-danger">
                 Delete
               </button>
             </div>

@@ -14,6 +14,7 @@ import type { CheckoutConsent } from "../../api/client";
 import { useUiStore } from "../../store/uiStore";
 import type { ProjectResponse, FieldWarning } from "../../schemas/project";
 import { ProjectForm } from "./ProjectForm";
+import { SettingsHeader } from "./SettingsHeader";
 import { ProjectArchiveDialog } from "../dashboard/ProjectDashboard";
 
 type DeleteDialog = { id: string; ownsCheckout: boolean; resourceDir?: string; force?: boolean; agents?: string[]; error?: string };
@@ -121,18 +122,17 @@ export function ProjectsEditor() {
 
   return (
     <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="projects">
-      <div className="config-editor-header" data-slot="header">
-        <h2>Projects</h2>
-        <button onClick={openCreate}>New project</button>
-      </div>
+      <SettingsHeader eyebrow="Projects" title="Projects">
+        <button className="ad-button-primary config-primary-action" onClick={openCreate}>New project</button>
+      </SettingsHeader>
 
       {entries.length === 0 && (
         <p className="config-empty">No projects defined. Create one to get started.</p>
       )}
       <ul className="config-list" data-slot="list">
         {entries.map(([id, proj]) => (
-          <li key={id} className="config-list-item" data-slot="item">
-            <div className="config-list-item-main">
+          <li key={id} className="config-list-item config-row-grid" data-slot="item">
+            <div className="config-row-identity config-row-identity-swatch">
               <div
                 className="project-color-swatch"
                 style={{
@@ -141,22 +141,26 @@ export function ProjectsEditor() {
                     : "var(--ad-project-fallback)",
                 }}
               />
-              <strong>{proj.title}</strong>
-              <code className="config-slug">{id}</code>
-              <span>{proj.archived ? "Archived" : "Active"}</span>
+              <div className="config-row-identity">
+                <strong>{proj.title}</strong>
+                <code className="config-slug">{id}</code>
+              </div>
+            </div>
+            <div className="config-row-detail">
+              <span className={proj.archived ? "config-badge config-badge-neutral" : "config-badge"}>{proj.archived ? "Archived" : "Active"}</span>
               <span className="config-cwd">{proj.cwd}</span>
             </div>
             <div className="config-list-item-actions" data-slot="actions">
-              <button onClick={() => openEdit(id, proj)}>Edit</button>
+              <button className="config-text-action" onClick={() => openEdit(id, proj)}>Edit</button>
               {proj.archived ? (
-                <button onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
+                <button className="config-text-action config-text-action-quiet" onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
               ) : (
-                <button onClick={() => {
+                <button className="config-text-action config-text-action-quiet" onClick={() => {
                   setArchiveError("");
                   setArchiveID(id);
                 }} disabled={archive.isPending}>Archive</button>
               )}
-              <button onClick={() => setDeleting({ id, ownsCheckout: proj.worktree?.owned ?? false, resourceDir: proj.resource_dir })} className="btn-danger">
+              <button onClick={() => setDeleting({ id, ownsCheckout: proj.worktree?.owned ?? false, resourceDir: proj.resource_dir })} className="config-text-action config-text-action-danger">
                 Delete
               </button>
             </div>

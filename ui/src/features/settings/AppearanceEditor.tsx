@@ -3,6 +3,7 @@ import { configErrorMessage, QUERY_KEYS, useConfig, usePutConfig } from "../../a
 import type { Config } from "../../schemas/config";
 import { SKY_GROVE_SKIN, STUDIO_SKIN, effectiveAppearance } from "../appearance/appearance";
 import { useUiStore } from "../../store/uiStore";
+import { SettingsHeader } from "./SettingsHeader";
 
 const appearances = [
   {
@@ -68,14 +69,10 @@ export function AppearanceEditor() {
         : undefined;
 
   return (
-    <div className="config-editor appearance-editor" data-ui="config-editor" data-variant="appearance">
-      <div className="config-editor-header" data-slot="header">
-        <div>
-          <h2>Appearance</h2>
-          <p>Choose one look for every project, agent, and browser session.</p>
-        </div>
+    <div className="config-editor" data-ui="config-editor" data-variant="appearance">
+      <SettingsHeader eyebrow="Appearance" title="Theme" description="Choose one look for every project, agent, and browser session.">
         {putConfig.isPending && <span className="appearance-saving">Saving…</span>}
-      </div>
+      </SettingsHeader>
 
       {warning && <p className="appearance-warning" role="status">{warning}</p>}
 
@@ -83,27 +80,32 @@ export function AppearanceEditor() {
         <legend className="ad-visually-hidden">Chuck appearance</legend>
         {appearances.map((appearance) => (
           <label className="appearance-option" data-slot="item" key={appearance.id}>
-            <input
-              // When a warning is present the durable selection is not a clean
-              // valid appearance (unsupported/unreadable/read error), so leave
-              // every radio unchecked — clicking Core then saves "" to repair it
-              // rather than being inert because Core is only the effective
-              // fallback (FS-12.R32/A11).
-              checked={!warning && active === appearance.id}
-              name="appearance"
-              onChange={() => save(appearance.value)}
-              type="radio"
-              value={appearance.value}
-            />
             <span className="appearance-preview" data-slot="preview" data-preview-skin={appearance.id} aria-hidden="true">
-              <span className="appearance-preview-sky" data-slot="preview-sky" />
+              <span className="appearance-preview-sky" data-slot="preview-sky">
+                <span className="appearance-preview-action" data-slot="preview-action" />
+                <span className="appearance-preview-signal" data-slot="preview-signal" />
+              </span>
               <span className="appearance-preview-surface" data-slot="preview-surface" />
-              <span className="appearance-preview-action" data-slot="preview-action" />
-              <span className="appearance-preview-signal" data-slot="preview-signal" />
+              <span className="appearance-preview-surface" data-slot="preview-surface" />
+              <span className="appearance-preview-surface" data-slot="preview-surface" />
             </span>
-            <span className="appearance-copy">
-              <strong>{appearance.name}</strong>
-              <span>{appearance.description}</span>
+            <span className="appearance-choice">
+              <input
+                // When a warning is present the durable selection is not a clean
+                // valid appearance (unsupported/unreadable/read error), so leave
+                // every radio unchecked — clicking Core then saves "" to repair it
+                // rather than being inert because Core is only the effective
+                // fallback (FS-12.R32/A11).
+                checked={!warning && active === appearance.id}
+                name="appearance"
+                onChange={() => save(appearance.value)}
+                type="radio"
+                value={appearance.value}
+              />
+              <span className="appearance-copy">
+                <strong>{appearance.name}</strong>
+                <span>{appearance.description}</span>
+              </span>
             </span>
           </label>
         ))}

@@ -20,6 +20,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Review available — Settings composition (FS-12.R62/A34, TS-08.R113):** every Settings tab
+  adopts the Figma Make `Settings` study: 180px left section list with soft done-tinted selection,
+  mono eyebrow + section title (Theme, Configured backends, Dependent work) via the new
+  `SettingsHeader`, softly raised role/project/phone rows with text actions (destructive in error
+  color; roles without an override read "Inherit global"), one raised card per backend with ruled
+  mono-labelled groups and ruled model rows, ruled Notifications/Tasks lists, and three equal theme
+  cards whose `preview-sky` band holds the action bar and signal over three surfaces (skin rules
+  unchanged, no contract change). Primary actions use `--ad-action-primary` with a pressed edge.
+  Excluded: study sample data, prototype notes, Appearance default tab, concept theme, invented
+  backend fields; sub-1024px layout (below the desktop floor). Remote's `window.confirm` revoke is
+  pre-existing and untouched. 730 UI tests, presentation/style checks, UI build, `make test`
+  (`CHUCK_RUNTIME_ROOT=`), `make build` and `make embed` passed. Real-browser captures of all seven
+  tabs in Core, Sky & Grove and Studio at 1024/1280 (fake-backend fixture: roles with/without
+  override, active/archived long-name project, four backends) show no overflow or page errors.
+  Harness and captures: shared project resources `settings-design/` (`harness/`, `runs/final`);
+  Make source in `settings-design/App.tsx`. Owed in review: independent rendered pass including
+  hover/focus/disabled states, an expanded model env and configuration-source panel, and the
+  paired-phone/pairing states.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
