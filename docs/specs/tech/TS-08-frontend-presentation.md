@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -825,8 +825,8 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   tests cover request equivalence and recovery; FS-12.A24 owns the rendered gate for R69–R72.
 - **R73 — The phone app is a separate, phone-first entry.** `ui/remote.html` with
   `ui/src/remote/` is a second Vite entry in the same build and embed (TS-13.R14). It has its own
-  compact shell designed for phone widths (360–430px), not the desktop shell, skins, or the 1024px
-  desktop floor, and it renders with Core tokens only. It reuses `ui/src/api` and the existing
+  compact shell designed for phone widths (360–430px), not the desktop shell or the 1024px
+  desktop floor. R111 supersedes its original Core-only palette restriction. It reuses `ui/src/api` and the existing
   transcript, diff, and permission rendering primitives where they fit a phone, rather than forking
   them. It ships a web-app manifest (`display: standalone`) and a service worker limited to push
   display, notification click routing, and caching the app shell; it never caches API responses.
@@ -1230,6 +1230,19 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   separators, actual new-tab navigation or contained overflow. Run the applicable TS-06 closure
   matrix, style/presentation checks and `make embed` after final implementation edits; never edit
   generated dist. No credentialed provider smoke is added for this presentation-only change.
+
+- **R111 (planned) — Mobile composition shares Chuck's appearance seam.** FS-20.R43's
+  phone layout lives in `styles/features/phone.css` and feature-owned `remote/` composition.
+  `remote.css` statically imports the existing finite skin styles after shared construction;
+  the paired phone applies the same `applyAppearance` allowlist to its read-only `/api/config`
+  projection, refreshing while open and retaining Core on missing/unknown/failed configuration.
+  No theme provider, browser preference, skin picker, new palette, API authority or desktop-shell
+  import is added. Shared icons/mark, semantic tokens, Radix dialogs and existing renderers supply
+  the reference's construction. Setup and destructive sheets preserve validation, drafts,
+  focus trapping and dismissal semantics. Pipeline progress comes from the existing run detail,
+  never prototype stage data. Verify all three palettes at phone widths and preserve desktop
+  geometry through focused tests, the development matrix and actual remote-entry browser review.
+  This supersedes the Core-only phone verification clauses in R110 and FS-12.R60/A32.
 
 ## 3. Interfaces & data shapes
 

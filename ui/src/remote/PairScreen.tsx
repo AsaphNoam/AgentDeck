@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { claimPairing, PhoneAPIError, waitPairing } from "./api";
 import { rememberPaired } from "./connection";
 import { navigate } from "./router";
+import { PhoneIcon } from "./PhoneIcon";
 
 const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent);
 const isStandalone = () =>
@@ -32,14 +33,18 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
   if (isIOS() && !isStandalone()) {
     return (
       <main className="phone-screen phone-center">
-        <h1>Add Chuck to your Home Screen</h1>
-        <p>On iPhone, pairing has to happen inside the installed app.</p>
+        <div className="phone-pair-icon"><PhoneIcon name="phone" size={42} /></div>
+        <header className="phone-page-heading">
+          <span className="phone-eyebrow">DESKTOP → PHONE</span>
+          <h1>Add Chuck to your Home Screen</h1>
+          <p>On iPhone, pairing has to happen inside the installed app so it can keep its own secure connection.</p>
+        </header>
         <ol className="phone-steps">
           <li>Tap the Share button, then <strong>Add to Home Screen</strong>.</li>
           <li>Open Chuck from your Home Screen.</li>
           <li>Enter the pairing code there{code ? ":" : "."}</li>
         </ol>
-        {code && <p className="phone-code">{code}</p>}
+        {code && <p className="phone-code" aria-label="Pairing code">{code}</p>}
       </main>
     );
   }
@@ -66,21 +71,32 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
   if (phase === "waiting") {
     return (
       <main className="phone-screen phone-center" aria-live="polite">
-        <h1>Allow this phone on your Mac</h1>
-        <p>
-          Chuck on your Mac is asking <strong>Allow this phone?</strong> for “{name.trim()}”.
-        </p>
+        <div className="phone-pair-icon"><PhoneIcon name="phone" size={42} /></div>
+        <header className="phone-page-heading">
+          <span className="phone-eyebrow">DESKTOP → PHONE</span>
+          <h1>Waiting for approval</h1>
+          <p>Allow this phone in Chuck on your Mac to finish pairing.</p>
+        </header>
+        <section className="phone-settings-card">
+          <span className="phone-status" data-tone="waiting"><i aria-hidden="true" />Waiting for desktop approval</span>
+          <p>Chuck on your Mac is asking <strong>Allow this phone?</strong> for “{name.trim()}”. Keep this screen open.</p>
+        </section>
       </main>
     );
   }
 
   return (
     <main className="phone-screen phone-center">
-      <h1>Pair this phone</h1>
-      <p>
-        On your Mac, open Chuck → Settings → Remote → <strong>Pair a phone</strong>. This phone needs the Tailscale app,
-        signed in to the same tailnet.
-      </p>
+      <div className="phone-pair-icon"><PhoneIcon name="phone" size={42} /></div>
+      <header className="phone-page-heading">
+        <span className="phone-eyebrow">DESKTOP → PHONE</span>
+        <h1>Pair this phone</h1>
+        <p>Start pairing in Chuck on your Mac, then enter the one-time code here.</p>
+      </header>
+      <section className="phone-settings-card">
+        <div className="phone-section-title"><PhoneIcon name="shield" size={19} /><h2>Private to your tailnet</h2></div>
+        <p className="phone-help">Open Chuck → Settings → Remote → <strong>Pair a phone</strong>. This phone needs the Tailscale app signed in to the same tailnet.</p>
+      </section>
       <form
         className="phone-form"
         onSubmit={(event) => {
@@ -104,9 +120,10 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
         </label>
         {error && <p className="phone-error">{error}</p>}
         <button type="submit" className="phone-primary" disabled={code.trim().length !== 8 || !name.trim()}>
-          Pair
+          Pair <PhoneIcon name="arrow" size={17} />
         </button>
       </form>
+      <p className="phone-help">The code works once and expires after five minutes. No desktop password is entered on this phone.</p>
     </main>
   );
 }

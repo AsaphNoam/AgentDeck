@@ -45,6 +45,11 @@
     "reason": "Project RGB accent is persisted project data"
   },
   {
+    "file": "src/remote/HomeScreen.tsx",
+    "rule": "inline-style",
+    "reason": "Phone project mark uses the persisted project RGB accent under TS-08.R14"
+  },
+  {
     "file": "src/presentation/VisualMatrix.tsx",
     "rule": "inline-style",
     "reason": "Fixture cards render the fixed declared project-accent palette"

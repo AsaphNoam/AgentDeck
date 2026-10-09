@@ -1,4 +1,10 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import * as Dialog from "@radix-ui/react-dialog";
+import { applyAppearance } from "../features/appearance/appearance";
+import { ChuckMark } from "../components/shell/ChuckMark";
+import { phoneFetch } from "./api";
+import { PhoneIcon } from "./PhoneIcon";
 import { classify, connect, useConnection, wasPaired } from "./connection";
 import { HomeScreen } from "./HomeScreen";
 import { PairScreen, UnpairedScreen } from "./PairScreen";
@@ -25,26 +31,33 @@ function Banner() {
  *  is visibly stale while the Mac is unreachable (FS-20.R23). */
 function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
   const link = useConnection((state) => state.link);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const path = usePath();
+  const config = useQuery({ queryKey: ["phone-appearance"], queryFn: () => phoneFetch<{ appearance_skin?: string }>("/api/config"), refetchInterval: 5000, enabled: link === "connected" });
+  const skin = config.isError ? undefined : config.data?.appearance_skin;
+  useEffect(() => { applyAppearance(skin); }, [skin]);
+  const go = (route: string) => { setMenuOpen(false); navigate(route); };
   return (
     <div className="phone-app">
       <header className="phone-header">
-        {back ? (
-          <button type="button" className="phone-back" onClick={() => navigate("/")}>
-            ‹ Home
-          </button>
-        ) : (
-          <>
-            <span className="phone-brand">Chuck</span>
-            <span className="phone-header-actions">
-              <button type="button" aria-label="This phone" onClick={() => navigate("/phone")}>
-                ⚙
-              </button>
-            </span>
-          </>
-        )}
+        <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
+          <Dialog.Trigger className="phone-menu-trigger" aria-label="Open navigation"><PhoneIcon name="menu" size={21} /></Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="phone-navigation-overlay" />
+            <Dialog.Content className="phone-navigation" aria-describedby={undefined}>
+              <Dialog.Title className="phone-eyebrow">Your companion</Dialog.Title>
+              <nav aria-label="Mobile navigation">
+                <button type="button" aria-current={path === "/" ? "page" : undefined} onClick={() => go("/")}><PhoneIcon name="home" />Home<PhoneIcon name="arrow" size={16} /></button>
+                <button type="button" aria-current={path === "/phone" ? "page" : undefined} onClick={() => go("/phone")}><PhoneIcon name="phone" />This phone<PhoneIcon name="arrow" size={16} /></button>
+              </nav>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+        <button type="button" className="phone-brand" aria-label="Chuck Home" onClick={() => navigate("/")}><ChuckMark compact /><strong>Chuck</strong><span className="phone-companion">companion</span></button>
       </header>
       <Banner />
       <main className="phone-screen" aria-busy={link === "checking"} data-stale={link === "unreachable" ? "true" : undefined}>
+        {back && !match(path, "agent") && !match(path, "run") && <button type="button" className="phone-back" onClick={() => navigate("/")}><PhoneIcon name="back" size={16} />Home</button>}
         {children}
       </main>
     </div>
@@ -55,6 +68,9 @@ export function PhoneApp() {
   const link = useConnection((state) => state.link);
   const setLink = useConnection((state) => state.setLink);
   const path = usePath();
+  useEffect(() => {
+    if (link === "unpaired") applyAppearance();
+  }, [link]);
 
   useEffect(() => {
     void classify()

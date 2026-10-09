@@ -47,6 +47,7 @@ const server = setupServer(
   ),
   http.get("/api/remote/home", () => HttpResponse.json(home)),
   http.get("/api/projects", () => HttpResponse.json({ "my-app": { title: "My app", color: [1, 2, 3] } })),
+  http.get("/api/config", () => HttpResponse.json({ appearance_skin: "" })),
   http.post("/api/remote/pair", async ({ request }) => {
     claims++;
     const body = (await request.json()) as { code: string };
@@ -77,6 +78,7 @@ afterEach(() => {
   cleanup();
   disconnect();
   server.resetHandlers();
+  document.documentElement.removeAttribute("data-skin");
 });
 afterAll(() => server.close());
 
@@ -90,6 +92,24 @@ function renderApp() {
 }
 
 describe("PhoneApp", () => {
+  it("follows configured appearance and falls back to Core for an unknown value", async () => {
+    server.use(http.get("/api/config", () => HttpResponse.json({ appearance_skin: "studio" })));
+    renderApp();
+    await waitFor(() => expect(document.documentElement.dataset.skin).toBe("studio"));
+    cleanup();
+    server.use(http.get("/api/config", () => HttpResponse.json({ appearance_skin: "unknown" })));
+    renderApp();
+    await waitFor(() => expect(document.documentElement.hasAttribute("data-skin")).toBe(false));
+  });
+
+  it("opens the companion navigation and dismisses it without changing the page", async () => {
+    renderApp();
+    fireEvent.click(await screen.findByRole("button", { name: "Open navigation" }));
+    expect(screen.getByRole("navigation", { name: "Mobile navigation" })).toHaveTextContent("This phone");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(window.location.pathname).toBe("/");
+  });
   it("opens Home on what needs the person", async () => {
     renderApp();
     expect(await screen.findByText("implementer@my-app")).toBeInTheDocument();

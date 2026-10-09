@@ -20,7 +20,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub remains `AsaphNoam/AgentDeck`. Installer/updater defaults still point
   to `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repo.
-- **Active change:** None.
+- **Active change:** Figma mobile companion overhaul (FS-20.R43/A15, TS-08.R111).
 - **Waiting for review:** Think Tank room page no longer shows the per-message "tools and changes"
   disclosure between published contributions (FS-21.R39/A19, TS-14.R15, TS-08.R104, FS-03.R77);
   live and unfinished-turn activity still renders. Done without a design stage at the user's
@@ -33,7 +33,23 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. Release `v0.12.0` is published; manual acceptance gates remain below.
+**In progress — Figma mobile companion overhaul.** User requested `/work` implementing the
+`/mobile` design in Figma Make `OykxmXqZnnyA67QA1lv3AU`, keeping all Chuck theme palettes.
+Clean `main` at startup. Specification delta: FS-20.R43/A15 and TS-08.R111 (planned).
+Slices: (1) phone shell/Home/project and shared theme application; (2) conversation/Files/Manage,
+pipeline, phone settings/pairing and sheets; (3) focused behavior/style checks, reference comparison,
+three-appearance rendered mobile and desktop matrix, closure/embed and review handoff.
+Source slices are implemented: shell/Home/project and theme bridge; chat, Files/Manage,
+pipeline history, phone/pairing and Radix sheets. Focused remote tests (53), TypeScript,
+stylelint/presentation contract and UI build passed; `make check-specs` passed.
+First `make embed` passed; rendered corrections need a final embed refresh.
+Current slice: compare exact Make prototype screenshots with real paired phone, repair material
+layout issues, then run the full closure matrix once. Shared reference sources/screenshots live in
+`/Users/mcnoam/.chuck/project-resources/agentdeck-20261007t221535z/mobile-design/`.
+Direction: experienced operator away from the Mac, attention first then configured projects;
+quiet header, restrained typography, separated attention and compact rows; real agent permission
+and pipeline stage state lead. Preserve remote security, all existing controls/refusals/drafts,
+eight-character pairing and native iPhone install requirements. No decorative motion.
 
 ## Acceptance gates still owed
 

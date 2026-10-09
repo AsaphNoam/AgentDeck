@@ -101,7 +101,7 @@ describe("ProjectScreen start pipeline", () => {
     renderScreen();
     fireEvent.click(await screen.findByRole("button", { name: "Start pipeline" }));
     fireEvent.change(await screen.findByRole("textbox", { name: "Run goal" }), { target: { value: "Ship it" } });
-    fireEvent.click(screen.getAllByRole("button", { name: "Start pipeline" })[1]);
+    fireEvent.click(screen.getByRole("dialog", { name: "Start pipeline" }).querySelector('button[type="submit"]')!);
   }
 
   it("starts a run in this project and opens it", async () => {

@@ -7,11 +7,21 @@ import { setupServer } from "msw/node";
 import { RunScreen } from "./RunScreen";
 import { useConnection } from "./connection";
 
-const template = { version: 2, title: "Delivery", orchestrator_role: "implementer", inputs: [], stages: [{ id: "work", title: "Work", objective: "Do the work.", coordination: "standing", inputs: [], outputs: [] }] };
+const template = { version: 2, title: "Delivery", orchestrator_role: "implementer", inputs: [{ name: "feature", description: "Feature", required: true }], stages: [
+  { id: "work", title: "Work", objective: "Do the work.", coordination: "standing", inputs: [], outputs: [] },
+  { id: "review", title: "Review", objective: "Review the work.", coordination: "standing", inputs: [], outputs: [] },
+  { id: "fix", title: "Fix", objective: "Address findings.", coordination: "standing", inputs: [], outputs: [] },
+] };
 const eligible = { eligible: true, reason: "" };
 const controls = { continue: eligible, retry: eligible, replace: { eligible: false, reason: "" }, stop: eligible, repair_cleanup: { eligible: false, reason: "" } };
-const run = { run_id: "run_1", template_id: "delivery", template_snapshot: template, display_name: "Ship", project: "app", goal: "Ship it", inputs: {}, assignments: {}, orchestrator: { backend: "codex", model: "m" }, dedicated_assignments: {}, state: "paused", revision: 7, pending_action: "", current_stage_id: "work", current_task_id: "", current_attempt_id: "", current_agent_id: "a_live", attention_reason: "Stage needs input", final_outcome: "", created_at: "2026-10-05T00:00:00Z", updated_at: "2026-10-05T00:00:00Z" };
-const detail = { run, template, inputs: {}, orchestrator: run.orchestrator, dedicated_assignments: {}, stage_tasks: [], assignments: {}, values: [], diagnostics: [], controls };
+const run = { run_id: "run_1", template_id: "delivery", template_snapshot: template, display_name: "Ship", project: "app", goal: "Ship the feature and review it.", inputs: { feature: "Search normalization" }, assignments: {}, orchestrator: { backend: "codex", model: "m" }, dedicated_assignments: {}, state: "paused", revision: 7, pending_action: "", current_stage_id: "review", current_task_id: "task_review", current_attempt_id: "", current_agent_id: "a_live", attention_reason: "stage_needs_input", final_outcome: "", created_at: "2026-10-05T00:00:00Z", updated_at: "2026-10-05T00:00:00Z" };
+const stageTask = (taskId: string, stageId: string, stageIndex: number, state: string, attempt: number, summary = "") => ({
+  task_id: taskId, run_id: run.run_id, stage_id: stageId, stage_index: stageIndex, attempt_number: attempt, state,
+  assignment_text: "", standing_owner: { agent_id: "a_live", name: "Chucky", state, route: "live" as const },
+  result: summary ? { outcome: "success", summary, details: "", checks: "", outputs: {} } : undefined,
+  work: [], created_at: "2026-10-05T00:00:00Z", updated_at: "2026-10-05T00:00:00Z",
+});
+const detail = { run, template, inputs: run.inputs, orchestrator: run.orchestrator, dedicated_assignments: {}, stage_tasks: [stageTask("task_work", "work", 0, "completed", 1, "Implementation completed."), stageTask("task_review", "review", 1, "waiting", 1)], assignments: {}, values: [], diagnostics: [], controls };
 
 let posts: string[] = [];
 let refuse = false;
@@ -47,8 +57,14 @@ function renderScreen() {
 describe("RunScreen", () => {
   it("shows the run's stage and reason and continues with the typed input", async () => {
     renderScreen();
-    expect(await screen.findByText("Pipeline · app · paused · Stage 1 of 1 · Work")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Ship" })).toBeInTheDocument();
+    expect(screen.getByText("Stage 2 of 3")).toBeInTheDocument();
     expect(screen.getByText("Stage needs input")).toBeInTheDocument();
+    expect(screen.getByText("Implementation completed.")).toBeInTheDocument();
+    expect(screen.getAllByText("Review", { selector: "strong" })).toHaveLength(2);
+    expect(screen.queryByText("Not started")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Ship the feature and review it.")).toHaveLength(2);
+    expect(screen.getByText("Search normalization")).toBeInTheDocument();
     const input = screen.getByRole("textbox", { name: "Input for the stage (optional)" });
     fireEvent.change(input, { target: { value: "use the staging host" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));

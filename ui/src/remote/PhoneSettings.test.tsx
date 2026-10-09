@@ -72,10 +72,17 @@ describe("PhoneSettings", () => {
   });
 
   it("unpairs itself", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderSettings();
     fireEvent.click(await screen.findByRole("button", { name: "Unpair this phone" }));
+    expect(await screen.findByRole("dialog", { name: "Unpair this phone?" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Unpair phone" }));
     await waitFor(() => expect(useConnection.getState().link).toBe("unpaired"));
     expect(calls).toContain("unpair");
+  });
+
+  it("keeps unpairing unavailable while the Mac is unreachable", async () => {
+    useConnection.setState({ link: "unreachable" });
+    renderSettings();
+    expect(await screen.findByRole("button", { name: "Unpair this phone" })).toBeDisabled();
   });
 });

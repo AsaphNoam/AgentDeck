@@ -5,7 +5,7 @@ import { PhoneApp } from "./PhoneApp";
 import "../styles/remote.css";
 
 // The phone entry served only by the tailnet listener (TS-13.R14). It shares
-// ui/src/api with the desktop but not its shell, skins, or SharedWorker.
+// ui/src/api and appearance palettes with the desktop, not its shell or SharedWorker.
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: true, staleTime: 0 } },
 });

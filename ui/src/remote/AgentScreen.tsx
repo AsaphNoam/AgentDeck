@@ -1,4 +1,4 @@
-import { AutoGrowTextarea } from "../components/ui";
+import { AutoGrowTextarea, ConfirmDialog, VisuallyHidden } from "../components/ui";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -38,6 +38,7 @@ import { PhoneAnnotationForm } from "./AnnotationForm";
 import { useConnection, watchReasoning, type OpenTranscript } from "./connection";
 import { getRuntimeOptions } from "./api";
 import { navigate } from "./router";
+import { PhoneIcon } from "./PhoneIcon";
 
 // The phone reads a bounded window and keeps at most EARLIER_PAGES older ones
 // (FS-20.R13).
@@ -99,12 +100,12 @@ function PermissionCard({ agent, event, latest, disabled, onSettled }: {
         </blockquote>
       )}
       {error && <p className="phone-error">{error}</p>}
-      <div className="phone-actions">
-        <button type="button" className="phone-primary" disabled={disabled || busy} onClick={() => void decide("approve")}>
-          Approve
-        </button>
+      <div className="phone-actions phone-permission-actions">
         <button type="button" disabled={disabled || busy} onClick={() => void decide("deny")}>
           Deny
+        </button>
+        <button type="button" className="phone-primary" disabled={disabled || busy} onClick={() => void decide("approve")}>
+          Approve
         </button>
       </div>
     </section>
@@ -178,6 +179,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [stopOpen, setStopOpen] = useState(false);
   const [tab, setTab] = useState<"chat" | "files" | "manage">("chat");
   const [rename, setRename] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -316,23 +318,38 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     if (!addAnnotation(agentId, draft)) setError("At most 20 annotations can wait at once. Send or discard them first.");
   };
   const heldText = held.data && typeof held.data === "object" && "text" in held.data ? String((held.data as { text?: string }).text ?? "") : "";
+  const stateLabel = agent.running ? agent.state.replace("_", " ") : "Stopped";
+  const runtimeLabel = [agent.backend, agent.model].filter(Boolean).join(" · ");
+  const roleBackend = [agent.role, agent.backend].filter(Boolean).join(" · ");
 
   return (
     <div className="phone-agent">
-      <header className="phone-agent-header">
-        <h1>{agentTitle(agent)}</h1>
-        <p className="phone-meta">
-          {agent.running ? agent.state.replace("_", " ") : "stopped"}
-          {agent.detail ? ` · ${clip(agent.detail, 80)}` : ""}
-        </p>
+      <div className="phone-agent-top">
+        <button type="button" className="phone-agent-back" aria-label={`Back to ${agent.project}`} onClick={() => navigate(`/project/${encodeURIComponent(agent.project)}`)}>
+          <PhoneIcon name="back" size={19} />{agent.project}
+        </button>
+        {agent.running ? (
+          <button type="button" className="phone-agent-control phone-agent-stop" disabled={offline || busy} onClick={() => setStopOpen(true)}>Stop</button>
+        ) : (
+          <button type="button" className="phone-agent-control" disabled={offline || busy} onClick={() => void act(() => resumeAgent(agentId))}>Resume</button>
+        )}
+      </div>
+      <header className="phone-agent-header phone-agent-identity">
+        <div className="phone-agent-title">
+          <span className="phone-eyebrow">{roleBackend}</span>
+          <h1>{agentTitle(agent)}</h1>
+          <p className="phone-agent-runtime">{agent.model}{agent.effort ? ` · ${agent.effort} effort` : ""}</p>
+        </div>
+        <span className="phone-status" data-tone={agent.running ? agent.state : "stopped"}>
+          {stateLabel}
+        </span>
       </header>
       <div className="phone-actions phone-tabs" role="tablist" aria-label="Agent views">
-        {(["chat", "files", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}</button>)}
+        {(["chat", "files", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} className={tab === name ? "active" : undefined} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}{name === "files" && files.data?.files.length ? <span className="phone-tab-count">{files.data.files.length}</span> : null}</button>)}
       </div>
       {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setDiffSeq(tracked.diff_refs[0].seq); setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
-      {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} />}
-      {tab === "manage" && error && <p className="phone-error">{error}</p>}
-      {tab === "chat" && <>
+      {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} error={error} />}
+      {tab === "chat" && <div className="phone-conversation">
       {pending && <PermissionCard agent={agent} event={pending} latest={latest} disabled={offline} onSettled={refresh} />}
       {diffSeq !== null && (
         <section ref={diffCard} className="phone-card" aria-label="Requested diff">
@@ -355,7 +372,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
             ) : (
               <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
             ))}
-          <div className="phone-transcript" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
+          <div className="phone-transcript phone-transcript-bubbles" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
             <TurnList agentId={agentId} events={rows} lead={lead} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
           </div>
           <PhoneAnnotationForm agent={agent} />
@@ -377,7 +394,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
           )}
           {agent.running && (
             <form
-              className="phone-composer"
+              className="phone-composer phone-composer-box"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (!text.trim()) return;
@@ -387,20 +404,21 @@ export function AgentScreen({ agentId }: { agentId: string }) {
               }}
             >
               <label className="phone-field">
-                {agent.state === "waiting_input" && !pending ? "Reply" : "Message"}
-                <AutoGrowTextarea rows={3} maxHeight="40vh" value={text} onChange={(event) => setText(event.target.value)} />
+                <VisuallyHidden>{agent.state === "waiting_input" && !pending ? "Reply" : "Message"}</VisuallyHidden>
+                <AutoGrowTextarea rows={3} maxHeight="40vh" value={text} placeholder={offline ? "Reconnect to send a message" : "Ask for changes…"} onChange={(event) => setText(event.target.value)} />
               </label>
               {error && <p className="phone-error">{error}</p>}
               {notice && <p className="phone-meta">{notice}</p>}
-              <div className="phone-actions">
-                <button type="submit" className="phone-primary" disabled={offline || busy || !text.trim()}>
-                  Send
-                </button>
+              <div className="phone-actions phone-composer-actions">
+                <span className="phone-composer-meta">{runtimeLabel}{agent.effort ? ` · ${agent.effort}` : ""}</span>
                 {agent.steering_available && isBusy && (
                   <button type="button" disabled={offline || busy || !text.trim()} onClick={() => void act(() => steerPrompt(agentId, text), true)}>
                     Steer
                   </button>
                 )}
+                <button type="submit" className="phone-send-icon" aria-label="Send" title="Send" disabled={offline || busy || !text.trim()}>
+                  <PhoneIcon name="up" size={19} />
+                </button>
               </div>
             </form>
           )}
@@ -413,23 +431,26 @@ export function AgentScreen({ agentId }: { agentId: string }) {
             Cancel turn
           </button>
         )}
-        {agent.running && (
-          <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => void act(() => stopAgent(agentId))}>
-            Stop
-          </button>
-        )}
-        {!agent.running && !agent.archived && (
-          <button type="button" disabled={offline || busy} onClick={() => void act(() => resumeAgent(agentId))}>
-            Resume
-          </button>
-        )}
       </div>
-      </>}
+      </div>}
+      <ConfirmDialog
+        open={stopOpen}
+        title="Stop this agent?"
+        confirmLabel="Stop"
+        destructive
+        pending={busy}
+        confirmDisabled={offline}
+        onCancel={() => setStopOpen(false)}
+        onConfirm={() => void act(() => stopAgent(agentId), false, () => setStopOpen(false))}
+      >
+        <p>Stop this agent on your Mac? You can still view its transcript and recorded output.</p>
+        {error && <p className="phone-error" role="alert">{error}</p>}
+      </ConfirmDialog>
     </div>
   );
 }
 
-function AgentManagement({ agent, offline, busy, act, rename, setRename }: { agent: AgentState; offline: boolean; busy: boolean; act: (fn: () => Promise<unknown>, clears?: boolean, after?: (result: unknown) => void) => void; rename: string; setRename: (value: string) => void }) {
+function AgentManagement({ agent, offline, busy, act, rename, setRename, error }: { agent: AgentState; offline: boolean; busy: boolean; act: (fn: () => Promise<unknown>, clears?: boolean, after?: (result: unknown) => void) => void; rename: string; setRename: (value: string) => void; error: string | null }) {
   const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
   const [runtime, setRuntime] = useState({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" });
   const [archiveConfirm, setArchiveConfirm] = useState(false);
@@ -447,5 +468,42 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename }: { age
     const next = options.data?.backends.find((item) => item.id === backendID);
     selectModel(backendID, (next?.models.find((item) => item.id === next.default_model) ?? next?.models[0])?.id ?? "");
   };
-  return <section className="phone-section" aria-label="Agent management"><form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}><label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label><button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button></form>{agent.running && agent.interface === "chat" && <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}><p className="phone-card-kicker">Runtime</p><label className="phone-field">Backend<select value={runtime.backend} onChange={(event) => selectBackend(event.target.value)}><option value="">Choose…</option>{(options.data?.backends ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label><label className="phone-field">Model<select value={runtime.model} onChange={(event) => selectModel(runtime.backend, event.target.value)}>{(backend?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>{(model?.efforts.length ?? 0) > 0 && <label className="phone-field">Effort<select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<button type="submit" disabled={disable || !runtime.backend || !runtime.model}>Switch runtime</button></form>}{agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}{agent.running && agent.interface === "chat" && (liveModel?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{liveModel!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}<div className="phone-card"><button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>{agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}{archiveConfirm ? <><p>Archive this agent? Restore is available on the desktop.</p><div className="phone-actions"><button type="button" disabled={offline || busy} onClick={() => setArchiveConfirm(false)}>Cancel</button><button type="button" className="phone-danger" disabled={offline || busy} onClick={() => act(() => archiveAgent(agent.agent_id), false, () => navigate(`/project/${encodeURIComponent(agent.project)}`))}>Archive agent</button></div></> : <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>}</div></section>;
+  return (
+    <section className="phone-section" aria-label="Agent management">
+      <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}>
+        <label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label>
+        <button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button>
+      </form>
+      {agent.running && agent.interface === "chat" && (
+        <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}>
+          <p className="phone-card-kicker">Runtime</p>
+          <label className="phone-field">Backend<select value={runtime.backend} onChange={(event) => selectBackend(event.target.value)}><option value="">Choose…</option>{(options.data?.backends ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>
+          <label className="phone-field">Model<select value={runtime.model} onChange={(event) => selectModel(runtime.backend, event.target.value)}>{(backend?.models ?? []).map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></label>
+          {(model?.efforts.length ?? 0) > 0 && <label className="phone-field">Effort<select value={runtime.effort} onChange={(event) => setRuntime({ ...runtime, effort: event.target.value })}><option value="">Model default</option>{model!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}
+          <button type="submit" disabled={disable || !runtime.backend || !runtime.model}>Switch runtime</button>
+        </form>
+      )}
+      {agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}
+      {agent.running && agent.interface === "chat" && (liveModel?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{liveModel!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}
+      <div className="phone-card">
+        <button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>
+        {agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}
+        <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>
+      </div>
+      {!archiveConfirm && error && <p className="phone-error" role="alert">{error}</p>}
+      <ConfirmDialog
+        open={archiveConfirm}
+        title="Archive this agent?"
+        confirmLabel="Archive agent"
+        destructive
+        pending={busy}
+        confirmDisabled={offline}
+        onCancel={() => setArchiveConfirm(false)}
+        onConfirm={() => act(() => archiveAgent(agent.agent_id), false, () => navigate(`/project/${encodeURIComponent(agent.project)}`))}
+      >
+        <p>Restore is available on the desktop.</p>
+        {error && <p className="phone-error" role="alert">{error}</p>}
+      </ConfirmDialog>
+    </section>
+  );
 }

@@ -60,7 +60,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 | TS-05 | [tech/TS-05-security.md](tech/TS-05-security.md) | Partial | Loopback boundary, tokens, context authorization, and planned shared launch credential for direct actions |
 | TS-06 | [tech/TS-06-build-test.md](tech/TS-06-build-test.md) | Partial | Build tags, release runtime, action-client packaging, install, test strategy & conventions |
 | TS-07 | [tech/TS-07-federation.md](tech/TS-07-federation.md) | Partial | Native configuration authority, resolvers, consent, freshness, redaction, launch freezing |
-| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Current | Presentation contracts, built-in skins, shared layout/control polish, turn activity and live-thought disclosure |
+| TS-08 | [tech/TS-08-frontend-presentation.md](tech/TS-08-frontend-presentation.md) | Partial | Presentation contracts, built-in skins, shared layout/control polish, turn activity and mobile companion overhaul |
 | TS-09 | [tech/TS-09-pipeline-control-plane.md](tech/TS-09-pipeline-control-plane.md) | Partial | Ordered pipeline progression over durable stage tasks; planned room-backed stages, synthesis acceptance and frozen orchestrator guidance |
 | TS-10 | [tech/TS-10-work-dependency-control-plane.md](tech/TS-10-work-dependency-control-plane.md) | Current | Durable task lineage, scoped work management, same-task wait/continuation and managed room targets |
 | TS-11 | [tech/TS-11-agent-knowledge-delivery.md](tech/TS-11-agent-knowledge-delivery.md) | Partial | Embedded operating knowledge, conditional skill delivery, planned shared standing context and four-role seeding, direct-action discovery and frozen pipeline guidance |

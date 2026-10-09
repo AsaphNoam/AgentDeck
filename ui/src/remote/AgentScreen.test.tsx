@@ -133,7 +133,14 @@ describe("AgentScreen", () => {
     expect(await screen.findByText("agent is not running")).toBeInTheDocument();
     expect(box).toHaveValue("keep me");
     fireEvent.click(screen.getByRole("button", { name: "Cancel turn" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    const confirm = screen.getByRole("dialog", { name: "Stop this agent?" });
+    act(() => useConnection.setState({ link: "unreachable" }));
+    expect(within(confirm).getByRole("button", { name: "Stop" })).toBeDisabled();
+    act(() => useConnection.setState({ link: "connected" }));
+    fireEvent.click(within(confirm).getByRole("button", { name: "Stop" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Stop this agent?" })).not.toBeInTheDocument());
   });
 
   it("disables every action while the Mac is unreachable", async () => {
@@ -258,12 +265,15 @@ describe("AgentScreen", () => {
     expect(screen.queryByRole("button", { name: /Annotate lines/ })).toBeNull();
   });
 
-  it("uses an inline archive confirmation that says restore is desktop-only", async () => {
+  it("confirms archive in a sheet and keeps refusal visible there", async () => {
+    server.use(http.post("/api/sessions/a1/archive", () => HttpResponse.json({ error: { code: "conflict", message: "Archiving is unavailable right now." } }, { status: 409 })));
     renderScreen();
     fireEvent.click(screen.getByRole("tab", { name: "Manage" }));
     fireEvent.click(await screen.findByRole("button", { name: "Archive" }));
-    expect(screen.getByText("Archive this agent? Restore is available on the desktop.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Archive agent" })).toBeInTheDocument();
+    const confirm = screen.getByRole("dialog", { name: "Archive this agent?" });
+    expect(within(confirm).getByText("Restore is available on the desktop.")).toBeInTheDocument();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Archive agent" }));
+    expect(await within(confirm).findByRole("alert")).toHaveTextContent("Archiving is unavailable right now.");
   });
 
   // FS-20.R39 — archival from the desktop reaches an open phone screen.

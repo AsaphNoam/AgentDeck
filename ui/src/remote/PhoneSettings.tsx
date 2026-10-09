@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { phoneFetch, unpairSelf } from "./api";
 import { disconnect, rememberPaired, useConnection } from "./connection";
+import { ConfirmDialog } from "../components/ui";
+import { PhoneIcon } from "./PhoneIcon";
 
 interface Self {
   id: string;
@@ -27,12 +29,14 @@ const iosBrowserTab = () =>
 /** "This phone": its name, attention notifications, and unpairing
  *  (FS-20.R8, R18, R28). */
 export function PhoneSettings() {
-  const offline = useConnection((state) => state.link !== "connected");
+  const link = useConnection((state) => state.link);
+  const offline = link !== "connected";
   const client = useQueryClient();
   const self = useQuery({ queryKey: ["self"], queryFn: () => phoneFetch<Self>("/api/remote/self") });
   const [name, setName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unpairOpen, setUnpairOpen] = useState(false);
 
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true);
@@ -74,12 +78,28 @@ export function PhoneSettings() {
   if (!s) return <p className="phone-empty">{self.isError ? errorText(self.error) : "Loading…"}</p>;
   const withdrawn = pushSupported() && Notification.permission === "denied";
   const lapsed = s.notifications === "expired" || (s.notifications === "on" && withdrawn);
+  const connection = link === "connected" ? "Connected" : link === "unreachable" ? "Mac unreachable" : "Reconnecting";
 
   return (
     <div className="phone-agent">
-      <h1>This phone</h1>
+      <header className="phone-page-heading">
+        <span className="phone-eyebrow">YOUR COMPANION</span>
+        <h1>This phone</h1>
+        <p>Stay connected. On your terms.</p>
+      </header>
+      <section className="phone-phone-art" aria-label="Pairing status">
+        <PhoneIcon name="phone" size={34} />
+        <div>
+          <strong>{s.name}</strong>
+          <span>Paired with Chuck’s Mac</span>
+          <span className="phone-status" data-tone={offline ? "waiting" : "connected"}>
+            <i aria-hidden="true" />{connection}
+          </span>
+        </div>
+      </section>
       <form
-        className="phone-card phone-form"
+        className="phone-settings-card phone-form"
+        aria-label="Phone name"
         onSubmit={(event) => {
           event.preventDefault();
           if (name === null) return;
@@ -93,8 +113,10 @@ export function PhoneSettings() {
           });
         }}
       >
+        <div className="phone-section-title"><h2>Phone name</h2></div>
+        <p className="phone-help">This is how your phone appears in Chuck’s Remote settings.</p>
         <label className="phone-field">
-          Name
+          Name for this phone
           <input maxLength={64} value={name ?? s.name} onChange={(event) => setName(event.target.value)} />
         </label>
         {name !== null && (
@@ -103,11 +125,11 @@ export function PhoneSettings() {
           </button>
         )}
       </form>
-      <section className="phone-card" aria-label="Notifications">
-        <p className="phone-card-kicker">Notifications</p>
-        <p>Get notified when an agent needs permission or a reply, hits an error, or a task or run needs you. Finished work never notifies.</p>
+      <section className="phone-settings-card" aria-label="Notifications">
+        <div className="phone-section-title"><PhoneIcon name="bell" size={19} /><h2>Notifications</h2></div>
+        <p className="phone-help">Know when an agent needs permission or a reply, hits an error, or a pipeline run needs you. Finished work never notifies.</p>
         {!pushSupported() || iosBrowserTab() ? (
-          <p className="phone-meta">Add Chuck to the Home Screen and open it from there to turn on notifications.</p>
+          <p className="phone-help">Add Chuck to the Home Screen and open it from there to turn on notifications.</p>
         ) : lapsed ? (
           <>
             <p className="phone-error">Notifications are off: this phone stopped accepting them.</p>
@@ -125,23 +147,43 @@ export function PhoneSettings() {
           </button>
         )}
       </section>
-      {error && <p className="phone-error">{error}</p>}
+      <section className="phone-settings-card" aria-label="Connection">
+        <div className="phone-section-title"><PhoneIcon name="wifi" size={19} /><h2>Connection</h2></div>
+        <div className="phone-keyvalue"><span>Desktop</span><strong>Chuck’s Mac</strong></div>
+        <div className="phone-keyvalue"><span>Status</span><strong>{connection}</strong></div>
+        <p className="phone-help">Your Mac runs the work. This phone is a remote companion.</p>
+        {offline && <p className="phone-help">The last known state is shown. Actions are unavailable until your Mac reconnects.</p>}
+      </section>
+      {error && <p className="phone-error" role="alert">{error}</p>}
       <button
         type="button"
         className="phone-danger"
         disabled={offline || busy}
-        onClick={() => {
-          if (!window.confirm("Unpair this phone? It will need to be paired again from the Mac.")) return;
-          void run(async () => {
-            await unpairSelf();
-            rememberPaired(false);
-            disconnect();
-            useConnection.getState().setLink("unpaired");
-          });
-        }}
+        onClick={() => setUnpairOpen(true)}
       >
         Unpair this phone
       </button>
+      <p className="phone-help">Unpairing revokes this phone’s access. Your agents keep running on your Mac.</p>
+      <div className="phone-help phone-desktop-note"><PhoneIcon name="shield" size={18} /><p>Projects, roles, runtimes, and templates are managed on your Mac.</p></div>
+      <ConfirmDialog
+        open={unpairOpen}
+        title="Unpair this phone?"
+        confirmLabel="Unpair phone"
+        destructive
+        pending={busy}
+        confirmDisabled={offline}
+        onCancel={() => setUnpairOpen(false)}
+        onConfirm={() => void run(async () => {
+          await unpairSelf();
+          rememberPaired(false);
+          disconnect();
+          useConnection.getState().setLink("unpaired");
+          setUnpairOpen(false);
+        })}
+      >
+        <p>This phone will lose access to Chuck and will need to be paired again from the Mac.</p>
+        <p>Your agents keep running on your Mac.</p>
+      </ConfirmDialog>
     </div>
   );
 }

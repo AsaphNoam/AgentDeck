@@ -243,6 +243,20 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   behavior remain under FS-05.R40. Web links and tables follow FS-03.R78–R79; no new phone file
   access, annotation or custom touch-menu behavior is introduced.
 
+- **R43 (planned) — The companion adopts the Figma mobile composition.** The `/mobile`
+  study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`) governs the phone's
+  visual overhaul: a quiet Chuck companion header with a Home/This phone navigation menu,
+  a connected-workspace introduction, separated attention cards, compact project and agent rows,
+  clear page identity, quiet Chat/Files/Manage tabs, readable conversation and inset composer,
+  pipeline stage summary and progress timeline, phone connection/notification panels, and
+  phone-sized setup/confirmation sheets. The product uses real state and existing controls,
+  including Manage, rather than the study's synthetic content, preview controls, device frame,
+  status bar or surrounding studio. Pairing retains R6's eight-character code and iPhone install
+  handoff. Long content, empty/error/offline states and action refusal remain usable at 360–430px.
+  All three Chuck appearances share this composition and use their existing semantic palettes;
+  the phone follows the desktop's durable appearance preference without offering a skin picker.
+  This supersedes R16's skins exclusion only for applying the configured appearance.
+
 ## 3. States & transitions
 
 Desktop remote connection: `Off → Needs Tailscale sign-in → Connecting → On`; `On → Connecting` on
@@ -350,6 +364,16 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   web-link taps open separately and wide tables scroll locally. *Verify:* phone component tests
   and FS-03.A59–A61's focused browser journey. This supersedes only A12's Commands-list check;
   its file-access and route-restriction checks remain owed.
+
+- **A15 (planned)** (R43) — Compare Home, project, populated permission conversation,
+  Files/Manage, pipeline progress/recovery, This phone, pairing and setup sheets against the
+  Figma `/mobile` reference at 390px, with 360px/430px long-content and offline checks.
+  Core, Sky & Grove and Studio retain the common geometry and distinct existing palettes;
+  changing desktop appearance reaches the phone after configuration refresh, unknown/failed
+  configuration falls back to Core, and no phone appearance control appears. Exercise navigation,
+  launch, conversation/permission, pipeline and unpair actions with existing refusal/draft
+  preservation. Verify focused remote tests, presentation checks, development visual matrix
+  and real-browser screenshots of the actual phone entry.
 
 ## 6. Deviations & open decisions
 
