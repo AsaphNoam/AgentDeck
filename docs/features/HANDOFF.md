@@ -20,7 +20,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
-- **Review available — Settings composition (FS-12.R62/A34, TS-08.R113):** every Settings tab
+- **Review closed — Settings composition (FS-12.R62/A34, TS-08.R113):** every Settings tab
   adopts the Figma Make `Settings` study: 180px left section list with soft done-tinted selection,
   mono eyebrow + section title (Theme, Configured backends, Dependent work) via the new
   `SettingsHeader`, softly raised role/project/phone rows with text actions (destructive in error
@@ -35,9 +35,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   tabs in Core, Sky & Grove and Studio at 1024/1280 (fake-backend fixture: roles with/without
   override, active/archived long-name project, four backends) show no overflow or page errors.
   Harness and captures: shared project resources `settings-design/` (`harness/`, `runs/final`);
-  Make source in `settings-design/App.tsx`. Owed in review: independent rendered pass including
-  hover/focus/disabled states, an expanded model env and configuration-source panel, and the
-  paired-phone/pairing states.
+  Make source in `settings-design/App.tsx`. Independent review of `22dd186` found no confirmed
+  defects. Source/spec review passed all 730 UI tests and 41 presentation/style checks. The
+  invariant sweep found no violations: applicable classes §3, §8, §10, §13 and §17 passed;
+  §1–2, §4–7, §9, §11–12 and §14–16 have no applicable changed surface. No unresolved local
+  choices or open fixes remain; no fix-model recommendation is needed.
+  Independent approved Chromium execution used the working UI, the built real binary, a fresh
+  review-owned home and fake backend on loopback only. All seven tabs in all three appearances
+  at 1024/1280 passed (42 static captures), plus hover, keyboard focus, invalid Tasks/disabled
+  Save, expanded model environment, linked configuration-source effective view, long paired-phone
+  row, rename/disabled Save, pairing code and pending pairing (42 state captures). All captures
+  have zero page errors and horizontal overflow; screenshots were inspected against the study's
+  hierarchy and spacing. Display-safe browser fixtures supplied linked-source and phone states;
+  this closes presentation coverage, not live-provider or real-tailnet/device gates.
+  Evidence and reusable harness: `/private/tmp/settings-independent/` (`static/report.json`,
+  `states/report.json`, screenshots and `harness/`). Review-owned processes shut down; unrelated
+  concurrent dirty-tree work was preserved. This closes the unit without a new review obligation.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
