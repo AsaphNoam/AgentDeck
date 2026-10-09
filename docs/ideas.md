@@ -34,6 +34,26 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
+  when a provider interrupts work because its quota is exhausted, show a system quota-limit
+  indicator and the reported reset time. A toggleable Auto continue feature should create a
+  scheduled continuation of the interrupted task at that time. Defining scope: toggle ownership
+  and default, trustworthy quota/reset evidence, same-task recovery, cancellation after manual
+  intervention, repeated quota failures, and behavior when the server misses the reset time.
+  Proposed behavior awaiting confirmation: show Quota reached and the reported reset time on the
+  affected agent and conversation; save one local pending continuation, preserving the original
+  conversation and any durable assignment. Cancel it when Auto continue is disabled or manual
+  intervention supersedes the interrupted work. Unknown/untrustworthy reset times stay manual;
+  a new quota interruption may schedule another future reset, while other errors need attention.
+  Valid overdue continuations may run after server restart. Keep existing transcript retention;
+  no general recurring scheduler. Decisions requested: global toggle off by default versus
+  per-agent/on-by-default alternatives; independent chats/tasks first versus including
+  pipeline-owned and Think Tank turns; confirmation of these recovery rules.
+  Discovery: FS-03.R68/TS-04.R80 notices carry no structured quota/reset fields;
+  `internal/runtime/chat.go` finishes generic prompt failures without classifying quota.
+  FS-16.R33–R34 support same-assignment work-revision continuation, but FS-16 §6 explicitly
+  excludes time-based starts. Do not equate the provider-refresh `provider_check_busy` HTTP 429
+  with provider quota exhaustion. No technical design or ready change yet.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

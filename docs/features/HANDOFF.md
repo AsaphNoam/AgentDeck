@@ -20,6 +20,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Design awaiting scope:** Quota indicator and automatic continuation in
+  [`ideas.md`](../ideas.md). Shipped notices/errors have no quota/reset classification, and tasks
+  have no time-based starts. The proposed behavior and open toggle/coverage/recovery decisions
+  are recorded with the idea; obtain product confirmation before FS/TS design. No ready change
+  or product code was created.
 - **Review fixes closed:** mobile companion unit `50e0d97^..d3e737f` and Think Tank disclosure
   unit `7b76bc4` are closed. Resume refusals stay visible on Files (INV §8); dismissed sheets and
   confirmations restore opener focus (INV §10); bounded activity rows carry durable publication
@@ -116,3 +121,10 @@ The full pre-release state, including settled findings and historical changelog,
 [`HANDOFF-through-2026-10-09`](../archive/state/HANDOFF-through-2026-10-09.md). Keep this live file
 focused on open gates, decisions, paused work, and the current release until the release record is
 updated after publication.
+
+## Recent changelog
+
+- **2026-10-09 — Feature design:** Captured quota-limit indication and optional scheduled
+  continuation; checked existing notice, prompt-error and same-task wait behavior. Proposed
+  scope is awaiting the human's toggle, coverage and recovery decisions. Other dirty-tree
+  presentation work is preserved.
