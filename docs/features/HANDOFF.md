@@ -20,23 +20,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
-- **Waiting for review — mobile companion overhaul:** Figma Make `/mobile` composition across
-  Home/project, Chat/Files/Manage, pipeline history, pairing, This phone and setup/confirmation
-  sheets (FS-20.R43/A15, TS-08.R111). Core, Sky & Grove and Studio follow the desktop's durable
-  preference through the existing semantic palette seam. Source commits `50e0d97` and `ad9d94b`
-  plus this closure's generated embed/spec updates form one review unit. All 724 UI tests,
-  41 presentation/style checks, TypeScript, specification checks, both Go test variants, `go vet`
-  and `make dist` passed. Source-build Go tests require `CHUCK_RUNTIME_ROOT=` here because Chuck
-  supplies the packaged runtime to its child processes; the initial ambient-runtime credential
-  probe failure passed with that intended source-build environment.
-  Actual paired-phone and independent rendered comparison passed all three palettes, 360px long
-  content, 390px composition and 430px settings; desktop matrix passed at 1024/1280 in all themes.
-  Genuine fake-provider pending permission, opaque viewport setup/Stop sheets, and an unchanged
-  draft across phone-listener disconnect/reconnect passed without page errors. Reference sources,
-  prototype renders, matrix and actual phone receipts are in shared project resources
-  `mobile-design/` (`runs/final` for width/palette captures, `runs/verified-final` for corrected
-  interaction receipts; earlier permission/offline/full-page sheet captures are superseded).
-  Existing real-tailnet, Android/iPhone and credentialed-provider acceptance gates remain owed.
+- **Reviewed — mobile companion overhaul, fixes open:** `50e0d97`, `ad9d94b` and `d3e737f`
+  remain one review unit (FS-20.R43/A15, TS-08.R111). Review found a hidden Resume refusal on
+  Files and missing focus return after sheet dismissal; see **Review findings**. Review reran
+  all 53 remote tests and 41 presentation/style checks, and reproduced both findings in a
+  loopback-only browser harness across Core, Sky & Grove and Studio at 360px. Conversation and
+  Stop-sheet geometry stayed inside the viewport with a long project id; no page errors.
+  Implementation closure already passed the full UI/Go/build matrix. Source-build Go tests need
+  `CHUCK_RUNTIME_ROOT=` here. Reference, desktop matrix and actual paired-phone receipts remain
+  at `/Users/mcnoam/.chuck/project-resources/agentdeck-20261007t221535z/mobile-design/`
+  (`runs/final` and corrected `runs/verified-final`). Existing real-tailnet, Android/iPhone and
+  credentialed-provider gates remain owed. No product code or specifications changed in review.
 - **Waiting for review:** Think Tank room page no longer shows the per-message "tools and changes"
   disclosure between published contributions (FS-21.R39/A19, TS-14.R15, TS-08.R104, FS-03.R77);
   live and unfinished-turn activity still renders. Done without a design stage at the user's
@@ -49,7 +43,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. The Figma mobile companion overhaul is complete and available for review above.
+None. The mobile companion overhaul has been reviewed; its fixes are available above.
 
 ## Acceptance gates still owed
 
@@ -112,7 +106,50 @@ and does not close any manual provider gates.
 
 ## Review findings
 
-None open.
+### Mobile companion overhaul — reviewed 2026-10-09
+
+Unit: `50e0d97^..d3e737f`; findings keep this unit open. The later GitHub-rename handoff commit
+is administrative and creates no review obligation. The Think Tank review unit is unchanged.
+
+**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+- **Must fix — Resume refusal is invisible on Files.** `ui/src/remote/AgentScreen.tsx:334`
+  makes Resume available above all tabs, but the stopped-agent error at line 427 is inside the
+  Chat branch; Files renders only its own query errors. Open a stopped agent's Files tab and
+  have the Mac refuse Resume (for example, a launch validation failure): the request returns its
+  reason and `act` stores it, yet no feedback appears until switching to Chat. This violates
+  FS-20.R27 and INV §8. Render lifecycle-action feedback outside tab-specific content or in
+  every tab. Test a rejected Resume on Files and verify the reason remains visible. Browser
+  reproduction returned 409 “Resume refused for review”: zero matching text on Files, one on
+  Chat, in all three palettes. Fix difficulty: trivial/easy.
+- **Worth fixing — Dismissed sheets lose the operator's focus position.**
+  `ui/src/remote/PhoneSheet.tsx:5` and the new confirmation callers in
+  `AgentScreen.tsx:436`, `RunScreen.tsx:69` and `PhoneSettings.tsx:178` open controlled Radix
+  dialogs without a `Dialog.Trigger` or explicit close-focus restoration. Open New agent and
+  close it, or open Stop and Cancel: after the dialog unmounts, `document.activeElement` is
+  `body` rather than the opening button. The next Tab starts at the header navigation, making
+  keyboard/assistive navigation lose its position. INV §10 (missing dialog trigger/focus wiring);
+  TS-08.R111 is the relevant sheet contract. Restore focus to the opener on dismissal through
+  the existing dialog seam; test cancellation/close/Escape in a browser after unmount. Confirmed
+  for New agent close and Stop Cancel across all three palettes. Fix difficulty: trivial/easy.
+
+Specification coverage and local choices: accepted the eight-character pairing/iPhone install
+handoff, real stage-attempt history, retained Manage controls, and read-only shared appearance
+application instead of the prototype's mock controls and data, as FS-20.R43/TS-08.R111 require.
+The saved Home/conversation reference and corrected permission receipt match the required
+composition with Chuck's own palette. No unresolved local-choice or specification gap found.
+
+Invariant sweep: applicable classes §1 (appearance/lifecycle), §2 (shared construction),
+§8 (feedback), §10 (wiring), §11 (run collection serialization), §13 (selectors), and §17
+(test oracles) reviewed. Findings are tagged above; no other violation found. Classes §3–§7,
+§9, §12, and §14–§16 have no applicable changed surface: no seeded-config writes, registration,
+concurrency, adapter contract, record recovery, liveness/storage, CLI invocation, HTTP/security
+handler, external-effect ordering, or new stream/retention mechanism. The timeline consumes the
+existing run projection; server collections are initialized before serialization.
+
+Review evidence: 53 focused remote tests and 41 presentation checks passed. Browser harness and
+captures are in `/private/tmp/mobile-review.mjs` and `/private/tmp/mobile-review/`; those use
+stubbed APIs and do not replace the outstanding real-device gates.
 
 ## Blocked on human
 
