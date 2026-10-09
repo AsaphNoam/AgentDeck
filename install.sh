@@ -9,7 +9,7 @@
 #   4. Install the binary into an on-PATH bin dir.
 #   5. Seed ~/.chuck on first run (the binary seeds lazily on `dashboard start`).
 #
-# Prereqs: Go 1.25+, Node 20+, npm. Node is build-time only unless the optional
+# Prereqs: Go 1.26.6+, Node 20+, npm. Node is build-time only unless the optional
 # Claude ACP adapter is installed; that adapter requires Node 22+ at runtime.
 
 set -euo pipefail
@@ -38,7 +38,7 @@ LDFLAGS="-X ${VERSION_PKG}.Version=${VERSION} \
 -X ${VERSION_PKG}.Date=${DATE}"
 
 echo "==> Checking prerequisites"
-command -v go   >/dev/null 2>&1 || { echo "error: Go 1.25+ is required"; exit 1; }
+command -v go   >/dev/null 2>&1 || { echo "error: Go 1.26.6+ is required"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "error: Node 20+ is required"; exit 1; }
 command -v npm  >/dev/null 2>&1 || { echo "error: npm is required"; exit 1; }
 

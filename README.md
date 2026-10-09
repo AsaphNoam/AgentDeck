@@ -37,7 +37,7 @@ own; neither choice promises new models, account access, or that a native sessio
 older provider version.
 
 ```sh
-curl -fsSL https://github.com/AsaphNoam/Chuck/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/AsaphNoam/AgentDeck/releases/latest/download/install.sh | CHUCK_REPO=AsaphNoam/AgentDeck bash
 ```
 
 Pass `--version X.Y.Z` to select a release, `--no-start` to install without launching the dashboard,
@@ -50,11 +50,13 @@ credentials itself. After installation, use:
 chuck auth claude       # or: chuck auth codex
 chuck dashboard start --detach
 chuck dashboard open
-chuck update --check
-chuck update            # asks before downloading
-chuck update --yes      # non-interactive update
+chuck update --repo AsaphNoam/AgentDeck --check
+chuck update --repo AsaphNoam/AgentDeck       # asks before downloading
+chuck update --repo AsaphNoam/AgentDeck --yes # non-interactive update
 chuck update --rollback
 ```
+
+Until the GitHub repository is renamed to Chuck, use the repository override shown above.
 
 `chuck update` changes Chuck and its bundled copies only; it never touches your installed
 providers, and each backend keeps its provider choice. `--rollback` restores the previous Chuck
