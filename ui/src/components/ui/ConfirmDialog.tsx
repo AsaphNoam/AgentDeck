@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 
 interface ConfirmDialogProps {
@@ -24,11 +25,25 @@ export function ConfirmDialog({
   confirmDisabled = false,
   destructive = false,
 }: ConfirmDialogProps) {
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
-        <Dialog.Content className="dialog-content" data-ui="dialog" data-slot="content" data-variant="default">
+        <Dialog.Content
+          className="dialog-content"
+          data-ui="dialog"
+          data-slot="content"
+          data-variant="default"
+          onOpenAutoFocus={() => {
+            restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            restoreFocusRef.current?.focus();
+            restoreFocusRef.current = null;
+          }}
+        >
           <Dialog.Title data-slot="title">{title}</Dialog.Title>
           <div data-slot="body">{children}</div>
           <div className="form-actions" data-slot="actions">

@@ -24,6 +24,7 @@ type ThinkTankActivity struct {
 	SourceSeq  int64
 	Payload    string
 	Truncated  bool
+	Published  bool
 	CreatedAt  time.Time
 }
 
@@ -105,7 +106,7 @@ ORDER BY v.seq DESC LIMIT 1 OFFSET ?`, roomID, limit).Scan(&after)
 func (s *Store) listThinkTankActivity(roomID string, afterSeq int64, limit int) ([]ThinkTankActivity, error) {
 	rows, err := s.db.Query(`
 SELECT v.room_id, v.seq, v.attempt_id, v.agent_id, v.agent_name, v.project, v.cwd, v.generation, v.turn_id,
-  v.source_seq, v.payload, v.truncated, v.created_at
+  v.source_seq, v.payload, v.truncated, a.entry_seq > 0, v.created_at
 FROM think_tank_activity v JOIN think_tank_attempts a ON a.attempt_id = v.attempt_id
 WHERE v.room_id = ? AND v.seq > ? AND NOT (a.turn = 'opening' AND a.state != 'finalized')
 ORDER BY v.seq LIMIT ?`, roomID, afterSeq, limit)
@@ -117,7 +118,7 @@ ORDER BY v.seq LIMIT ?`, roomID, afterSeq, limit)
 		var a ThinkTankActivity
 		var created string
 		if err := rows.Scan(&a.RoomID, &a.Seq, &a.AttemptID, &a.AgentID, &a.AgentName, &a.Project, &a.Cwd,
-			&a.Generation, &a.TurnID, &a.SourceSeq, &a.Payload, &a.Truncated, &created); err != nil {
+			&a.Generation, &a.TurnID, &a.SourceSeq, &a.Payload, &a.Truncated, &a.Published, &created); err != nil {
 			rows.Close()
 			return nil, fmt.Errorf("state: scan think tank activity: %w", err)
 		}

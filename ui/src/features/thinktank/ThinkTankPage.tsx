@@ -180,6 +180,9 @@ function Room({ room }: { room: ThinkTankDetail }) {
 
   const shownEntries = entries.data?.entries ?? [];
   const placed = new Set(shownEntries.map((e) => e.attempt_id).filter(Boolean));
+  for (const row of activity.data?.activity ?? []) {
+    if (row.published) placed.add(row.attempt_id);
+  }
   const loose = [...byAttempt.keys()].filter((attempt) => !placed.has(attempt));
 
   return (

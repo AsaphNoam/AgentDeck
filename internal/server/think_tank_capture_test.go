@@ -103,6 +103,9 @@ func TestThinkTankCaptureProjectsRoomActivity(t *testing.T) {
 	if len(page.Activity) != 8 || page.Activity[0].AgentName != "a_one" || page.Activity[1].SourceSeq != 2 {
 		t.Fatalf("activity rows = %+v", page.Activity)
 	}
+	if !page.Activity[0].Published || page.Activity[len(page.Activity)-1].Published {
+		t.Fatalf("activity publication state = %+v", page.Activity)
+	}
 
 	var files struct {
 		Sources []thinkTankSourceWire `json:"sources"`

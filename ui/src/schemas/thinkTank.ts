@@ -127,6 +127,8 @@ export const thinkTankActivitySchema = z.object({
   project: z.string(),
   source_seq: z.number(),
   truncated: z.boolean().optional().default(false),
+  /** Server-derived publication state stays correct when the entry window is clipped. */
+  published: z.boolean().optional().default(false),
   event: z.object({
     type: z.string(),
     seq: z.number().optional(),

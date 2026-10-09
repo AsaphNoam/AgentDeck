@@ -172,6 +172,7 @@ type thinkTankActivityWire struct {
 	Project   string          `json:"project"`
 	SourceSeq int64           `json:"source_seq"`
 	Truncated bool            `json:"truncated,omitempty"`
+	Published bool            `json:"published,omitempty"`
 	Event     json.RawMessage `json:"event,omitempty"`
 	CreatedAt string          `json:"created_at"`
 }
@@ -179,7 +180,7 @@ type thinkTankActivityWire struct {
 func thinkTankActivityFor(a state.ThinkTankActivity) thinkTankActivityWire {
 	return thinkTankActivityWire{Version: thinkTankWireVersion, RoomID: a.RoomID, Seq: a.Seq, AttemptID: a.AttemptID,
 		AgentID: a.AgentID, AgentName: a.AgentName, Project: a.Project, SourceSeq: a.SourceSeq,
-		Truncated: a.Truncated, Event: json.RawMessage(a.Payload), CreatedAt: a.CreatedAt.Format("2006-01-02T15:04:05Z07:00")}
+		Truncated: a.Truncated, Published: a.Published, Event: json.RawMessage(a.Payload), CreatedAt: a.CreatedAt.Format("2006-01-02T15:04:05Z07:00")}
 }
 
 // thinkTankActivityLive omits an oversized event body; the client refetches

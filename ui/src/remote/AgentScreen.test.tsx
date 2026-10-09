@@ -26,6 +26,7 @@ const agent: AgentState = {
 let permissionStatus = 200;
 let promptStatus = 200;
 let annotationStatus = 202;
+let resumeStatus = 200;
 const posts: string[] = [];
 const events = [
   { agent_id: "a1", seq: 1, type: "user_text", ts: "", data: { text: "Clean the build" } },
@@ -67,7 +68,11 @@ const server = setupServer(
   http.post("/api/sessions/a1/steer", () => HttpResponse.json({ accepted: true, outcome: "steered" })),
   http.post("/api/sessions/a1/cancel", () => HttpResponse.json({})),
   http.post("/api/sessions/a1/stop", () => HttpResponse.json({})),
+  http.post("/api/sessions/a1/resume", () => resumeStatus === 409
+    ? HttpResponse.json({ error: { code: "conflict", message: "Resume refused for review" } }, { status: 409 })
+    : HttpResponse.json({ resumed: true })),
   http.post("/api/sessions/a1/archive", () => HttpResponse.json({})),
+  http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: [] })),
   http.get("/api/remote/runtime-options", () => HttpResponse.json({ backends: [] })),
 );
 
@@ -76,6 +81,7 @@ beforeEach(() => {
   permissionStatus = 200;
   promptStatus = 200;
   annotationStatus = 202;
+  resumeStatus = 200;
   posts.length = 0;
   reads.length = 0;
   live = fullWindow;
@@ -134,12 +140,18 @@ describe("AgentScreen", () => {
     expect(box).toHaveValue("keep me");
     fireEvent.click(screen.getByRole("button", { name: "Cancel turn" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Stop" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+    const stopOpener = screen.getByRole("button", { name: "Stop" });
+    stopOpener.focus();
+    fireEvent.click(stopOpener);
     const confirm = screen.getByRole("dialog", { name: "Stop this agent?" });
     act(() => useConnection.setState({ link: "unreachable" }));
     expect(within(confirm).getByRole("button", { name: "Stop" })).toBeDisabled();
     act(() => useConnection.setState({ link: "connected" }));
-    fireEvent.click(within(confirm).getByRole("button", { name: "Stop" }));
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Stop this agent?" })).not.toBeInTheDocument());
+    expect(document.activeElement).toBe(stopOpener);
+    fireEvent.click(stopOpener);
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Stop this agent?" })).getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Stop this agent?" })).not.toBeInTheDocument());
   });
 
@@ -148,6 +160,15 @@ describe("AgentScreen", () => {
     await screen.findByRole("region", { name: "Permission request" });
     act(() => useConnection.setState({ link: "unreachable" }));
     for (const name of ["Approve", "Deny", "Stop"]) expect(screen.getByRole("button", { name })).toBeDisabled();
+  });
+
+  it("shows a refused Resume on Files", async () => {
+    resumeStatus = 409;
+    useConnection.setState({ agents: { a1: { ...agent, running: false, state: "idle" } } });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Files" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Resume refused for review");
   });
 
   it("shows a pending permission and latest reply that fall before the window", async () => {

@@ -55,13 +55,25 @@ function renderScreen() {
 describe("ProjectScreen new agent", () => {
   it("uses the configured default role, an editable suggested name, and backend default model", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "New agent" }));
+    const opener = await screen.findByRole("button", { name: "New agent" });
+    opener.focus();
+    fireEvent.click(opener);
     const role = await screen.findByRole("combobox", { name: "Role" });
     await waitFor(() => expect(role).toHaveValue("reviewer"));
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Reviewer");
     expect(screen.getByRole("combobox", { name: "Model" })).toHaveValue("preferred");
     fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Remote reviewer" } });
     expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Remote reviewer");
+  });
+
+  it("returns focus to the New agent opener after dismissal", async () => {
+    renderScreen();
+    const opener = await screen.findByRole("button", { name: "New agent" });
+    opener.focus();
+    fireEvent.click(opener);
+    fireEvent.keyDown(await screen.findByRole("dialog", { name: "New agent" }), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New agent" })).toBeNull());
+    expect(document.activeElement).toBe(opener);
   });
 
   // FS-20.A10 — a non-default runtime reaches the launch request; a refusal keeps the form.

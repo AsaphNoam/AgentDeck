@@ -101,6 +101,27 @@ describe("ThinkTankPage", () => {
     expect(screen.queryByText(/tools and changes/)).toBeNull();
   });
 
+  // FS-21.R39, TS-14.R15: the activity wire retains publication knowledge
+  // when the corresponding contribution has fallen outside the entry window.
+  it("does not revive clipped published activity as an unfinished turn", async () => {
+    detail = { ...room(), phase: "ended", active: undefined };
+    const clippedEntries = fixture.entries.filter((entry) => entry.attempt_id !== "tta_1");
+    const activity = [{
+      version: 1, room_id: "tt_fixture", seq: 1, attempt_id: "tta_1", agent_id: "a_one",
+      agent_name: "Ari", project: "alpha", source_seq: 1, published: true,
+      created_at: "2026-10-06T09:00:00Z",
+      event: { type: "tool_call", data: { tool_call_id: "old", name: "Read" } },
+    }];
+    server.use(
+      http.get("/api/think-tanks/tt_fixture/entries", () => HttpResponse.json({ entries: clippedEntries, complete: true })),
+      http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ activity, complete: true })),
+    );
+    renderRoom();
+    await screen.findByRole("heading", { name: "Cache choice" });
+    await waitFor(() => expect(screen.queryByText("Ari's unfinished turn")).toBeNull());
+    expect(document.querySelector('[data-slot="activity"]')).toBeNull();
+  });
+
   // FS-03.A57, TS-08.R104: an unfinished attempt (no published entry) reuses
   // the quiet turn projection, so its tools stay inspectable.
   it.each(["discussion", "ended"])("keeps an unfinished turn's tools inspectable in %s while refusing stale approvals", async (phase) => {

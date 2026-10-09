@@ -128,8 +128,10 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   `appendRenderedEvent`, `groupTranscriptRows`/`ToolRun`, content renderers and annotation helpers;
   equal tool ids from different actors/attempts never merge. Render contributions as attributed
   room items; activity renders in attempt-scoped disclosures only for a live or unfinished
-  attempt with no published entry, never between published entries. Bind permission/child actions to their
-  original source under an atomic generation/turn guard; stale activity is read-only. Participant
+  attempt with no published entry, never between published entries. Retained activity records carry
+  the server-derived publication state for their attempt so independently clipped entry and activity
+  windows compose correctly. Bind permission/child actions to their original source under an atomic
+  generation/turn guard; stale activity is read-only. Participant
   links reach ordinary cards/conversations; normal agent views identify room work. Use existing
   presentation contracts and all three appearances, without a new renderer or design framework.
   Read-only settled activity keeps disclosure, copy, file viewing and annotation controls usable;
