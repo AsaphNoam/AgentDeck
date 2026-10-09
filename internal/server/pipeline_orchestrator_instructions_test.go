@@ -139,3 +139,97 @@ func TestPipelineOrchestratorInstructionsEligibility(t *testing.T) {
 		t.Fatal("whitespace-only instructions rendered a block")
 	}
 }
+
+func createPipelineSnapshotTask(t *testing.T, srv *Server, runID, taskID string, snapshot string) state.Task {
+	t.Helper()
+	now := time.Now().UTC()
+	_, _, err := srv.stateStore.CreatePipelineRun(state.CreatePipelineRunParams{
+		Run: state.PipelineRunRecord{
+			RunID: runID, TemplateID: "snapshot", TemplateSnapshot: json.RawMessage(snapshot),
+			DisplayName: "Snapshot", Project: "tmpproj", Goal: "test", Inputs: json.RawMessage(`{}`),
+			Assignments: json.RawMessage(`{}`), State: "queued", Revision: 1, CurrentStageID: "stage", CreatedAt: now, UpdatedAt: now,
+		},
+		RequestID: "request_" + runID, RequestHash: "hash_" + runID,
+		InitialStageTask: &state.CreatePipelineStageTaskParams{
+			RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "stage",
+			Task: state.Task{TaskID: taskID, Project: "tmpproj", DisplayName: "Stage", Instruction: "do work",
+				TargetKind: state.TargetLaunch, Role: "impl", CreatedByKind: "pipeline"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, err := srv.stateStore.ReadTask(taskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return task
+}
+
+func TestPipelineOrchestratorInstructionsValidateFrozenSnapshot(t *testing.T) {
+	for name, snapshot := range map[string]string{
+		"malformed":           `{`,
+		"null":                `null`,
+		"empty object":        `{}`,
+		"missing fields":      `{"version":2}`,
+		"null arrays":         `{"version":2,"title":"x","orchestrator_role":"impl","inputs":null,"stages":[]}`,
+		"wrong guidance type": `{"version":2,"title":"x","orchestrator_role":"impl","inputs":[],"stages":[],"orchestrator_instructions":[]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := testServer(t, true)
+			task := createPipelineSnapshotTask(t, srv, "run_"+strings.ReplaceAll(name, " ", "_"), "task_bad", snapshot)
+			if _, err := srv.pipelineOrchestratorInstructions(task); !errors.Is(err, errPipelineOrchestratorContext) {
+				t.Fatalf("corrupt snapshot error = %v", err)
+			}
+		})
+	}
+
+	for name, snapshot := range map[string]string{
+		"omitted": `{"version":2,"title":"x","orchestrator_role":"impl","inputs":[],"stages":[{"id":"stage","title":"Stage","objective":"Do work","inputs":[],"outputs":[]}]}`,
+		"empty":   `{"version":2,"title":"x","orchestrator_role":"impl","inputs":[],"stages":[{"id":"stage","title":"Stage","objective":"Do work","inputs":[],"outputs":[]}],"orchestrator_instructions":""}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := testServer(t, true)
+			task := createPipelineSnapshotTask(t, srv, "run_"+name, "task_valid", snapshot)
+			if got, err := srv.pipelineOrchestratorInstructions(task); got != "" || err != nil {
+				t.Fatalf("valid snapshot = %q, %v", got, err)
+			}
+		})
+	}
+
+	t.Run("storage read failure", func(t *testing.T) {
+		srv := testServer(t, true)
+		task := createPipelineSnapshotTask(t, srv, "run_read_error", "task_read_error", `{"version":2,"title":"x","orchestrator_role":"impl","inputs":[],"stages":[{"id":"stage","title":"Stage","objective":"Do work","inputs":[],"outputs":[]}]}`)
+		if _, err := srv.stateStore.DB().Exec(`DROP TABLE pipeline_runs`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := srv.pipelineOrchestratorInstructions(task); err == nil {
+			t.Fatal("storage failure returned no error")
+		}
+	})
+}
+
+func TestCorruptPipelineSnapshotFailsTaskStartWithoutLaunching(t *testing.T) {
+	srv := testServer(t, true)
+	srv.registry.Chat().SetCommand(buildFakeACP(t))
+	task := createPipelineSnapshotTask(t, srv, "run_dispatch_bad", "task_dispatch_bad", `{"version":2}`)
+	for attempt := 0; attempt < state.MaxTaskStartAttempts; attempt++ {
+		admitted, ok, err := srv.stateStore.AdmitReadyTask(task.TaskID, state.TaskReservation{
+			AttemptID: "attempt_bad_" + string(rune('1'+attempt)), AgentID: "a_corrupt", Generation: "g_corrupt", Claim: state.ClaimCreated,
+		}, 1)
+		if err != nil || !ok {
+			t.Fatalf("admit attempt %d = %+v, %v", attempt, admitted, err)
+		}
+		srv.startLaunchedTask(context.Background(), admitted)
+		task, err = srv.stateStore.ReadTask(task.TaskID)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if task.State != state.TaskDependencyFailed || !strings.Contains(task.AttentionReason, "pipeline orchestrator context is unavailable") {
+		t.Fatalf("task after corrupt snapshot = %+v", task)
+	}
+	if _, err := srv.stateStore.ReadSession("a_corrupt"); !errors.Is(err, state.ErrNotFound) {
+		t.Fatalf("corrupt snapshot started a process/session: %v", err)
+	}
+}

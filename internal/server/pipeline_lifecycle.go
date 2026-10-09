@@ -46,6 +46,37 @@ func (s *Server) pipelineOrchestratorInstructions(task state.Task) (string, erro
 	if err != nil {
 		return "", err
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(snapshot, &fields); err != nil || fields == nil {
+		return "", fmt.Errorf("%w: unreadable template snapshot", errPipelineOrchestratorContext)
+	}
+	for _, field := range []string{"version", "title", "orchestrator_role", "inputs", "stages"} {
+		if _, ok := fields[field]; !ok {
+			return "", fmt.Errorf("%w: incomplete template snapshot", errPipelineOrchestratorContext)
+		}
+	}
+	var version int
+	if err := json.Unmarshal(fields["version"], &version); err != nil || version != 2 {
+		return "", fmt.Errorf("%w: unsupported template snapshot", errPipelineOrchestratorContext)
+	}
+	var title, role string
+	var inputs []pipeline.ValueDecl
+	var stages []pipeline.Stage
+	if err := json.Unmarshal(fields["title"], &title); err != nil ||
+		json.Unmarshal(fields["orchestrator_role"], &role) != nil ||
+		json.Unmarshal(fields["inputs"], &inputs) != nil || inputs == nil ||
+		json.Unmarshal(fields["stages"], &stages) != nil || len(stages) == 0 {
+		return "", fmt.Errorf("%w: invalid template snapshot structure", errPipelineOrchestratorContext)
+	}
+	if strings.TrimSpace(title) == "" || strings.TrimSpace(role) == "" {
+		return "", fmt.Errorf("%w: incomplete template snapshot", errPipelineOrchestratorContext)
+	}
+	if raw, ok := fields["orchestrator_instructions"]; ok {
+		var instructions *string
+		if err := json.Unmarshal(raw, &instructions); err != nil || instructions == nil {
+			return "", fmt.Errorf("%w: invalid orchestrator instructions in template snapshot", errPipelineOrchestratorContext)
+		}
+	}
 	var template pipeline.Template
 	if err := json.Unmarshal(snapshot, &template); err != nil {
 		return "", fmt.Errorf("%w: unreadable template snapshot", errPipelineOrchestratorContext)
