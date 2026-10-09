@@ -25,8 +25,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Review units / findings:** Think Tank pipeline stages, readable workspace consent and
   collapsible tasks (`fb715a1`..`3d9ab39`, reviewed 2026-10-08) is closed after its six
   lifecycle, lineage and acceptance-recovery findings were fixed. Clone first-message failure
-  investigation (2026-10-08) has an
-  unresolved field failure and a confirmed diagnostic gap; see Review findings. Chat links,
+  investigation (2026-10-08): its diagnostic gap is fixed; the field failure stays open, not
+  reproduced live, blocked on field evidence (see Review findings, Blocked on human). Chat links,
   tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) is closed after its three
   verification/specification findings were fixed; closure evidence is in the changelog.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -80,10 +80,15 @@ The six review findings are closed. Key seams: `pipeline/rooms.go`,
 
 ## Blocked on human
 
-No human decision is needed. The v0.11.0 release published its three assets after the rerun, but
+The v0.11.0 release published its three assets after the rerun, but
 its body is still empty (checked 2026-10-08): set the notes from
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`
 when publication is authorized. Do not retag or recut a new version.
+
+Clone first-message failure needs field evidence: on the next occurrence, with a build that has
+TS-04.R85, capture the `runtime: provider prompt failed` line from `~/.chuck/dashboard.log` and
+the failing request's URL and response body from the browser Network tab. Four live Claude
+variants did not reproduce it.
 
 ## Review findings
 
@@ -119,20 +124,16 @@ the source display name. This is independent of sending and is not a fix finding
   tests `TestCloneForksTheConversationIntoANewAgent` and
   `TestForkLaunchCopiesHistoryThroughTheBoundary` pass; the latter sends and completes a clone
   turn. They do not reproduce the field failure or prove live-provider compatibility.
-- **Worth fixing** — confirmed observability gap; fix complexity easy.
-  `internal/runtime/jsonrpc.go:24–31` retains RPC code/data but Error() returns only Message;
-  `internal/runtime/chat.go:776–790` emits only that string for a live-process session/prompt
-  failure and logs no correlated diagnostic. A generic “Internal Error” therefore loses RPC
-  classification/context at the user-visible boundary, while the captured provider stderr ring
-  is not consulted on this path. This prevents determining whether a successful fork is rejected
-  by the provider on its next turn. Add a bounded, sanitized diagnostic at the existing failure
-  seam identifying agent, backend, operation and RPC code, plus allowlisted provider reason when
-  present (workflow §12.5, TS-04.R12, INV §8/§11). Never dump raw Data, prompt text or stderr.
-  Verify with a fake peer returning a generic message plus code/detail: the transcript remains
-  safe and the diagnostic identifies the failure without secrets.
+  **Fix run 2026-10-09 — not reproduced; blocked on field evidence (§3).** The provider was
+  Claude: Codex refuses clone (`clone_unavailable`). On an isolated v-main server
+  (`CHUCK_HOME` scratch, port 4399) live Claude Sonnet clone → first prompt succeeded with
+  history intact for a running source, a stopped source (clone named Atlas), a clone of a
+  clone, and a woken stopped clone; no 409 and no WARN was logged. The live-process prompt
+  failure now logs `runtime: provider prompt failed` with agent, backend, RPC code and data key
+  names (TS-04.R85), so the next occurrence's `dashboard.log` identifies it. Keep the
+  no-retry/no-ownership-change constraint above.
 
-No product code, specifications or tests changed. Focused fake-provider tests passed with loopback
-permission after the sandbox blocked the test listener. No live provider turn was started.
+The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
 
 ## Decisions needing your input
 
@@ -151,6 +152,14 @@ permission after the sandbox blocked the test listener. No live provider turn wa
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-09 — Clone first-message investigation: diagnostic gap fixed (INV §8/§11).**
+  A live-process `session/prompt` RPC failure now logs one bounded diagnostic (agent, backend,
+  operation, RPC code, sorted data key names, recognized reason) and adds only a recognized
+  reason to the transcript (TS-04.R85); `TestPromptFailureLogsBoundedDiagnostic` proves no raw
+  data or prompt text leaks. The field failure was not reproduced in four live Claude clone
+  variants and stays open, blocked on evidence. `make test` (both Go variants), `make build`
+  passed.
 
 - **2026-10-08 — Think Tank stage review findings closed (INV §1/§2/§4/§5/§7/§8/§9/§10/§15/§16).**
   Stop now durably retries room close/cancel and generation-scoped claimed-launch teardown; room-turn

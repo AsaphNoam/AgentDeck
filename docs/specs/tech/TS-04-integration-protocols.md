@@ -1075,6 +1075,13 @@ seals it before successor frames. Room permission/child actions use a shared ato
 any runtime interface extension joins every implementation under INV §6. Existing private
 Send/Steer semantics stay intact. The paused direct-transport migration is not a prerequisite.
 
+**R85 — A live-process prompt failure is diagnosable without leaking provider data.** When a
+`session/prompt` RPC fails while the provider process lives, the transcript error keeps the peer's
+message plus only a recognized provider reason (R9/R82 vocabulary). One server log line correlates
+the failure: agent, backend type, operation, RPC code, the provider data's top-level key names
+(sorted, at most 8) and any recognized reason. Raw data values, prompt text and stderr are never
+logged or returned (R12, INV §8).
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

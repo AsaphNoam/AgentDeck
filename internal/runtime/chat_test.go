@@ -1,9 +1,11 @@
 package runtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1195,6 +1197,46 @@ func TestModelRejectionWithUnrecognizedDataStaysGeneric(t *testing.T) {
 	_, err := c.Start(context.Background(), spec)
 	if !errors.Is(err, ErrSettingRejected) || strings.Contains(err.Error(), "secret_marker") {
 		t.Fatalf("Start error = %v, want a generic ErrSettingRejected", err)
+	}
+}
+
+// TS-04.R85, R12, INV §8 — a live-process prompt failure keeps the transcript
+// safe and logs one correlated diagnostic naming agent, backend, operation, RPC
+// code and data key names, without the raw data or prompt text.
+func TestPromptFailureLogsBoundedDiagnostic(t *testing.T) {
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	c, spec := newChatTest(t, "stream_text")
+	spec.Env = append(spec.Env, `FAKEACP_PROMPT_REJECT_DATA={"details":"secret_marker"}`)
+	h, err := c.Start(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	ch, unsub, _ := c.Subscribe(h.AgentID)
+	defer unsub()
+
+	if err := c.SendPrompt(context.Background(), h.AgentID, "prompt_marker"); err != nil {
+		t.Fatalf("SendPrompt: %v", err)
+	}
+	var ed ErrorData
+	_ = json.Unmarshal(waitForEvent(t, ch, EvError).Data, &ed)
+	if ed.Message != "Internal error" || ed.Fatal {
+		t.Fatalf("transcript error = %+v, want the non-fatal peer message only", ed)
+	}
+	waitForEvent(t, ch, EvTurnEnd)
+
+	line := logs.String()
+	for _, want := range []string{"provider prompt failed", "agent=a_test01", "backend=claude-acp",
+		"operation=session/prompt", "rpc_code=-32603", "data_keys=[details]"} {
+		if !strings.Contains(line, want) {
+			t.Fatalf("diagnostic %q missing %q", line, want)
+		}
+	}
+	if strings.Contains(line, "secret_marker") || strings.Contains(line, "prompt_marker") {
+		t.Fatalf("diagnostic leaked provider data or prompt text: %q", line)
 	}
 }
 

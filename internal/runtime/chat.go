@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -814,7 +815,7 @@ func (c *ChatRuntime) runPromptTurn(as *agentState, text, turnID string) error {
 			c.clearInlineMail(as.agentID, deliveryKey)
 			td := as.lastContext().turnEnd("error")
 			as.settleTurnContext(&td, false)
-			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: promptFailureMessage(as, err), Fatal: false})
 			nextText, nextTurnID := c.finishTurn(as, turnID, td)
 			c.runReservedHeld(as, nextText, nextTurnID)
 			return
@@ -1439,7 +1440,7 @@ func (c *ChatRuntime) StartActivation(ctx context.Context, agentID, kind string,
 			c.clearInlineMail(as.agentID, deliveryKey)
 			td := as.lastContext().turnEnd("error")
 			as.settleTurnContext(&td, false)
-			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: err.Error(), Fatal: false})
+			c.emit(as, EvError, ErrorData{Scope: "protocol", Message: promptFailureMessage(as, err), Fatal: false})
 			nextText, nextTurnID := c.finishTurn(as, turnID, td)
 			c.runReservedHeld(as, nextText, nextTurnID)
 			return
@@ -2486,6 +2487,51 @@ func claudeVersionTooOld(err error) *ProviderTooOldError {
 		return nil
 	}
 	return &ProviderTooOldError{Have: m[1], Need: m[2]}
+}
+
+// maxDiagnosticDataKeys bounds the provider data key names a prompt-failure
+// diagnostic records (INV §8).
+const maxDiagnosticDataKeys = 8
+
+// promptFailureMessage returns the transcript message for a session/prompt RPC
+// failure on a live process and logs one correlated diagnostic: agent, backend,
+// operation, RPC code, the provider data's top-level key names and any
+// recognized provider reason. The transcript keeps the peer's message and adds
+// only a recognized reason; raw data, prompt text and stderr are never reported
+// (TS-04.R85, R12).
+func promptFailureMessage(as *agentState, err error) string {
+	msg := err.Error()
+	reason := modelPolicyRefusal(err)
+	if tooOld := claudeVersionTooOld(err); tooOld != nil {
+		reason = tooOld.Error()
+	}
+	backendType := ""
+	if as.adapter != nil {
+		backendType = as.adapter.Type()
+	}
+	attrs := []any{"agent", as.agentID, "backend", backendType, "operation", "session/prompt",
+		"message", strutil.ClipRunes(msg, maxPolicyReason)}
+	var rpcErr *rpcError
+	if errors.As(err, &rpcErr) {
+		var data map[string]json.RawMessage
+		keys := []string{}
+		if json.Unmarshal(rpcErr.Data, &data) == nil {
+			for k := range data {
+				keys = append(keys, strutil.ClipRunes(k, 40))
+			}
+			slices.Sort(keys)
+			if len(keys) > maxDiagnosticDataKeys {
+				keys = keys[:maxDiagnosticDataKeys]
+			}
+		}
+		attrs = append(attrs, "rpc_code", rpcErr.Code, "data_keys", keys)
+	}
+	if reason != "" {
+		attrs = append(attrs, "reason", reason)
+		msg += ": " + reason
+	}
+	slog.Warn("runtime: provider prompt failed", attrs...)
+	return msg
 }
 
 // providerUpdateGuidance is the repair for an incompatible selected provider,
