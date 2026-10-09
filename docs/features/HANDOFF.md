@@ -17,9 +17,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   and readable release notes are published. General CI `37935311001` also succeeded.
   Release notes are in
   [`RELEASE-v0.12.0-notes.md`](../archive/state/RELEASE-v0.12.0-notes.md).
-- **Repository:** GitHub remains `AsaphNoam/AgentDeck`. Installer/updater defaults still point
-  to `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
-  `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repo.
+- **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
+  Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
 - **Waiting for review — mobile companion overhaul:** Figma Make `/mobile` composition across
   Home/project, Chat/Files/Manage, pipeline history, pairing, This phone and setup/confirmation
