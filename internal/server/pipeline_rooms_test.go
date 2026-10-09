@@ -126,3 +126,53 @@ func TestPipelineThinkTankStageEndToEnd(t *testing.T) {
 		t.Fatalf("provider prompts = %d, want two participants and one judge", got)
 	}
 }
+
+// TS-09.R54 / FS-21.R42 — a completed setup runtime may take private work
+// under its original generation. Replayed Stop closes the room without
+// stopping that turn; only a launch claimed across Stop is torn down.
+func TestPipelineStopRoomPreservesPrivateTurnOnSameGeneration(t *testing.T) {
+	srv, _, ids, _ := thinkTankTestServer(t)
+	agents := strings.Split(ids, ",")
+	agent := agents[0]
+	room := createTestRoom(t, srv, agents, 1)
+	generation := srv.registry.Generation(agent)
+	if _, err := srv.stateStore.DB().Exec(`UPDATE think_tanks SET pipeline_run_id = 'pr_stop' WHERE room_id = ?`, room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE think_tank_members SET launch_generation = ? WHERE room_id = ? AND agent_id = ?`, generation, room, agent); err != nil {
+		t.Fatal(err)
+	}
+	before, err := srv.stateStore.ReadThinkTank(room)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.StopRoom(context.Background(), room); err != nil {
+		t.Fatal(err)
+	}
+	after, err := srv.stateStore.ReadThinkTank(room)
+	if err != nil || after.Room.Revision == before.Room.Revision {
+		t.Fatalf("room did not close: %+v err=%v", after.Room, err)
+	}
+	if err := srv.StopRoom(context.Background(), room); err != nil {
+		t.Fatal(err)
+	}
+	replayed, _ := srv.stateStore.ReadThinkTank(room)
+	if replayed.Room.Revision != after.Room.Revision {
+		t.Fatalf("idempotent close changed room revision: %d -> %d", after.Room.Revision, replayed.Room.Revision)
+	}
+	if _, err := srv.stateStore.ReadRunning(agent); err != nil {
+		t.Fatalf("ready participant runtime stopped: %v", err)
+	}
+	if _, err := srv.registry.SendPromptOrHold(context.Background(), agent, "private follow-up"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.DB().Exec(`UPDATE think_tank_members SET stop_teardown = 1 WHERE room_id = ? AND agent_id = ?`, room, agent); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.StopRoom(context.Background(), room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := srv.stateStore.ReadRunning(agent); err != nil {
+		t.Fatalf("private same-generation turn stopped: %v", err)
+	}
+}

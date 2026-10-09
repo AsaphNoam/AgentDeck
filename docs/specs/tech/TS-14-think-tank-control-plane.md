@@ -368,8 +368,8 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
 
 - **Pipeline rooms (shipped 2026-10-08).** R19's attributed stage context is the room's first
   `stage_context` entry, so the existing paged read, delivery and read receipts carry it rather
-  than a separate section. R20's Stop leaves setup already claimed to settle but does not then
-  stop that fresh idle runtime (FS-14 §6).
+  than a separate section. R20's Stop durably tracks setup already claimed and tears down its
+  freshly launched idle runtime after that claim settles.
 - The human selected SQLite authority and explicit room tools after reviewing canonical-file and
   automatic-assistant-publication alternatives. No material technical choice remains open here.
 - Current normalized assistant output is a delta without publication intent. Explicit submission

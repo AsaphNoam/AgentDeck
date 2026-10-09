@@ -10,7 +10,7 @@ import (
 
 // Reconcile advances only durable task-backed pipeline effects. Process launch,
 // resume, report, and release belong to the shared task dispatcher.
-func (m *Manager) Reconcile(_ context.Context, runID string) error {
+func (m *Manager) Reconcile(ctx context.Context, runID string) error {
 	unlock := m.lockRun(runID)
 	defer unlock()
 	for step := 0; step < maxReconcileSteps; step++ {
@@ -22,7 +22,7 @@ func (m *Manager) Reconcile(_ context.Context, runID string) error {
 		case "release_stage_task":
 			return m.reconcileTaskStageRelease(run)
 		case "cleanup_run":
-			return m.reconcileRunCleanup(run)
+			return m.reconcileRunCleanup(ctx, run)
 		case "activate_replacement":
 			current, found, err := m.currentStageTask(run.RunID)
 			if err != nil || !found {
@@ -79,9 +79,8 @@ func (m *Manager) settleCleanup(runID, stageID, attempt string) (bool, error) {
 	}
 }
 
-// roomSettled reports whether the run's current stage room still has an
-// in-flight turn; a cancelled room turn keeps the run stopping until it
-// settles (TS-09.R54).
+// roomSettled includes launches claimed before Stop as well as room turns.
+// The stop fence remains live until their ordinary teardown has settled.
 func (m *Manager) roomSettled(runID string) (bool, error) {
 	current, found, err := m.currentStageTask(runID)
 	if err != nil || !found || current.RoomID == "" {
@@ -94,10 +93,29 @@ func (m *Manager) roomSettled(runID string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return len(room.Running) == 0, nil
+	if len(room.Running) != 0 || room.Room.JudgeStatus == state.ThinkTankJudgeLaunching {
+		return false, nil
+	}
+	for _, member := range room.Members {
+		if member.SetupState == state.ThinkTankSetupLaunching {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
-func (m *Manager) reconcileRunCleanup(run state.PipelineRunRecord) error {
+func (m *Manager) reconcileRunCleanup(ctx context.Context, run state.PipelineRunRecord) error {
+	// cleanup_run is the durable room-close/cancel obligation committed with
+	// Stop. Replay is idempotent and must precede terminal run state.
+	current, found, err := m.currentStageTask(run.RunID)
+	if err != nil {
+		return err
+	}
+	if found && current.RoomID != "" && m.lifecycle != nil {
+		if err := m.lifecycle.StopRoom(ctx, current.RoomID); err != nil {
+			return err
+		}
+	}
 	settled, err := m.settleCleanup(run.RunID, "", "")
 	if err != nil {
 		return err

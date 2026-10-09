@@ -225,6 +225,7 @@ type agentState struct {
 	execTurnID string
 	context    contextReading
 	turnActive bool
+	stopping   bool
 	toolNames  map[string]string       // toolCallID -> normalized name (for status detail)
 	pending    map[string]*pendingPerm // toolCallID -> withheld permission request
 	resolved   map[string]struct{}     // toolCallIDs already settled this turn
@@ -441,7 +442,7 @@ func (c *ChatRuntime) Start(ctx context.Context, spec LaunchSpec) (*Handle, erro
 	now := time.Now().UTC()
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: sess.SessionID,
-		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now, Generation: spec.Generation,
 		FastAvailable: applied.FastAvailable, SteeringAvailable: as.steeringSupported(),
 	}); err != nil {
 		failForked()
@@ -486,7 +487,10 @@ func (c *ChatRuntime) SendPromptOrHold(ctx context.Context, agentID, text string
 	if err != nil {
 		return false, err
 	}
-	turnID, held := as.claimTurnOrHold(text)
+	turnID, held, err := as.claimTurnOrHold(text)
+	if err != nil {
+		return false, err
+	}
 	if held {
 		return true, nil
 	}
@@ -672,17 +676,20 @@ func (as *agentState) claimTurn() (string, bool) {
 // between the two reads the same turnActive flag the gate is taken under, in the
 // same critical section, so a hold cannot race a turn_end and be left sitting
 // until the turn after next (TS-01.R29, INV §5).
-func (as *agentState) claimTurnOrHold(text string) (string, bool) {
+func (as *agentState) claimTurnOrHold(text string) (string, bool, error) {
 	as.mu.Lock()
 	defer as.mu.Unlock()
+	if as.stopping {
+		return "", false, ErrNoHandle
+	}
 	turnID, claimed := as.claimTurnLocked()
 	if claimed {
-		return turnID, false
+		return turnID, false, nil
 	}
 	// At most one held message per agent: a second submission replaces it rather
 	// than stacking a second queued turn (FS-03.R48, INV §16).
 	as.held = heldMessage{Text: text, AfterSeq: as.seq}
-	return "", true
+	return "", true, nil
 }
 
 // resolveSteerFallback commits the reservation only after the adapter guarantees
@@ -726,13 +733,33 @@ func (as *agentState) resolveSteerFallback(outcome SteerOutcome, callErr error, 
 }
 
 func (as *agentState) claimTurnLocked() (string, bool) {
-	if as.turnActive {
+	if as.turnActive || as.stopping {
 		return "", false
 	}
 	as.turnActive = true
 	as.cancelEscalated = false
 	as.resolved = map[string]struct{}{}
 	return as.nextTurnIDLocked(), true
+}
+
+// claimIdleStop closes the turn gate before a generation-scoped cleanup stop.
+// A private prompt that won first keeps its turn; one arriving later cannot
+// claim or queue work on the runtime being removed.
+func (c *ChatRuntime) claimIdleStop(agentID string) bool {
+	c.mu.Lock()
+	as := c.agents[agentID]
+	if as == nil {
+		c.mu.Unlock()
+		return false
+	}
+	as.mu.Lock()
+	defer c.mu.Unlock()
+	defer as.mu.Unlock()
+	if as.turnActive || as.stopping {
+		return false
+	}
+	as.stopping = true
+	return true
 }
 
 // runPromptTurn drives one provider turn for text under a gate the caller has
@@ -1294,7 +1321,7 @@ func (c *ChatRuntime) Resume(ctx context.Context, spec LaunchSpec, sessionID str
 	now := time.Now().UTC()
 	if err := c.store.WriteRunning(state.RunningEntry{
 		AgentID: as.agentID, PID: pgid, SessionID: resolvedSessionID,
-		Interface: "chat", HookToken: spec.HookToken, StartedAt: now,
+		Interface: "chat", HookToken: spec.HookToken, StartedAt: now, Generation: spec.Generation,
 		FastAvailable: applied.FastAvailable, SteeringAvailable: as.steeringSupported(),
 	}); err != nil {
 		as.shutdown()

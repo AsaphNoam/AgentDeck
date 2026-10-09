@@ -698,6 +698,26 @@ ALTER TABLE think_tanks ADD COLUMN pipeline_stage_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE think_tanks ADD COLUMN pipeline_task_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE think_tanks ADD COLUMN stage_context TEXT NOT NULL DEFAULT '';
 CREATE INDEX idx_think_tanks_pipeline_run ON think_tanks(pipeline_run_id) WHERE pipeline_run_id != '';
+		`,
+	},
+	{
+		// Think Tank output acceptance is a durable recovery obligation. Keep the
+		// published source and automatic retry budget on the stage authority so a
+		// restart cannot reset bounded recovery (FS-14.R86, TS-09.R53).
+		version: 46,
+		sql: `
+ALTER TABLE pipeline_stage_tasks ADD COLUMN acceptance_entry_seq INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE pipeline_stage_tasks ADD COLUMN acceptance_attempts INTEGER NOT NULL DEFAULT 0;
+`,
+	},
+	{
+		// A stopped pipeline room may still own a newly launched idle agent.
+		// Retain the launch generation so cleanup cannot stop a later private one.
+		version: 47,
+		sql: `
+ALTER TABLE think_tank_members ADD COLUMN launch_generation TEXT NOT NULL DEFAULT '';
+ALTER TABLE think_tank_members ADD COLUMN stop_teardown INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE running ADD COLUMN generation TEXT NOT NULL DEFAULT '';
 `,
 	},
 }

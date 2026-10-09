@@ -314,7 +314,7 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 	if current, found, stageErr := m.currentStageTask(runID); stageErr == nil && found {
 		updated, stopErr := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
 			State: "stopping", PendingAction: "cleanup_run", CurrentStageID: run.CurrentStageID,
-			CurrentAgentID: current.StandingAgentID, FinalOutcome: "",
+			CurrentAgentID: current.StandingAgentID, FinalOutcome: "", MarkRoomTeardown: current.RoomID != "",
 		})
 		if stopErr == nil {
 			m.publish(updated)
@@ -323,12 +323,10 @@ func (m *Manager) Stop(ctx context.Context, runID string, expectedRevision int64
 		if stopErr != nil {
 			return RunDetail{}, stopErr
 		}
-		// The committed stop already fences every room claim; now close the
-		// stage room and cancel only its own in-flight turn (TS-09.R54).
-		if current.RoomID != "" && m.lifecycle != nil {
-			if err := m.lifecycle.StopRoom(ctx, current.RoomID); err != nil {
-				slog.Warn("pipeline: stop stage room", "run", runID, "room", current.RoomID, "err", err)
-			}
+		// The committed cleanup cursor owns room closure and replays it after
+		// transient failure or restart.
+		if err := m.Reconcile(ctx, runID); err != nil {
+			slog.Warn("pipeline: stop cleanup", "run", runID, "err", err)
 		}
 		return m.Detail(runID)
 	} else if stageErr != nil {
@@ -353,6 +351,15 @@ func (m *Manager) FinishStopCleanup(runID string, expectedRevision int64) (RunDe
 	}
 	if run.State != "stopping" || run.PendingAction != "cleanup_run" {
 		return RunDetail{}, controlError("invalid_state", "run cleanup is not pending")
+	}
+	current, found, err := m.currentStageTask(runID)
+	if err != nil {
+		return RunDetail{}, err
+	}
+	if found && current.RoomID != "" && m.lifecycle != nil {
+		if err := m.lifecycle.StopRoom(context.Background(), current.RoomID); err != nil {
+			return RunDetail{}, err
+		}
 	}
 	settled, err := m.settleCleanup(runID, "", "")
 	if err != nil {

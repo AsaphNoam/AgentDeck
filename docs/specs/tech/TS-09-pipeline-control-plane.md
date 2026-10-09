@@ -761,10 +761,9 @@ new durable run revision or a structured validation/conflict result.
 
 ## 5. Deviations & open decisions
 
-- **Think Tank stages (shipped 2026-10-08).** R51–R56 shipped with FS-14 §6's recorded gaps:
-  Stop does not tear down setup runtimes claimed before it, room-turn tasks are not attributed as
-  stage descendants, produced-value context overflow is caught at room creation, and the automatic
-  acceptance retry count is in memory. Room slots are frozen in the one assignments map under
+- **Think Tank stages (shipped 2026-10-08).** R51–R56 include durable Stop cleanup, room-turn
+  lineage, pre-acceptance context bounds and restart-safe output-acceptance recovery. Room slots
+  are frozen in the one assignments map under
   `think_tank:<stage>:participant:<id>` / `think_tank:<stage>:judge` keys.
 - **Shared standing instructions (planned).** R57–R60 extend R36/R6 and distinguish constant
   run-wide guidance from R39's per-stage assignment prohibition on system-prompt mutation. Stage

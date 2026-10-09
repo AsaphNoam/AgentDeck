@@ -696,9 +696,9 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
-- **Collapse and room-backed stage tasks (shipped 2026-10-08).** R46–R48 shipped; tasks created
-  during room-owned turns are not yet recorded as stage descendants (FS-14 §6). Invalid lineage —
-  a cycle or a chain that never reaches a root — always renders visible.
+- **Collapse and room-backed stage tasks (shipped 2026-10-08).** R46–R48 shipped; room-owned turns
+  now attribute created tasks as stage descendants. Invalid lineage — a cycle or a chain that never
+  reaches a root — always renders visible.
 - **Work-in-motion redesign.** R41–R45 and A27–A29 shipped 2026-10-03. Rendered acceptance used
   the real UI against the Go-marshalled task fixture in all three skins at 1024px and 1440px; a
   live multi-agent journey through the built binary was not run. Optional collapsing of long

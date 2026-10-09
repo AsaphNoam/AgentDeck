@@ -1078,15 +1078,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
-**Think Tank stages shipped with known gaps, 2026-10-08.** R81–R86 shipped with these recorded
-deviations: (1) participant setup already claimed before Stop settles its launch, but Stop does not
-then tear down that fresh idle runtime; (2) tasks created during room-owned turns are not recorded
-as stage descendants (FS-16.R48's last sentence); (3) produced values that would overflow a later
-room's 256 KiB stage context are detected when that room is created — the run pauses naming the
-field — not before the producing stage's result is accepted (TS-09.R56); (4) the automatic
-output-acceptance retry count (three) is in memory and restarts after a Chuck restart, while the
-held `accept_room_output` state itself is durable. A49's restart/race fault-injection matrix
-remains planned beyond the state/manager tests that shipped. No desktop inline start form exists
+**Think Tank stage recovery, 2026-10-08.** R81–R86 now retain Stop cleanup through claimed setup
+and room-turn settlement, attribute room-turn tasks as stage descendants, reject downstream room
+context overflow before producer acceptance, and persist the synthesis source and automatic
+acceptance budget across restart. A49's broader restart/race matrix remains planned beyond the
+focused state/manager/server tests. No desktop inline start form exists
 (starts use the modal), so A51 exercised the modal start and the run-page attention warning. The
 bounded packaged Claude/Codex room/judge probe for A50 is owed.
 

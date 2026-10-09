@@ -24,11 +24,12 @@ type Agent struct {
 
 // RunningEntry records an active session for an agent.
 type RunningEntry struct {
-	AgentID   string `json:"agent_id"`
-	PID       int    `json:"pid"`
-	SessionID string `json:"session_id"`
-	Interface string `json:"interface"`
-	TTY       string `json:"tty,omitempty"`
+	AgentID    string `json:"agent_id"`
+	Generation string `json:"-"`
+	PID        int    `json:"pid"`
+	SessionID  string `json:"session_id"`
+	Interface  string `json:"interface"`
+	TTY        string `json:"tty,omitempty"`
 	// Driver is the TerminalDriver backing a terminal agent (xterm/tmux/iterm2);
 	// empty for chat agents. DriverIDs carries driver-specific identifiers (e.g.
 	// the tmux session name, iTerm2 window/tab/session ids). (Phase 6 techspec §3.1.)
@@ -425,6 +426,7 @@ type PipelineRunUpdate struct {
 	AttentionReason  string
 	FinalOutcome     string
 	UpdatedAt        time.Time
+	MarkRoomTeardown bool
 }
 
 type PipelineReportInput struct {

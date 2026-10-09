@@ -411,6 +411,39 @@ ORDER BY parent.updated_at DESC LIMIT 1`, task.CreatedByAgentID, task.CreatedByG
 			inherited = &lineage
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return Task{}, fmt.Errorf("state: read creator task lineage: %w", err)
+		} else {
+			// A room stage has no assigned agent. Its running attempt is the
+			// authority for work created by a participant or judge, and the
+			// captured generation/turn keeps later private work out of the run.
+			err = tx.QueryRow(`
+SELECT l.task_id, l.parent_task_id, l.pipeline_run_id, l.pipeline_stage_id,
+       l.creation_attempt_id, l.created_at
+FROM think_tank_attempts a
+JOIN think_tanks room ON room.room_id = a.room_id
+JOIN pipeline_stage_tasks p ON p.room_id = room.room_id
+JOIN pipeline_runs r ON r.run_id = p.run_id
+JOIN task_lineage l ON l.task_id = p.task_id
+WHERE a.agent_id = ? AND a.generation = ? AND a.turn_id != ''
+  AND a.state = 'running' AND room.origin_project = ? AND r.project = ?
+  AND a.turn_id = (SELECT turn_id FROM turn_budget WHERE agent_id = a.agent_id ORDER BY rowid DESC LIMIT 1)
+ORDER BY a.created_at DESC LIMIT 1`, task.CreatedByAgentID, task.CreatedByGeneration, task.Project, task.Project).
+				Scan(&lineage.TaskID, &lineage.ParentTaskID, &lineage.PipelineRunID,
+					&lineage.PipelineStageID, &lineage.CreationAttemptID, &created)
+			if err == nil {
+				if lineage.CreatedAt, err = parseTime(created); err != nil {
+					return Task{}, err
+				}
+				var runState, stageState string
+				if err := tx.QueryRow(`SELECT r.state, p.state FROM pipeline_runs r JOIN pipeline_stage_tasks p ON p.run_id = r.run_id AND p.task_id = ? WHERE r.run_id = ?`, lineage.TaskID, lineage.PipelineRunID).Scan(&runState, &stageState); err != nil {
+					return Task{}, ErrTaskRunClosed
+				}
+				if runState == "stopping" || runState == "stopped" || runState == "completed" || stageState != "open" {
+					return Task{}, ErrTaskRunClosed
+				}
+				inherited = &lineage
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return Task{}, fmt.Errorf("state: read room creator lineage: %w", err)
+			}
 		}
 	}
 
@@ -1613,6 +1646,10 @@ type PipelineStageTask struct {
 	RoomID        string `json:"room_id,omitempty"`
 	// SourceEntrySeq is the accepted synthesis entry (TS-09.R53).
 	SourceEntrySeq int64 `json:"source_entry_seq,omitempty"`
+	// AcceptanceEntrySeq and AcceptanceAttempts retain an unpublished synthesis
+	// acceptance obligation and its bounded automatic recovery progress.
+	AcceptanceEntrySeq int64 `json:"acceptance_entry_seq,omitempty"`
+	AcceptanceAttempts int   `json:"acceptance_attempts,omitempty"`
 }
 
 const (

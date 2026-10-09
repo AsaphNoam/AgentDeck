@@ -358,11 +358,12 @@ func (s *Server) launchThinkTankSetup(ctx context.Context, d state.ThinkTankDeta
 		if m.Role != state.ThinkTankRoleParticipant || m.SetupState != state.ThinkTankSetupPending {
 			continue
 		}
-		if _, err := s.stateStore.ClaimThinkTankMemberSetup(d.Room.RoomID, m.AgentID); err != nil {
+		generation := mintHookToken()
+		if _, err := s.stateStore.ClaimThinkTankMemberSetup(d.Room.RoomID, m.AgentID, generation); err != nil {
 			return
 		}
-		name, launchErr := s.launchReservedThinkTankAgent(ctx, m.AgentID, m.SetupConfig, d.Room.Title)
-		updated, err := s.stateStore.MarkThinkTankMemberSetup(d.Room.RoomID, m.AgentID, name, launchErr)
+		name, launchErr := s.launchReservedThinkTankAgent(ctx, m.AgentID, m.SetupConfig, d.Room.Title, generation)
+		updated, err := s.stateStore.MarkThinkTankMemberSetup(d.Room.RoomID, m.AgentID, name, launchErr, generation)
 		if err != nil {
 			s.log.Debug("mark think tank setup", "room", d.Room.RoomID, "agent", m.AgentID, "err", err)
 			return
@@ -398,7 +399,7 @@ func (s *Server) interruptThinkTankOnExit(agentID, generation, cause string) {
 // launchReservedThinkTankAgent launches a reserved room identity into the
 // group named by the room title. An identity that already exists is never
 // relaunched or regrouped (FS-21.R51, TS-14.R22).
-func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, config, title string) (string, string) {
+func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, config, title string, launchGeneration ...string) (string, string) {
 	if agent, err := s.stateStore.ReadAgent(agentID); err == nil {
 		return agent.Name, ""
 	}
@@ -407,7 +408,11 @@ func (s *Server) launchReservedThinkTankAgent(ctx context.Context, agentID, conf
 		return "", "the saved launch settings are unreadable"
 	}
 	req.Group = title
-	resp, ae := s.launchAgent(ctx, req, launchOptions{AgentID: agentID})
+	generation := ""
+	if len(launchGeneration) > 0 {
+		generation = launchGeneration[0]
+	}
+	resp, ae := s.launchAgent(ctx, req, launchOptions{AgentID: agentID, Generation: generation})
 	if ae != nil {
 		return "", ae.Message
 	}
@@ -427,14 +432,15 @@ func (s *Server) launchThinkTankJudge(ctx context.Context, d state.ThinkTankDeta
 		s.log.Debug("reserve think tank judge id", "err", err)
 		return
 	}
-	reserved, err := s.stateStore.ReserveThinkTankJudge(d.Room.RoomID, agentID, req.Name, req.Project)
+	generation := mintHookToken()
+	reserved, err := s.stateStore.ReserveThinkTankJudge(d.Room.RoomID, agentID, req.Name, req.Project, generation)
 	if err != nil {
 		s.log.Debug("reserve think tank judge", "room", d.Room.RoomID, "err", err)
 		return
 	}
 	s.publishThinkTankUpdate(reserved)
-	name, launchErr := s.launchReservedThinkTankAgent(ctx, agentID, d.Room.JudgeConfig, d.Room.Title)
-	updated, err := s.stateStore.MarkThinkTankJudgeLaunched(d.Room.RoomID, name, launchErr)
+	name, launchErr := s.launchReservedThinkTankAgent(ctx, agentID, d.Room.JudgeConfig, d.Room.Title, generation)
+	updated, err := s.stateStore.MarkThinkTankJudgeLaunched(d.Room.RoomID, name, launchErr, generation)
 	if err != nil {
 		s.log.Debug("mark think tank judge", "room", d.Room.RoomID, "err", err)
 		return

@@ -224,9 +224,11 @@ type ThinkTankMember struct {
 	Checkpoint int64
 	// Setup records a reserved new agent's launch intent before its effects
 	// (TS-14.R2). Existing agents join ready.
-	SetupState  string
-	SetupConfig string
-	SetupError  string
+	SetupState       string
+	SetupConfig      string
+	SetupError       string
+	LaunchGeneration string
+	StopTeardown     bool
 }
 
 type ThinkTankAttempt struct {
@@ -757,13 +759,13 @@ func scanThinkTank(row interface{ Scan(...any) error }) (ThinkTank, error) {
 }
 
 const thinkTankMemberColumns = `room_id, agent_id, agent_name, project, role, ord, cap, completed,
-  may_leave, state, checkpoint, setup_state, setup_config, setup_error`
+  may_leave, state, checkpoint, setup_state, setup_config, setup_error, launch_generation, stop_teardown`
 
 func scanThinkTankMember(row interface{ Scan(...any) error }) (ThinkTankMember, error) {
 	var m ThinkTankMember
 	if err := row.Scan(&m.RoomID, &m.AgentID, &m.AgentName, &m.Project, &m.Role, &m.Order, &m.Cap,
 		&m.Completed, &m.MayLeave, &m.State, &m.Checkpoint, &m.SetupState, &m.SetupConfig,
-		&m.SetupError); err != nil {
+		&m.SetupError, &m.LaunchGeneration, &m.StopTeardown); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ThinkTankMember{}, ErrNotFound
 		}
@@ -995,13 +997,17 @@ func bumpThinkTankTx(tx *sql.Tx, roomID string) error {
 
 // ClaimThinkTankMemberSetup fences setup launch effects against Pause/End/Delete.
 // Delete refuses the claimed slot until its ordinary launch outcome commits.
-func (s *Store) ClaimThinkTankMemberSetup(roomID, agentID string) (ThinkTankDetail, error) {
+func (s *Store) ClaimThinkTankMemberSetup(roomID, agentID string, launchGeneration ...string) (ThinkTankDetail, error) {
 	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase != ThinkTankPhaseSetup || d.Room.Control != ThinkTankRunning || d.Room.Hold != "" {
 			return thinkTankConflict("room setup is no longer runnable")
 		}
-		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ? WHERE room_id = ? AND agent_id = ? AND role = ? AND setup_state = ?`,
-			ThinkTankSetupLaunching, roomID, agentID, ThinkTankRoleParticipant, ThinkTankSetupPending)
+		generation := ""
+		if len(launchGeneration) > 0 {
+			generation = launchGeneration[0]
+		}
+		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, launch_generation = ? WHERE room_id = ? AND agent_id = ? AND role = ? AND setup_state = ?`,
+			ThinkTankSetupLaunching, generation, roomID, agentID, ThinkTankRoleParticipant, ThinkTankSetupPending)
 		if err != nil {
 			return fmt.Errorf("state: claim think tank setup: %w", err)
 		}
@@ -1016,15 +1022,20 @@ func (s *Store) ClaimThinkTankMemberSetup(roomID, agentID string) (ThinkTankDeta
 // outcome. When every participant is ready, the room leaves setup. A failed
 // slot keeps the room in setup with a hold naming it; retry relaunches only
 // that slot, never a ready one (TS-14.R2).
-func (s *Store) MarkThinkTankMemberSetup(roomID, agentID, name, launchErr string) (ThinkTankDetail, error) {
+func (s *Store) MarkThinkTankMemberSetup(roomID, agentID, name, launchErr string, launchGeneration ...string) (ThinkTankDetail, error) {
 	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		state := ThinkTankSetupReady
 		if launchErr != "" {
 			state = ThinkTankSetupFailed
 		}
+		generation := ""
+		if len(launchGeneration) > 0 {
+			generation = launchGeneration[0]
+		}
 		res, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?,
+	  launch_generation = CASE WHEN ? = '' THEN launch_generation ELSE ? END,
   agent_name = CASE WHEN ? = '' THEN agent_name ELSE ? END
-WHERE room_id = ? AND agent_id = ? AND setup_state IN ('pending', 'launching', 'failed')`, state, launchErr, name, name, roomID, agentID)
+WHERE room_id = ? AND agent_id = ? AND setup_state IN ('pending', 'launching', 'failed')`, state, launchErr, generation, generation, name, name, roomID, agentID)
 		if err != nil {
 			return fmt.Errorf("state: mark think tank setup: %w", err)
 		}
@@ -1348,6 +1359,14 @@ func (s *Store) ClosePipelineThinkTank(roomID string) (ThinkTankDetail, error) {
 		}
 		return nil
 	})
+}
+
+func (s *Store) ClearThinkTankStopTeardown(roomID, agentID, generation string) error {
+	_, err := s.db.Exec(`UPDATE think_tank_members SET stop_teardown = 0 WHERE room_id = ? AND agent_id = ? AND launch_generation = ?`, roomID, agentID, generation)
+	if err != nil {
+		return fmt.Errorf("state: settle stopped room launch: %w", err)
+	}
+	return nil
 }
 
 func endThinkTankTx(tx *sql.Tx, d ThinkTankDetail, reason string) error {

@@ -412,6 +412,32 @@ func (r *Registry) CancelGuarded(ctx context.Context, agentID, expectedGeneratio
 	return rt.CancelGuarded(ctx, agentID, expectedGeneration, expectedTurn)
 }
 
+// StopGuardedIdle tears down only the captured chat generation while its turn
+// gate is idle. It is used for a room launch claimed before pipeline Stop, so
+// cleanup cannot interrupt a later private turn on that same generation.
+func (r *Registry) StopGuardedIdle(ctx context.Context, agentID, expectedGeneration string) (bool, error) {
+	r.mu.Lock()
+	if expectedGeneration == "" || r.generationByAgent[agentID] != expectedGeneration || r.rtByAgent[agentID] != r.chat {
+		r.mu.Unlock()
+		return false, nil
+	}
+	if !r.chat.claimIdleStop(agentID) {
+		r.mu.Unlock()
+		return false, nil
+	}
+	delete(r.rtByAgent, agentID)
+	delete(r.generationByAgent, agentID)
+	extra := r.onExitExtra
+	r.mu.Unlock()
+	if err := r.chat.Stop(ctx, agentID); err != nil {
+		return true, err
+	}
+	if extra != nil {
+		extra(agentID, expectedGeneration, "requested_stop")
+	}
+	return true, nil
+}
+
 // Stop routes a stop to the owning runtime and forgets the agent.
 // The agent is removed from rtByAgent before rt.Stop() so that concurrent
 // SendPrompt/Permission calls get ErrNoHandle immediately rather than racing

@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -209,6 +210,36 @@ func (s *Store) StageThinkTankTurn(callerAgentID, token, disposition, message, r
 		}
 	default:
 		return ThinkTankAttempt{}, thinkTankInvalid("disposition must be reply, leave or decline_closing")
+	}
+	if a.Turn == ThinkTankTurnJudge && disposition == ThinkTankReply {
+		var runID, templateJSON, outputJSON string
+		var stageIndex int
+		err := tx.QueryRow(`SELECT p.run_id, p.stage_index, r.template_snapshot_json, p.output_values_json
+FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id
+WHERE p.room_id = ? AND p.state = 'open'`, a.RoomID).
+			Scan(&runID, &stageIndex, &templateJSON, &outputJSON)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return ThinkTankAttempt{}, fmt.Errorf("state: read judge pipeline context: %w", err)
+		}
+		if err == nil {
+			declared := map[string]string{}
+			if err := json.Unmarshal([]byte(outputJSON), &declared); err != nil {
+				return ThinkTankAttempt{}, fmt.Errorf("state: decode judge output contract: %w", err)
+			}
+			if len(declared) != 1 {
+				return ThinkTankAttempt{}, thinkTankInvalid("pipeline judge must produce one named output")
+			}
+			outputs := map[string]string{}
+			for name := range declared {
+				outputs[name] = message
+			}
+			if err := validateProspectiveRoomContextsTx(tx, runID, stageIndex, templateJSON, declared, outputs); err != nil {
+				if errors.Is(err, ErrThinkTankOutputRefused) {
+					return ThinkTankAttempt{}, thinkTankInvalid("%s; shorten the synthesis and submit again", strings.TrimPrefix(err.Error(), ErrThinkTankOutputRefused.Error()+": "))
+				}
+				return ThinkTankAttempt{}, err
+			}
+		}
 	}
 	if _, err := tx.Exec(`UPDATE think_tank_attempts SET disposition = ?, message = ? WHERE attempt_id = ? AND state = ?`,
 		disposition, message, a.AttemptID, ThinkTankAttemptRunning); err != nil {
@@ -567,7 +598,7 @@ VALUES(?, ?, ?, ?, ?, ?, ?)`, id, roomID, commandID, kind, body, context, format
 
 // ReserveThinkTankJudge persists the fresh judge's reserved identity before
 // its launch effects (TS-14.R2, R13).
-func (s *Store) ReserveThinkTankJudge(roomID, agentID, agentName, project string) (ThinkTankDetail, error) {
+func (s *Store) ReserveThinkTankJudge(roomID, agentID, agentName, project string, launchGeneration ...string) (ThinkTankDetail, error) {
 	return s.openThinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.Phase != ThinkTankPhaseEnded || d.Room.JudgeStatus != ThinkTankJudgeReady {
 			return thinkTankConflict("the judge is not ready to launch")
@@ -576,11 +607,15 @@ func (s *Store) ReserveThinkTankJudge(roomID, agentID, agentName, project string
 			ThinkTankJudgeLaunching, agentID, roomID); err != nil {
 			return fmt.Errorf("state: reserve think tank judge: %w", err)
 		}
+		generation := ""
+		if len(launchGeneration) > 0 {
+			generation = launchGeneration[0]
+		}
 		if _, err := tx.Exec(`
-INSERT INTO think_tank_members(room_id, agent_id, agent_name, project, role, ord, cap, may_leave, state, setup_state)
-VALUES(?, ?, ?, ?, ?, (SELECT COUNT(*) FROM think_tank_members WHERE room_id = ?), 1, 0, ?, ?)`,
+INSERT INTO think_tank_members(room_id, agent_id, agent_name, project, role, ord, cap, may_leave, state, setup_state, launch_generation)
+VALUES(?, ?, ?, ?, ?, (SELECT COUNT(*) FROM think_tank_members WHERE room_id = ?), 1, 0, ?, ?, ?)`,
 			roomID, agentID, agentName, project, ThinkTankRoleJudge, roomID, ThinkTankMemberActive,
-			ThinkTankSetupPending); err != nil {
+			ThinkTankSetupPending, generation); err != nil {
 			return fmt.Errorf("state: insert think tank judge: %w", err)
 		}
 		return nil
@@ -588,7 +623,7 @@ VALUES(?, ?, ?, ?, ?, (SELECT COUNT(*) FROM think_tank_members WHERE room_id = ?
 }
 
 // MarkThinkTankJudgeLaunched records the reserved judge's launch outcome.
-func (s *Store) MarkThinkTankJudgeLaunched(roomID, name, launchErr string) (ThinkTankDetail, error) {
+func (s *Store) MarkThinkTankJudgeLaunched(roomID, name, launchErr string, launchGeneration ...string) (ThinkTankDetail, error) {
 	return s.thinkTankTx(roomID, func(tx *sql.Tx, d ThinkTankDetail) error {
 		if d.Room.JudgeStatus != ThinkTankJudgeLaunching {
 			return thinkTankConflict("the judge is not launching")
@@ -601,9 +636,14 @@ func (s *Store) MarkThinkTankJudgeLaunched(roomID, name, launchErr string) (Thin
 			status, launchErr, roomID); err != nil {
 			return fmt.Errorf("state: mark think tank judge: %w", err)
 		}
+		generation := ""
+		if len(launchGeneration) > 0 {
+			generation = launchGeneration[0]
+		}
 		if _, err := tx.Exec(`UPDATE think_tank_members SET setup_state = ?, setup_error = ?,
+	  launch_generation = CASE WHEN ? = '' THEN launch_generation ELSE ? END,
   agent_name = CASE WHEN ? = '' THEN agent_name ELSE ? END
-WHERE room_id = ? AND agent_id = ?`, setup, launchErr, name, name, roomID, d.Room.JudgeAgentID); err != nil {
+WHERE room_id = ? AND agent_id = ?`, setup, launchErr, generation, generation, name, name, roomID, d.Room.JudgeAgentID); err != nil {
 			return fmt.Errorf("state: mark think tank judge member: %w", err)
 		}
 		return nil

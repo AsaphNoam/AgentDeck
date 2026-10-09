@@ -3,6 +3,8 @@ package state
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -53,6 +55,112 @@ func TestCreatePipelineStageTaskIsIdempotentAndRetainsLineage(t *testing.T) {
 	}
 }
 
+// TS-09.R53 — retained holds and terminal runs cannot consume a bounded
+// recovery batch ahead of a later eligible completed synthesis.
+func TestPendingRoomOutputSweepSkipsMoreThanOneBatchOfIneligibleRows(t *testing.T) {
+	st, _ := newTestStore(t)
+	stamp := formatTime(time.Now().UTC())
+	for i := 0; i < 130; i++ {
+		runID, taskID, roomID := fmt.Sprintf("run_%03d", i), fmt.Sprintf("task_%03d", i), fmt.Sprintf("room_%03d", i)
+		stateName, pending := "paused", "accept_room_output"
+		if i >= 65 && i < 129 {
+			stateName, pending = "stopped", ""
+		} else if i == 129 {
+			stateName, pending = "running", "accept_room_output"
+		}
+		if _, err := st.DB().Exec(`INSERT INTO pipeline_runs(run_id, template_id, display_name, project, goal, state, pending_action, created_at, updated_at) VALUES (?, 't', 'run', 'proj', 'goal', ?, ?, ?, ?)`, runID, stateName, pending, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.DB().Exec(`INSERT INTO tasks(task_id, project, display_name, instruction, target_kind, state, created_by_kind, created_at, updated_at) VALUES (?, 'proj', 'room', 'room', 'launch', 'ready', 'pipeline', ?, ?)`, taskID, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.DB().Exec(`INSERT INTO think_tanks(room_id, command_id, goal, origin_project, openings, phase, control, judge_status, created_at, updated_at, pipeline_run_id, pipeline_task_id) VALUES (?, ?, 'goal', 'proj', 0, 'ended', 'running', 'completed', ?, ?, ?, ?)`, roomID, roomID, stamp, stamp, runID, taskID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.DB().Exec(`INSERT INTO pipeline_stage_tasks(run_id, stage_index, attempt_number, stage_id, task_id, created_at, execution_kind, room_id) VALUES (?, 0, 1, 'room', ?, ?, 'think_tank', ?)`, runID, taskID, stamp, roomID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stages, err := st.PendingThinkTankStageOutputs(64)
+	if err != nil || len(stages) != 1 || stages[0].RunID != "run_129" {
+		t.Fatalf("eligible output starved after retained batches: stages=%+v err=%v", stages, err)
+	}
+}
+
+// FS-14.A52 / TS-09.R56 — prospective output validation accounts for JSON
+// escaping and the total of all later room inputs before a producer commits.
+func TestProspectiveRoomContextRejectsEscapedAndCumulativeOutput(t *testing.T) {
+	st, _ := newTestStore(t)
+	runID, _ := st.NewPipelineRunID()
+	now := time.Now().UTC()
+	template := json.RawMessage(`{"version":2,"stages":[{"id":"draft","title":"Draft","objective":"draft","outputs":[{"name":"draft","value":"draft"}]},{"id":"room","title":"Room","objective":"choose","coordination":"think_tank","inputs":[{"name":"a","value":"draft"},{"name":"b","value":"other"}],"outputs":[{"name":"answer","value":"answer"}]}]}`)
+	if _, _, err := st.CreatePipelineRun(CreatePipelineRunParams{Run: PipelineRunRecord{
+		RunID: runID, TemplateID: "overflow", TemplateSnapshot: template, DisplayName: "Overflow", Project: "p", Goal: "g",
+		Inputs: json.RawMessage(`{"other":""}`), Assignments: json.RawMessage(`{}`), State: "running", Revision: 1,
+		CurrentStageID: "draft", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "overflow", RequestHash: "overflow"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB().Exec(`INSERT INTO pipeline_values(run_id, name, value, source_kind, updated_at) VALUES (?, 'other', ?, 'run_input', ?)`, runID, strings.Repeat("x", 100000), formatTime(now)); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := st.DB().Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	tooLarge := strings.Repeat("<", 44000)
+	err = validateProspectiveRoomContextsTx(tx, runID, 0, string(template), map[string]string{"draft": "draft"}, map[string]string{"draft": tooLarge})
+	if !errors.Is(err, ErrThinkTankOutputRefused) {
+		t.Fatalf("escaped/cumulative context error = %v, want ErrThinkTankOutputRefused", err)
+	}
+}
+
+func TestOrdinaryProducerOverflowStaysUnaccepted(t *testing.T) {
+	st, _ := newTestStore(t)
+	runID, _ := st.NewPipelineRunID()
+	taskID, _ := st.NewTaskID()
+	now := time.Now().UTC()
+	template := json.RawMessage(`{"version":2,"stages":[{"id":"draft","title":"Draft","objective":"draft","outputs":[{"name":"draft","value":"draft"}]},{"id":"room","title":"Room","objective":"choose","coordination":"think_tank","inputs":[{"name":"draft","value":"draft"}],"outputs":[{"name":"answer","value":"answer"}]}]}`)
+	_, _, err := st.CreatePipelineRun(CreatePipelineRunParams{Run: PipelineRunRecord{
+		RunID: runID, TemplateID: "overflow-ordinary", TemplateSnapshot: template, DisplayName: "Overflow", Project: "p", Goal: "g",
+		Inputs: json.RawMessage(`{}`), Assignments: json.RawMessage(`{}`), State: "queued", Revision: 1, CurrentStageID: "draft", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "ordinary-overflow", RequestHash: "ordinary-overflow", InitialStageTask: &CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "draft", OutputValues: map[string]string{"draft": "draft"}, Task: Task{
+			TaskID: taskID, Project: "p", DisplayName: "Draft", Instruction: "draft", TargetKind: TargetLaunch, Role: "orchestrator", CreatedByKind: "pipeline",
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB().Exec(`UPDATE tasks SET state = ?, assigned_agent_id = 'owner', assigned_generation = 'gen', execution_handle = 'handle' WHERE task_id = ?`, TaskRunning, taskID); err != nil {
+		t.Fatal(err)
+	}
+	run, err := st.ReadPipelineRun(runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = st.AcceptPipelineStageTaskResult(taskID, "owner", "gen", "handle", run.Revision, TaskResult{
+		Outcome: OutcomeSuccess, Summary: "done", Outputs: map[string]string{"draft": strings.Repeat("<", 44000)},
+	})
+	if !errors.Is(err, ErrThinkTankOutputRefused) {
+		t.Fatalf("ordinary overflow error = %v, want ErrThinkTankOutputRefused", err)
+	}
+	task, err := st.ReadTask(taskID)
+	if err != nil || task.State != TaskRunning || task.Outcome != "" || len(task.Outputs) != 0 {
+		t.Fatalf("ordinary producer mutated after refusal: task=%+v err=%v", task, err)
+	}
+	values, err := st.ListPipelineValues(runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range values {
+		if value.Name == "draft" {
+			t.Fatalf("ordinary producer value persisted: %+v", values)
+		}
+	}
+}
+
 func TestAgentCreatedWorkInheritsStageLineageAndClosureFence(t *testing.T) {
 	st, _ := newTestStore(t)
 	runID, _ := st.NewPipelineRunID()
@@ -89,6 +197,85 @@ func TestAgentCreatedWorkInheritsStageLineageAndClosureFence(t *testing.T) {
 	_, err = st.CreateTask(Task{TaskID: blockedID, Project: "proj", DisplayName: "Too late", Instruction: "work", TargetKind: TargetLaunch, Role: "worker", CreatedByKind: "agent", CreatedByAgentID: "owner", CreatedByGeneration: "gen"})
 	if !errors.Is(err, ErrTaskRunClosed) {
 		t.Fatalf("closed-stage create error = %v", err)
+	}
+}
+
+// FS-16.R48 / TS-10.R38 — a room turn, including the judge, owns delegated
+// tasks only while its captured generation and turn are current. A later
+// private turn under the same generation cannot inherit stale room lineage.
+func TestRoomTurnCreatedWorkInheritsStageLineageOnlyDuringTurn(t *testing.T) {
+	st, _ := newTestStore(t)
+	runID, _ := st.NewPipelineRunID()
+	stageTaskID, _ := st.NewTaskID()
+	now := time.Now().UTC()
+	if _, _, err := st.CreatePipelineRun(CreatePipelineRunParams{Run: PipelineRunRecord{
+		RunID: runID, TemplateID: "room", TemplateSnapshot: json.RawMessage(`{"version":2}`),
+		DisplayName: "Room", Project: "proj", Goal: "discuss", Inputs: json.RawMessage(`{}`), Assignments: json.RawMessage(`{}`),
+		State: "running", Revision: 1, CurrentStageID: "debate", CreatedAt: now, UpdatedAt: now,
+	}, RequestID: "room-lineage", RequestHash: "hash", InitialStageTask: &CreatePipelineStageTaskParams{
+		RunID: runID, ExpectedRevision: 1, StageIndex: 0, AttemptNumber: 1, StageID: "debate",
+		Task: Task{TaskID: stageTaskID, Project: "proj", DisplayName: "Debate", Instruction: "discuss", TargetKind: TargetLaunch, Role: "worker", CreatedByKind: "pipeline"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	roomID := "room_lineage"
+	if _, err := st.DB().Exec(`INSERT INTO think_tanks(room_id, command_id, goal, origin_project, openings, phase, control, created_at, updated_at, pipeline_run_id, pipeline_stage_id, pipeline_task_id) VALUES (?, ?, 'discuss', 'proj', 0, 'discussion', 'running', ?, ?, ?, 'debate', ?)`, roomID, roomID, formatTime(now), formatTime(now), runID, stageTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB().Exec(`UPDATE pipeline_stage_tasks SET execution_kind = 'think_tank', room_id = ? WHERE task_id = ?`, roomID, stageTaskID); err != nil {
+		t.Fatal(err)
+	}
+	create := func(agent, generation, turn, id string) Task {
+		t.Helper()
+		created, err := st.CreateTask(Task{TaskID: id, Project: "proj", DisplayName: "Delegated", Instruction: "work", TargetKind: TargetLaunch, Role: "worker", CreatedByKind: "agent", CreatedByAgentID: agent, CreatedByGeneration: generation})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return created
+	}
+	for _, actor := range []struct{ agent, turn, kind string }{{"participant", "t1", "discussion"}, {"judge", "t2", "judge"}} {
+		if _, err := st.DB().Exec(`INSERT INTO think_tank_attempts(attempt_id, room_id, agent_id, turn, token, generation, turn_id, head, checkpoint, delivered_to, state, created_at) VALUES (?, ?, ?, ?, ?, 'gen1', ?, 0, 0, 0, 'running', ?)`, "attempt_"+actor.agent, roomID, actor.agent, actor.kind, "token_"+actor.agent, actor.turn, formatTime(now)); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.ResetTurnBudget(actor.agent, actor.turn); err != nil {
+			t.Fatal(err)
+		}
+		id, _ := st.NewTaskID()
+		child := create(actor.agent, "gen1", actor.turn, id)
+		lineage, err := st.ReadTaskLineage(child.TaskID)
+		if err != nil || lineage.ParentTaskID != stageTaskID || lineage.PipelineRunID != runID {
+			t.Fatalf("%s lineage = %+v, err=%v", actor.agent, lineage, err)
+		}
+		if err := st.ResetTurnBudget(actor.agent, "private"); err != nil {
+			t.Fatal(err)
+		}
+		id, _ = st.NewTaskID()
+		private := create(actor.agent, "gen1", "private", id)
+		if _, err := st.ReadTaskLineage(private.TaskID); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("same-generation private task inherited room lineage: %v", err)
+		}
+		id, _ = st.NewTaskID()
+		private = create(actor.agent, "gen2", "private", id)
+		if _, err := st.ReadTaskLineage(private.TaskID); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("new-generation private task inherited room lineage: %v", err)
+		}
+		if _, err := st.DB().Exec(`UPDATE think_tank_attempts SET state = 'failed' WHERE attempt_id = ?`, "attempt_"+actor.agent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.DB().Exec(`UPDATE pipeline_runs SET state = 'stopping' WHERE run_id = ?`, runID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.DB().Exec(`UPDATE think_tank_attempts SET state = 'running' WHERE attempt_id = 'attempt_judge'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.ResetTurnBudget("judge", "t2"); err != nil {
+		t.Fatal(err)
+	}
+	id, _ := st.NewTaskID()
+	_, err := st.CreateTask(Task{TaskID: id, Project: "proj", DisplayName: "Too late", Instruction: "work", TargetKind: TargetLaunch, Role: "worker", CreatedByKind: "agent", CreatedByAgentID: "judge", CreatedByGeneration: "gen1"})
+	if !errors.Is(err, ErrTaskRunClosed) {
+		t.Fatalf("post-Stop create = %v, want closed run", err)
 	}
 }
 

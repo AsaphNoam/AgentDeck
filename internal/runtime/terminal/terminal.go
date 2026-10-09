@@ -217,7 +217,7 @@ func (r *Runtime) Start(ctx context.Context, spec rt.LaunchSpec) (*rt.Handle, er
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: "", Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
-		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
+		HookToken: spec.HookToken, StartedAt: time.Now().UTC(), Generation: spec.Generation,
 	}); err != nil {
 		a.closePTYHub()
 		a.closePersistence()
@@ -262,7 +262,7 @@ func (r *Runtime) Resume(ctx context.Context, spec rt.LaunchSpec, sessionID stri
 	if err := r.store.WriteRunning(state.RunningEntry{
 		AgentID: a.agentID, PID: tab.PGID, SessionID: sessionID, Interface: "terminal",
 		TTY: tab.TTY, Driver: tab.Driver, DriverIDs: tab.IDs,
-		HookToken: spec.HookToken, StartedAt: time.Now().UTC(),
+		HookToken: spec.HookToken, StartedAt: time.Now().UTC(), Generation: spec.Generation,
 	}); err != nil {
 		a.closePTYHub()
 		a.closePersistence()

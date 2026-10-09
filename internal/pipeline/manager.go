@@ -34,9 +34,6 @@ type Manager struct {
 	locks              map[string]*runLock
 	attentionMu        sync.Mutex
 	pendingPermissions map[string]map[string]pendingPermission
-	// roomOutputFailures counts automatic acceptance retries per run, guarded
-	// by attentionMu (FS-14.R86).
-	roomOutputFailures map[string]int
 }
 
 // runLock is one run's control mutex plus the count of holders and waiters that

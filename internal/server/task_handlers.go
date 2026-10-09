@@ -813,6 +813,9 @@ func (s *Server) ReportAgentTaskResult(req messaging.AgentTaskResultRequest) (st
 		return state.Task{}, err
 	}
 	updated, err := s.stateStore.AcceptPipelineStageTaskResult(task.TaskID, req.AgentID, req.Generation, req.ExecutionHandle, run.Revision, req.Result)
+	if errors.Is(err, state.ErrThinkTankOutputRefused) {
+		return state.Task{}, &messaging.ToolError{Code: "validation", Message: strings.TrimPrefix(err.Error(), state.ErrThinkTankOutputRefused.Error()+": ")}
+	}
 	if err != nil {
 		return state.Task{}, err
 	}

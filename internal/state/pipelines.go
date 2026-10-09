@@ -716,6 +716,19 @@ WHERE run_id = ? AND revision = ?`,
 		}
 		return PipelineRunRecord{}, ErrPipelineConflict
 	}
+	if update.MarkRoomTeardown {
+		// Capture only launches still claimed at Stop. Ready members may
+		// already be doing private work on this same generation.
+		if _, err := tx.Exec(`UPDATE think_tank_members SET stop_teardown = 1
+WHERE room_id = (SELECT room_id FROM pipeline_stage_tasks WHERE run_id = ?
+  ORDER BY stage_index DESC, attempt_number DESC LIMIT 1)
+  AND launch_generation != '' AND (setup_state = 'launching' OR
+    (role = 'judge' AND setup_state = 'pending' AND EXISTS (
+      SELECT 1 FROM think_tanks t WHERE t.room_id = think_tank_members.room_id
+        AND t.judge_status = 'launching')))`, runID); err != nil {
+			return PipelineRunRecord{}, fmt.Errorf("state: capture stopped room launches: %w", err)
+		}
+	}
 	if err := registerPipelineRunOutcomeTx(tx, runID, update.State, update.FinalOutcome, update.UpdatedAt); err != nil {
 		return PipelineRunRecord{}, err
 	}

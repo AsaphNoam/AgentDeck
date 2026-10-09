@@ -65,10 +65,43 @@ func (m *Manager) acceptRoomOutput(ctx context.Context, runID string, explicit b
 		unlock()
 		return nil
 	}
-	revision := run.Revision
+	if !explicit && current.AcceptanceAttempts >= maxRoomOutputAttempts {
+		defer unlock()
+		latest, readErr := m.store.ReadPipelineRun(runID)
+		if readErr != nil {
+			return readErr
+		}
+		paused, pauseErr := m.store.UpdatePipelineRunCAS(runID, latest.Revision, state.PipelineRunUpdate{
+			State: "paused", PendingAction: pendingAcceptRoomOutput, CurrentStageID: current.StageID,
+			AttentionReason: "output acceptance failed: automatic retries exhausted",
+		})
+		if pauseErr != nil {
+			return pauseErr
+		}
+		m.publish(paused)
+		m.notify(paused, "needs_attention")
+		return nil
+	}
+	prepared, err := m.store.PrepareThinkTankStageOutputAcceptance(current.TaskID, !explicit)
+	if err != nil {
+		unlock()
+		if errors.Is(err, state.ErrPipelineStageConflict) {
+			return nil
+		}
+		return err
+	}
+	latest, err := m.store.ReadPipelineRun(runID)
+	if err != nil {
+		unlock()
+		return err
+	}
+	if latest.Revision != run.Revision {
+		m.publish(latest)
+	}
+	revision := latest.Revision
 	if held {
-		resumed, err := m.store.UpdatePipelineRunCAS(runID, run.Revision, state.PipelineRunUpdate{
-			State: "running", PendingAction: "", CurrentStageID: current.StageID,
+		resumed, err := m.store.UpdatePipelineRunCAS(runID, revision, state.PipelineRunUpdate{
+			State: "running", PendingAction: pendingAcceptRoomOutput, CurrentStageID: current.StageID,
 		})
 		if err != nil {
 			unlock()
@@ -79,7 +112,6 @@ func (m *Manager) acceptRoomOutput(ctx context.Context, runID string, explicit b
 	}
 	accepted, err := m.store.AcceptThinkTankStageOutput(current.TaskID, revision)
 	if err == nil {
-		m.clearRoomOutputFailures(runID)
 		m.publish(accepted)
 		unlock()
 		return m.Reconcile(ctx, runID)
@@ -91,7 +123,7 @@ func (m *Manager) acceptRoomOutput(ctx context.Context, runID string, explicit b
 		return nil
 	}
 	defer unlock()
-	if !refused && m.noteRoomOutputFailure(runID) < maxRoomOutputAttempts {
+	if !refused && !explicit && prepared.AcceptanceAttempts < maxRoomOutputAttempts {
 		return err
 	}
 	reason := "output acceptance failed: " + strings.TrimPrefix(err.Error(), state.ErrThinkTankOutputRefused.Error()+": ")
@@ -106,7 +138,6 @@ func (m *Manager) acceptRoomOutput(ctx context.Context, runID string, explicit b
 	if pauseErr != nil {
 		return errors.Join(err, pauseErr)
 	}
-	m.clearRoomOutputFailures(runID)
 	m.publish(paused)
 	m.notify(paused, "needs_attention")
 	return nil
@@ -170,20 +201,4 @@ func roomAttention(room state.ThinkTank) string {
 		return "Think Tank paused"
 	}
 	return ""
-}
-
-func (m *Manager) noteRoomOutputFailure(runID string) int {
-	m.attentionMu.Lock()
-	defer m.attentionMu.Unlock()
-	if m.roomOutputFailures == nil {
-		m.roomOutputFailures = map[string]int{}
-	}
-	m.roomOutputFailures[runID]++
-	return m.roomOutputFailures[runID]
-}
-
-func (m *Manager) clearRoomOutputFailures(runID string) {
-	m.attentionMu.Lock()
-	defer m.attentionMu.Unlock()
-	delete(m.roomOutputFailures, runID)
 }

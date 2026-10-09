@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -103,7 +104,9 @@ func insertPipelineStageRowsTx(tx *sql.Tx, p CreatePipelineStageTaskParams, now 
 	return roomID, nil
 }
 
-const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, ''), p.execution_kind, p.room_id, p.source_entry_seq`
+const pipelineStageTaskColumns = `p.run_id, p.stage_index, p.attempt_number, p.stage_id, p.task_id, p.standing_agent_id, p.coordinator_task_id, p.assignment_digest, p.state, p.closure_revision, p.created_at, COALESCE(p.closed_at, ''), p.execution_kind, p.room_id, p.source_entry_seq, p.acceptance_entry_seq, p.acceptance_attempts`
+
+const maxThinkTankAcceptanceAttempts = 3
 
 // latestStageOrder is the run cursor's definition: the newest attempt of the
 // newest stage. The per-stage partial unique index names the open attempt of one
@@ -228,12 +231,14 @@ func (s *Store) AcceptPipelineStageTaskResult(taskID, agentID, generation, execu
 	}
 	defer tx.Rollback()
 	var runID, runState, stageState, taskState, assignedID, assignedGeneration, storedHandle, outputJSON string
+	var templateJSON string
+	var stageIndex int
 	var revision int64
 	var pendingYield int
 	err = tx.QueryRow(`
-SELECT p.run_id, r.state, p.state, r.revision, t.state, COALESCE(t.assigned_agent_id, ''), t.assigned_generation, t.execution_handle, t.pending_yield, p.output_values_json
+		SELECT p.run_id, r.state, p.state, r.revision, t.state, COALESCE(t.assigned_agent_id, ''), t.assigned_generation, t.execution_handle, t.pending_yield, p.output_values_json, p.stage_index, r.template_snapshot_json
 FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id JOIN tasks t ON t.task_id = p.task_id
-WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &taskState, &assignedID, &assignedGeneration, &storedHandle, &pendingYield, &outputJSON)
+		WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &taskState, &assignedID, &assignedGeneration, &storedHandle, &pendingYield, &outputJSON, &stageIndex, &templateJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PipelineRunRecord{}, ErrNotFound
 	}
@@ -268,6 +273,11 @@ WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &t
 			if result.Outputs[name] == "" {
 				return PipelineRunRecord{}, ErrPipelineStageConflict
 			}
+		}
+	}
+	if result.Outcome == OutcomeSuccess {
+		if err := validateProspectiveRoomContextsTx(tx, runID, stageIndex, templateJSON, declared, result.Outputs); err != nil {
+			return PipelineRunRecord{}, err
 		}
 	}
 	if err := commitStageResultTx(tx, stageResultCommit{
@@ -353,6 +363,89 @@ func commitStageResultTx(tx *sql.Tx, c stageResultCommit) error {
 // the published text cannot become the named output as it stands (TS-09.R53).
 var ErrThinkTankOutputRefused = errors.New("state: think tank output refused")
 
+// validateProspectiveRoomContextsTx checks the values that would be visible to
+// every later room before the producing task is accepted. It deliberately runs
+// in the result transaction: a rejected output must leave the producer and its
+// run cursor available for correction (TS-09.R56, FS-14.A52).
+func validateProspectiveRoomContextsTx(tx *sql.Tx, runID string, stageIndex int, templateJSON string, declared, outputs map[string]string) error {
+	type stageInput struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+	type stageOutput struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	type stage struct {
+		ID           string        `json:"id"`
+		Title        string        `json:"title"`
+		Objective    string        `json:"objective"`
+		Coordination string        `json:"coordination"`
+		Inputs       []stageInput  `json:"inputs"`
+		Outputs      []stageOutput `json:"outputs"`
+	}
+	var snapshot struct {
+		Stages []stage `json:"stages"`
+	}
+	if err := json.Unmarshal([]byte(templateJSON), &snapshot); err != nil {
+		return fmt.Errorf("state: decode pipeline template for prospective room context: %w", err)
+	}
+	var runName, goal string
+	if err := tx.QueryRow(`SELECT display_name, goal FROM pipeline_runs WHERE run_id = ?`, runID).Scan(&runName, &goal); err != nil {
+		return fmt.Errorf("state: read pipeline context identity: %w", err)
+	}
+	values := map[string]string{}
+	rows, err := tx.Query(`SELECT name, value FROM pipeline_values WHERE run_id = ?`, runID)
+	if err != nil {
+		return fmt.Errorf("state: read prospective pipeline values: %w", err)
+	}
+	for rows.Next() {
+		var name, value string
+		if err := rows.Scan(&name, &value); err != nil {
+			rows.Close()
+			return err
+		}
+		values[name] = value
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("state: iterate prospective pipeline values: %w", err)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for name, valueKey := range declared {
+		if value, ok := outputs[name]; ok {
+			values[valueKey] = value
+		}
+	}
+	outputNames := []string{}
+	for name := range outputs {
+		if _, declaredOutput := declared[name]; declaredOutput {
+			outputNames = append(outputNames, name)
+		}
+	}
+	sort.Strings(outputNames)
+	for i := stageIndex + 1; i < len(snapshot.Stages); i++ {
+		next := snapshot.Stages[i]
+		if next.Coordination != "think_tank" || len(next.Outputs) != 1 {
+			continue
+		}
+		context := ThinkTankStageContext{
+			RunID: runID, RunName: runName, StageID: next.ID, StageTitle: next.Title,
+			Goal: goal, Objective: next.Objective, Inputs: []ThinkTankStageInput{},
+			Output: ThinkTankStageOutput{Name: next.Outputs[0].Name, Description: next.Outputs[0].Description, MaxRunes: MaxStageValueRunes},
+		}
+		for _, input := range next.Inputs {
+			context.Inputs = append(context.Inputs, ThinkTankStageInput{Name: input.Name, Value: values[input.Value]})
+		}
+		if _, err := EncodeThinkTankStageContext(context); err != nil {
+			return fmt.Errorf("%w: output %s: later room %s context exceeds its size limit", ErrThinkTankOutputRefused, strings.Join(outputNames, ", "), next.ID)
+		}
+	}
+	return nil
+}
+
 // MaxStageValueRunes mirrors the pipeline named-value limit for room output.
 const MaxStageValueRunes = 64000
 
@@ -368,12 +461,14 @@ func (s *Store) AcceptThinkTankStageOutput(taskID string, expectedRunRevision in
 	}
 	defer tx.Rollback()
 	var runID, runState, stageState, kind, roomID, taskState, outputJSON, judgeStatus string
-	var revision int64
+	var templateJSON string
+	var stageIndex int
+	var revision, acceptanceSeq int64
 	err = tx.QueryRow(`
-SELECT p.run_id, r.state, p.state, r.revision, p.execution_kind, p.room_id, t.state, p.output_values_json, tt.judge_status
+		SELECT p.run_id, r.state, p.state, r.revision, p.execution_kind, p.room_id, t.state, p.output_values_json, tt.judge_status, p.stage_index, r.template_snapshot_json, p.acceptance_entry_seq
 FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id JOIN tasks t ON t.task_id = p.task_id
 JOIN think_tanks tt ON tt.room_id = p.room_id AND tt.pipeline_task_id = p.task_id
-WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &kind, &roomID, &taskState, &outputJSON, &judgeStatus)
+		WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &kind, &roomID, &taskState, &outputJSON, &judgeStatus, &stageIndex, &templateJSON, &acceptanceSeq)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PipelineRunRecord{}, ErrNotFound
 	}
@@ -392,6 +487,9 @@ WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &k
 		}
 		return PipelineRunRecord{}, fmt.Errorf("state: read room synthesis: %w", err)
 	}
+	if acceptanceSeq == 0 || acceptanceSeq != seq {
+		return PipelineRunRecord{}, ErrPipelineStageConflict
+	}
 	declared := map[string]string{}
 	if err := json.Unmarshal([]byte(outputJSON), &declared); err != nil {
 		return PipelineRunRecord{}, fmt.Errorf("state: decode stage output contract: %w", err)
@@ -409,6 +507,9 @@ WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &k
 	if utf8.RuneCountInString(body) > MaxStageValueRunes {
 		return PipelineRunRecord{}, fmt.Errorf("%w: output %s: the synthesis exceeds %d characters", ErrThinkTankOutputRefused, name, MaxStageValueRunes)
 	}
+	if err := validateProspectiveRoomContextsTx(tx, runID, stageIndex, templateJSON, declared, map[string]string{name: body}); err != nil {
+		return PipelineRunRecord{}, err
+	}
 	summary := fmt.Sprintf("Think Tank judge synthesis accepted from room %s entry %d.", roomID, seq)
 	if err := commitStageResultTx(tx, stageResultCommit{
 		RunID: runID, TaskID: taskID, TaskState: taskState, Revision: revision, Source: StageExecutionThinkTank,
@@ -422,12 +523,72 @@ WHERE p.task_id = ?`, taskID).Scan(&runID, &runState, &stageState, &revision, &k
 	return s.ReadPipelineRun(runID)
 }
 
+// PrepareThinkTankStageOutputAcceptance records the exact published synthesis
+// and, for automatic recovery, consumes one bounded attempt. The update is
+// conditional on the open stage authority so a restart or a duplicate sweep
+// cannot reset or replace the source entry (TS-09.R53, INV §5/§9).
+func (s *Store) PrepareThinkTankStageOutputAcceptance(taskID string, automatic bool) (PipelineStageTask, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return PipelineStageTask{}, fmt.Errorf("state: begin prepare think tank output acceptance: %w", err)
+	}
+	defer tx.Rollback()
+	var runState, stageState, kind, roomID, judgeStatus string
+	var sourceSeq, attempts int64
+	err = tx.QueryRow(`
+SELECT r.state, p.state, p.execution_kind, p.room_id, tt.judge_status,
+       p.acceptance_entry_seq, p.acceptance_attempts
+FROM pipeline_stage_tasks p JOIN pipeline_runs r ON r.run_id = p.run_id
+JOIN think_tanks tt ON tt.room_id = p.room_id AND tt.pipeline_task_id = p.task_id
+WHERE p.task_id = ?`, taskID).Scan(&runState, &stageState, &kind, &roomID, &judgeStatus, &sourceSeq, &attempts)
+	if errors.Is(err, sql.ErrNoRows) {
+		return PipelineStageTask{}, ErrNotFound
+	}
+	if err != nil {
+		return PipelineStageTask{}, fmt.Errorf("state: read think tank output acceptance: %w", err)
+	}
+	if kind != StageExecutionThinkTank || stageState != "open" || runState == "stopping" || runState == "stopped" || runState == "completed" || judgeStatus != ThinkTankJudgeCompleted {
+		return PipelineStageTask{}, ErrPipelineStageConflict
+	}
+	var publishedSeq int64
+	if err := tx.QueryRow(`SELECT seq FROM think_tank_entries WHERE room_id = ? AND kind = ? ORDER BY seq DESC LIMIT 1`, roomID, ThinkTankEntrySynthesis).Scan(&publishedSeq); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return PipelineStageTask{}, ErrPipelineStageConflict
+		}
+		return PipelineStageTask{}, fmt.Errorf("state: read think tank synthesis: %w", err)
+	}
+	if sourceSeq != 0 && sourceSeq != publishedSeq {
+		return PipelineStageTask{}, ErrPipelineStageConflict
+	}
+	if sourceSeq == 0 {
+		sourceSeq = publishedSeq
+	}
+	if automatic && attempts < maxThinkTankAcceptanceAttempts {
+		attempts++
+	}
+	if _, err := tx.Exec(`UPDATE pipeline_stage_tasks SET acceptance_entry_seq = ?, acceptance_attempts = ? WHERE task_id = ? AND state = 'open'`, sourceSeq, attempts, taskID); err != nil {
+		return PipelineStageTask{}, fmt.Errorf("state: record think tank output acceptance: %w", err)
+	}
+	if runState == "running" {
+		if _, err := tx.Exec(`UPDATE pipeline_runs SET pending_action = 'accept_room_output', revision = revision + 1, updated_at = ? WHERE run_id = (SELECT run_id FROM pipeline_stage_tasks WHERE task_id = ?) AND state = 'running' AND pending_action = ''`, formatTime(timeNow()), taskID); err != nil {
+			return PipelineStageTask{}, fmt.Errorf("state: record room output intent: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return PipelineStageTask{}, fmt.Errorf("state: commit think tank output acceptance: %w", err)
+	}
+	return scanPipelineStageTask(s.db.QueryRow(`SELECT `+pipelineStageTaskColumns+` FROM pipeline_stage_tasks p WHERE p.task_id = ?`, taskID))
+}
+
 // PendingThinkTankStageOutputs lists open room-backed stages whose judge has
 // completed, for the bounded post-commit recovery sweep (TS-09.R53).
 func (s *Store) PendingThinkTankStageOutputs(limit int) ([]PipelineStageTask, error) {
 	rows, err := s.db.Query(`SELECT `+pipelineStageTaskColumns+` FROM pipeline_stage_tasks p
 JOIN think_tanks tt ON tt.room_id = p.room_id
-WHERE p.execution_kind = ? AND p.state = 'open' AND tt.judge_status = ? LIMIT ?`, StageExecutionThinkTank, ThinkTankJudgeCompleted, limit)
+JOIN pipeline_runs r ON r.run_id = p.run_id
+WHERE p.execution_kind = ? AND p.state = 'open' AND tt.judge_status = ?
+  AND r.state = 'running' AND r.pending_action IN ('', 'accept_room_output')
+ORDER BY p.created_at, p.run_id, p.stage_index, p.attempt_number LIMIT ?`, StageExecutionThinkTank, ThinkTankJudgeCompleted, limit)
 	if err != nil {
 		return nil, fmt.Errorf("state: list pending room outputs: %w", err)
 	}
@@ -562,7 +723,7 @@ func readPipelineStageTaskTx(tx *sql.Tx, runID string, stageIndex, attempt int) 
 func scanPipelineStageTask(row interface{ Scan(...any) error }) (PipelineStageTask, error) {
 	var v PipelineStageTask
 	var created, closed string
-	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed, &v.ExecutionKind, &v.RoomID, &v.SourceEntrySeq); err != nil {
+	if err := row.Scan(&v.RunID, &v.StageIndex, &v.AttemptNumber, &v.StageID, &v.TaskID, &v.StandingAgentID, &v.CoordinatorTaskID, &v.AssignmentDigest, &v.State, &v.ClosureRevision, &created, &closed, &v.ExecutionKind, &v.RoomID, &v.SourceEntrySeq, &v.AcceptanceEntrySeq, &v.AcceptanceAttempts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return PipelineStageTask{}, ErrNotFound
 		}

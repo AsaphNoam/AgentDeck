@@ -12,10 +12,10 @@ func (s *Store) ReadRunning(id string) (RunningEntry, error) {
 	var r RunningEntry
 	var startedAt, driverIDs string
 	err := s.db.QueryRow(`
-SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available
+SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available, generation
 FROM running
 WHERE agent_id = ?`, id).Scan(
-		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable, &r.SteeringAvailable,
+		&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable, &r.SteeringAvailable, &r.Generation,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RunningEntry{}, ErrNotFound
@@ -34,8 +34,8 @@ WHERE agent_id = ?`, id).Scan(
 // WriteRunning inserts or updates a running entry.
 func (s *Store) WriteRunning(r RunningEntry) error {
 	_, err := s.db.Exec(`
-INSERT INTO running(agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO running(agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available, generation)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(agent_id) DO UPDATE SET
     pid = excluded.pid,
     session_id = excluded.session_id,
@@ -46,8 +46,9 @@ ON CONFLICT(agent_id) DO UPDATE SET
     hook_token = excluded.hook_token,
     started_at = excluded.started_at,
     fast_available = excluded.fast_available,
-    steering_available = excluded.steering_available`,
-		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, r.Driver, encodeDriverIDs(r.DriverIDs), r.HookToken, formatTime(r.StartedAt), r.FastAvailable, r.SteeringAvailable,
+    steering_available = excluded.steering_available,
+    generation = excluded.generation`,
+		r.AgentID, r.PID, r.SessionID, r.Interface, r.TTY, r.Driver, encodeDriverIDs(r.DriverIDs), r.HookToken, formatTime(r.StartedAt), r.FastAvailable, r.SteeringAvailable, r.Generation,
 	)
 	if err != nil {
 		return fmt.Errorf("state: write running: %w", err)
@@ -58,7 +59,7 @@ ON CONFLICT(agent_id) DO UPDATE SET
 // ListRunning returns all running entries.
 func (s *Store) ListRunning() ([]RunningEntry, error) {
 	rows, err := s.db.Query(`
-SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available
+SELECT agent_id, pid, session_id, interface, tty, driver, driver_ids, hook_token, started_at, fast_available, steering_available, generation
 FROM running
 ORDER BY started_at, agent_id`)
 	if err != nil {
@@ -70,7 +71,7 @@ ORDER BY started_at, agent_id`)
 	for rows.Next() {
 		var r RunningEntry
 		var startedAt, driverIDs string
-		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable, &r.SteeringAvailable); err != nil {
+		if err := rows.Scan(&r.AgentID, &r.PID, &r.SessionID, &r.Interface, &r.TTY, &r.Driver, &driverIDs, &r.HookToken, &startedAt, &r.FastAvailable, &r.SteeringAvailable, &r.Generation); err != nil {
 			return nil, fmt.Errorf("state: scan running: %w", err)
 		}
 		r.DriverIDs = decodeDriverIDs(driverIDs)

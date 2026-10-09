@@ -194,7 +194,7 @@ func TestHeldSuccessorOwnsGateBeforeNewerSend(t *testing.T) {
 	if text != "queued first" || turnID == "" {
 		t.Fatalf("reserved successor = %q %q", text, turnID)
 	}
-	if _, held := as.claimTurnOrHold("newer send"); !held {
+	if _, held, err := as.claimTurnOrHold("newer send"); err != nil || !held {
 		t.Fatal("newer Send claimed the gate before the queued successor")
 	}
 	as.mu.Lock()

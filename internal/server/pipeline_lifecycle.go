@@ -42,18 +42,69 @@ func (s *Server) RoomLaunchConfig(_ context.Context, execution pipeline.StageExe
 // own running turns through the guarded generation/turn seam, so a newer
 // private turn is never killed (TS-09.R54, FS-21.R42).
 func (s *Server) StopRoom(ctx context.Context, roomID string) error {
+	prior, err := s.stateStore.ReadThinkTank(roomID)
+	if err != nil {
+		return err
+	}
 	d, err := s.stateStore.ClosePipelineThinkTank(roomID)
 	if err != nil {
 		return err
 	}
-	s.publishThinkTankUpdate(d)
+	if d.Room.Revision != prior.Room.Revision {
+		s.publishThinkTankUpdate(d)
+	}
 	for _, a := range d.Running {
 		if a.TurnID == "" {
 			continue
 		}
-		if _, err := s.registry.CancelGuarded(ctx, a.AgentID, a.Generation, a.TurnID); err != nil {
-			s.log.Warn("cancel pipeline room turn", "room", roomID, "agent", a.AgentID, "err", err)
+		if _, err := s.registry.CancelGuarded(ctx, a.AgentID, a.Generation, a.TurnID); err != nil && !errors.Is(err, runtime.ErrNoHandle) {
+			return fmt.Errorf("cancel pipeline room turn: %w", err)
 		}
+	}
+	for _, member := range d.Members {
+		if !member.StopTeardown || member.LaunchGeneration == "" {
+			continue
+		}
+		if member.SetupState == state.ThinkTankSetupLaunching ||
+			(member.Role == state.ThinkTankRoleJudge && d.Room.JudgeStatus == state.ThinkTankJudgeLaunching) {
+			continue
+		}
+		if err := s.stopRoomOwnedGeneration(ctx, member.AgentID, member.LaunchGeneration); err != nil {
+			return fmt.Errorf("stop pipeline room agent %s: %w", member.AgentID, err)
+		}
+		if err := s.stateStore.ClearThinkTankStopTeardown(roomID, member.AgentID, member.LaunchGeneration); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// A room may finish launching after Stop. The lifecycle claim serializes this
+// generation check with ordinary launch/resume, preserving later private work.
+func (s *Server) stopRoomOwnedGeneration(ctx context.Context, agentID, generation string) error {
+	if !s.claimLifecycle(agentID) {
+		return errors.New("a lifecycle transition is already in progress")
+	}
+	defer s.releaseLifecycle(agentID)
+	if s.registry.Generation(agentID) == "" {
+		// After restart the registry no longer owns the old process. The
+		// durable running generation distinguishes it from a later private
+		// launch before the ordinary orphan-stop seam reaps it.
+		running, err := s.stateStore.ReadRunning(agentID)
+		if errors.Is(err, state.ErrNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if running.Generation == generation {
+			return s.stopStageLocked(ctx, agentID)
+		}
+		return nil
+	}
+	_, err := s.registry.StopGuardedIdle(ctx, agentID, generation)
+	if err != nil {
+		return err
 	}
 	return nil
 }
