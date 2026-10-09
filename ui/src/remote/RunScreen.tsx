@@ -1,4 +1,4 @@
-import { AutoGrowTextarea } from "../components/ui";
+import { AutoGrowTextarea, ConfirmDialog } from "../components/ui";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { continuePipelineRun, getPipelineRun, repairPipelineCleanup, replacePipelineOrchestrator, retryPipelineRun, stopPipelineRun } from "../api/pipelines";
@@ -7,6 +7,7 @@ import { getRuntimeOptions } from "./api";
 import { useConnection } from "./connection";
 import { navigate } from "./router";
 import { PhoneIcon } from "./PhoneIcon";
+import { PhoneSheet } from "./PhoneSheet";
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
 
@@ -29,6 +30,8 @@ export function RunScreen({ runId }: { runId: string }) {
   const client = useQueryClient();
   const detail = useQuery({ queryKey: ["run", runId, revision], queryFn: () => getPipelineRun(runId), placeholderData: (previous) => previous });
   const [input, setInput] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const [stopOpen, setStopOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
   const run = async (operation: () => Promise<unknown>, after?: () => void) => { setBusy(true); setError(""); try { await operation(); after?.(); } catch (err) { setError(errorText(err)); } finally { setBusy(false); void client.invalidateQueries({ queryKey: ["run"] }); } };
   const data = detail.data;
   if (!data) return <p className="phone-empty">{detail.isError ? errorText(detail.error) : "Loading…"}</p>;
@@ -61,10 +64,11 @@ export function RunScreen({ runId }: { runId: string }) {
     {error && <p className="phone-error" role="alert">{error}</p>}
 
     {controls.continue.eligible && <form className="phone-card phone-form" aria-label="Continue" onSubmit={(event) => { event.preventDefault(); void run(() => continuePipelineRun(runId, rev, input), () => setInput("")); }}><label className="phone-field">Input for the stage (optional)<AutoGrowTextarea rows={2} value={input} onChange={(event) => setInput(event.target.value)} /></label><button type="submit" className="phone-primary" disabled={disabled}>Continue</button></form>}
-    <div className="phone-actions">{controls.retry.eligible && <button type="button" disabled={disabled} onClick={() => void run(() => retryPipelineRun(runId, rev))}>Retry stage</button>}{controls.repair_cleanup.eligible && <button type="button" disabled={disabled} onClick={() => void run(() => repairPipelineCleanup(runId, rev))}>Retry cleanup</button>}{controls.stop.eligible && <button type="button" className="phone-danger" disabled={disabled} onClick={() => void run(() => stopPipelineRun(runId, rev))}>Stop run</button>}</div>
-    {controls.replace.eligible && <ReplaceForm key={rev} standing={data.orchestrator ?? pipeline.orchestrator} reason={controls.replace.reason} disabled={disabled} onSubmit={(runtime) => void run(() => replacePipelineOrchestrator(runId, rev, runtime))} />}
+    <div className="phone-actions">{controls.retry.eligible && <button type="button" disabled={disabled} onClick={() => void run(() => retryPipelineRun(runId, rev))}>Retry stage</button>}{controls.repair_cleanup.eligible && <button type="button" disabled={disabled} onClick={() => void run(() => repairPipelineCleanup(runId, rev))}>Retry cleanup</button>}{controls.stop.eligible && <button type="button" className="phone-danger" disabled={disabled} onClick={() => setStopOpen(true)}>Stop run</button>}{controls.replace.eligible && <button type="button" disabled={disabled} onClick={() => setReplaceOpen(true)}>Replace orchestrator</button>}</div>
+    {replaceOpen && <PhoneSheet title="Replace orchestrator" onClose={() => setReplaceOpen(false)}><ReplaceForm key={rev} standing={data.orchestrator ?? pipeline.orchestrator} reason={controls.replace.reason} disabled={disabled || !controls.replace.eligible} onSubmit={(runtime) => void run(() => replacePipelineOrchestrator(runId, rev, runtime), () => setReplaceOpen(false))} />{error && <p className="phone-error" role="alert">{error}</p>}</PhoneSheet>}
+    <ConfirmDialog open={stopOpen} title="Stop this pipeline?" confirmLabel="Stop run" destructive pending={busy} confirmDisabled={offline || !controls.stop.eligible} onCancel={() => setStopOpen(false)} onConfirm={() => void run(() => stopPipelineRun(runId, rev), () => setStopOpen(false))}><p>Stop this work on your Mac? You can still view its recorded output.</p>{error && <p className="phone-error" role="alert">{error}</p>}</ConfirmDialog>
 
-    <section className="phone-run-progress" aria-labelledby="phone-run-progress">
+    <section className="phone-section phone-run-progress" aria-labelledby="phone-run-progress">
       <div className="phone-section-title"><div><p className="phone-eyebrow">STAGE HISTORY</p><h2 id="phone-run-progress">Progress</h2></div><span>{stageTasks.length} attempt{stageTasks.length === 1 ? "" : "s"}</span></div>
       {stageTasks.length ? <ol className="phone-timeline">{stageTasks.map((task) => {
         const outcome = task.result?.outcome || task.state;

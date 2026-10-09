@@ -91,13 +91,13 @@ export function PhoneSettings() {
         <PhoneIcon name="phone" size={34} />
         <div>
           <strong>{s.name}</strong>
-          <span>Paired with Chuck’s Mac</span>
+          <span>Paired with your Mac</span>
           <span className="phone-status" data-tone={offline ? "waiting" : "connected"}>
             <i aria-hidden="true" />{connection}
           </span>
         </div>
       </section>
-      <form
+      <details className="phone-details"><summary>Phone name</summary><form
         className="phone-settings-card phone-form"
         aria-label="Phone name"
         onSubmit={(event) => {
@@ -124,9 +124,10 @@ export function PhoneSettings() {
             Save name
           </button>
         )}
-      </form>
-      <section className="phone-settings-card" aria-label="Notifications">
-        <div className="phone-section-title"><PhoneIcon name="bell" size={19} /><h2>Notifications</h2></div>
+      </form></details>
+      <section className="phone-section" aria-label="Notifications">
+        <div className="phone-section-title"><h2>Notifications</h2></div>
+        <div className="phone-settings-card"><PhoneIcon name="bell" size={19} /><strong>Know when you’re needed</strong>
         <p className="phone-help">Know when an agent needs permission or a reply, hits an error, or a pipeline run needs you. Finished work never notifies.</p>
         {!pushSupported() || iosBrowserTab() ? (
           <p className="phone-help">Add Chuck to the Home Screen and open it from there to turn on notifications.</p>
@@ -146,13 +147,15 @@ export function PhoneSettings() {
             Turn notifications on
           </button>
         )}
+        </div>
       </section>
-      <section className="phone-settings-card" aria-label="Connection">
-        <div className="phone-section-title"><PhoneIcon name="wifi" size={19} /><h2>Connection</h2></div>
-        <div className="phone-keyvalue"><span>Desktop</span><strong>Chuck’s Mac</strong></div>
+      <section className="phone-section" aria-label="Connection">
+        <div className="phone-section-title"><h2>Connection</h2></div><div className="phone-settings-card">
+        <div className="phone-keyvalue"><span>Desktop</span><strong>Your Mac</strong></div>
         <div className="phone-keyvalue"><span>Status</span><strong>{connection}</strong></div>
         <p className="phone-help">Your Mac runs the work. This phone is a remote companion.</p>
         {offline && <p className="phone-help">The last known state is shown. Actions are unavailable until your Mac reconnects.</p>}
+        </div>
       </section>
       {error && <p className="phone-error" role="alert">{error}</p>}
       <button
@@ -183,6 +186,7 @@ export function PhoneSettings() {
       >
         <p>This phone will lose access to Chuck and will need to be paired again from the Mac.</p>
         <p>Your agents keep running on your Mac.</p>
+        {error && <p className="phone-error" role="alert">{error}</p>}
       </ConfirmDialog>
     </div>
   );

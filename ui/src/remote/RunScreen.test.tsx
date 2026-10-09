@@ -88,6 +88,7 @@ describe("RunScreen", () => {
     await waitFor(() => expect(posts).toEqual(['retry {"revision":7}']));
     await waitFor(() => expect(screen.getByRole("button", { name: "Stop run" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
+    fireEvent.click(screen.getByRole("dialog", { name: "Stop this pipeline?" }).querySelector(".btn-danger")!);
     await waitFor(() => expect(posts).toEqual(['retry {"revision":7}', 'stop {"revision":7}']));
   });
 

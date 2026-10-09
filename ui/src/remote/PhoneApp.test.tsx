@@ -89,16 +89,26 @@ function renderApp() {
       <PhoneApp />
     </QueryClientProvider>,
   );
+  return client;
 }
 
 describe("PhoneApp", () => {
-  it("follows configured appearance and falls back to Core for an unknown value", async () => {
-    server.use(http.get("/api/config", () => HttpResponse.json({ appearance_skin: "studio" })));
-    renderApp();
+  it("refreshes all configured appearances without remounting Home and falls back on failure", async () => {
+    let appearance = "studio";
+    let failed = false;
+    server.use(http.get("/api/config", () => failed ? HttpResponse.json({ error: "unavailable" }, { status: 503 }) : HttpResponse.json({ appearance_skin: appearance })));
+    const client = renderApp();
+    const heading = await screen.findByRole("heading", { name: "Away, not out of the loop." });
+    for (appearance of ["studio", "sky-grove", "", "unknown"]) {
+      await act(async () => { await client.invalidateQueries({ queryKey: ["phone-appearance"] }); });
+      await waitFor(() => expect(document.documentElement.dataset.skin).toBe(["studio", "sky-grove"].includes(appearance) ? appearance : undefined));
+      expect(screen.getByRole("heading", { name: "Away, not out of the loop." })).toBe(heading);
+    }
+    appearance = "studio";
+    await act(async () => { await client.invalidateQueries({ queryKey: ["phone-appearance"] }); });
     await waitFor(() => expect(document.documentElement.dataset.skin).toBe("studio"));
-    cleanup();
-    server.use(http.get("/api/config", () => HttpResponse.json({ appearance_skin: "unknown" })));
-    renderApp();
+    failed = true;
+    await act(async () => { await client.invalidateQueries({ queryKey: ["phone-appearance"] }); });
     await waitFor(() => expect(document.documentElement.hasAttribute("data-skin")).toBe(false));
   });
 

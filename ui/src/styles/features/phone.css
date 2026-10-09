@@ -83,7 +83,7 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-agent-status { display: flex; flex-direction: column; align-items: flex-end; gap: var(--ad-space-2); max-width: 30%; }
 .phone-agent-status > svg { color: var(--ad-text-muted); }
 .phone-row-stopped { opacity: 0.65; }
-.phone-tabs { display: flex; flex-wrap: nowrap; gap: var(--ad-space-6); border-bottom: var(--ad-border-thin) solid var(--ad-border-default); }
+.phone-actions.phone-tabs { display: flex; flex-wrap: nowrap; gap: var(--ad-space-6); border-bottom: var(--ad-border-thin) solid var(--ad-border-default); }
 .phone-actions.phone-tabs > button { flex: 0 1 auto; border: 0; border-bottom: var(--ad-border-thick) solid transparent; border-radius: 0; background: transparent; color: var(--ad-text-muted); min-height: 44px; padding: var(--ad-space-2) 0; font-size: 0.75rem; }
 .phone-tabs button[aria-selected="true"] { border-bottom-color: var(--ad-state-done); color: var(--ad-state-done); font-weight: 600; }
 .phone-tab-count { color: var(--ad-text-muted); font-size: 0.625rem; margin-left: var(--ad-space-2); }
@@ -135,6 +135,7 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-settings-card { display: grid; gap: var(--ad-space-3); padding: var(--ad-space-4); border: var(--ad-border-thin) solid var(--ad-border-default); background: var(--ad-surface-panel); border-radius: var(--ad-radius-medium); min-width: 0; }
 .phone-settings-card > svg { color: var(--ad-state-done); }
 .phone-settings-card strong { font-size: 0.8125rem; }
+.phone-settings-card h2 { font-size: 0.9375rem; margin: 0; }
 .phone-settings-card p { color: var(--ad-text-muted); font-size: 0.75rem; line-height: 1.8; margin: 0; }
 .phone-keyvalue { display: flex; justify-content: space-between; gap: var(--ad-space-2); font-size: 0.6875rem; }
 .phone-keyvalue span { color: var(--ad-text-muted); }
@@ -176,6 +177,7 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .dialog-content::before { content: ""; display: block; width: 34px; height: 4px; border-radius: var(--ad-radius-round); background: var(--ad-border-default); margin: 0 auto var(--ad-space-4); }
 .phone-sheet .phone-card { border: 0; padding: 0; background: transparent; }
 .phone-sheet .phone-form > h2 { display: none; }
+.phone-sheet .phone-section-title h2 { font-size: 1.3125rem; }
 .phone-sheet-close { border: 0; background: var(--ad-surface-subtle); border-radius: var(--ad-radius-round); font-size: 1.25rem; width: 44px; min-height: 44px; padding: 0; }
 @media (hover: hover) {
   .phone-row:hover, .phone-menu-trigger:hover, .phone-navigation button:hover { background: var(--ad-surface-subtle); }

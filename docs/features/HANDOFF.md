@@ -42,7 +42,12 @@ three-appearance rendered mobile and desktop matrix, closure/embed and review ha
 Source slices are implemented: shell/Home/project and theme bridge; chat, Files/Manage,
 pipeline history, phone/pairing and Radix sheets. Focused remote tests (53), TypeScript,
 stylelint/presentation contract and UI build passed; `make check-specs` passed.
-First `make embed` passed; rendered corrections need a final embed refresh.
+Rendered correction slice: fixed tab wrapping and stretched Send, aligned the conversation
+identity/permission order with the reference, collapsed phone-name editing, finished notification
+and connection panels, and added pipeline Stop/Replace sheets. Focused 53 tests, TypeScript and
+presentation contract pass. Exact Make prototype six-screen reference is rendered at 390×844.
+Desktop development matrix passed at 1024/1280 across all three palettes without phone CSS leakage.
+`make dist` is running to refresh the final embedded UI; real paired-phone final pass follows.
 Current slice: compare exact Make prototype screenshots with real paired phone, repair material
 layout issues, then run the full closure matrix once. Shared reference sources/screenshots live in
 `/Users/mcnoam/.chuck/project-resources/agentdeck-20261007t221535z/mobile-design/`.
