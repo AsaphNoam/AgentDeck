@@ -26,8 +26,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   (`3448dae`, 2026-10-09) remains available for review. Think Tank pipeline stages, readable workspace consent and
   collapsible tasks (`fb715a1`..`3d9ab39`, reviewed 2026-10-08) is closed after its six
   lifecycle, lineage and acceptance-recovery findings were fixed. Clone first-message failure
-  investigation (2026-10-08): its diagnostic gap is fixed; the field failure stays open, not
-  reproduced live, blocked on field evidence (see Review findings, Blocked on human). Chat links,
+  investigation (2026-10-08): its diagnostic gap is fixed; the unconfirmed field failure was closed
+  by the user on 2026-10-09, to reopen if it recurs (see Review findings). Chat links,
   tables and tabs (`7661d97`..`70614c8`, reviewed 2026-10-08) is closed after its three
   verification/specification findings were fixed; closure evidence is in the changelog.
 - **Known verification issue:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -84,25 +84,27 @@ The six review findings are closed. Key seams: `pipeline/rooms.go`,
 ## Blocked on human
 
 Release readiness checked 2026-10-09: the range from `v0.11.0` to `main` contains 32 commits
-through `2ebd148`. No version was proposed, tag created, or push performed. Workflow §16.1
-blocks release on the open **Must fix** clone first-message finding below; return to `/fix`
-with the field evidence requested here. The clone-name change (`3448dae`) also remains an open
-review unit and needs review or an explicit user decision before release. Resume `/release`
-after readiness is resolved; package refresh and release verification have not run.
+through `2ebd148`. No version was proposed, tag created, or push performed.
+The user closed the unconfirmed clone first-message finding on 2026-10-09 because no further
+evidence is available, with reopening only if it recurs; that finding no longer blocks release.
+The clone-name change (`3448dae`) remains an open review unit and needs review or an explicit
+user decision before tagging. Package refresh and release verification have not run.
 
 The v0.11.0 release published its three assets after the rerun, but
 its body is still empty (checked 2026-10-08): set the notes from
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`
 when publication is authorized. Do not retag or recut a new version.
 
-Clone first-message failure needs field evidence: on the next occurrence, with a build that has
-TS-04.R85, capture the `runtime: provider prompt failed` line from `~/.chuck/dashboard.log` and
-the failing request's URL and response body from the browser Network tab. Four live Claude
-variants did not reproduce it.
-
 ## Review findings
 
-### Clone first-message failure — investigation 2026-10-08 — **Fix model:** medium — Codex Terra or Claude Opus.
+No open findings.
+
+## Closed investigation: clone first-message failure — 2026-10-08
+
+**User disposition 2026-10-09:** closed as unconfirmed, not fixed; no further evidence is
+available. Reopen if the issue recurs. Capture the failing request URL/body and the bounded
+`runtime: provider prompt failed` diagnostic from `~/.chuck/dashboard.log` then. Four live
+Claude variants did not reproduce the failure. This is no longer a release blocker.
 
 **Report (verbatim):** “cloning a chat gave it a generic name (Atlas), when I sent the agent a
 message it didn't work - returned Internal Error. Looking in the console I saw Failed to load
@@ -119,7 +121,7 @@ Naming is **confirmed works as specified** under FS-01.R4/R36: `clone.go:72` omi
 `launch.go:331` calls `suggestName`, whose first unused suggestion is Atlas. Independent of sending.
 Superseded 2026-10-09 by user request: FS-01.R39 names a clone "<source name> Copy".
 
-- **Must fix** — probable field behavior; root cause undetermined; fix complexity medium
+- **Closed unconfirmed** — reported field behavior; root cause undetermined; fix complexity medium
   (no invariant class) — field route and root cause remain unidentified.
   The reported first message to a successful clone fails instead of continuing its conversation
   (FS-01.R36). `internal/server/sessions.go:27` accepts chat input via SendPromptOrHold;
@@ -134,7 +136,7 @@ Superseded 2026-10-09 by user request: FS-01.R39 names a clone "<source name> Co
   tests `TestCloneForksTheConversationIntoANewAgent` and
   `TestForkLaunchCopiesHistoryThroughTheBoundary` pass; the latter sends and completes a clone
   turn. They do not reproduce the field failure or prove live-provider compatibility.
-  **Fix run 2026-10-09 — not reproduced; blocked on field evidence (§3).** The provider was
+  **Fix run 2026-10-09 — not reproduced; subsequently closed by user.** The provider was
   Claude: Codex refuses clone (`clone_unavailable`). On an isolated v-main server
   (`CHUCK_HOME` scratch, port 4399) live Claude Sonnet clone → first prompt succeeded with
   history intact for a running source, a stopped source (clone named Atlas), a clone of a
