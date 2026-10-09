@@ -83,6 +83,13 @@ The six review findings are closed. Key seams: `pipeline/rooms.go`,
 
 ## Blocked on human
 
+Release readiness checked 2026-10-09: the range from `v0.11.0` to `main` contains 32 commits
+through `2ebd148`. No version was proposed, tag created, or push performed. Workflow §16.1
+blocks release on the open **Must fix** clone first-message finding below; return to `/fix`
+with the field evidence requested here. The clone-name change (`3448dae`) also remains an open
+review unit and needs review or an explicit user decision before release. Resume `/release`
+after readiness is resolved; package refresh and release verification have not run.
+
 The v0.11.0 release published its three assets after the rerun, but
 its body is still empty (checked 2026-10-08): set the notes from
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md) with `gh release edit`
