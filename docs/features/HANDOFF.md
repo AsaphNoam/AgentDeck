@@ -60,6 +60,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   tests passed again. Saved implementation renders were inspected. Independent live-browser review
   remains blocked in the review sandbox: loopback listeners return EPERM and Chromium aborts at
   launch. Keep this unit open until that rendered verification can run; no product code was edited.
+  Investigation confirmed the blocked process was Codex's native review subagent, with
+  `approval_policy: never`, `workspace-write`, and `network_access: false`; its parent recorded
+  `approval_policy: on-request`. Both loopback bind and temporary Chromium render reproduced the
+  failures under the sandbox and passed through approved `require_escalated` execution. Run the
+  outstanding rendered review in an approval-capable independent agent; do not treat the native
+  review child's inability to escalate as a Chuck launch defect. See investigation below.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -133,6 +139,31 @@ and does not close any manual provider gates.
 
 None. Existing live-provider and real-device acceptance gates above remain owed.
 
+## Browser-verification permission investigation — 2026-10-09
+
+- **Report (verbatim):** “Blocked why, /investigate-bug Chuck needs to be able to do this”.
+  Trigger: independent desktop-agent-page review of `ea8dfc8` reported loopback `EPERM` and
+  Chromium launch failure. Environment: macOS arm64, Chuck Codex ACP, native Codex review
+  subagent, CLI `0.161.0`. Logs exist in the isolated Codex profile.
+- **Confirmed — works as specified:** the native review child recorded `approval_policy: never`
+  and `workspace-write` with `network_access: false`. Its parent recorded `on-request`. Source
+  identity and policies are in
+  `~/.chuck/codex/sessions/2026/10/09/rollout-2026-10-09T21-19-32-01a121e4-4d7f-7352-9e8c-d631d60a7990.jsonl`
+  (`session_meta.source.subagent: review`, parent `01a121e3-c15e-7443-811f-8db575c301d0`).
+  A Node listener on `127.0.0.1:0` fails with `EPERM` inside this sandbox and binds/closes
+  successfully through approved `require_escalated` execution. The same Playwright/Chromium
+  executable aborts with `SIGABRT` under the sandbox and renders `Browser probe` successfully
+  through approved escalation. These bounded probes use no live provider or external page.
+- **Boundary:** FS-03.R14/R18 and TS-05.R9 govern Chuck's ACP approval relay;
+  `internal/server/launch.go:646` and `internal/runtime/permission.go:44` implement that policy.
+  They do not grant the native review child OS/network access. Workflow §14.4 still requires
+  rendered verification; USABILITY-REVIEW §2 explicitly retains blocked visual steps when a
+  browser cannot run. No product/spec defect or missing diagnostic was established, so no
+  investigation fix unit or fix-model recommendation is required.
+- **Next:** complete the independent rendered review in an approval-capable agent using bounded
+  approved execution, an isolated review-owned home and fake backend. Only permission feasibility
+  was verified here; the desktop visual review remains open. No product code or specs changed.
+
 ## Blocked on human
 
 The published `v0.11.0` release body remains empty. Its notes are preserved in
@@ -147,6 +178,10 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-09 — Investigation:** Native Codex review child cannot request escalation; loopback
+  and Chromium failures reproduce in its sandbox and pass via approved parent execution.
+  No Chuck launch defect established; independent desktop rendered verification remains owed.
 
 - **2026-10-09 — Review:** Desktop agent-page `ea8dfc8` source/spec/caller review and 730 UI tests
   passed without findings. Independent rendered verification is blocked by sandbox permissions;
