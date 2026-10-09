@@ -761,6 +761,11 @@ new durable run revision or a structured validation/conflict result.
 
 ## 5. Deviations & open decisions
 
+- **Planned quota specialization:** TS-10.R39–R44 extends recovery only for FS-01.R40–R45's
+  quota-confirmed interruption, retaining same-agent current work through the run owner's claim.
+  R12/R13's fresh-agent generic crash/Retry rules and ordinary blocked-answer requirements remain
+  current for other failures. A quota failure cannot synthesize stage output or progression.
+
 - **Think Tank stages (shipped 2026-10-08).** R51–R56 include durable Stop cleanup, room-turn
   lineage, pre-acceptance context bounds and restart-safe output-acceptance recovery. Room slots
   are frozen in the one assignments map under

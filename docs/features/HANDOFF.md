@@ -20,11 +20,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
-- **Design awaiting scope:** Quota indicator and automatic continuation in
-  [`ideas.md`](../ideas.md). Shipped notices/errors have no quota/reset classification, and tasks
-  have no time-based starts. The proposed behavior and open toggle/coverage/recovery decisions
-  are recorded with the idea; obtain product confirmation before FS/TS design. No ready change
-  or product code was created.
+- **Design awaiting technical decisions:** Quota indicator and automatic continuation in
+  [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
+  including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
+  FS-01.R40–R45/FS-04.R53 and TS-04.R86–R88/TS-10.R39–R44 cover detection and same-owner
+  recovery. Await confirmation of additive config/session API + existing Cancel semantics and
+  one-record-per-agent retention, plus structured Codex reset forwarding through the existing
+  pinned adapter patch. Codex privately receives reset data but does not forward it over ACP;
+  provider text parsing is unsupported. No ready change/product code yet. Specification lint,
+  launcher twin comparison and diff whitespace checks passed for the partial design; rerun after
+  the pending decisions and boundary specifications before promotion.
 - **Review fixes closed:** mobile companion unit `50e0d97^..d3e737f` and Think Tank disclosure
   unit `7b76bc4` are closed. Resume refusals stay visible on Files (INV §8); dismissed sheets and
   confirmations restore opener focus (INV §10); bounded activity rows carry durable publication
@@ -51,6 +56,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   (permission, activity, long name, staged runtime + Discard, `@` picker, live turn, archive,
   header Copy thread identity). Reference source, renders, harness and receipts: shared project
   resources `agent-design/` (`runs/final`).
+  Static review of `ea8dfc8` found no confirmed defects; presentation/style checks and all 730 UI
+  tests passed again. Saved implementation renders were inspected. Independent live-browser review
+  remains blocked in the review sandbox: loopback listeners return EPERM and Chromium aborts at
+  launch. Keep this unit open until that rendered verification can run; no product code was edited.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -138,6 +147,15 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-09 — Review:** Desktop agent-page `ea8dfc8` source/spec/caller review and 730 UI tests
+  passed without findings. Independent rendered verification is blocked by sandbox permissions;
+  the review unit remains open.
+
+- **2026-10-09 — Feature design:** Confirmed default-on global quota continuation for every chat
+  and exact attributed continuation notice; drafted feature/technical core and owner exceptions.
+  Verified pinned typed-failure and reset surfaces. API/retention and Codex forwarding decisions
+  remain open; the idea stays in design and implementation has not started.
 
 - **2026-10-09 — Implementation:** Desktop agent page matches the Figma Make agent-conversation
   study across all three appearances; waiting for review.

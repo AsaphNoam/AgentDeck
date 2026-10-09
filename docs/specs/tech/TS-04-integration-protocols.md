@@ -1082,6 +1082,42 @@ the failure: agent, backend type, operation, RPC code, the provider data's top-l
 (sorted, at most 8) and any recognized reason. Raw data values, prompt text and stderr are never
 logged or returned (R12, INV §8).
 
+**R86 (planned) — Quota evidence is normalized at actual provider completion.** For
+FS-01.R40–R45, add AIR `sessionFailure` to R62's bilateral capability negotiation and decode
+`_meta.jetbrains.air.sessionFailure` from prompt results and `session_info_update`, retaining the
+actual source generation/executing turn. The pinned Claude 0.85.1 and Codex 2.1.1 wire omits its
+internal failure kind: their terminal `severity:"error"`, `category:"limit"`, empty `actions`
+policy identifies account quota; `retry` identifies rate limiting and `new_session` identifies
+session/context budgets. Validate the complete supported policy shape; missing/unknown evidence
+is not quota. Warning/retrying updates never finish a turn. One shared settlement path covers
+ordinary prompts and reserved activations, overriding a misleading `end_turn` to `error` for a
+terminal quota failure and attaching bounded optional quota evidence to that `turn_end`.
+The same failure id/revision seen in an update and result yields one episode. Root ownership is
+never inferred from child activity, current counters, arbitrary message text or an HTTP 429.
+
+**R87 (planned) — Only applicable reset evidence can authorize timed continuation.** Decode
+Claude `usage_update._meta["_claude/rateLimit"]` separately from context usage; its subscription
+`status:"rejected"`, `rateLimitType` and finite Unix-second `resetsAt` can describe the blocking
+window. Correlate evidence to the same provider session/executing quota episode, not another
+agent, old runtime, model or earlier allowance. Do not substitute an allowed/warning window,
+an overage timestamp when ordinary usage is blocked, or an unrelated future reset. If several
+applicable exhausted windows all block execution, the reset is the latest of their required
+resets; a blocking window with unknown time makes the combined reset unknown. Preserve the
+normalized instant in UTC and let clients display timezone. Missing, stale, conflicting,
+malformed or uncorrelated data stays unknown. No provider-text date parser, independent login,
+extra provider client or prompt-based quota polling is introduced.
+
+**R88 (planned) — Quota blocks automatic successor admission.** Persist/source-correlate the
+quota interruption before completing owner settlement or admitting held follow-ups, mail/task
+activations and room turns. Retain their existing pending input rather than consuming it or
+running it immediately into the same quota. The quota terminal path suppresses `runReservedHeld`
+and equivalent reserved Steer/successor admission; the claimed interrupted-work continuation takes
+priority over retained automatic successors. Explicit accepted manual intervention and the claimed
+quota continuation may enter the ordinary turn gate; a successful turn clears the block, a new
+quota failure renews it, and an unrelated failure remains needs-attention. Shared turn preparation,
+inline-mail confirmation and exact source generation/turn-end fan-out retain TS-01.R31–R32's
+contracts. This is neither a permission policy nor a new agent lifecycle state vocabulary.
+
 ## 3. Interfaces & data shapes
 
 - ACP: JSON-RPC messages over newline-delimited child stdin/stdout; adapter determines exact

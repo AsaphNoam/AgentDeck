@@ -1,6 +1,6 @@
 # FS-04 — Configuration & Onboarding
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/config/`, `internal/server/config_handlers.go`, `internal/server/directory_picker.go`, `ui/src/features/settings/`, `ui/src/features/onboarding/` · **Journeys:** J2, J9
 **Absorbed:** [`phase-3-config-onboarding.md`](../../archive/phases/phase-3-config-onboarding.md)
 
@@ -159,6 +159,15 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   launch snapshots, projects, agents, pipelines, or onboarding readiness.
 
 ### 2.5 Composition timing
+
+- **R53 (planned)** — Settings expose one global **Auto continue after quota reset** toggle,
+  enabled by default on fresh and existing installations when absent; explicit false is preserved.
+  It reads/writes through the existing global configuration API and survives restart. Its help says
+  that Chuck automatically continues quota-interrupted chats at the provider's known reset time,
+  including task/pipeline/Think Tank agents, and continued turns use the provider normally.
+  A change applies immediately under FS-01.R43, rather than only to new launches under R13;
+  an applying/failed save reports the actual saved state and a readable error. It changes no
+  permissions or onboarding gate and adds no per-agent override.
 
 - **R13.** Editing a role, project, backend, or the global config affects **new launches only**.
   A running agent and its ordinary resume/switch paths keep the frozen launch snapshot; an explicit
@@ -450,6 +459,12 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   files are not recreated, and references, custom fields and session snapshots remain unchanged.
   *Verify by* migration, seed idempotence, reference-resolution and resume fixtures, including
   unavailable-skill and per-role failure cases.
+
+- **A33 (planned)** (R53) — Fresh configuration and an older file with no field both read enabled;
+  explicit false survives read/save/restart. Settings toggles immediately affect pending schedules
+  across ordinary/task/pipeline/room agents; a failed save restores the saved value and exposes its
+  reason. Unrelated config and frozen sessions remain intact. *Verify:* config/API and Settings
+  tests plus the FS-01.A26 browser journey.
 
 ## 6. Deviations & open decisions
 

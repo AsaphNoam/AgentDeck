@@ -369,6 +369,14 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
 
 ## 5. Deviations & open decisions
 
+- **Planned quota specialization:** TS-10.R39–R44 extends R6/R23's explicit-retry-only failure
+  recovery solely for FS-01.R40–R45's confirmed quota interruptions. The room owner preserves
+  phase/member/opportunity and staged/published/withheld data, creates only a guarded continuation
+  attempt with fresh execution authority and revalidates Pause/End and pipeline closure. Staged
+  data from the failed attempt stays historical; a new authorized submission is required for
+  publication, never a token transfer or inferred success. Successful publication and
+  allowance accounting still require exact provider completion; no quota timer fabricates them.
+
 - **Pipeline rooms (shipped 2026-10-08).** R19's attributed stage context is the room's first
   `stage_context` entry, so the existing paged read, delivery and read receipts carry it rather
   than a separate section. R20's Stop durably tracks setup already claimed and tears down its

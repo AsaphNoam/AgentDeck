@@ -36,24 +36,40 @@ the relevant feature and technical specifications; it does not change product co
 
 - **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
   when a provider interrupts work because its quota is exhausted, show a system quota-limit
-  indicator and the reported reset time. A toggleable Auto continue feature should create a
-  scheduled continuation of the interrupted task at that time. Defining scope: toggle ownership
-  and default, trustworthy quota/reset evidence, same-task recovery, cancellation after manual
-  intervention, repeated quota failures, and behavior when the server misses the reset time.
-  Proposed behavior awaiting confirmation: show Quota reached and the reported reset time on the
-  affected agent and conversation; save one local pending continuation, preserving the original
-  conversation and any durable assignment. Cancel it when Auto continue is disabled or manual
-  intervention supersedes the interrupted work. Unknown/untrustworthy reset times stay manual;
-  a new quota interruption may schedule another future reset, while other errors need attention.
-  Valid overdue continuations may run after server restart. Keep existing transcript retention;
-  no general recurring scheduler. Decisions requested: global toggle off by default versus
-  per-agent/on-by-default alternatives; independent chats/tasks first versus including
-  pipeline-owned and Think Tank turns; confirmation of these recovery rules.
-  Discovery: FS-03.R68/TS-04.R80 notices carry no structured quota/reset fields;
-  `internal/runtime/chat.go` finishes generic prompt failures without classifying quota.
-  FS-16.R33–R34 support same-assignment work-revision continuation, but FS-16 §6 explicitly
-  excludes time-based starts. Do not equate the provider-refresh `provider_check_busy` HTTP 429
-  with provider quota exhaustion. No technical design or ready change yet.
+  indicator and the reported reset time, then schedule continuation. The operator confirmed a
+  global toggle **on by default** and coverage for **every quota-interrupted chat agent**, including
+  durable tasks, pipeline owners/coordinators/delegates and all Think Tank phases. Once work
+  actually continues, append the exact system message **Chuck continued this conversation when
+  the quota reset**. Planned feature requirements: FS-01.R40–R45/A23–A28 and FS-04.R53/A33;
+  owner-boundary clarifications are in FS-03/FS-14/FS-16/FS-21 §6. The same-work, manual-control,
+  unknown-reset, future-reset-only retry and overdue-restart recovery rules from the earlier
+  proposal are preserved. Technical core: TS-04.R86–R88, TS-10.R39–R44; owner exceptions in
+  TS-09/TS-14 §5. No product code or ready change yet.
+  **Waiting on two technical decisions:** (1) extend existing config/session APIs with
+  `auto_continue`, quota/reset/schedule projections and existing Cancel also cancelling the
+  pending continuation; retain one bounded local recovery record per agent until conversation
+  deletion and retain notices under normal transcript rules; (2) extend the existing hash-checked
+  Codex adapter patch to forward structured quota/reset metadata, or accept that Codex normally
+  has no trustworthy reset time and must recover manually. Recommendation: approve both.
+  **Verified provider evidence:** `scripts/release/package.json`/lock pin Claude ACP 0.85.1 and
+  Codex ACP 2.1.1. Both emit `_meta.jetbrains.air.sessionFailure`, but Chuck's
+  `internal/runtime/capabilities.go` does not offer it and `acpmap.go` drops prompt `_meta`.
+  Their wire drops the internal failure kind; pinned policy `error` + `limit` + empty `actions`
+  identifies account quota, distinct from `retry` rate limits and `new_session` context budgets.
+  Claude's `dist/acp-agent.js:4919` forwards SDK rejected rate-limit/reset data through
+  `usage_update._meta["_claude/rateLimit"]` only after assistant usage is known. Codex's
+  `dist/index.js:30460` consumes `account/rateLimits/updated` but returns no ACP update; its
+  `account/rateLimits/read` is a private app-server call. The failure record carries no reset time,
+  and neither provider has a verified terminal-text reset format; do not invent a date parser or
+  another authenticated provider client. Source evidence is in the pinned installed packages under
+  `scripts/release/node_modules`; the existing reviewed patch/input/output hashes are in
+  `scripts/release/assemble.sh:68` and `scripts/release/patches/`.
+  Official [failure-extension contract](https://github.com/agentclientprotocol/claude-agent-acp/blob/main/docs/session-failure-extension.md),
+  [Claude releases](https://github.com/agentclientprotocol/claude-agent-acp/releases),
+  [Codex package](https://github.com/agentclientprotocol/codex-acp/blob/main/package.json) and
+  [Codex releases](https://github.com/agentclientprotocol/codex-acp/releases) were checked: no
+  already-forwarded Codex reset surface avoids the proposed patch. Packaged/installed provider
+  classification/reset/delivery gates remain implementation acceptance, not fake-provider proof.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,

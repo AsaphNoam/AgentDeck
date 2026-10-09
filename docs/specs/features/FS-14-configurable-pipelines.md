@@ -1078,6 +1078,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
+- **Planned quota recovery:** FS-01.R40–R45 covers every quota-interrupted pipeline chat,
+  including its standing owner, stage coordinator, delegate and room-backed stage participants.
+  It authorizes only same-work continuation after a known reset, not generic blocked-result
+  Continue, Retry with a fresh agent, manufactured output or bypass of an explicit Pause/Stop.
+  Other recovery and outcome rules remain authoritative.
+
 **Think Tank stage recovery, 2026-10-08.** R81–R86 now retain Stop cleanup through claimed setup
 and room-turn settlement, attribute room-turn tasks as stage descendants, reject downstream room
 context overflow before producer acceptance, and persist the synthesis source and automatic

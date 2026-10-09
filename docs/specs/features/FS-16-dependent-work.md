@@ -696,6 +696,12 @@ Each names the verification that demonstrates it.
 
 ## 6. Deviations & open decisions
 
+- **Planned quota continuation:** FS-01.R40–R45 specializes interruption/recovery only for a
+  provider-confirmed quota interruption. The same task/assignee remains unfinished; its schedule
+  is a host continuation intent, not a second task or a result/prerequisite. It includes pipeline
+  and room-owned work through their owners. The no-time-based-starts exclusion below remains
+  current until this ships, then excludes general timers/cron but permits this quota-reset recovery.
+
 - **Collapse and room-backed stage tasks (shipped 2026-10-08).** R46–R48 shipped; room-owned turns
   now attribute created tasks as stage descendants. Invalid lineage — a cycle or a chain that never
   reaches a root — always renders visible.

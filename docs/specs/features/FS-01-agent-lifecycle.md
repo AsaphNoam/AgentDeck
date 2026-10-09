@@ -193,6 +193,68 @@ orphaned processes.
   dimension. Clone creates a distinct agent with a new `agent_id`; the source keeps its id. Only the
   ephemeral CLI `session_id` changes when an existing agent starts/resumes.
 
+### Quota interruption and automatic continuation
+
+- **R40 (planned)** — **Quota interruption is system state.** Every chat agent whose executing
+  turn is interrupted by a provider usage quota shows **Quota reached** on its dashboard card and
+  conversation, independently of the process being live or stopped. This includes ordinary chats,
+  task assignees, pipeline agents and all Think Tank participant/private/closing/judge turns.
+  Detection requires provider-owned terminal quota evidence; arbitrary assistant/user/tool text,
+  an advisory warning, an adapter's active automatic retry, a transient rate limit, context/output
+  limits and Chuck's own concurrency limits do not establish quota interruption. A known reset is
+  shown as a local date/time with timezone; missing or ambiguous evidence reads **Reset time
+  unknown**, never an invented countdown. Each affected chat is tracked independently, including
+  several agents using the same provider quota.
+- **R41 (planned)** — **Auto continue schedules the interrupted conversation.** With the global
+  setting in FS-04.R53 on, a known future quota reset creates one durable scheduled continuation
+  for that agent's interrupted work, visible in its conversation as **Will continue at …**.
+  A repeated observation of the same interruption creates no duplicate. The schedule lives locally
+  with Chuck's machine state and survives server/browser restarts. It does not create another
+  conversation, duplicate a durable task, or claim that unfinished work has completed. A person can
+  cancel that pending continuation in the conversation without disabling the global feature.
+  Unknown reset times keep the quota indicator and explain that automatic continuation cannot yet
+  be scheduled. Later trustworthy reset evidence for that same interruption can schedule it.
+- **R42 (planned)** — **Continuation preserves the work and its owner.** At or after the reset,
+  Chuck continues the same conversation through its ordinary prompt/resume path, with its current
+  runtime identity and frozen permission/configuration rules. It asks the agent to continue the
+  interrupted work from its existing history, rather than replaying the original request or tools.
+  Logical agent/provider-session history is preserved; an ordinary process resume may replace
+  the runtime generation, and continuation always has its own executing turn identity.
+  A durable assignment keeps its task and assignee; pipeline work keeps its current run/stage
+  assignment; Think Tank work keeps its room, participant and unfinished opportunity. Each owner
+  authorizes its continuation under its existing exclusivity, capacity and closure rules. Quota
+  interruption writes no result, consumes no completed room allowance and does not advance a stage
+  or room. Already accepted task/stage results and published/withheld room submissions are not
+  repeated. A staged but unpublished failed room submission remains historical; continuation must
+  read current room state and make a valid submission under its new turn authority, never publish
+  a failed turn's staged text as though that turn succeeded. Waiting for a busy agent, lifecycle
+  action or available capacity delays the schedule
+  visibly, without starting overlapping turns or turning that delay into a failure.
+- **R43 (planned)** — **Manual control supersedes pending automation.** Disabling Auto continue
+  cancels every pending quota continuation, including one waiting for admission; it stops no turn
+  already admitted. A successful manual Send/Steer, Cancel/Stop, Resume/Retry/Continue, runtime
+  change, conversation archive/deletion, or relevant task/run/room control that supersedes or closes
+  the interrupted work cancels its schedule. Refused operations do not erase it. Re-enabling the
+  setting applies to later quota interruptions and does not resurrect cancelled schedules.
+  Each cancellation and dispatch is serialized so only one can win; no stale timer revives work
+  after the person's intervention. Normal resume/project/archive eligibility still applies.
+- **R44 (planned)** — **Reset recovery is bounded and honest.** Chuck must be running to dispatch
+  a continuation. After restart it admits overdue schedules only after checking that the original
+  work is still unfinished and eligible; it does not replay an uncertain pre-crash delivery.
+  A newly observed quota interruption can schedule its newly reported future reset, with at most
+  one pending continuation per agent. An unchanged/past reset never creates a retry loop. A
+  non-quota failure or uncertain delivery leaves an actionable needs-attention reason and no
+  automatic retry; an unavailable/archived target cannot silently create replacement work.
+  Passing the reset time alone does not claim the quota has cleared. Successful continuation
+  clears the interruption indicator; a fresh quota failure updates it and its next known reset.
+- **R45 (planned)** — **The chat attributes automatic continuation to Chuck.** Once continuation
+  actually begins, the conversation gains exactly one durable system message:
+  **Chuck continued this conversation when the quota reset**. It is attributed to Chuck, never
+  to the person or agent, and replays in live, archived and phone transcripts in order. Merely
+  scheduling, passing the reset time, losing admission or failing to start does not emit it.
+  Reconnect/restart cannot duplicate it. Existing transcript retention and search treatment of
+  system notices remain unchanged.
+
 ## 3. States & transitions
 
 Live status is one of `busy | idle | waiting_input | done | error` (FS-00.R4). Lifecycle-relevant
@@ -358,6 +420,39 @@ transitions:
 - **A22 (shipped 2026-09-26)** (R38) — Activating Clone from an eligible dashboard card calls only the fork
   route and, after success, opens `/agent/<new-agent-id>`; a failed fork stays on the source surface
   and keeps the existing error feedback. *Verify:* `CardContextMenu.test.tsx`.
+
+- **A23 (planned)** (R40–R41) — Drive terminal provider quota evidence in ordinary chats and
+  concurrently in several agents sharing a backend. Each card/chat shows its own quota reason,
+  trustworthy reset time and exactly one schedule. Try arbitrary prose, advisory warnings,
+  retrying-provider errors, transient 429s and unknown/ambiguous reset times; none falsely schedules.
+  *Verify:* provider-boundary fixtures, state/API tests and a focused desktop/phone browser journey.
+- **A24 (planned)** (R41–R42, R45) — Reach a known reset in a partially completed ordinary chat,
+  once with the runtime live and once stopped. Continue the same identity/history without replaying
+  the original request; append the exact Chuck message once only after work begins. Reload live,
+  Archive and phone transcripts; ordering, attribution and retained history agree. *Verify:*
+  controllable-clock fake-provider integration tests, transcript/component tests and A23's journey.
+- **A25 (planned)** (R42) — Quota-interrupt an ordinary task, standing/coordinator pipeline work,
+  delegated work and each Think Tank phase (opening, discussion, private, closing and judge),
+  including a room-backed pipeline stage. Reset resumes only the unfinished owned opportunity in
+  the same conversation; task/assignee/room/run provenance is retained, no outcome/allowance/stage
+  advances on quota, and accepted/published/withheld work is never duplicated. *Verify:*
+  owner-state and fake-provider integration tests with post-submission quota failure cases.
+- **A26 (planned)** (R41, R43) — Race reset admission against cancelling one schedule, global
+  disable, successful/refused manual input/control, runtime switch, archive/deletion and owner
+  closure. Only the winning eligible action takes effect, failed manual actions retain recovery,
+  and re-enable does not revive a cancelled schedule. *Verify:* state/lifecycle/API race tests and
+  A23's cancellation/settings journey.
+- **A27 (planned)** (R42, R44–R45) — Restart before reset, after reset and around admission/provider
+  delivery/notice append. Eligible overdue work continues; uncertain delivery holds for attention;
+  busy/capacity deferral does not spend failures; no duplicate turn or system message occurs.
+  New quota evidence with a future reset replaces the wait; stale times and non-quota errors stop
+  automatic retry with a readable reason. *Verify:* fake-clock restart/failure-injection tests.
+- **A28 (planned)** (R40–R45) — Exercise packaged and supported installed Claude/Codex quota
+  signals through ordinary and owner-activation prompt paths. Verify terminal classification,
+  reset provenance/timezone and actual continuation using captured provider wire shapes, plus a
+  bounded credentialed provider check when available. Record unknown reset support honestly;
+  fake output is not proof of provider delivery. *Verify:* pinned-adapter contract fixtures and a
+  recorded live-provider gate before claiming provider coverage.
 
 ## 6. Deviations & open decisions
 
