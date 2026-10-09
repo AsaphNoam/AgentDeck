@@ -238,14 +238,6 @@ function Room({ room }: { room: ThinkTankDetail }) {
                     </div>
                   )}
                 </article>
-                {entry.attempt_id && byAttempt.has(entry.attempt_id) && (
-                  <AttemptActivity
-                    label={`${entryAuthor(entry)}'s tools and changes`}
-                    live={room.active_attempts.some((a) => a.attempt_id === entry.attempt_id)}
-                    events={byAttempt.get(entry.attempt_id)!}
-                    render={renderActivity}
-                  />
-                )}
               </li>
             ))}
             {loose.map((attempt) => {

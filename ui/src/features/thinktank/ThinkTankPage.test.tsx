@@ -83,9 +83,9 @@ describe("ThinkTankPage", () => {
     window.getSelection()?.removeAllRanges();
   });
 
-  // FS-03.A57, TS-08.R104: attempt activity reuses quiet completed turns within
-  // its attempt, and the canonical contribution stays a visible room entry.
-  it("collapses a completed attempt turn without hiding the room contribution", async () => {
+  // FS-21.R39: a published contribution is not followed by its attempt's
+  // tools and changes; only the canonical room entry is shown.
+  it("shows no tools and changes between published contributions", async () => {
     detail = { ...room(), phase: "ended", active: undefined };
     const activity = [
       { type: "assistant_text", data: { delta: "Drafting a cache plan." } },
@@ -96,20 +96,21 @@ describe("ThinkTankPage", () => {
     server.use(http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ activity, complete: true })));
     renderRoom();
     expect(await screen.findByText("LRU")).toBeTruthy();
-    expect(await screen.findByText("Final attempt answer.")).toBeTruthy();
-    expect(screen.queryByText("Drafting a cache plan.")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Show activity/ }));
-    expect(screen.getByText("Drafting a cache plan.")).toBeTruthy();
+    await waitFor(() => expect(document.querySelector('[data-slot="activity"]')).toBeNull());
+    expect(screen.queryByText("Final attempt answer.")).toBeNull();
+    expect(screen.queryByText(/tools and changes/)).toBeNull();
   });
 
-  it.each(["discussion", "ended"])("keeps settled tools inspectable in %s while refusing stale approvals", async (phase) => {
+  // FS-03.A57, TS-08.R104: an unfinished attempt (no published entry) reuses
+  // the quiet turn projection, so its tools stay inspectable.
+  it.each(["discussion", "ended"])("keeps an unfinished turn's tools inspectable in %s while refusing stale approvals", async (phase) => {
     detail = { ...room(), phase, active: undefined };
     const activity = [
       { type: "tool_call", data: { tool_call_id: "c1", name: "Bash", args: { command: "inspect me" } } },
       { type: "tool_result", data: { tool_call_id: "c1", content: "x".repeat(650)+"tail", status: "completed" } },
       { type: "permission_request", data: { tool_call_id: "old", name: "Stale permission", reason: "Old turn" } },
       { type: "diff", data: { path: "notes.md", old_text: "old", new_text: "new" } },
-    ].map((event, i) => ({ version: 1, room_id: "tt_fixture", seq: i+1, attempt_id: "tta_1", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: i+1, created_at: "2026-10-06T09:00:00Z", event }));
+    ].map((event, i) => ({ version: 1, room_id: "tt_fixture", seq: i+1, attempt_id: "tta_unfinished", agent_id: "a_one", agent_name: "Ari", project: "alpha", source_seq: i+1, created_at: "2026-10-06T09:00:00Z", event }));
     server.use(http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ activity, complete: true })));
     renderRoom();
     fireEvent.click(await screen.findByRole("button", { name: "Ran 1 tool" }));

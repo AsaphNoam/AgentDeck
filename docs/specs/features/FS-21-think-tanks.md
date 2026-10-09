@@ -208,8 +208,10 @@ each participant keeps its own ordinary provider session. TS-14 owns the archite
   unchanged under TS-05.R3.
 - **R39** — Rooms are listed on their originating project and in Archive, including
   after the originating project is removed. Retained room history includes committed messages and
-  room activity shown with them, including tool/diff content and source attribution, rather than
-  depending on a surviving participant transcript. File inspection does not snapshot entire files;
+  source attribution rather than depending on a surviving participant transcript. The room page
+  shows no tools-and-changes disclosure between published messages; tool/diff activity appears
+  only for a live or unfinished turn that has no published message yet, and Files/Commands remain
+  the way to inspect what participants touched. File inspection does not snapshot entire files;
   annotation excerpts remain point-in-time captures, and file links retain origin context for
   ordinary inspection when the files remain available. FS-05.R39 governs Archive discovery.
 - **R40** — Explicit room deletion is available only when paused or ended with no active
@@ -429,8 +431,9 @@ completion; R37 defines partial opening publication and pending input on End.
   journey; steering an active room turn is additionally covered by A23.
 - **A19** (R24, R26, R29) — Seed participants with earlier and private messages, files,
   commands and tool events, then give each distinguishable room-turn activity. Inspect the room's
-  conversation, Files/Commands and participant affordances: room activity is attributed and
-  inspectable, private/earlier activity is not imported, and the normal individual conversation
+  conversation, Files/Commands and participant affordances: published messages carry no
+  tools-and-changes disclosure, an unfinished turn's activity is attributed and inspectable,
+  private/earlier activity is not imported, and the normal individual conversation
   still exposes its own history. Equal relative paths from two room participants open in the
   correct workspace. *Verified by:* room projection/file integration tests and a rendered group
   view versus individual-history journey.

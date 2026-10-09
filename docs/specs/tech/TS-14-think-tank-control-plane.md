@@ -127,7 +127,8 @@ host activations, and REST/SSE for the UI. Shipped 2026-10-06; §5 lists the dev
   room entries without changing legacy agent Archive payloads. Reuse scoped `foldTranscript`/
   `appendRenderedEvent`, `groupTranscriptRows`/`ToolRun`, content renderers and annotation helpers;
   equal tool ids from different actors/attempts never merge. Render contributions as attributed
-  room items and activity in attempt-scoped disclosures. Bind permission/child actions to their
+  room items; activity renders in attempt-scoped disclosures only for a live or unfinished
+  attempt with no published entry, never between published entries. Bind permission/child actions to their
   original source under an atomic generation/turn guard; stale activity is read-only. Participant
   links reach ordinary cards/conversations; normal agent views identify room work. Use existing
   presentation contracts and all three appearances, without a new renderer or design framework.
@@ -393,7 +394,7 @@ they remain explicit implementation gates, not design-time or fake-ACP claims.
   agent); selected-agent delivery commits annotation mail and the batch atomically. Pause/resume/end are
   idempotent and carry no expected revision; create, messages and annotations carry command ids.
   Retry targets are `setup`, `turn` and `judge`; a judge retry always launches a fresh judge.
-  Settled attempt activity retains inspection and annotation controls; unresolved retained approvals
+  Unfinished attempt activity retains inspection and annotation controls; unresolved retained approvals
   render cancelled and cannot send a stale decision. Live permission actions use the ordinary
   per-agent decision endpoint, which already refuses a settled tool call.
 - R18's credentialed Claude/Codex checks and the real-binary rendered journey remain owed.

@@ -1161,7 +1161,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   remote `/api/events` feed and shared bounded reasoning store: `remote/connection.ts` currently
   handles `new_message`, so add a `runtime_activity` handler and clear reasoning/live choices on
   its reconnect/generation boundaries, with the same limits as desktop. Do not introduce a phone-only
-  final/turn classifier or new transport. Retained Think Tank attempt activity reuses the turn
+  final/turn classifier or new transport. Think Tank attempt activity shown for a live or unfinished attempt (FS-21.R39) reuses the turn
   projection within its existing source-agent/attempt boundary without changing room message
   publication, retention or live reasoning availability. Empty/non-chat activity and unknown
   legacy events remain visible under their existing renderer behavior, not silently discarded.

@@ -614,7 +614,7 @@ Requirements are user- and API-observable. R-item numbering is continuous throug
 - **R77 — The same compact history works across chat surfaces.** Full agent chat,
   dashboard chat panes, read-only archive and phone chat use the same turn/disclosure semantics
   for the content each surface supports, including existing completed history after reload.
-  Retained Think Tank attempt activity may reuse the projection within its attempt boundary;
+  Think Tank activity for a live or unfinished attempt may reuse the projection within its attempt boundary;
   canonical room contributions and judge synthesis remain visible room messages under FS-21.
   Opening activity preserves original attribution, copy/file and annotation actions where allowed.
   This is presentation only: durable transcript/API content, search, provider context, clone data,

@@ -21,6 +21,10 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   to `AsaphNoam/Chuck` until the postponed rename; use `CHUCK_REPO=AsaphNoam/AgentDeck` and
   `chuck update --repo AsaphNoam/AgentDeck` meanwhile. Release CI publishes to the current repo.
 - **Active change:** None.
+- **Waiting for review:** Think Tank room page no longer shows the per-message "tools and changes"
+  disclosure between published contributions (FS-21.R39/A19, TS-14.R15, TS-08.R104, FS-03.R77);
+  live and unfinished-turn activity still renders. Done without a design stage at the user's
+  request. UI tests (721), UI build and `make check-specs` passed; Go untouched, `make embed` not run.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
