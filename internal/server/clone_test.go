@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/AsaphNoam/Chuck/internal/config"
 	"github.com/AsaphNoam/Chuck/internal/index"
@@ -50,6 +52,21 @@ func readEvents(t *testing.T, srv *Server, id string) []runtime.Event {
 	return evs
 }
 
+// FS-01.R39 — a clone name keeps the suffix within the display-name limit, and
+// an unnamed source falls back to the curated suggestion.
+func TestCloneNameAppendsCopyWithinTheLimit(t *testing.T) {
+	if got := cloneName("Atlas Copy"); got != "Atlas Copy Copy" {
+		t.Fatalf("cloneName = %q", got)
+	}
+	long := cloneName(strings.Repeat("é", maxAgentNameRunes))
+	if utf8.RuneCountInString(long) != maxAgentNameRunes || !strings.HasSuffix(long, " Copy") {
+		t.Fatalf("long clone name = %d runes", utf8.RuneCountInString(long))
+	}
+	if got := cloneName("  "); got != "" {
+		t.Fatalf("unnamed clone name = %q, want the suggestion fallback", got)
+	}
+}
+
 // FS-01.A20 / TS-03.R43: Clone creates one running agent with a distinct id,
 // the same configured identity, a distinct native session, the source's visible
 // history through its last completed turn plus a source-link marker; a later
@@ -78,6 +95,10 @@ func TestCloneForksTheConversationIntoANewAgent(t *testing.T) {
 	if out.Agent.AgentID == src || out.Agent.Role != source.Role || out.Agent.Project != source.Project ||
 		out.Agent.Backend != source.Backend || out.Agent.Model != source.Model || out.Agent.Interface != source.Interface {
 		t.Fatalf("clone identity = %+v, source %+v", out.Agent, source)
+	}
+	// FS-01.R39 — the clone is named after its source.
+	if source.Name == "" || out.Agent.Name != source.Name+" Copy" {
+		t.Fatalf("clone name = %q, source %q", out.Agent.Name, source.Name)
 	}
 	if out.Running == nil || out.Running.SessionID != "fake-fork-1" || out.HistoryHandoff != "native_fork" || out.ForkedFromAgentID != src {
 		t.Fatalf("clone envelope = %s", body)

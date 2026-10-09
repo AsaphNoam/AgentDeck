@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/AsaphNoam/Chuck/internal/runtime"
 	"github.com/AsaphNoam/Chuck/internal/state"
+	"github.com/AsaphNoam/Chuck/internal/strutil"
 	"github.com/AsaphNoam/Chuck/internal/transcript"
 )
 
@@ -70,7 +73,7 @@ func (s *Server) cloneAgent(ctx context.Context, sourceID string) (cloneResponse
 	}
 
 	resp, ae := s.launchAgent(ctx, launchRequest{
-		Role: source.Role, Project: source.Project, Backend: source.Backend, Model: source.Model,
+		Name: cloneName(source.Name), Role: source.Role, Project: source.Project, Backend: source.Backend, Model: source.Model,
 		Effort: source.Effort, Fast: source.Fast, Interface: source.Interface, Group: source.Group,
 	}, launchOptions{Fork: &runtime.ForkPlan{
 		SourceAgentID: sourceID, SourceSessionID: snap.LastSessionID, SourceSeq: boundary, Prefix: prefix,
@@ -79,6 +82,18 @@ func (s *Server) cloneAgent(ctx context.Context, sourceID string) (cloneResponse
 		return cloneResponse{}, ae
 	}
 	return cloneResponse{sessionResponse: resp, HistoryHandoff: "native_fork", ForkedFromAgentID: sourceID, ForkedFromSeq: boundary}, nil
+}
+
+// cloneName names a clone after its source, shortening the source name so the
+// result stays within the display-name limit; an unnamed source gets the
+// curated suggestion (FS-01.R39).
+func cloneName(source string) string {
+	const suffix = " Copy"
+	source = strings.TrimSpace(source)
+	if source == "" {
+		return ""
+	}
+	return strutil.ClipRunes(source, maxAgentNameRunes-utf8.RuneCountInString(suffix)) + suffix
 }
 
 func cloneUnavailable(reason string) *runtime.APIError {

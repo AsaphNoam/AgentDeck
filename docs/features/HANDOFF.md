@@ -106,8 +106,8 @@ a clone request or a structured 409 access-log entry. No correlated provider dia
 An optional request for provider and Network URL/body was sent; no answer at closure.
 
 Naming is **confirmed works as specified** under FS-01.R4/R36: `clone.go:72` omits Name;
-`launch.go:331` calls `suggestName`, whose first unused suggestion is Atlas. R36 does not carry
-the source display name. This is independent of sending and is not a fix finding.
+`launch.go:331` calls `suggestName`, whose first unused suggestion is Atlas. Independent of sending.
+Superseded 2026-10-09 by user request: FS-01.R39 names a clone "<source name> Copy".
 
 - **Must fix** — probable field behavior; root cause undetermined; fix complexity medium
   (no invariant class) — field route and root cause remain unidentified.
@@ -152,6 +152,12 @@ The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
   still copies silently through bare `writeText`.
 
 ## Changelog
+
+- **2026-10-09 — Clone keeps its source's name (FS-01.R39).** User-requested: a clone is named
+  "<source name> Copy" (source shortened to fit 256 characters; an unnamed source still gets the
+  curated suggestion). `cloneName` in `server/clone.go`; covered by
+  `TestCloneNameAppendsCopyWithinTheLimit` and the clone fork test. `make test` (both Go
+  variants) and `make build` passed. New small review unit.
 
 - **2026-10-09 — Clone first-message investigation: diagnostic gap fixed (INV §8/§11).**
   A live-process `session/prompt` RPC failure now logs one bounded diagnostic (agent, backend,

@@ -118,6 +118,10 @@ orphaned processes.
   session. Background commands remain owned by the source and do not continue in the clone; any
   copied running task row is closed at the fork boundary as not carried. A failed fork creates no
   new agent, transcript, running process, or messaging identity.
+- **R39 (shipped 2026-10-09)** — A clone is named after its source: the source's display name
+  followed by ` Copy` (a clone of "Atlas" is "Atlas Copy"; cloning that gives "Atlas Copy Copy").
+  The source name is shortened when needed so the result stays within R4's 256-character limit.
+  A source with no display name falls back to R4's curated suggestion.
 - **R38 (shipped 2026-09-26)** — A successful Clone action in the dashboard opens the newly created agent's
   conversation immediately, so the person lands on the copied transcript and fork marker instead
   of remaining on the source card. The client routes only after the fork response returns the new
