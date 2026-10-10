@@ -1243,6 +1243,10 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   never prototype stage data. Verify all three palettes at phone widths and preserve desktop
   geometry through focused tests, the development matrix and actual remote-entry browser review.
   This supersedes the Core-only phone verification clauses in R110 and FS-12.R60/A32.
+  Agent Manage and Files use phone-scoped compact controls. File content is rendered inside
+  the selected tracked-file row using the existing single selected-path query. The composer
+  footer has no panel border; only the textbox is outlined, with Send using the shared
+  icon-primary button and its phone touch target.
 
 - **R117 — Phone and desktop share the working indicator.** FS-20.R44 uses
   the same stateless transcript indicator component, existing `.transcript-pending` and

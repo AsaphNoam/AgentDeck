@@ -106,11 +106,10 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-quote { border-left: var(--ad-border-thick) solid var(--ad-border-default); color: var(--ad-text-secondary); display: grid; font-size: 0.75rem; gap: var(--ad-space-1); margin: 0; padding-left: var(--ad-space-3); white-space: pre-wrap; }
 .phone-quote span { color: var(--ad-text-muted); font-size: 0.625rem; }
 .phone-composer { display: grid; gap: var(--ad-space-2); border-top: var(--ad-border-thin) solid var(--ad-border-default); padding-top: var(--ad-space-4); }
-.phone-composer-box { background: var(--ad-surface-panel); border: var(--ad-border-thin) solid var(--ad-border-default); border-radius: var(--ad-radius-large); padding: var(--ad-space-1); }
-.phone-composer-box:focus-within { border-color: var(--ad-state-done); }
+.phone-composer-box { background: transparent; border: 0; padding: 0; }
 .phone-composer-box .phone-field { gap: 0; }
-.phone-composer-box .phone-field textarea { background: transparent; border: 0; border-radius: var(--ad-radius-large); min-height: 104px; padding: var(--ad-space-3); resize: none; }
-.phone-composer-actions { align-items: center; display: flex; gap: var(--ad-space-2); padding: var(--ad-space-1) var(--ad-space-2) var(--ad-space-2); }
+.phone-composer-box .phone-field textarea { background: var(--ad-surface-panel); border: var(--ad-border-thin) solid var(--ad-border-default); border-radius: var(--ad-radius-medium); min-height: 104px; padding: var(--ad-space-3); resize: none; }
+.phone-composer-actions { align-items: center; display: flex; gap: var(--ad-space-2); border: 0; background: transparent; padding: 0 var(--ad-space-2); }
 .phone-composer-meta { color: var(--ad-text-muted); font-size: 0.625rem; margin-right: auto; overflow-wrap: anywhere; }
 .phone-composer-actions.phone-actions > button { flex: 0 0 auto; }
 /* Fill/shape/size now come from .ad-button-icon-primary; the button is already a 44px touch target. */
@@ -121,6 +120,21 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-field input, .phone-field textarea, .phone-field select { background: var(--ad-surface-panel); border: var(--ad-border-thin) solid var(--ad-border-default); border-radius: var(--ad-radius-medium); color: var(--ad-text-primary); font: inherit; font-size: 1rem; font-weight: 400; min-height: 46px; min-width: 0; width: 100%; padding: var(--ad-space-3); }
 .phone-actions { display: flex; flex-wrap: wrap; gap: var(--ad-space-2); }
 .phone-actions > button { align-items: center; display: flex; justify-content: center; gap: var(--ad-space-2); flex: 1 1 120px; }
+.phone-manage { gap: var(--ad-space-4); }
+.phone-manage .phone-card { background: transparent; border: 0; border-bottom: var(--ad-border-thin) solid var(--ad-border-default); border-radius: 0; padding: 0 0 var(--ad-space-4); gap: var(--ad-space-3); }
+.phone-manage .phone-field input, .phone-manage .phone-field select { min-height: 36px; font-size: 0.875rem; padding: var(--ad-space-2); border-radius: var(--ad-radius-small); }
+.phone-manage button, .phone-file-actions.phone-actions > button { flex: 0 0 auto; width: auto; border: 0; background: transparent; border-radius: var(--ad-radius-small); font-size: 0.75rem; padding: var(--ad-space-1) var(--ad-space-2); justify-self: start; }
+/* The link colour is this group's own secondary look; a danger button keeps .ad-button-danger's colour instead. */
+.phone-manage button:not(.ad-button-danger), .phone-file-actions.phone-actions > button:not(.ad-button-danger) { color: var(--ad-state-done); }
+.phone-manage .phone-manage-rename { display: flex; align-items: flex-end; }
+.phone-manage-rename .phone-field { flex: 1; min-width: 0; }
+.phone-manage .phone-manage-lifecycle { display: flex; flex-wrap: wrap; align-items: center; }
+.phone-manage-lifecycle .phone-meta { flex-basis: 100%; order: 1; }
+.phone-files .phone-list { gap: 0; }
+.phone-files .phone-row { border: 0; border-bottom: var(--ad-border-thin) solid var(--ad-border-default); border-radius: 0; background: transparent; padding: var(--ad-space-3) 0; }
+.phone-file-actions { gap: var(--ad-space-3); }
+.phone-file-actions.phone-actions > button { padding-inline: 0; }
+.phone-file-preview { min-width: 0; margin-top: var(--ad-space-2); }
 .phone-agent-groups { display: grid; gap: var(--ad-space-3); }
 .phone-agent-group { border-top: var(--ad-border-thin) solid var(--ad-border-default); }
 .phone-agent-group-header { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-3) 0; }

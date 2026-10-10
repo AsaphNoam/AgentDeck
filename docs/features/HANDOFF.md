@@ -20,6 +20,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Release preparation — v0.13.0:** user requested a minor release and committing the dirty
+  mobile detail/composer work. Release is blocked by ROOM-WIDTH-01 below; awaiting permission
+  to fix it and a decision to run or waive the pending group-controls, button and room-page
+  reviews. No tag or push performed.
+- **Review pending — mobile detail/composer polish:** Files previews expand beneath the selected
+  row and collapse in place; Manage has compact rule-separated controls; the composer outlines
+  only its textbox. Send retains the newer shared icon-primary construction and 44px touch
+  target (FS-12.R68). 758 UI tests, 41 presentation/style checks, distributable build and
+  phone details harness passed in Core, Sky & Grove and Studio; evidence:
+  `/tmp/chuck-release-phone-*.png`. Untagged Go suite passed; tagged suite hit the documented
+  pipeline-stop flake, and the affected full server package passed on retry (136s). Other tagged
+  packages passed. Spec/launcher checks and diff checks passed. Work committed on main.
 - **Design ready — No persona and optional persona awareness:**
   [`agents-without-a-persona-by-default.md`](../ready-changes/agents-without-a-persona-by-default.md)
   is Waiting to start. Final scope: hide canonical Default, show No persona, persona selection
@@ -44,7 +56,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   regroup, collapsed-header drag beside Ungrouped, scoped Stop/Archive, individual Restore,
   legacy route absence and no exceptions. Evidence: `/tmp/chuck-group-journey-final/`;
   development matrix: `/tmp/chuck-group-matrix/`; group-only snapshot:
-  `/tmp/chuck-group-final-verify/`. Original mobile detail/composer edits remain unstaged.
+  `/tmp/chuck-group-final-verify/`. Mobile detail/composer work is tracked separately above.
 - **Small-change review — 2026-10-10:** mobile spinner `ada153b` (FS-20.R44/A16,
   TS-08.R117), fine right-click menus `083aa23` (FS-12.R66), agent-page width `e2621ac`
   (FS-12.R61), and token-count/stopped-card follow-up `ded893c` (FS-12.R65/R67) closed
@@ -208,6 +220,11 @@ and does not close any manual provider gates.
   No product code or permission defaults changed.
 
 ## Blocked on human
+
+For `v0.13.0`, authorize the ROOM-WIDTH-01 fix and decide whether to run or waive the
+pending group-controls, button-design and Think Tank room-page reviews. The release launcher
+requires the open Must fix to return to fix work before tagging. Publishing still requires
+explicit authorization to push all unpushed main commits and the release tag.
 
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older

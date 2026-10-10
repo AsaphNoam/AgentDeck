@@ -571,21 +571,31 @@ describe("AgentScreen management and views", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Chat", "Files", "Manage"]);
   });
 
-  it("opens a changed file's current text", async () => {
+  it("opens current text beneath the selected file and collapses it in place", async () => {
     const paths: string[] = [];
     server.use(
-      http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: [{ path: "src/main.go", edit_count: 2, last_ts: "2026-10-02T00:00:00Z", has_diff: false, diff_refs: [] }] })),
+      http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: ["src/main.go", "src/other.go"].map((path) => ({ path, edit_count: 2, last_ts: "2026-10-02T00:00:00Z", has_diff: false, diff_refs: [] })) })),
       http.get("/api/sessions/a1/file", ({ request }) => {
-        paths.push(new URL(request.url).searchParams.get("path") ?? "");
-        return HttpResponse.json({ path: "src/main.go", content: "package main\n", truncated: false });
+        const path = new URL(request.url).searchParams.get("path") ?? "";
+        paths.push(path);
+        return HttpResponse.json({ path, content: `package main\n// ${path}`, truncated: false });
       }),
     );
     renderScreen();
     fireEvent.click(screen.getByRole("tab", { name: "Files" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Open file" }));
+    const firstRow = (await screen.findByText("src/main.go")).closest("li")!;
+    const secondRow = screen.getByText("src/other.go").closest("li")!;
+    fireEvent.click(within(firstRow).getByRole("button", { name: "Open file" }));
     const content = await screen.findByRole("region", { name: "File content" });
     await waitFor(() => expect(content).toHaveTextContent("package main"));
+    expect(firstRow).toContainElement(content);
+    expect(secondRow).not.toContainElement(content);
     expect(paths).toEqual(["src/main.go"]);
+    fireEvent.click(within(secondRow).getByRole("button", { name: "Open file" }));
+    await waitFor(() => expect(within(secondRow).getByRole("region", { name: "File content" })).toHaveTextContent("src/other.go"));
+    expect(within(firstRow).queryByRole("region", { name: "File content" })).not.toBeInTheDocument();
+    fireEvent.click(within(secondRow).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("region", { name: "File content" })).not.toBeInTheDocument();
   });
 });
 

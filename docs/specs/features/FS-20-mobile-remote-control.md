@@ -199,6 +199,8 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   edit count and last-touched time, and each command with its exit status, newest first. A changed
   file with a diff opens that diff in the conversation; **Open file** shows the file's current
   text read-only with the desktop's size, binary, and encoding limits (FS-03.R64). The phone opens
+  the selected file's preview directly beneath its own row; opening another file moves the
+  preview there, and Close collapses it without leaving Files.
   only paths in that agent's own changed-files list; it never opens an arbitrary path, searches
   files, or reads a file reached through a symbolic link at the tracked path. Annotating opened file
   text stays desktop-only. This is the one remote exception to FS-03.R64's statement that no
@@ -263,6 +265,9 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   All three Chuck appearances share this composition and use their existing semantic palettes;
   the phone follows the desktop's durable appearance preference without offering a skin picker.
   This supersedes R16's skins exclusion only for applying the configured appearance.
+  Manage uses quiet, compact fields and actions separated by rules rather than stacked cards.
+  Files has compact text actions. The chat composer outlines only its textbox; its model/effort
+  footer is unboxed and Send uses R68's quiet outlined surface within a 44px touch target.
 
 - **R44 — Live chat work is visible on the phone.** At the conversation tail,
   a running, busy chat agent shows the desktop's spinner and **Working…** label, including

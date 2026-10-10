@@ -449,7 +449,24 @@ export function AgentScreen({ agentId }: { agentId: string }) {
         {(["chat", "files", "manage"] as const).map((name) => <button key={name} type="button" role="tab" aria-selected={tab === name} className={tab === name ? "active" : undefined} onClick={() => setTab(name)}>{name[0].toUpperCase() + name.slice(1)}{name === "files" && files.data?.files.length ? <span className="phone-tab-count">{files.data.files.length}</span> : null}</button>)}
       </div>
       {!agent.running && tab !== "manage" && error && <p className="phone-error" role="alert">{error}</p>}
-      {tab === "files" && <section className="phone-section" aria-label="Files"><h2>Files</h2>{files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">{(files.data?.files ?? []).map((tracked) => <li key={tracked.path}><div className="phone-row"><span className="phone-row-title">{tracked.path}</span><span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span><div className="phone-actions">{tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setDiffSeq(tracked.diff_refs[0].seq); setTab("chat"); }}>Open diff</button>}<button type="button" onClick={() => setFilePath(tracked.path)}>Open file</button></div></div></li>)}</ul>}{filePath && <section className="phone-card" aria-label="File content"><div className="phone-actions"><strong>{filePath}</strong><button type="button" onClick={() => setFilePath(null)}>Close</button></div>{file.isError ? <p className="phone-error">{errorText(file.error)}</p> : <pre className="phone-pre">{file.data?.content}</pre>}</section>}</section>}
+      {tab === "files" && <section className="phone-section phone-files" aria-label="Files">
+        <h2>Files</h2>
+        {files.isError ? <p className="phone-error">{errorText(files.error)}</p> : <ul className="phone-list">
+          {(files.data?.files ?? []).map((tracked) => <li key={tracked.path}>
+            <div className="phone-row">
+              <span className="phone-row-title">{tracked.path}</span>
+              <span className="phone-row-meta">{tracked.edit_count} edits · {new Date(tracked.last_ts).toLocaleString()}</span>
+              <div className="phone-actions phone-file-actions">
+                {tracked.has_diff && tracked.diff_refs[0] && <button type="button" onClick={() => { setDiffSeq(tracked.diff_refs[0].seq); setTab("chat"); }}>Open diff</button>}
+                <button type="button" aria-expanded={filePath === tracked.path} onClick={() => setFilePath(filePath === tracked.path ? null : tracked.path)}>{filePath === tracked.path ? "Close" : "Open file"}</button>
+              </div>
+              {filePath === tracked.path && <section className="phone-file-preview" aria-label="File content">
+                {file.isError ? <p className="phone-error">{errorText(file.error)}</p> : file.isPending ? <p className="phone-meta">Loading…</p> : <pre className="phone-pre">{file.data?.content}</pre>}
+              </section>}
+            </div>
+          </li>)}
+        </ul>}
+      </section>}
       {tab === "manage" && <AgentManagement agent={agent} offline={offline} busy={busy} act={act} rename={rename} setRename={setRename} error={error} />}
       {tab === "chat" && <div className="phone-conversation">
       {diffSeq !== null && (
@@ -516,7 +533,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
                   </button>
                 )}
                 <button type="submit" className="phone-send-icon ad-button-icon-primary" aria-label="Send" title="Send" disabled={offline || busy || !text.trim()}>
-                  <PhoneIcon name="up" size={19} />
+                  <PhoneIcon name="up" size={14} />
                 </button>
               </div>
             </form>
@@ -571,8 +588,8 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename, error }
     selectModel(backendID, (next?.models.find((item) => item.id === next.default_model) ?? next?.models[0])?.id ?? "");
   };
   return (
-    <section className="phone-section" aria-label="Agent management">
-      <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}>
+    <section className="phone-section phone-manage" aria-label="Agent management">
+      <form className="phone-card phone-form phone-manage-rename" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}>
         <label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label>
         <button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button>
       </form>
@@ -591,7 +608,7 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename, error }
       )}
       {agent.fast_available && <label className="phone-card phone-check"><input type="checkbox" checked={agent.fast} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { fast: event.target.checked }))} /> Fast mode</label>}
       {agent.running && agent.interface === "chat" && (liveModel?.efforts.length ?? 0) > 0 && <label className="phone-card phone-field">Effort<select value={agent.effort ?? ""} disabled={disable} onChange={(event) => act(() => setSessionConfig(agent.agent_id, { effort: event.target.value }))}><option value="">Model default</option>{liveModel!.efforts.map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label>}
-      <div className="phone-card">
+      <div className="phone-card phone-manage-lifecycle">
         <button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>
         {agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}
         <button type="button" className="ad-button-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>

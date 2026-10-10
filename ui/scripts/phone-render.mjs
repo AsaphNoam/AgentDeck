@@ -16,6 +16,7 @@ import { chromium, devices } from "playwright";
 
 const [fixturePath, out = join(tmpdir(), "phone-render.png")] = process.argv.slice(2);
 const historyCheck = process.argv.includes("--history-check");
+const detailsCheck = process.argv.includes("--details-check");
 const spinnerCheck = process.argv.includes("--spinner-check");
 let skin = "";
 
@@ -62,7 +63,10 @@ try {
   // A URL predicate, not "**/api/**", which would also catch Vite's /src/api modules.
   await context.route((url) => url.pathname.startsWith("/api/"), (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (spinnerCheck && path === "/api/config") return route.fulfill({ json: { appearance_skin: skin } });
+    if ((detailsCheck || spinnerCheck) && path === "/api/config") return route.fulfill({ json: { appearance_skin: skin } });
+    if (detailsCheck && path === "/api/remote/runtime-options") return route.fulfill({ json: { backends: [{ id: "claude", name: "Claude", default_model: "m", models: [{ id: "m", name: "Sonnet", efforts: ["low", "medium", "high"], default_effort: "medium" }] }] } });
+    if (detailsCheck && path === "/api/sessions/a1/files") return route.fulfill({ json: { agent_id: "a1", files: ["src/main.go", "src/another-file-with-a-long-name.go"].map((path) => ({ path, edit_count: 2, last_ts: "2026-10-10T00:00:00Z", has_diff: false, diff_refs: [] })) } });
+    if (detailsCheck && path === "/api/sessions/a1/file") return route.fulfill({ json: { path: new URL(route.request().url()).searchParams.get("path"), content: "package main\n\nfunc main() {\n    println(\"hello\")\n}\n", truncated: false } });
     if (path === "/api/sessions/a1/transcript") {
       if (!history) return route.fulfill({ json: transcript });
       const url = new URL(route.request().url());
@@ -128,6 +132,36 @@ try {
       await update({ ...agent, state: "busy", running: false });
       await page.getByText("Working…", { exact: true }).waitFor({ state: "hidden" });
       console.log(`${theme || "core"} spinner: ${JSON.stringify(metrics)}, reduced=${reduced}; busy → idle/waiting/error/stopped passed`);
+    }
+  }
+  if (shown && detailsCheck) {
+    for (const theme of ["", "sky-grove", "studio"]) {
+      skin = theme;
+      await page.goto("http://localhost:5199/remote.html", { waitUntil: "domcontentloaded" });
+      await page.evaluate(() => {
+        history.pushState(null, "", "/agent/a1");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await page.getByRole("tab", { name: "Chat", exact: true }).waitFor();
+      await page.waitForFunction((theme) => (document.documentElement.dataset.skin || "") === theme, theme);
+      const prefix = out.replace(/\.png$/, `-${theme || "core"}`);
+      await page.screenshot({ path: `${prefix}-chat.png`, fullPage: true, animations: "disabled" });
+      const metrics = await page.evaluate(() => {
+        const footer = getComputedStyle(document.querySelector(".phone-composer-actions"));
+        const button = document.querySelector(".phone-send-icon");
+        const send = button.getBoundingClientRect();
+        const circle = getComputedStyle(button, "::before");
+        return { footerBorder: footer.borderWidth, sendWidth: send.width, sendHeight: send.height, circleWidth: send.width - parseFloat(circle.left) - parseFloat(circle.right), circleHeight: send.height - parseFloat(circle.top) - parseFloat(circle.bottom), overflow: document.documentElement.scrollWidth > innerWidth };
+      });
+      if (metrics.footerBorder !== "0px" || metrics.sendWidth !== 44 || metrics.sendHeight !== 44 || metrics.circleWidth !== 44 || metrics.circleHeight !== 28 || metrics.overflow) throw new Error(`${theme}: ${JSON.stringify(metrics)}`);
+      await page.getByRole("tab", { name: "Files", exact: true }).click();
+      await page.getByRole("button", { name: "Open file", exact: true }).first().click();
+      await page.getByRole("region", { name: "File content" }).getByText("package main", { exact: false }).waitFor();
+      await page.screenshot({ path: `${prefix}-files.png`, fullPage: true, animations: "disabled" });
+      await page.getByRole("tab", { name: "Manage", exact: true }).click();
+      await page.getByRole("button", { name: "Switch runtime", exact: true }).waitFor();
+      await page.screenshot({ path: `${prefix}-manage.png`, fullPage: true, animations: "disabled" });
+      console.log(`${theme || "core"} details: ${JSON.stringify(metrics)}`);
     }
   }
   console.log(`wrote ${out}`);
