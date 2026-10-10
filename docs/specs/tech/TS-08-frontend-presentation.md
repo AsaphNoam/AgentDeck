@@ -1278,6 +1278,20 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   `--ad-state-busy`, attention to `--ad-state-waiting`, room tile to `--ad-surface-subtle`); no
   token, skin rule, motion or dependency is added. Verify with focused tests, the presentation
   checks and the A35 browser comparison.
+- **R115 — The room-page composition stays in the Think Tank feature.** FS-12.R64 refines R87's
+  layout in `ThinkTankPage`, `RoomComposer` and `styles/features/think-tank.css`. The page keeps
+  its `data-ui="think-tank"` root, `data-state` phase and the `header`/`goal`/`body`/
+  `discussion`/`entry`/`activity`/`status`/`participants`/`files`/`commands`/`composer`/
+  `turn-limit` slots, entry `data-variant` and `data-speaker-slot`; new parts use implementation
+  classes. `PageHeader` and `Badge` leave the room page; Files/Commands become one Radix dialog
+  built like `ConfirmDialog`. The composer keeps R97's `composer` construction and adds the agent
+  page's `composer-toolbar`/`composer-references` markup with the same caret insert. Model and
+  effort come from the existing agent store and are omitted when the agent is not live. Icons
+  join `components/ui/icons.tsx`. Colors map onto semantic tokens: speaker tints from R99's
+  palette mixed into `--ad-surface-raised`, the user bubble from `--ad-action-secondary`, state
+  tones from `--ad-state-*`, the eyebrow from `--ad-state-done`. The live dots are state
+  indication with a `prefers-reduced-motion` stop; no token, skin rule or dependency is added.
+  Verify with focused tests, the presentation checks and the A36 browser comparison.
 
 ## 3. Interfaces & data shapes
 

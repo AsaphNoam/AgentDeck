@@ -25,8 +25,24 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Review closed — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
   independent source/spec and rendered review passed without findings on 2026-10-10. Project
   and Archive cards passed in all three appearances at 1024/1440, including removed origins,
-  separate keyboard focus and hover. No pending review unit remains.
+  separate keyboard focus and hover.
   Evidence: `/tmp/chuck-room-review-20261010/`; closure details below.
+- **Review pending — Think Tank room page (FS-12.R64/A36, TS-08.R115):** the full room page
+  adopts the Figma Make `ThinkTank` study (source: Figma MCP resource
+  `file://figma/make/source/OykxmXqZnnyA67QA1lv3AU/src/ThinkTank.tsx` + `think-tank.css`):
+  breadcrumb, eyebrow/title header with counted Files/Commands, context row with state chip,
+  goal card, canvas discussion with round labels and speaker-tinted bubbles, current-action
+  band, inset composer with `@`/`#`/source toolbar and help row (ended → read-only note),
+  participant/judge cards with tinted edges and live model · effort, Files/Commands as one
+  dialog. Page now scrolls; the discussion list has the study's fixed scroll height.
+  732 UI tests, presentation/style checks, UI build, both Go variants (`CHUCK_RUNTIME_ROOT=`),
+  `make build` and `make embed` passed. Rendered with `ui/scripts/room-render.mjs`
+  (new `openings` state) in Core, Sky & Grove and Studio at 1024/1440 for live, ended and
+  hidden-openings rooms; receipts in shared project resources `think-tank-design/runs/r1/`.
+  Owed for review: independent rendered comparison (A36) including a paused room, a held
+  failure with Retry, a pipeline room, Files dialog → file viewer, and keyboard focus.
+  Reviewer note: room status chip reuses `roomStatus` tones (Running/Waiting/Needs
+  attention/Paused/Ended) rather than the study's openings/judge-failed labels.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned

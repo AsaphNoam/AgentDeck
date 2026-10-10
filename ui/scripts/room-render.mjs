@@ -6,7 +6,8 @@
 //   node scripts/room-render.mjs [outDir] [state]
 //
 // state is "live" (default: a speaker mid-turn with a pending approval and a
-// queued message), "ended" (operator ended, judge synthesis complete), "project"
+// queued message), "ended" (operator ended, judge synthesis complete), "openings"
+// (hidden concurrent openings), "project"
 // (room discovery cards), or "matrix" (the development presentation matrix).
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,6 +42,14 @@ const room = {
   deletable: !live,
 };
 room.active_attempts = room.active ? [room.active] : [];
+// "openings" hides contributions while two openings are still being written.
+const openings = state === "openings";
+if (openings) {
+  Object.assign(room, { phase: "openings", active: undefined, pending: [], end_reason: "", judge_status: "waiting", deletable: false });
+  room.judge = { ...room.judge, status: "waiting", agent_id: "" };
+  room.members = room.members.filter((m) => m.role === "participant");
+  room.active_attempts = ["a_ari", "a_bea"].map((agent_id) => ({ attempt_id: `tta_${agent_id}`, agent_id, turn: "opening", state: "running", failure: "", started_at: at }));
+}
 const entry = (seq, kind, agent_id, agent_name, project, body, extra = {}) => ({ seq, kind, agent_id, agent_name, project, body, attempt_id: `tta_${seq}`, created_at: at, ...extra });
 const entries = [
   entry(1, "opening", "a_ari", "Ari", "alpha", "**Write-through with TTL.** Every write updates Redis synchronously; reads tolerate at most `ttl=30s` staleness.\n\n```go\ncache.Set(ctx, key, value, 30*time.Second)\n```"),
@@ -128,8 +137,8 @@ try {
         const path = new URL(route.request().url()).pathname;
         if (path === "/api/think-tanks") return route.fulfill({ json: { version: 1, rooms: cards, clipped: false } });
         if (path === "/api/think-tanks/tt_demo") return route.fulfill({ json: room });
-        if (path === "/api/think-tanks/tt_demo/entries") return route.fulfill({ json: { version: 1, entries, complete: true } });
-        if (path === "/api/think-tanks/tt_demo/activity") return route.fulfill({ json: { version: 1, activity, complete: true } });
+        if (path === "/api/think-tanks/tt_demo/entries") return route.fulfill({ json: { version: 1, entries: openings ? entries.filter((e) => e.input_id) : entries, complete: true } });
+        if (path === "/api/think-tanks/tt_demo/activity") return route.fulfill({ json: { version: 1, activity: openings ? [] : activity, complete: true } });
         if (path === "/api/projects") return route.fulfill({ json: { alpha: { title: "Alpha", cwd: "/tmp", color: [80, 120, 200] }, beta: { title: "Beta", cwd: "/tmp", color: [60, 160, 120] } } });
         if (path === "/api/config") return route.fulfill({ json: { appearance_skin: skin, onboarded: true } });
         if (path === "/api/layout") return route.fulfill({ json: { order: [], density: { perRow: 3, gap: 16 } } });

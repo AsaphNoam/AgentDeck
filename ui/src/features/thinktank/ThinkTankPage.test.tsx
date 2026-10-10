@@ -1,6 +1,6 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { http, HttpResponse } from "msw";
@@ -31,6 +31,7 @@ const server = setupServer(
   http.get("/api/think-tanks/tt_fixture/entries", () => HttpResponse.json({ version: 1, entries: fixture.entries, complete: true })),
   http.get("/api/think-tanks/tt_fixture/activity", () => HttpResponse.json({ version: 1, activity: [], complete: true })),
   http.get("/api/think-tanks/tt_fixture/files", () => HttpResponse.json({ version: 1, sources: [], files: [] })),
+  http.get("/api/think-tanks/tt_fixture/commands", () => HttpResponse.json({ sources: [], commands: [{ source_id: "src_1", agent_name: "Ari", project: "alpha", tool_call_id: "t1", command: "go test ./...", status: "completed", seq: 4 }] })),
   http.get("/api/sessions/:agentId/file-search", () => HttpResponse.json({ agent_id: "a_one", files: [] })),
   http.post("/api/think-tanks/tt_fixture/messages", async ({ request }) => {
     posted.push(await request.json());
@@ -192,14 +193,14 @@ describe("ThinkTankPage", () => {
     renderRoom();
     expect(await screen.findByRole("heading", { name: "Cache choice" })).toBeTruthy();
     // FS-21.R43: the full goal is subordinate to the title.
-    expect(screen.getByText("Goal", { selector: "summary" })).toBeTruthy();
+    expect(screen.getByText("Room goal", { selector: "summary > strong" })).toBeTruthy();
     expect(await screen.findByText("LRU")).toBeTruthy();
     expect(screen.getByText("Consider eviction")).toBeTruthy();
     const participantLinks = screen.getAllByRole("link", { name: "Ari" });
     expect(participantLinks.some((link) => link.getAttribute("href") === "/agent/a_one")).toBe(true);
     expect(screen.queryByRole("link", { name: "Gone" })).toBeNull();
     expect(screen.getByText("Agent deleted")).toBeTruthy();
-    expect(screen.getByText("2 of 2 turns")).toBeTruthy();
+    expect(screen.getByText("2 / 2 turns")).toBeTruthy();
   });
 
   // FS-21.A36, R49: a refused increase keeps the draft and its command id;
@@ -406,11 +407,28 @@ describe("ThinkTankPage", () => {
     expect(screen.queryByRole("option", { name: /@Gone/ })).toBeNull();
   });
 
-  it("disables room input once the discussion has ended", async () => {
+  // FS-12.R64: Files/Commands carry counts and open a dialog of sourced rows;
+  // a live member's card shows its runtime from the agent store.
+  it("lists room commands in a dialog and shows a live member's runtime", async () => {
+    useAgentStore.setState({ agents: { a_one: { agent_id: "a_one", model: "opus", effort: "high" } as never } });
+    renderRoom();
+    expect(await screen.findByText("opus · high")).toBeTruthy();
+    const open = await screen.findByRole("button", { name: /Commands 1/ });
+    fireEvent.click(open);
+    const dialog = await screen.findByRole("dialog", { name: "Commands" });
+    expect(within(dialog).getByText("go test ./...")).toBeTruthy();
+    expect(within(dialog).getByText(/^Ari · .+ · completed$/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  // FS-21.R46, FS-12.R64: an ended room replaces the composer with a read-only note.
+  it("makes room input read-only once the discussion has ended", async () => {
     detail = { ...room(), phase: "ended", end_reason: "operator", judge_status: "", judge: { enabled: false }, deletable: true };
     renderRoom();
     expect(await screen.findByText(/You ended the discussion/)).toBeTruthy();
-    expect((screen.getByLabelText("Message the room") as HTMLTextAreaElement).disabled).toBe(true);
+    expect(screen.getByText("This room is read-only")).toBeTruthy();
+    expect(screen.queryByLabelText("Message the room")).toBeNull();
     expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
   });
 });

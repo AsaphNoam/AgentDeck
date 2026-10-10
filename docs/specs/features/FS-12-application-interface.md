@@ -462,6 +462,40 @@ Requirements are user-observable.
   study's sample rooms and copy are excluded; real status, attention, allowance, judge and
   retained-identity data drive the card, and FS-02.R71/FS-21.R44 behavior is unchanged.
 
+- **R64 — The Think Tank room page adopts the Figma think-tank composition.** The `ThinkTank`
+  study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`) governs the full room page.
+  A quiet breadcrumb row leads with Back to the origin project, then "project / Think Tank" and
+  the stable room id at the right. The header pairs a mono uppercase "Think Tank / project"
+  eyebrow with a room-symbol tile over the large title; at the right sit Files and Commands with
+  their counts, a short rule, the existing Pause / Keep going / Resume control, a quiet
+  destructive End discussion and Delete. A context row follows: a state chip (Running, Waiting,
+  Needs attention, Paused, Ended — colored by its tone with a dot), "Phase …", a rule,
+  "Independent openings On/Off", "Final synthesis On/Off" and, for a pipeline room, its run link
+  at the right. The goal is a full-width card disclosure, "Room goal" with a one-line preview and
+  "View full goal"/"Collapse". Below, the discussion sits directly on the page canvas beside a
+  ~272px participant column. The discussion opens with "Room discussion" and "Shared history only
+  · started time"; ruled round labels introduce the independent openings and the discussion;
+  each contribution has a byline (author link, project, ruled kind, time at the right), an
+  optional "Addressed to" line, and a softly tinted bubble in that speaker's tint; your messages
+  carry a "Y" tile and a user-tinted bubble; departures and missing openings read as quiet event
+  rows; the synthesis is a ruled card. While openings are hidden, a centred "A little space for
+  independent thinking" placeholder names who is still writing. The current action follows as a
+  band — live dots while a turn runs, ! for attention, Ⅱ when paused, — when ended — with its
+  pending note and recovery actions. The composer is an inset, softly raised box: textarea, then
+  a toolbar with `@`/`#` inserts and the "Files and commands from" source at the left and a
+  labelled Send at the right; a help row beneath says whether the message is held until the
+  current turn or shared now, and how to send. An ended room replaces the composer with a
+  read-only note. Each participant is a card whose leading edge carries its speaker tint: name
+  link ↗ with project, the live agent's model · effort when known, "completed / limit turns", a
+  status dot and text, and Raise turn limit; the judge sits in its own "Final synthesis · Judge"
+  card with its state and a note that it does not take turns; a quiet "A room, not a group
+  assistant" note closes the column. Files and Commands open as a dialog listing each source
+  with its participant and project; a file opens in the existing viewer. All three appearances
+  express the composition through their semantic palettes. The study's sample conversation,
+  tagline, state-preview selector, per-command Reference, file "Annotate file" button and
+  held-message bubbles are excluded; real entries, activity, annotations, file viewer, mentions,
+  turn-limit, retry, pause/end/delete and judge-repair behavior is unchanged (FS-21).
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -697,6 +731,15 @@ Requirements are user-observable.
   tile, title/phase/state row, status, goal, roster, footer and budget column match the study's
   hierarchy and spacing without horizontal overflow; room and participant links stay separate
   focusable actions; Archive shows origin, including a removed project.
+  *Verify:* focused component tests plus the working tree's real-browser comparison.
+
+- **A36** (R64) — Compare the rendered study with real rooms at 1024px and 1440px in Core, Sky &
+  Grove and Studio: hidden concurrent openings, a live discussion turn with a held message, a
+  paused room, a failed turn needing attention, an ended room with synthesis and a departed
+  participant, a long title and goal, and a pipeline room. Breadcrumb, header, context row, goal
+  card, discussion, current-action band, composer and participant column match the study's
+  hierarchy and spacing without horizontal overflow; Files/Commands dialogs open the file viewer;
+  mentions, annotations, Raise turn limit, retries and Delete still work.
   *Verify:* focused component tests plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions

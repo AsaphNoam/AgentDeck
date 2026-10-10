@@ -1,85 +1,340 @@
 @layer ad-features {
-/* Think Tank room (TS-08.R87). Reading order: goal and phase, then the
-   attributed discussion, then the current action and composer; participants
-   stay compact beside the discussion. */
+/* Think Tank room in the Figma think-tank composition (FS-12.R64, TS-08.R115).
+   Reading order: breadcrumb, header and context, the goal card, then the
+   attributed discussion on the page canvas, the current action and the
+   composer, with participant cards beside it (TS-08.R87). */
 .think-tank[data-ui="think-tank"] {
-  display: grid;
-  gap: var(--ad-space-4);
-  margin: 0 auto;
-  max-width: 1440px;
-  min-width: 0;
-  padding: 0 var(--ad-space-6) var(--ad-space-6);
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-.app-shell:has(.think-tank) {
-  height: 100dvh;
-  min-height: 0;
-}
-
-.app-main:has(> .think-tank) {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.think-tank-title {
-  overflow-wrap: anywhere;
-}
-
-/* The full goal is subordinate to the title: available on demand, never
-   occupying the first conversation viewport (FS-21.R43). */
-.think-tank-goal {
-  color: var(--ad-text-secondary);
-}
-
-.think-tank-goal > summary {
-  cursor: pointer;
-  width: fit-content;
-}
-
-.think-tank-goal > p {
   color: var(--ad-text-primary);
-  margin: var(--ad-space-2) 0 0;
-  max-width: 72ch;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
+  display: grid;
+  font-size: 0.875rem;
+  margin: 0 auto;
+  max-width: 1320px;
+  min-width: 0;
+  padding: var(--ad-space-6) calc(var(--ad-space-8) + var(--ad-space-1)) calc(var(--ad-space-8) + var(--ad-space-1));
 }
 
-.think-tank-phase {
+.think-tank-breadcrumb {
+  align-items: center;
+  color: var(--ad-text-muted);
+  display: flex;
+  font-size: 0.75rem;
+  gap: var(--ad-space-6);
+  margin-bottom: calc(var(--ad-space-4) + var(--ad-space-1));
+  min-width: 0;
+}
+
+.think-tank-breadcrumb > a {
   align-items: center;
   color: var(--ad-text-secondary);
   display: inline-flex;
+  flex: none;
+  gap: var(--ad-space-2);
+  text-decoration: none;
+}
+
+.think-tank-breadcrumb > a:hover {
+  color: var(--ad-text-primary);
+}
+
+.think-tank-breadcrumb-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.think-tank-breadcrumb-path > span {
+  color: var(--ad-border-strong);
+  margin-inline: var(--ad-space-3);
+  opacity: 0.35;
+}
+
+.think-tank-breadcrumb-path > strong {
+  color: var(--ad-text-secondary);
+  font-weight: 500;
+}
+
+.think-tank-breadcrumb > code {
+  background: transparent;
+  border: 0;
+  color: var(--ad-text-muted);
+  flex: none;
+  font-family: var(--ad-font-mono);
+  font-size: 0.6875rem;
+  margin-left: auto;
+  padding: 0;
+}
+
+.think-tank-header {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-6);
+  justify-content: space-between;
+}
+
+.think-tank-heading {
+  min-width: 0;
+}
+
+.think-tank-eyebrow {
+  align-items: center;
+  color: var(--ad-state-done);
+  display: flex;
+  font-family: var(--ad-font-mono);
+  font-size: 0.625rem;
+  gap: var(--ad-space-2);
+  letter-spacing: 0.13em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.think-tank-eyebrow > span:last-child {
+  color: var(--ad-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.think-tank-symbol {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-state-done);
+  display: grid;
+  flex: none;
+  height: 32px;
+  place-items: center;
+  width: 32px;
+}
+
+.think-tank-title {
+  font-size: 1.625rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.2;
+  margin: var(--ad-space-3) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.think-tank-actions {
+  align-items: center;
+  display: flex;
+  flex: none;
   flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  justify-content: flex-end;
+}
+
+/* Quiet outlined controls: forest text on the raised surface. */
+.think-tank .ad-button {
+  border-color: color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
+  color: var(--ad-state-done);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  min-height: 0;
+  padding: var(--ad-space-2) calc(var(--ad-space-3) + var(--ad-space-1));
+  white-space: nowrap;
+}
+
+.think-tank .ad-button [data-slot="label"] {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--ad-space-2);
+}
+
+.think-tank .ad-button-primary {
+  background: var(--ad-action-primary);
+  border-color: var(--ad-action-primary);
+  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
+}
+
+.think-tank .think-tank-quiet-danger {
+  border-color: color-mix(in srgb, var(--ad-state-error) 25%, var(--ad-surface-raised));
+  color: var(--ad-state-error);
+}
+
+.think-tank-count {
+  color: var(--ad-text-muted);
+  font-size: 0.625rem;
+}
+
+.think-tank-action-rule {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  height: 22px;
+  margin: 0 var(--ad-space-1);
+}
+
+.think-tank-context {
+  align-items: center;
+  color: var(--ad-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  gap: calc(var(--ad-space-3) + var(--ad-space-1));
+  margin: var(--ad-space-6) 0 calc(var(--ad-space-4) + var(--ad-space-1));
+}
+
+.think-tank-context b {
+  color: var(--ad-text-primary);
+  font-weight: 500;
+  margin-left: var(--ad-space-1);
+}
+
+.think-tank-state {
+  --ad-room-tone: var(--ad-text-muted);
+  align-items: center;
+  color: var(--ad-room-tone);
+  display: inline-flex;
+  font-weight: 500;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-state > i {
+  background: currentColor;
+  border-radius: var(--ad-radius-round);
+  height: 6px;
+  width: 6px;
+}
+
+.think-tank-state[data-state="active"] { --ad-room-tone: var(--ad-state-busy); }
+.think-tank-state[data-state="waiting"] { --ad-room-tone: var(--ad-state-waiting); }
+.think-tank-state[data-state="attention"] { --ad-room-tone: var(--ad-state-error); }
+
+.think-tank-state:is([data-state="paused"], [data-state="ended"], [data-state="attention"]) > i {
+  border-radius: 0;
+}
+
+.think-tank-state[data-state="attention"] > i {
+  transform: rotate(45deg);
+}
+
+.think-tank-context-rule {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  height: 16px;
+}
+
+.think-tank-pipeline {
+  color: var(--ad-state-done);
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.think-tank-pipeline:hover {
+  text-decoration: underline;
+}
+
+/* The full goal is subordinate to the title: a one-line card that opens on
+   demand, never occupying the first conversation viewport (FS-21.R43). */
+.think-tank-goal {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  margin-bottom: var(--ad-space-6);
+  min-width: 0;
+}
+
+.think-tank-goal > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.75rem;
   gap: var(--ad-space-3);
+  list-style: none;
+  min-width: 0;
+  padding: var(--ad-space-3) var(--ad-space-4);
+}
+
+.think-tank-goal > summary::-webkit-details-marker {
+  display: none;
+}
+
+.think-tank-goal-chevron {
+  color: var(--ad-text-muted);
+  display: inline-block;
+  transition: transform 120ms ease-out;
+}
+
+.think-tank-goal[open] .think-tank-goal-chevron {
+  transform: rotate(90deg);
+}
+
+.think-tank-goal > summary > strong {
+  flex: none;
+  font-weight: 600;
+}
+
+.think-tank-goal-preview {
+  color: var(--ad-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.think-tank-goal[open] .think-tank-goal-preview {
+  visibility: hidden;
+}
+
+.think-tank-goal-toggle {
+  color: var(--ad-state-done);
+  flex: none;
+  font-size: 0.6875rem;
+  margin-left: auto;
+}
+
+.think-tank-goal-toggle > span + span,
+.think-tank-goal[open] .think-tank-goal-toggle > span:first-child {
+  display: none;
+}
+
+.think-tank-goal[open] .think-tank-goal-toggle > span + span {
+  display: inline;
+}
+
+.think-tank-goal > p {
+  color: var(--ad-text-secondary);
+  line-height: 1.75;
+  margin: 0;
+  max-width: 940px;
+  overflow-wrap: anywhere;
+  padding: 0 calc(var(--ad-space-8) + var(--ad-space-2)) calc(var(--ad-space-4) + var(--ad-space-1));
+  white-space: pre-wrap;
 }
 
 .think-tank-body {
-  align-items: stretch;
+  align-items: start;
   display: grid;
-  gap: var(--ad-space-6);
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
-  min-height: 0;
+  gap: calc(var(--ad-space-6) + var(--ad-space-1));
+  grid-template-columns: minmax(0, 1fr) 272px;
 }
 
+/* Shared history lives on the canvas; only messages and controls are surfaced. */
 .think-tank-discussion {
   display: grid;
-  gap: var(--ad-space-4);
   min-width: 0;
-  min-height: 0;
-  grid-template-rows: minmax(0, 1fr) auto auto;
 }
 
-.think-tank-discussion > .think-tank-entries {
-  overflow-y: auto;
-  align-content: start;
-  padding-inline-end: var(--ad-space-2);
+.think-tank-discussion-heading {
+  align-items: baseline;
+  display: flex;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+  padding: var(--ad-space-4) 0;
+}
+
+.think-tank-discussion-heading > h2 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.think-tank-discussion-heading > span {
+  color: var(--ad-text-muted);
+  font-size: 0.75rem;
 }
 
 .think-tank-entries,
 .think-tank-members,
-.think-tank-panel ul,
+.think-tank-source-rows,
 .think-tank-list > ul,
 .think-tank-setup-participants ol {
   display: grid;
@@ -87,6 +342,14 @@
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.think-tank-discussion > .think-tank-entries {
+  align-content: start;
+  gap: calc(var(--ad-space-6) + var(--ad-space-1));
+  height: clamp(390px, 53vh, 650px);
+  overflow-y: auto;
+  padding: var(--ad-space-6) var(--ad-space-2) var(--ad-space-8) 0;
 }
 
 .think-tank-entries > li {
@@ -99,83 +362,223 @@
   color: var(--ad-text-muted);
 }
 
-/* One attributed contribution: the speaker leads, the body reads like an
-   ordinary assistant message. */
-.think-tank-entry {
-  background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-inline-start: var(--ad-border-thick) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-medium);
-  display: grid;
-  gap: var(--ad-space-2);
-  min-width: 0;
-  padding: var(--ad-space-3) var(--ad-space-4);
-}
-
-.think-tank-entry[data-variant="user"],
-.think-tank-entry[data-variant="annotation"] {
-  background: var(--ad-surface-subtle);
-  border-inline-start-color: var(--ad-action-primary);
-}
-
-.think-tank-entry[data-variant="synthesis"] {
-  border-inline-start-color: var(--ad-state-done);
-}
-
-.think-tank-entry[data-variant="stage_context"] {
-  border-inline-start-color: var(--ad-border-strong);
-}
-
-.think-tank-entry[data-variant="departure"],
-.think-tank-entry[data-variant="missing_opening"] {
-  background: transparent;
-  border-style: dashed;
-}
-
-.think-tank-entry-meta {
-  align-items: baseline;
+.think-tank-round {
+  align-items: center;
   color: var(--ad-text-secondary);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.85rem;
-  gap: var(--ad-space-1) var(--ad-space-3);
+  font-size: 0.75rem;
+  gap: var(--ad-space-3);
+  margin: var(--ad-space-1) 0 var(--ad-space-4);
+}
+
+.think-tank-round > span {
+  background: var(--ad-border-default);
+  flex: 1;
+  height: 1px;
+}
+
+.think-tank-round > b {
+  color: var(--ad-text-muted);
+  font-weight: 400;
+}
+
+/* One attributed contribution: byline, then a bubble in the speaker's tint. */
+.think-tank-entry {
+  --ad-think-tank-speaker-tint: var(--ad-border-default);
+  align-items: flex-start;
+  display: flex;
+  gap: var(--ad-space-3);
+  min-width: 0;
+}
+
+.think-tank-entry-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.think-tank-entry-meta {
+  align-items: center;
+  color: var(--ad-text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  gap: var(--ad-space-1) var(--ad-space-2);
+  line-height: 1.5;
+  margin: var(--ad-space-1) 0 var(--ad-space-2);
 }
 
 .think-tank-author {
   color: var(--ad-text-primary);
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.think-tank-author:hover {
+  color: var(--ad-state-done);
+  text-decoration: underline;
 }
 
 .think-tank-entry-kind {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
   color: var(--ad-text-muted);
+  padding-left: var(--ad-space-2);
 }
 
 .think-tank-entry-meta time {
+  color: var(--ad-text-muted);
   margin-inline-start: auto;
 }
 
-.think-tank-entry-body {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.think-tank-addressed {
+  color: var(--ad-text-secondary);
+  font-size: 0.75rem;
+  margin: 0 0 var(--ad-space-2);
 }
 
-.think-tank-addressed {
-  margin: 0;
+.think-tank-entry-body {
+  background: color-mix(in srgb, var(--ad-think-tank-speaker-tint) 9%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-think-tank-speaker-tint) 24%, var(--ad-surface-raised));
+  border-radius: var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium) var(--ad-radius-medium);
+  line-height: 1.8;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: calc(var(--ad-space-4) + var(--ad-space-1)) calc(var(--ad-space-4) + var(--ad-space-2));
+}
+
+.think-tank-entry-body > :first-child { margin-top: 0; }
+.think-tank-entry-body > :last-child { margin-bottom: 0; }
+
+.think-tank-avatar {
+  background: color-mix(in srgb, var(--ad-state-done) 10%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-border-default) 80%, var(--ad-text-primary));
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-state-done);
+  display: grid;
+  flex: none;
+  font-size: 0.625rem;
+  font-weight: 600;
+  height: 32px;
+  place-items: center;
+  width: 32px;
+}
+
+.think-tank-entry:is([data-variant="user"], [data-variant="annotation"]) .think-tank-entry-body {
+  background: color-mix(in srgb, var(--ad-action-secondary) 7%, var(--ad-surface-raised));
+  border-color: color-mix(in srgb, var(--ad-action-secondary) 15%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium) var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium);
+}
+
+.think-tank-entry[data-variant="stage_context"] .think-tank-entry-body {
+  background: var(--ad-surface-subtle);
+  border-color: var(--ad-border-default);
+}
+
+/* Departures and missing openings are quiet events, not contributions. */
+.think-tank-entry:is([data-variant="departure"], [data-variant="missing_opening"]) {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-small);
   color: var(--ad-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  padding: var(--ad-space-3) calc(var(--ad-space-3) + var(--ad-space-1));
+}
+
+.think-tank-entry:is([data-variant="departure"], [data-variant="missing_opening"]) .think-tank-entry-meta {
+  margin: 0;
+}
+
+.think-tank-entry:is([data-variant="departure"], [data-variant="missing_opening"]) .think-tank-entry-body {
+  background: transparent;
+  border: 0;
+  line-height: 1.6;
+  padding: var(--ad-space-1) 0 0;
+}
+
+.think-tank-event-symbol {
+  color: var(--ad-text-muted);
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+/* The synthesis is a ruled card in the judge's tint. */
+.think-tank-entry[data-variant="synthesis"] {
+  background: color-mix(in srgb, var(--ad-think-tank-speaker-tint) 5%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-left: 3px solid color-mix(in srgb, var(--ad-think-tank-speaker-tint) 60%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  padding: var(--ad-space-4) calc(var(--ad-space-4) + var(--ad-space-1));
+}
+
+.think-tank-entry[data-variant="synthesis"] .think-tank-entry-body {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.think-tank-hidden-openings {
+  color: var(--ad-text-secondary);
+  justify-items: center;
+  padding: var(--ad-space-8) var(--ad-space-3) var(--ad-space-12);
+  text-align: center;
+}
+
+.think-tank-hidden-openings > h3 {
+  color: var(--ad-text-primary);
+  font-size: 1.1875rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  margin: var(--ad-space-3) 0 0;
+}
+
+.think-tank-hidden-openings > p {
+  font-size: 0.75rem;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.think-tank-thinking {
+  align-items: center;
+  color: var(--ad-state-done);
+  display: flex;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-3);
+}
+
+.think-tank-dots {
+  display: inline-flex;
+  gap: var(--ad-space-1);
+}
+
+.think-tank-dots > i {
+  animation: think-tank-pulse 1.8s infinite;
+  background: currentColor;
+  border-radius: var(--ad-radius-round);
+  height: 4px;
+  width: 4px;
+}
+
+.think-tank-dots > i:nth-child(2) { animation-delay: 0.2s; }
+.think-tank-dots > i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes think-tank-pulse {
+  50% { opacity: 0.3; }
 }
 
 /* Retained activity sits under the contribution it produced, scoped to that
    attempt. Settled activity is read-only. */
 .think-tank-activity {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
   margin-inline-start: var(--ad-space-4);
   min-width: 0;
+  padding-left: var(--ad-space-4);
 }
 
 .think-tank-activity > summary {
   color: var(--ad-text-secondary);
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
 }
 
 .think-tank-activity-body {
@@ -187,107 +590,339 @@
   padding: 0;
 }
 
+/* The current action: one band between the history and the composer. */
 .think-tank-status {
-  background: var(--ad-surface-subtle);
-  border-inline-start: var(--ad-border-thick) solid var(--ad-state-idle);
-  display: grid;
-  gap: var(--ad-space-2);
-  padding: var(--ad-space-3) var(--ad-space-4);
+  --ad-room-tone: var(--ad-text-muted);
+  display: flex;
+  gap: var(--ad-space-3);
+  padding: calc(var(--ad-space-4) + var(--ad-space-1)) var(--ad-space-2) calc(var(--ad-space-4) + var(--ad-space-1)) 0;
 }
 
-.think-tank-status[data-state="active"] { border-inline-start-color: var(--ad-state-busy); }
-.think-tank-status[data-state="waiting"] { border-inline-start-color: var(--ad-state-waiting); }
-.think-tank-status[data-state="attention"] { border-inline-start-color: var(--ad-state-error); }
-.think-tank-status[data-state="paused"] { border-inline-start-color: var(--ad-state-unknown); }
-.think-tank-status[data-state="ended"] { border-inline-start-color: var(--ad-state-done); }
+.think-tank-status[data-state="active"] { --ad-room-tone: var(--ad-state-busy); }
+.think-tank-status[data-state="waiting"] { --ad-room-tone: var(--ad-state-waiting); }
+.think-tank-status[data-state="attention"] { --ad-room-tone: var(--ad-state-error); }
 
-.think-tank-status p {
+.think-tank-status-symbol {
+  color: var(--ad-room-tone);
+  flex: none;
+  font-weight: 600;
+  width: 24px;
+}
+
+.think-tank-status-symbol > .think-tank-dots {
+  padding-top: var(--ad-space-2);
+}
+
+.think-tank-status-main {
+  display: grid;
+  gap: var(--ad-space-1);
+  min-width: 0;
+}
+
+.think-tank-status-main p {
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.think-tank-status-text {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.think-tank-status:not([data-state="paused"], [data-state="ended"]) .think-tank-status-text {
+  color: var(--ad-room-tone);
 }
 
 .think-tank-pending {
   color: var(--ad-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  line-height: 1.7;
 }
 
 .think-tank-status-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ad-space-2);
+  margin-top: var(--ad-space-2);
 }
 
 .think-tank-status-actions:empty {
   display: none;
 }
 
+/* Inset, softly raised composer box shared in shape with the agent page. */
 .think-tank-composer {
   display: grid;
-  gap: var(--ad-space-2);
-  background: var(--ad-surface-raised);
-  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  gap: var(--ad-space-3);
   min-width: 0;
+  padding: var(--ad-space-3) var(--ad-space-2) 0 0;
 }
 
 .think-tank-composer .composer {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.think-tank-composer .composer:focus-within {
+  border-color: var(--ad-state-done);
+}
+
+.think-tank-composer .composer textarea {
+  background: transparent;
+  max-height: 180px;
+  min-height: 65px;
+  padding: var(--ad-space-4) calc(var(--ad-space-4) + var(--ad-space-2)) var(--ad-space-1);
+}
+
+.think-tank-composer .composer textarea:focus {
+  box-shadow: none;
+  outline: none;
+}
+
+.think-tank-composer .composer-toolbar {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+  padding: var(--ad-space-2) var(--ad-space-3) var(--ad-space-3);
+}
+
+.think-tank-composer .composer-references {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-1);
+  min-width: 0;
+}
+
+.think-tank-composer .composer-references button {
   background: transparent;
   border: 0;
-  border-radius: 0;
-  margin-inline: auto;
-  width: min(100%, 52rem);
+  color: var(--ad-text-muted);
+  font-size: 1.05rem;
+  min-height: auto;
+  min-width: 0;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.think-tank-composer .composer-references button:hover:not(:disabled) {
+  box-shadow: none;
+  color: var(--ad-text-primary);
+  transform: none;
 }
 
 .think-tank-composer-source {
+  background: var(--ad-surface-subtle);
+  border: 0;
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-state-done);
+  font-size: 0.75rem;
+  margin-left: var(--ad-space-1);
+  max-width: 160px;
+  min-height: 0;
+  padding: var(--ad-space-1) var(--ad-space-2);
+}
+
+.think-tank-composer .composer-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-2);
+}
+
+.think-tank-composer .composer-actions .composer-icon {
+  background: var(--ad-action-primary);
+  border-color: var(--ad-action-primary);
+  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
+  display: inline-flex;
+  font-size: 0.75rem;
+  gap: var(--ad-space-2);
+  min-height: 0;
+  min-width: 0;
+  padding: var(--ad-space-2) calc(var(--ad-space-3) + var(--ad-space-1));
+}
+
+.think-tank-composer :is(.composer-error, .composer-notice) {
+  margin: 0;
+  padding: 0 var(--ad-space-4) var(--ad-space-3);
+}
+
+.think-tank-composer-help {
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.6875rem;
+  gap: var(--ad-space-2);
+  justify-content: space-between;
+  margin: 0;
+}
+
+.think-tank-readonly {
   align-items: center;
   color: var(--ad-text-secondary);
   display: flex;
-  font-size: 0.85rem;
-  gap: var(--ad-space-3);
-  padding: 0 var(--ad-space-2) var(--ad-space-2);
-  flex-wrap: wrap;
+  gap: calc(var(--ad-space-3) + var(--ad-space-1));
+  padding: var(--ad-space-3);
 }
 
+.think-tank-readonly strong {
+  color: var(--ad-text-primary);
+  font-size: 0.75rem;
+}
+
+.think-tank-readonly p {
+  font-size: 0.75rem;
+  margin: var(--ad-space-1) 0 0;
+}
+
+/* Participant column: one card per member, its speaker tint on the edge. */
 .think-tank-side {
   display: grid;
-  gap: var(--ad-space-4);
+  gap: var(--ad-space-3);
   min-width: 0;
-  position: sticky;
-  top: var(--ad-space-4);
-  align-content: start;
-  min-height: 0;
-  overflow-y: auto;
 }
 
-.think-tank-side h2,
-.think-tank-panel h2,
-.think-tank-list h2 {
-  font-size: 1rem;
+.think-tank-side-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.think-tank-side-heading > :is(h2, h3) {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.think-tank-side-heading > span {
+  color: var(--ad-text-muted);
+  font-family: var(--ad-font-mono);
+  font-size: 0.625rem;
+  text-transform: uppercase;
+}
+
+.think-tank-side-note {
+  color: var(--ad-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.7;
   margin: 0;
 }
 
 .think-tank-member {
-  border-bottom: var(--ad-border-thin) solid var(--ad-border-default);
+  --ad-think-tank-speaker-tint: var(--ad-border-strong);
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-left: 3px solid color-mix(in srgb, var(--ad-think-tank-speaker-tint) 60%, var(--ad-surface-raised));
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline);
   display: grid;
-  gap: var(--ad-space-1);
-  padding-bottom: var(--ad-space-2);
+  font-size: 0.75rem;
+  gap: var(--ad-space-2);
+  min-width: 0;
+  padding: var(--ad-space-4);
 }
 
-.think-tank-member > div {
+.think-tank-member-top {
   align-items: baseline;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--ad-space-1) var(--ad-space-2);
+  gap: var(--ad-space-2);
+  justify-content: space-between;
   min-width: 0;
 }
 
-.think-tank-member > div:first-child span,
+.think-tank-member-top > :is(a, strong) {
+  color: var(--ad-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.think-tank-member-top > a:hover {
+  color: var(--ad-state-done);
+}
+
+.think-tank-member-top > a > span {
+  color: var(--ad-text-muted);
+  font-weight: 400;
+}
+
+.think-tank-member-top > span {
+  color: var(--ad-text-secondary);
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.think-tank-member-runtime {
+  color: var(--ad-text-secondary);
+  font-family: var(--ad-font-mono);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .think-tank-member-meta {
   color: var(--ad-text-secondary);
-  font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ad-space-1) var(--ad-space-3);
+}
+
+.think-tank-member-meta:empty {
+  display: none;
+}
+
+.think-tank-member-turns {
+  font-family: var(--ad-font-mono);
+}
+
+.think-tank-member-state {
+  align-items: flex-start;
+  color: var(--ad-text-secondary);
+  display: flex;
+  gap: var(--ad-space-2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.think-tank-member-state > i {
+  background: var(--ad-text-muted);
+  border-radius: var(--ad-radius-round);
+  flex-shrink: 0;
+  height: 5px;
+  margin-top: var(--ad-space-2);
+  width: 5px;
+}
+
+.think-tank-member[data-state="speaking"] .think-tank-member-state {
+  color: var(--ad-text-primary);
+  font-weight: 600;
+}
+
+.think-tank-member[data-state="speaking"] .think-tank-member-state > i {
+  background: var(--ad-state-busy);
+}
+
+.think-tank-member:is([data-state="departed"], [data-state="exhausted"]) .think-tank-member-top > :is(a, strong) {
+  color: var(--ad-text-secondary);
+}
+
+.think-tank-member .ad-button-ghost {
+  border: 0;
+  justify-self: start;
+  padding: var(--ad-space-1) 0 0;
 }
 
 .think-tank-limit {
   display: grid;
-  font-size: 0.85rem;
   gap: var(--ad-space-2);
 }
 
@@ -305,35 +940,91 @@
   gap: var(--ad-space-2);
 }
 
-.think-tank-member[data-state="speaking"] {
-  border-bottom-color: var(--ad-state-busy);
-}
-
-.think-tank-member[data-state="departed"],
-.think-tank-member[data-state="exhausted"] {
-  color: var(--ad-text-muted);
-}
-
-.think-tank-panel {
+.think-tank-judge {
   display: grid;
-  gap: var(--ad-space-2);
+  gap: var(--ad-space-3);
+  margin-top: var(--ad-space-3);
 }
 
-.think-tank-panel li {
+.think-tank-history-note {
+  color: var(--ad-text-secondary);
+  padding: var(--ad-space-4) var(--ad-space-3) var(--ad-space-3);
+}
+
+.think-tank-history-note > svg {
+  color: var(--ad-state-done);
+}
+
+.think-tank-history-note > h3 {
+  color: var(--ad-text-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin: var(--ad-space-2) 0 var(--ad-space-1);
+}
+
+.think-tank-history-note > p {
+  font-size: 0.75rem;
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* Files and Commands dialog: one ruled row per participant source. */
+.dialog-content.think-tank-sources {
+  width: min(720px, calc(100vw - var(--ad-space-8)));
+}
+
+.think-tank-sources .think-tank-eyebrow {
+  color: var(--ad-state-done);
+}
+
+.think-tank-sources-note {
+  color: var(--ad-text-secondary);
+  line-height: 1.7;
+  margin: 0 0 var(--ad-space-3);
+}
+
+.think-tank-source-rows {
+  gap: 0;
+}
+
+.think-tank-source-rows > li {
+  align-items: center;
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  color: var(--ad-text-secondary);
+  display: flex;
+  gap: var(--ad-space-3);
+  padding: var(--ad-space-4) 0;
+}
+
+.think-tank-source-rows > li > div {
   display: grid;
+  flex: 1;
   gap: var(--ad-space-1);
   min-width: 0;
+}
+
+.think-tank-source-rows code {
+  color: var(--ad-text-primary);
+  font-family: var(--ad-font-mono);
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 
-.think-tank-panel li span {
-  color: var(--ad-text-secondary);
-  font-size: 0.85rem;
+.think-tank-source-rows span {
+  font-size: 0.6875rem;
 }
 
-.think-tank-panel code {
-  font-family: var(--ad-font-mono);
-  font-size: 0.85rem;
+.think-tank-sources .ad-button {
+  border-color: color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
+  color: var(--ad-state-done);
+  font-size: 0.75rem;
+  min-height: 0;
+  white-space: nowrap;
+}
+
+.think-tank-list h2 {
+  font-size: 1rem;
+  margin: 0;
 }
 
 /* Room cards follow the Figma room-summary study (FS-12.R63, TS-08.R114):
@@ -849,22 +1540,7 @@
 }
 
 /* R99: slots map to the stable Core speaker palette; identity is never a
-   lifecycle/state color. */
-
-.think-tank-entry[data-speaker-slot],
-.think-tank-member[data-speaker-slot] {
-  --ad-think-tank-speaker-tint: var(--ad-surface-panel);
-}
-
-.think-tank-entry[data-speaker-slot] {
-  background: color-mix(in srgb, var(--ad-think-tank-speaker-tint) 10%, var(--ad-surface-panel));
-}
-
-.think-tank-member[data-speaker-slot] {
-  border-inline-start: var(--ad-border-thick) solid var(--ad-think-tank-speaker-tint);
-  padding-inline-start: var(--ad-space-2);
-}
-
+   lifecycle/state color. Entries tint their bubble, members their edge. */
 .think-tank [data-speaker-slot="0"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-0); }
 .think-tank [data-speaker-slot="1"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-1); }
 .think-tank [data-speaker-slot="2"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-2); }
@@ -899,13 +1575,55 @@
 .think-tank [data-speaker-slot="31"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-31); }
 .think-tank [data-speaker-slot="judge"] { --ad-think-tank-speaker-tint: var(--ad-think-tank-speaker-judge); }
 
+@media (min-width: 1500px) {
+  .think-tank-discussion > .think-tank-entries {
+    height: 56vh;
+  }
+}
+
+/* The supported desktop floor keeps the hierarchy with tighter insets. */
+@media (max-width: 1150px) {
+  .think-tank[data-ui="think-tank"] {
+    padding: var(--ad-space-4) var(--ad-space-6) var(--ad-space-6);
+  }
+
+  .think-tank-body {
+    gap: var(--ad-space-4);
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+
+  .think-tank-pipeline {
+    margin-left: 0;
+  }
+}
+
 @media (width < 900px) {
   .think-tank-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .think-tank-side {
-    position: static;
+  .think-tank-header {
+    flex-direction: column;
+  }
+
+  .think-tank-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .think-tank-breadcrumb > code,
+  .think-tank-goal-preview {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .think-tank-dots > i {
+    animation: none;
+  }
+
+  .think-tank-goal-chevron {
+    transition: none;
   }
 }
 }

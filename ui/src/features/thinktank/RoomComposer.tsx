@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { newCommandID, useThinkTankMessage } from "../../api/thinkTanks";
 import { useAutocomplete, type MentionTarget } from "../../components/chat/autocomplete";
 import { AutoGrowTextarea, VisuallyHidden } from "../../components/ui";
-import { SendIcon } from "../../components/ui/icons";
+import { RoomIcon, SendIcon } from "../../components/ui/icons";
 import type { ThinkTankDetail } from "../../schemas/thinkTank";
 
 /** A selected mention over the draft, in UTF-16 offsets. */
@@ -92,6 +92,36 @@ export function RoomComposer({ room }: { room: ThinkTankDetail }) {
   };
   const addressed = [...new Set(mentions.map((m) => targets.find((t) => t.agentId === m.agentId)?.label ?? room.members.find((member) => member.agent_id === m.agentId)?.name ?? "an unavailable participant"))];
 
+  // The toolbar's @ and # type the trigger at the caret, as the agent
+  // composer does (FS-12.R64, TS-08.R115).
+  const insertTrigger = (trigger: "@" | "#") => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? text.length;
+    const end = textarea?.selectionEnd ?? start;
+    const token = (start > 0 && !/\s/.test(text[start - 1]) ? " " : "") + trigger;
+    changeText(text.slice(0, start) + token + text.slice(end));
+    requestAnimationFrame(() => {
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(start + token.length, start + token.length);
+      autocomplete.syncTrigger(textarea);
+    });
+  };
+
+  if (ended) {
+    return (
+      <div className="think-tank-composer" data-ui="think-tank" data-slot="composer">
+        <div className="think-tank-readonly">
+          <RoomIcon />
+          <div>
+            <strong>This room is read-only</strong>
+            <p>Room messages are closed. Annotate an entry to follow up with an agent; participant conversations stay available from their cards.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="think-tank-composer" data-ui="think-tank" data-slot="composer">
       <form className="composer" data-ui="composer" data-variant="room" onSubmit={(event) => { event.preventDefault(); submit(); }}>
@@ -102,8 +132,8 @@ export function RoomComposer({ room }: { room: ThinkTankDetail }) {
             ref={textareaRef}
             maxHeight="40vh"
             value={text}
-            disabled={ended || send.isPending}
-            placeholder={ended ? "The discussion has ended. Annotate an entry to follow up with an agent." : "Shared with every participant. @ addresses a participant or picks a file; # picks a command."}
+            disabled={send.isPending}
+            placeholder="Add a thought, question, or direction to the room…"
             onChange={(event) => { changeText(event.target.value); autocomplete.syncTrigger(event.target); }}
             onKeyUp={(event) => autocomplete.syncTrigger(event.currentTarget)}
             onClick={(event) => autocomplete.syncTrigger(event.currentTarget)}
@@ -117,25 +147,29 @@ export function RoomComposer({ room }: { room: ThinkTankDetail }) {
           />
           {autocomplete.picker}
         </div>
-        <div className="composer-actions">
-          <button type="submit" className="composer-icon" aria-label="Send to room" title="Send to room" disabled={ended || !text.trim() || send.isPending}><SendIcon /></button>
+        <div className="composer-toolbar">
+          <div className="composer-references">
+            <button type="button" aria-label="Address a participant or reference a file" title="Address a participant or reference a file" onClick={() => insertTrigger("@")}>@</button>
+            <button type="button" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
+            {sources.length > 0 && (
+              <select className="think-tank-composer-source" aria-label="Files and commands from" title="Files and commands from" value={selectedSource?.agent_id ?? ""} onChange={(event) => { setSourceId(event.target.value); autocomplete.reset(); }}>
+                {sources.map((m) => <option key={m.agent_id} value={m.agent_id}>{m.name}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="composer-actions">
+            <button type="submit" className="composer-icon" aria-label="Send to room" title="Send to room" disabled={!text.trim() || send.isPending}><span className="composer-send-label">Send to room</span><SendIcon /></button>
+          </div>
         </div>
-        {(addressed.length > 0 || (held && !ended)) && (
-          <p className="composer-notice" role="status">
-            {addressed.length > 0 && `Addressed to ${addressed.join(", ")} on their next room turn. `}
-            {held && !ended && "Held until the current turn finishes."}
-          </p>
+        {addressed.length > 0 && (
+          <p className="composer-notice" role="status">Addressed to {addressed.join(", ")} on their next room turn.</p>
         )}
         {error && <p className="composer-error" role="alert">{error}</p>}
       </form>
-      {sources.length > 0 && !ended && (
-        <label className="think-tank-composer-source">
-          Files and commands from
-          <select value={selectedSource?.agent_id ?? ""} onChange={(event) => { setSourceId(event.target.value); autocomplete.reset(); }}>
-            {sources.map((m) => <option key={m.agent_id} value={m.agent_id}>{m.name}</option>)}
-          </select>
-        </label>
-      )}
+      <p className="think-tank-composer-help">
+        <span>{held ? "Held until the current turn finishes, then shared with the room." : "Shared with every participant, not private agent history."}</span>
+        <span>Enter to send · Shift+Enter for a new line</span>
+      </p>
     </div>
   );
 }

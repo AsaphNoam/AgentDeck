@@ -26,6 +26,22 @@ export function CollapseIcon() {
   return <Icon><path d="M4 10 8 6l4 4" /></Icon>;
 }
 
+export function FileIcon() {
+  return <Icon><path d="M9.5 2H4v12h8V4.5zM9.5 2v3H12M6 9h4m-4 2.5h4" /></Icon>;
+}
+
+export function CommandIcon() {
+  return <Icon><path d="m3.5 5 3 3-3 3m5 0h4" /></Icon>;
+}
+
+export function PauseIcon() {
+  return <Icon><path d="M6 3.5v9m4-9v9" /></Icon>;
+}
+
+export function RoomIcon() {
+  return <Icon><path d="M2.5 2.5h11v8.5H6l-3.5 3z" /></Icon>;
+}
+
 export function CollapseAllIcon() {
   return <Icon><path d="M4 8.5 8 4.5l4 4M4 12.5l4-4 4 4" /></Icon>;
 }

@@ -1,5 +1,6 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   sourceFileURL,
   useDeleteThinkTank,
@@ -14,7 +15,9 @@ import {
 } from "../../api/thinkTanks";
 import { useProjects } from "../../api/config";
 import type { AnnotationDraft, FileContent, TranscriptEvent } from "../../api/types";
-import { Badge, Button, ConfirmDialog, PageHeader } from "../../components/ui";
+import { Button, ConfirmDialog } from "../../components/ui";
+import { BackIcon, CommandIcon, FileIcon, PauseIcon, RoomIcon } from "../../components/ui/icons";
+import { useAgentStore } from "../../store/agentStore";
 import { AnnotationContextMenu, type AnnotationMenuState } from "../../components/chat/AnnotationContextMenu";
 import { FileViewer } from "../../components/chat/FileViewer";
 import { SanitizedMarkdown } from "../../components/chat/renderers/SanitizedMarkdown";
@@ -30,26 +33,39 @@ import { copyText } from "../../lib/copyText";
 import { claimWebLink } from "../../lib/linkActions";
 import { agentConversationPath } from "../../lib/agentConversation";
 import { NewAgentModal } from "../launch/NewAgentModal";
-import type { ThinkTankActivity, ThinkTankDetail, ThinkTankEntry } from "../../schemas/thinkTank";
+import type { ThinkTankActivity, ThinkTankDetail, ThinkTankEntry, ThinkTankMember } from "../../schemas/thinkTank";
 import {
   entryAuthor,
   entryAddressees,
   entryLabel,
+  judgeText,
   memberName,
   memberState,
   phaseLabel,
   roomAnnotationSource,
   roomStatus,
   roomTitle,
+  type RoomStatus,
 } from "./roomText";
 import { RoomAnnotationTray } from "./RoomAnnotationTray";
 import { TurnLimitEditor } from "./TurnLimitEditor";
 import { RoomComposer } from "./RoomComposer";
 import { speakerSlot } from "./speakerSlot";
 
-/** ThinkTankPage is the room's full conversation page (FS-21.R27): goal and
- *  phase first, then the attributed discussion, then the current action and
- *  the composer, with compact participants beside it (TS-08.R87). */
+const STATE_LABEL: Record<RoomStatus["tone"], string> = {
+  active: "Running",
+  waiting: "Waiting",
+  attention: "Needs attention",
+  paused: "Paused",
+  ended: "Ended",
+};
+
+const STATUS_SYMBOL: Record<RoomStatus["tone"], string> = { active: "", waiting: "", attention: "!", paused: "Ⅱ", ended: "—" };
+
+/** ThinkTankPage is the room's full conversation page (FS-21.R27) in the Figma
+ *  think-tank composition (FS-12.R64, TS-08.R115): breadcrumb, header and
+ *  context row, the goal card, then the attributed discussion, the current
+ *  action and the composer, with participant cards beside it (TS-08.R87). */
 export function ThinkTankPage() {
   const { id = "" } = useParams();
   const room = useThinkTank(id);
@@ -75,7 +91,12 @@ function Room({ room }: { room: ThinkTankDetail }) {
   const activity = useThinkTankActivity(id);
   const [panel, setPanel] = useState<"" | "files" | "commands">("");
   const files = useThinkTankFiles(id, true);
-  const commands = useThinkTankCommands(id, panel === "commands");
+  const commands = useThinkTankCommands(id, true);
+  const agents = useAgentStore((state) => state.agents);
+  const runtimeOf = (agentID: string) => {
+    const agent = agents[agentID];
+    return agent?.model ? [agent.model, agent.effort].filter(Boolean).join(" · ") : "";
+  };
   const control = useThinkTankControl(id);
   const retry = useThinkTankRetry(id);
   const remove = useDeleteThinkTank(id);
@@ -184,65 +205,112 @@ function Room({ room }: { room: ThinkTankDetail }) {
     if (row.published) placed.add(row.attempt_id);
   }
   const loose = [...byAttempt.keys()].filter((attempt) => !placed.has(attempt));
+  const projectTitle = (project: string) => projects.data?.[project]?.title ?? project;
+  const fileList = files.data?.files ?? [];
+  const commandList = commands.data?.commands ?? [];
+  const writing = room.active_attempts.map((a) => memberName(room, a.agent_id));
+  // Ruled round labels introduce the first opening and the first discussion reply.
+  const firstOpening = shownEntries.find((e) => e.kind === "opening" || e.kind === "missing_opening")?.seq;
+  const firstReply = shownEntries.find((e) => e.kind === "reply")?.seq;
 
   return (
     <section className="think-tank" data-ui="think-tank" data-state={room.phase}>
-      <PageHeader
-        eyebrow={<>Think Tank · <Link to={`/project/${encodeURIComponent(room.origin_project)}`}>{originTitle}</Link>{room.pipeline && <> · <Link to={`/pipelines/runs/${encodeURIComponent(room.pipeline.run_id)}`}>Pipeline run · stage {room.pipeline.stage_id}</Link></>}</>}
-        title={<span className="think-tank-title">{roomTitle(room)}</span>}
-        description={<span className="think-tank-phase"><Badge variant={ended ? "neutral" : "info"}>{phaseLabel(room.phase)}</Badge>{room.openings && <span>Independent openings</span>}{room.judge.enabled && <span>Final synthesis</span>}</span>}
-        actions={
-          <>
-            <Button type="button" variant="ghost" onClick={() => setPanel(panel === "files" ? "" : "files")} aria-pressed={panel === "files"}>Files</Button>
-            <Button type="button" variant="ghost" onClick={() => setPanel(panel === "commands" ? "" : "commands")} aria-pressed={panel === "commands"}>Commands</Button>
-            {!ended && room.control === "running" && <Button type="button" onClick={() => act(() => control.mutateAsync("pause"))} busy={control.isPending}>Pause</Button>}
-            {!ended && room.control === "pause_requested" && <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))}>Keep going</Button>}
-            {!ended && room.control === "paused" && <Button type="button" variant="primary" onClick={() => act(() => control.mutateAsync("resume"))} busy={control.isPending}>Resume</Button>}
-            {!ended && room.control !== "end_requested" && <Button type="button" onClick={() => setConfirm("end")}>End discussion</Button>}
-            {room.deletable && <Button type="button" variant="danger" onClick={() => setConfirm("delete")}>Delete</Button>}
-          </>
-        }
-        data-slot="header"
-      />
+      <nav className="think-tank-breadcrumb" aria-label="Room location">
+        <Link to={`/project/${encodeURIComponent(room.origin_project)}`}><BackIcon />Project</Link>
+        <span className="think-tank-breadcrumb-path">{originTitle}<span aria-hidden="true">/</span><strong>Think Tank</strong></span>
+        <code>{room.room_id}</code>
+      </nav>
+      <header className="think-tank-header" data-slot="header">
+        <div className="think-tank-heading">
+          <p className="think-tank-eyebrow"><span className="think-tank-symbol"><RoomIcon /></span>Think Tank <span>/ {originTitle}</span></p>
+          <h1 className="think-tank-title">{roomTitle(room)}</h1>
+        </div>
+        <div className="think-tank-actions">
+          <Button type="button" onClick={() => setPanel("files")}><FileIcon />Files <span className="think-tank-count">{fileList.length}</span></Button>
+          <Button type="button" onClick={() => setPanel("commands")}><CommandIcon />Commands <span className="think-tank-count">{commandList.length}</span></Button>
+          {(!ended || room.deletable) && <span className="think-tank-action-rule" aria-hidden="true" />}
+          {!ended && room.control === "running" && <Button type="button" onClick={() => act(() => control.mutateAsync("pause"))} busy={control.isPending}><PauseIcon />Pause</Button>}
+          {!ended && room.control === "pause_requested" && <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))}>Keep going</Button>}
+          {!ended && room.control === "paused" && <Button type="button" variant="primary" onClick={() => act(() => control.mutateAsync("resume"))} busy={control.isPending}>Resume</Button>}
+          {!ended && room.control !== "end_requested" && <Button type="button" className="think-tank-quiet-danger" onClick={() => setConfirm("end")}>End discussion</Button>}
+          {room.deletable && <Button type="button" className="think-tank-quiet-danger" onClick={() => setConfirm("delete")}>Delete</Button>}
+        </div>
+      </header>
+      <div className="think-tank-context">
+        <span className="think-tank-state" data-state={status.tone}><i aria-hidden="true" />{STATE_LABEL[status.tone]}</span>
+        <span>Phase <b>{phaseLabel(room.phase)}</b></span>
+        <span className="think-tank-context-rule" aria-hidden="true" />
+        <span>Independent openings <b>{room.openings ? "On" : "Off"}</b></span>
+        <span>Final synthesis <b>{room.judge.enabled ? "On" : "Off"}</b></span>
+        {room.pipeline && <Link className="think-tank-pipeline" to={`/pipelines/runs/${encodeURIComponent(room.pipeline.run_id)}`}>Pipeline run · stage {room.pipeline.stage_id}</Link>}
+      </div>
       <details className="think-tank-goal" data-slot="goal">
-        <summary>Goal</summary>
+        <summary>
+          <span className="think-tank-goal-chevron" aria-hidden="true">›</span>
+          <strong>Room goal</strong>
+          <span className="think-tank-goal-preview">{room.goal}</span>
+          <span className="think-tank-goal-toggle" aria-hidden="true"><span>View full goal</span><span>Collapse</span></span>
+        </summary>
         <p>{room.goal}</p>
       </details>
       <div className="think-tank-body" data-slot="body">
         <div className="think-tank-discussion" data-slot="discussion">
+          <div className="think-tank-discussion-heading">
+            <h2>Room discussion</h2>
+            <span>Shared history only · started {new Date(room.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+          </div>
           <ol className="think-tank-entries" aria-label="Discussion">
-            {shownEntries.length === 0 && !entries.isLoading && (
-              <li className="think-tank-empty">{room.phase === "openings" ? "Openings stay hidden until every participant has answered." : "No contributions yet."}</li>
+            {shownEntries.length === 0 && !entries.isLoading && room.phase !== "openings" && (
+              <li className="think-tank-empty">No contributions yet.</li>
             )}
             {entries.data?.clipped && <li className="think-tank-empty">Showing the newest part of a long discussion.</li>}
             {activity.data?.clipped && <li className="think-tank-empty">Showing the newest 5,000 activity records. Earlier activity remains in retained room history.</li>}
-            {shownEntries.map((entry) => (
-              <li key={entry.seq}>
-                <article
-                  className="think-tank-entry"
-                  data-slot="entry"
-                  data-variant={entry.input_id ? "user" : entry.kind}
-                  data-speaker-slot={entry.input_id || entry.kind === "departure" || entry.kind === "missing_opening" || entry.kind === "stage_context" ? undefined : speakerSlot(room.members.find((m) => m.agent_id === entry.agent_id))}
-                  onContextMenu={(mouse) => annotateEntry(mouse, entry)}
-                >
-                  <header className="think-tank-entry-meta">
-                    {entry.agent_id && room.members.find((m) => m.agent_id === entry.agent_id)?.exists
-                      ? <Link className="think-tank-author" to={agentConversationPath(entry.agent_id)}>{entryAuthor(entry)}</Link>
-                      : <strong className="think-tank-author">{entryAuthor(entry)}</strong>}
-                    {entry.project && <span>{projects.data?.[entry.project]?.title ?? entry.project}</span>}
-                    {entryLabel(entry) && <span className="think-tank-entry-kind">{entryLabel(entry)}</span>}
-                    {entry.undiscussed && <span className="think-tank-entry-kind">Not discussed before the end</span>}
-                    <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleTimeString()}</time>
-                  </header>
-                  {entryAddressees(entry) && <p className="think-tank-addressed">Addressed to {entryAddressees(entry)} · shared with the room</p>}
-                  {entry.body && (
-                    <div className="think-tank-entry-body">
-                      <SanitizedMarkdown text={entry.body} onOpenFile={entry.attempt_id ? openFrom(entry.attempt_id) : undefined} />
+            {shownEntries.map((entry) => {
+              const member = room.members.find((m) => m.agent_id === entry.agent_id);
+              const event = entry.kind === "departure" || entry.kind === "missing_opening";
+              const user = !!entry.input_id;
+              return (
+                <li key={entry.seq}>
+                  {entry.seq === firstOpening && <RoundLabel label="Independent openings" note="revealed together" />}
+                  {entry.seq === firstReply && <RoundLabel label="Discussion" />}
+                  <article
+                    className="think-tank-entry"
+                    data-slot="entry"
+                    data-variant={user ? "user" : entry.kind}
+                    data-speaker-slot={user || event || entry.kind === "stage_context" ? undefined : speakerSlot(member)}
+                    onContextMenu={(mouse) => annotateEntry(mouse, entry)}
+                  >
+                    {user && <span className="think-tank-avatar" aria-hidden="true">Y</span>}
+                    {event && <span className="think-tank-event-symbol" aria-hidden="true">{entry.kind === "departure" ? "↗" : "○"}</span>}
+                    <div className="think-tank-entry-main">
+                      <header className="think-tank-entry-meta">
+                        {entry.agent_id && member?.exists
+                          ? <Link className="think-tank-author" to={agentConversationPath(entry.agent_id)}>{entryAuthor(entry)}</Link>
+                          : <strong className="think-tank-author">{entryAuthor(entry)}</strong>}
+                        {entry.project && <span>{projectTitle(entry.project)}</span>}
+                        {entryLabel(entry) && <span className="think-tank-entry-kind">{entryLabel(entry)}</span>}
+                        {entry.undiscussed && <span className="think-tank-entry-kind">Not discussed before the end</span>}
+                        <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time>
+                      </header>
+                      {entryAddressees(entry) && <p className="think-tank-addressed">Addressed to {entryAddressees(entry)} · shared with the room</p>}
+                      {entry.body && (
+                        <div className="think-tank-entry-body">
+                          <SanitizedMarkdown text={entry.body} onOpenFile={entry.attempt_id ? openFrom(entry.attempt_id) : undefined} />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </article>
+                  </article>
+                </li>
+              );
+            })}
+            {room.phase === "openings" && (
+              <li className="think-tank-hidden-openings">
+                <span className="think-tank-symbol" aria-hidden="true"><RoomIcon /></span>
+                <h3>A little space for independent thinking</h3>
+                <p>Openings stay hidden until every participant has answered, then appear together.</p>
+                {writing.length > 0 && <p className="think-tank-thinking"><span className="think-tank-dots" aria-hidden="true"><i /><i /><i /></span>Still writing: {writing.join(", ")}</p>}
               </li>
-            ))}
+            )}
             {loose.map((attempt) => {
               const rows = byAttempt.get(attempt)!;
               const live = room.active_attempts.some((a) => a.attempt_id === attempt);
@@ -259,7 +327,11 @@ function Room({ room }: { room: ThinkTankDetail }) {
             })}
           </ol>
           <div className="think-tank-status" data-slot="status" data-state={status.tone} role="status" aria-live="polite">
-            <p>{status.text}</p>
+            <span className="think-tank-status-symbol" aria-hidden="true">
+              {status.tone === "active" || status.tone === "waiting" ? <span className="think-tank-dots"><i /><i /><i /></span> : STATUS_SYMBOL[status.tone]}
+            </span>
+            <div className="think-tank-status-main">
+            <p className="think-tank-status-text">{status.text}</p>
             {room.pending.length > 0 && <p className="think-tank-pending">{room.pending.length === 1 ? "1 message is" : `${room.pending.length} messages are`} waiting for the turn to finish.</p>}
             <div className="think-tank-status-actions">
               {room.phase === "setup" && room.hold && <Button type="button" onClick={() => act(() => retry.mutateAsync({ target: "setup" }))}>Retry launch</Button>}
@@ -282,58 +354,81 @@ function Room({ room }: { room: ThinkTankDetail }) {
               )}
             </div>
             {actionError && <p className="form-error" role="alert">{actionError}</p>}
+            </div>
           </div>
           <RoomComposer room={room} />
         </div>
         <aside className="think-tank-side" data-slot="participants" aria-label="Participants">
-          <h2>Participants</h2>
+          <div className="think-tank-side-heading"><h2>Participants</h2><span>{participants.length}</span></div>
+          <p className="think-tank-side-note">Individual agents, shared context.</p>
           <ul className="think-tank-members">
-            {[...participants, ...judges].map((m) => (
-              <li key={m.agent_id} className="think-tank-member" data-speaker-slot={speakerSlot(m)} data-state={room.active_attempts.some((a) => a.agent_id === m.agent_id) ? "speaking" : m.state}>
-                <div>
-                  {m.exists ? <Link to={agentConversationPath(m.agent_id)}>{m.name}</Link> : <strong>{m.name}</strong>}
-                  <span>{projects.data?.[m.project]?.title ?? m.project}</span>
-                </div>
-                <div className="think-tank-member-meta">
-                  {m.role === "participant" && <span>{m.completed} of {m.limit} turns</span>}
-                  {memberState(room, m) && <span>{memberState(room, m)}</span>}
-                  {!m.exists && <span>Agent deleted</span>}
-                  {m.exists && m.archived && <span>Archived</span>}
-                  {m.setup_error && <span className="form-error">{m.setup_error}</span>}
-                </div>
-                <TurnLimitEditor room={room} member={m} />
-              </li>
+            {participants.map((m) => (
+              <MemberCard key={m.agent_id} room={room} member={m} project={projectTitle(m.project)} runtime={runtimeOf(m.agent_id)}>
+                <span className="think-tank-member-turns">{m.completed} / {m.limit} turns</span>
+              </MemberCard>
             ))}
           </ul>
-          {panel === "files" && (
-            <section className="think-tank-panel" data-slot="files">
-              <h2>Files</h2>
-              {files.data?.clipped && <p>Files from the newest 10,000 activity records are shown. Earlier changes remain in retained room history.</p>}
-              {(files.data?.files ?? []).length === 0 && <p>No files changed in room turns.</p>}
-              <ul>
-                {(files.data?.files ?? []).map((f) => (
-                  <li key={`${f.source_id}-${f.path}`}>
-                    <button type="button" className="annotation-link" onClick={() => setFile({ path: f.path }, f.source_id)}>{f.path}</button>
-                    <span>{f.agent_name} · {f.project}</span>
-                  </li>
+          {judges.length > 0 && (
+            <section className="think-tank-judge">
+              <div className="think-tank-side-heading"><h3>Final synthesis</h3><span>Judge</span></div>
+              <ul className="think-tank-members">
+                {judges.map((m) => (
+                  <MemberCard key={m.agent_id} room={room} member={m} project={projectTitle(m.project)} runtime={runtimeOf(m.agent_id)} />
                 ))}
               </ul>
+              <p className="think-tank-side-note">The judge observes the room and writes the final synthesis. It does not take discussion turns.</p>
             </section>
           )}
-          {panel === "commands" && (
-            <section className="think-tank-panel" data-slot="commands">
-              <h2>Commands</h2>
-              {commands.data?.clipped && <p>Commands from the newest 10,000 activity records are shown. Earlier commands remain in retained room history.</p>}
-              {(commands.data?.commands ?? []).length === 0 && <p>No commands ran in room turns.</p>}
-              <ul>
-                {(commands.data?.commands ?? []).map((c) => (
-                  <li key={`${c.seq}`}><code>{c.command}</code><span>{c.agent_name} · {c.status || "running"}</span></li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <section className="think-tank-history-note">
+            <RoomIcon />
+            <h3>A room, not a group assistant</h3>
+            <p>Each entry belongs to its author. Agent links open private conversations; only contributions shared here appear in this room.</p>
+          </section>
         </aside>
       </div>
+      <Dialog.Root open={panel !== ""} onOpenChange={(open) => { if (!open) setPanel(""); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="dialog-overlay" data-ui="dialog" data-slot="overlay" />
+          <Dialog.Content className="dialog-content think-tank-sources" data-ui="dialog" data-slot="content" data-variant="default" aria-describedby={undefined}>
+            <p className="think-tank-eyebrow">Think Tank / {originTitle}</p>
+            <Dialog.Title data-slot="title">{panel === "files" ? "Files" : "Commands"}</Dialog.Title>
+            {panel === "files" && (
+              <section data-ui="think-tank" data-slot="files">
+                <p className="think-tank-sources-note">Files changed in participant turns. Each file opens from its participant's retained workspace.</p>
+                {files.data?.clipped && <p className="think-tank-sources-note">Files from the newest 10,000 activity records are shown. Earlier changes remain in retained room history.</p>}
+                {fileList.length === 0 && <p className="think-tank-sources-note">No files changed in room turns.</p>}
+                <ul className="think-tank-source-rows">
+                  {fileList.map((f) => (
+                    <li key={`${f.source_id}-${f.path}`}>
+                      <FileIcon />
+                      <div><code>{f.path}</code><span>{f.agent_name} · {projectTitle(f.project)}</span></div>
+                      <Button type="button" aria-label={f.path} onClick={() => { setPanel(""); setFile({ path: f.path }, f.source_id); }}>Open read-only ↗</Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {panel === "commands" && (
+              <section data-ui="think-tank" data-slot="commands">
+                <p className="think-tank-sources-note">Commands from participant activity, not room-level tool calls.</p>
+                {commands.data?.clipped && <p className="think-tank-sources-note">Commands from the newest 10,000 activity records are shown. Earlier commands remain in retained room history.</p>}
+                {commandList.length === 0 && <p className="think-tank-sources-note">No commands ran in room turns.</p>}
+                <ul className="think-tank-source-rows">
+                  {commandList.map((c) => (
+                    <li key={`${c.seq}`}>
+                      <CommandIcon />
+                      <div><code>{c.command}</code><span>{c.agent_name} · {projectTitle(c.project)} · {c.status || "running"}</span></div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            <div className="form-actions" data-slot="actions">
+              <Dialog.Close asChild><button type="button">Close</button></Dialog.Close>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       {openFile && (
         <FileViewer
           agentId={openSource}
@@ -387,6 +482,41 @@ function Room({ room }: { room: ThinkTankDetail }) {
         onConfigure={(params) => act(() => retry.mutateAsync({ target: "judge", judge: params as ThinkTankLaunch }))}
       />
     </section>
+  );
+}
+
+function RoundLabel({ label, note }: { label: string; note?: string }) {
+  return <p className="think-tank-round" aria-hidden="true"><span />{label}{note && <b>{note}</b>}<span /></p>;
+}
+
+/** One participant or judge card: the speaker tint on its leading edge, then
+ *  name/project, the live runtime when known, turns, and its current state. */
+function MemberCard({ room, member: m, project, runtime, children }: {
+  room: ThinkTankDetail;
+  member: ThinkTankMember;
+  project: string;
+  runtime: string;
+  children?: ReactNode;
+}) {
+  const speaking = room.active_attempts.some((a) => a.agent_id === m.agent_id) || room.active?.agent_id === m.agent_id;
+  const base = memberState(room, m);
+  const state = base === "Judge" ? judgeText(room.judge_status, room.judge.error) || base : base || (room.phase === "ended" ? "Discussion ended" : "Waiting for next turn");
+  return (
+    <li className="think-tank-member" data-speaker-slot={speakerSlot(m)} data-state={speaking ? "speaking" : m.state}>
+      <div className="think-tank-member-top">
+        {m.exists ? <Link to={agentConversationPath(m.agent_id)}>{m.name} <span aria-hidden="true">↗</span></Link> : <strong>{m.name}</strong>}
+        <span>{project}</span>
+      </div>
+      {runtime && <p className="think-tank-member-runtime">{runtime}</p>}
+      <div className="think-tank-member-meta">
+        {children}
+        {!m.exists && <span>Agent deleted</span>}
+        {m.exists && m.archived && <span>Archived</span>}
+      </div>
+      <p className="think-tank-member-state"><i aria-hidden="true" />{state}</p>
+      {m.setup_error && <p className="form-error">{m.setup_error}</p>}
+      <TurnLimitEditor room={room} member={m} />
+    </li>
   );
 }
 
