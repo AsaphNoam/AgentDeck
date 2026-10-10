@@ -97,6 +97,19 @@ orphaned processes.
   does not change the roles of existing agents or explicit task, pipeline or Think Tank assignments.
   It supersedes R37's default-role behavior only as specified by FS-04.R54.
 
+- **R47 (planned) — No persona is the ordinary creation experience.** Superseding R37/R46 only
+  for persona presentation, desktop global/project launch, phone launch and onboarding show
+  **No persona** for the underlying empty default choice; they never offer a visible **Default**
+  persona. Persona selection belongs to a directly reachable **Advanced** disclosure alongside
+  the existing optional name/runtime controls. Default launch needs no disclosure interaction.
+  The compact launch summary shows No persona or the selected persona name so a saved custom
+  default remains visible while Advanced is closed. Choosing No persona contributes no persona
+  prompt and never conceals custom persona text. Opening/closing Advanced preserves all choices;
+  launch errors retain the draft and reveal any affected hidden control. This changes creation
+  composition, not runtime defaults or explicit saved automation assignments.
+  No persona stays Chuck aware. Creation contains no Chuck-awareness checkbox or per-agent
+  override; a named persona uses its saved awareness choice under FS-04.R56/FS-18.R20.
+
 ### Stop, cancel, rename, clone
 
 - **R6** — **Stop** (`POST /api/sessions/{id}/stop`) terminates the agent's process group, deletes the
@@ -473,6 +486,14 @@ transitions:
   choice is retained. *Verify:* focused launch/onboarding/phone component tests, server composition
   and lifecycle tests, provider instruction-delivery contracts, and one rendered launch journey.
 
+- **A30 (planned)** (R47) — From desktop global/project launch, phone launch and onboarding,
+  launch with Advanced closed and observe No persona in the summary and no persona text in the
+  composed base prompt. Open Advanced, select a named persona, collapse/reopen and launch; the
+  summary, retained draft and actual submitted choice agree. A custom saved default is honestly
+  named while collapsed; an invalid hidden selection reveals its repair. No UI labels present
+  the internal Default role as a selectable persona. *Verify:* focused form/component tests and
+  a rendered keyboard journey at the desktop floor and phone widths in all three appearances.
+
 ## 6. Deviations & open decisions
 
 - **Persona-free launch (planned):** R46/A29 are approved for
@@ -480,6 +501,10 @@ transitions:
   FS-04.R54–R55 own default selection, customization and upgrade preservation. CLI/API select
   `default` through their existing explicit-role contracts (`chuck default@<project>` or
   `POST /api/sessions` with `role:"default"`); omitted API roles and new CLI syntax are excluded.
+  The 2026-10-10 follow-up adds R47/A30 and FS-04.R56–R57/FS-18.R20: invisible default,
+  persona selection under Advanced and optional Chuck-awareness guidance. The ready change is
+  revised for persona-configuration-only awareness: the user explicitly rejected a per-agent
+  creation override. No persona remains aware, and existing agents retain their launch choice.
 
 - **Group API replacement (shipped 2026-10-10):** FS-02.R75–R76 and TS-03.R57–R58 replace the
   dashboard's global Release group with project-scoped Stop group and Archive group. R21/R34's

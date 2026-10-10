@@ -810,6 +810,20 @@ snapshot/results for the request, and honor request cancellation between member 
 No new group job scheduler or persistence is introduced. Verify conflicts with Resume, Stop,
 Archive and regrouping, cross-project isolation, and failures after stop/before archive commit.
 
+**R59 (planned) — Persona awareness extends only role configuration.** For FS-04.R56, role
+create/read/list/update responses and on-disk Role shape accept optional `chuck_aware`: boolean
+false means omit shared awareness prompt additions, true means include them, and absent/null
+means true for backward compatibility. Keep explicit false through JSON decoding, validation,
+configuration writes and frontend schemas; never coerce it with a truthy fallback. Invalid
+non-boolean values use existing field-validation errors. Existing endpoints, ids, permission
+tri-state and future-launch-only editing semantics remain. GET role maps continue returning the
+underlying definitions; No persona and hidden canonical Default are first-party presentation rules,
+not API role aliases or list suppression. The UI editor submits the explicit checkbox value.
+Launch/clone/resume/switch request shapes gain no awareness field and offer no per-agent override;
+the internal frozen session value is not a new session-setting control or session-summary field.
+TS-02.R44 owns the additive transcript metadata and private snapshot representation. Verify the
+real role API and frontend decoder round-trip true/false/legacy omission and reject invalid types.
+
 ## 3. Interfaces & data shapes
 
 Planned additive backend response field (R47; the example shows one entry, but all registered

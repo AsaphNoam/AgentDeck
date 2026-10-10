@@ -291,6 +291,34 @@ Provider prompt-preservation assertions use existing pinned contracts rather tha
 behavior from a fake peer. Run the applicable TS-06 closure matrix once at implementation closure
 and verify the Default/custom-role launch journey on desktop and phone.
 
+**R22 (planned) — The frozen awareness choice gates shared prompt wording only.** For FS-18.R20,
+resolve absent/null persona `chuck_aware` as true at fresh composition and carry the resolved choice
+through `LaunchSpec`, chat/terminal session metadata and TS-02.R44's snapshot. The canonical empty
+No persona choice is always true. Reuse `applyKnowledgeOverlay`: append `operatingContextPrompt`
+only when aware, and append `knowledgePrompt` only when aware and the package is verified. This
+supersedes R15's universal shared-context/pointer injection and no-configuration-field exclusion
+only for this awareness flag, and R21's unconditional overlay claim;
+never leave the standing context unconditional while gating only the skill pointer.
+
+Keep managed skill installation, native discovery, `RuntimeAddDirs`, `CHUCK_SKILL_DIR`, actual
+tool/MCP registration, `AutoApproveTools`, permission policy, project resource instructions/env,
+native-provider prompts and task/pipeline-specific instructions under their existing contracts.
+Do not suppress these with the checkbox or duplicate them in persona text. Package-unavailable
+behavior still strips stale skill env/path claims; aware processes retain stable shared context,
+and unaware processes receive neither managed awareness prompt block. The opt-out is not a
+guarantee that an agent cannot discover Chuck or receive user/task/tool-provided Chuck information.
+
+Resume, wake and switch use the frozen snapshot flag. Clone reads the source flag under its
+existing lifecycle claim and passes it via an internal-only `launchOptions` value before composing
+the new process; persona edits cannot turn it back on/off. Fresh task/pipeline/room agents resolve
+their selected persona once; later continuations preserve that agent's flag through ordinary
+resume. Existing/legacy callers with no recorded choice normalize to true. Do not change the
+provider fork protocol or reread a role solely to resolve awareness on resume. Rebuild each process's
+overlay from the frozen base and flag so suffixes do not accumulate; no live mutation or prompt
+purge occurs. Focused FS-18.A16 tests cover both blocks, metadata/reindex legacy defaults,
+clone-after-persona-edit and every existing process-composition path, while proving tools,
+permissions, dirs/env and provider instructions are unchanged.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:
@@ -333,8 +361,10 @@ SQLite state, REST/SSE data, or MCP arguments.
 
 ## 5. Deviations & open decisions
 
-- No external API or schema changes. `CHUCK_SKILL_DIR`, the managed path, and the bounded prompt
-  pointer are the only new agent-facing delivery interfaces.
+- The original knowledge-delivery change adds no external API or schema; `CHUCK_SKILL_DIR`, the
+  managed path and bounded prompt pointer are its agent-facing interfaces. Planned R22's optional
+  persona choice and frozen snapshot are separately owned by TS-03.R59 and TS-02.R44; no new
+  provider instruction protocol or per-agent launch override is introduced.
 - R15–R17 extend the existing prompt overlay and seed contents only; Claude's additive wire shape
   is owned by TS-04.R69. The direct-action migration remains paused and is not a prerequisite.
 - No migration touches a customized role, and no managed/read-only role architecture is introduced.

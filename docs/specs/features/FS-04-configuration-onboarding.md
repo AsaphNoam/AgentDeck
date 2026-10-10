@@ -260,6 +260,30 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   Default before retrying. Read/write failures preserve existing content and report the failed
   upgrade; no running agents or explicit assignments are rewritten.
 
+- **R56 (planned) — Personas choose Chuck awareness.** Persona create/edit offers a checkbox
+  labelled **Chuck aware agent**, on by default for new personas and for older definitions with
+  no saved choice. Directly beneath it show: **Adds Chuck operating guidance to the agent's system
+  instructions.** The selection is saved with the local persona definition and round-trips through
+  its existing configuration surface. Unchecked omits the shared prompt additions in FS-18.R20;
+  persona text, project instructions, native provider guidance and available tools retain their
+  contracts. Editing the checkbox affects newly launched agents, not existing agents or their
+  history. The user explicitly chose persona configuration only: no awareness control or override
+  appears in agent creation, even in Advanced, and No persona always remains Chuck aware. This
+  is an exceptional opt-out, not a promoted launch choice or awareness-status badge.
+
+- **R57 (planned) — The internal default is absent from persona management.** Superseding
+  R54–R55 only for first-party presentation, ordinary persona lists/editors do not expose the
+  canonical internal Default entry as an editable persona. Canonical means the internal default
+  id, empty persona text, inherited permissions and awareness on. Persona choice controls represent the empty
+  choice as **No persona**, and first-party agent identity displays use that wording wherever
+  they would otherwise name Default. Custom/specialized personas keep their existing identity
+  and editing scope. Hiding internal identity does not authorize overwriting any customized role
+  file, changing its permissions or mislabelling nonempty persona content as No persona.
+  An occupied customized same-id role remains ordinary user-owned content and is labelled with
+  its configured title as a custom persona, rather than hidden or represented as No persona.
+  If the canonical empty choice is unavailable, No persona cannot silently launch that custom
+  content; preserve the existing conflict/repair path in R55.
+
 ### 2.7 Onboarding wizard
 
 - **R16 — retired 2026-07-22:** The no-exit first-run wizard was replaced by the explicit
@@ -508,12 +532,26 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   After successful upgrade, editing/deleting Default retains ordinary role behavior. *Verify:*
   real config fixtures, startup/failure-injection tests and focused role/configuration API tests.
 
+- **A36 (planned)** (R56–R57, FS-01.R47) — Create and edit a persona with Chuck aware agent
+  checked/unchecked; inspect its saved choice and launch a new agent. Missing legacy choices
+  display checked. Confirm the explanatory sentence appears beneath the checkbox and is
+  associated with it accessibly; failed saves retain the checkbox/draft. Existing agents retain
+  their choice. Settings and persona selectors do not expose an internal Default persona; No
+  persona selection contributes no persona text and stays aware. No creation form exposes an
+  awareness control or override, including Advanced. A customized occupied default id remains
+  named user content rather than a silently substituted No persona choice. *Verify:* role/configuration API fixtures,
+  persona-editor component tests and the FS-01.A30 rendered journey.
+
 ## 6. Deviations & open decisions
 
 - **Persona-free default (planned):** The user confirmed on 2026-10-10 that Implementer must stop
   being the default and approved the remaining scope. R54–R55/A34–A35 are ready under
   [`agents-without-a-persona-by-default.md`](../../ready-changes/agents-without-a-persona-by-default.md).
   Empty text is the seed contract; deliberate role edits retain ordinary ownership semantics.
+  The user confirmed R56–R57/A36's persona-configuration-only scope: awareness is an edge-case
+  opt-out, not an agent-creation control. No persona stays aware. TS-02.R44, TS-03.R59,
+  TS-08.R120 and TS-11.R22 own the revised implementation contract; prior planned rules apply
+  except where these additions explicitly supersede their presentation/unconditional delivery.
 
 - **Invalid seeded-project `cwd`.** An invalid seeded-project `cwd` is still explained only after a
   launch fails rather than by preflight; reverse that part by adding a stricter preflight.

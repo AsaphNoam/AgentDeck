@@ -586,6 +586,26 @@ deliberate removal of that internal file resets this upgrade. Existing frozen se
 and explicit task/pipeline/room assignments are outside its write set. This narrowly supersedes
 R4's no-overwrite rule for the user-approved legacy preference change.
 
+**R44 (planned) — Chuck awareness is one frozen session value.** FS-04.R56/FS-18.R20 add optional
+`chuck_aware` to the ordinary Role JSON: absent/null resolves true; an explicit boolean is preserved.
+Existing files are not rewritten to add it, and seeding sets the internal empty default aware.
+One forward SQLite migration adds `sessions.chuck_aware INTEGER NOT NULL DEFAULT 1`, restricted
+to boolean values; legacy rows keep awareness on. `SessionSnapshot`, all session read/list scans,
+session upserts and both chat/terminal metadata writers carry the resolved value alongside the
+existing frozen prompt and permissions. Normal launch resolves it once from the chosen persona;
+resume/wake/switch read the stored value, not the current Role file. Clone copies the source value
+through an internal launch option; no public creation override or second session writer is added.
+
+The existing `session_meta` JSON gains optional `chuck_aware`; current writers explicitly encode
+both true and false. Absence/null in legacy transcript metadata means true, not Go's zero-value
+false. Indexer upsert and replay/reindex share that normalization so rebuilding an old session
+cannot silently opt it out or lose an explicit false. The SQLite snapshot remains resume authority;
+do not store awareness only in transcript JSON or overload federation `launch_config_json`.
+New process metadata retains the stored choice even after persona edits. Existing history is not
+rewritten, the session/role deletion lifetime is unchanged, and no new private retention store is
+introduced. Update executable migration/version guards and independent legacy/reindex tests under
+R12/INV §17; verify explicit false through durable storage, metadata, reindex and lifecycle recovery.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:

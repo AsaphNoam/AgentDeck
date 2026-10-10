@@ -20,13 +20,15 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
-- **Design ready — agents without a persona by default:**
+- **Design ready — No persona and optional persona awareness:**
   [`agents-without-a-persona-by-default.md`](../ready-changes/agents-without-a-persona-by-default.md)
-  is Waiting to start: FS-01.R46/A29, FS-04.R54–R55/A34–A35, TS-02.R43, TS-11.R21.
-  User confirmed replacing Implementer as the default; empty ordinary Default retains shared/
-  project/native context. A once-only installation marker preserves later explicit preferences.
-  Existing role files, frozen agents and explicit automation assignments are preserved.
-  No product code changed and no active implementation selected.
+  is Waiting to start. Final scope: hide canonical Default, show No persona, persona selection
+  under Advanced; Chuck aware agent only in persona configuration, on by default with help text.
+  User rejected per-agent launch overrides. No persona stays aware; existing agents freeze their
+  resolved choice. References: FS-01.R46–R47/A29–A30, FS-04.R54–R57/A34–A36, FS-18.R20/A16,
+  TS-02.R43–R44, TS-03.R59, TS-08.R120, TS-11.R21–R22. Only the two generic shared prompt
+  additions are gated; tools/permissions/knowledge/project/provider/task guidance remain.
+  No product code changed; this feature has not begun implementation.
 - **Review pending — desktop/phone group controls (FS-02.R72–R76/A54–A57,
   FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118, TS-13.R24):**
   shared searchable picker in ordinary launch/reassignment, collapsible phone sections,
@@ -227,6 +229,19 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design revision complete:** Finalized invisible No persona and Advanced
+  persona selection. User chose the on-by-default Chuck aware agent checkbox/help text only in
+  persona configuration, rejecting a creation override. Extended FS-01/FS-04/FS-18 and TS-02/
+  TS-03/TS-08/TS-11 for optional role config, one frozen session value, legacy metadata/reindex
+  defaults, both prompt gates and focused rendered acceptance. Bounded Luna discovery plus parent
+  verification found the typed SQLite snapshot and clone's internal source-snapshot seam; no
+  provider workaround or public launch flag is needed. Existing agents retain their choice,
+  installed knowledge and tool authority are unchanged, and the revised change is Waiting to start.
+  No product code or unrelated button/phone work changed.
+  Focused lint for all eight affected spec/change files, launcher contract/twin checks and
+  whitespace checks pass. Full `make check-specs` still reports the same three pre-existing
+  handoff issues (ROOM-WIDTH-01 formatting and the deleted group-change link).
 
 - **2026-10-10 — Feature design complete:** Confirmed that Implementer must stop being the ordinary
   default and promoted the empty Default persona to a waiting ready change. Bounded independent

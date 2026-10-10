@@ -211,6 +211,24 @@ explicit contribution/leave, incremental reads, ceilings rather than quotas, ind
 intervention and final-only judge. Current tool definitions own invocation details. Guidance grants
 no ability to create/end/delete rooms, edit membership, poll progress or manufacture consensus.
 
+**R20 (planned) — Chuck-awareness prompt guidance is optional.** Superseding R15's unconditional
+shared prompt delivery and the prompt-pointer portions of R3/R6 only, the **Chuck aware agent**
+  choice in FS-04.R56 defaults on. On gives a newly launched agent the shared standing Chuck
+operating context and, when verified, the prompt directing it to the operating skill. Off omits
+those two shared system/developer-prompt additions. It does not remove the agent's persona text,
+project/provider instructions, task/pipeline-specific assignment instructions, installed skill
+availability, tool registration, identity, permissions or authorized coordination capabilities.
+The choice controls host-added guidance, not whether a model can otherwise learn about Chuck.
+It cannot strip Chuck information supplied by a user, repository, tool or retained conversation.
+
+Existing agents keep their launch-time choice across stop/resume, wake, clone and runtime switch;
+older agents without a recorded choice retain on. Persona edits change defaults for future
+launches only. The shared guidance remains process-bound under R8, and native-provider
+instruction preservation remains R17. No current process is restarted or hot-rewritten, and
+  no transcript or provider history is purged when a persona's future default is changed.
+  Awareness is configured only with the persona. No persona always receives the on behavior;
+  ordinary agent creation offers no checkbox or launch override for it.
+
 ## 3. States & transitions
 
 - **Package:** absent or older cache → dashboard startup attempts to install the current complete
@@ -348,15 +366,32 @@ tools and explicitly stages its own contribution, preserves ceilings and unresol
 and claims no user-only authority. *Verified by:* package/overlay/tool-definition fixtures and
 TS-06.R33's bounded credentialed room smoke.
 
+**A16 (planned)** (R20, FS-04.R56) — Launch otherwise equivalent checked/unchecked personas and
+inspect effective provider instruction delivery: on includes the two awareness additions once;
+off excludes them while retaining persona/project/provider and task-specific instructions,
+tools, permissions and installed knowledge availability. Exercise a legacy definition/session
+with no choice, changed persona defaults, stop/resume, wake, clone and switch: existing agents
+retain their launch choice, and live processes/history are untouched. Package unavailability
+never advertises a verified skill path. *Verify:* role fixtures, server overlay/lifecycle tests
+and the existing pinned native-provider instruction contracts; fake peers alone do not prove
+model behavior.
+
 ## 6. Deviations & open decisions
+
+- **Optional awareness (planned):** R20/A16 and FS-04.R56–R57 are confirmed for
+  [`agents-without-a-persona-by-default.md`](../../ready-changes/agents-without-a-persona-by-default.md).
+  The final scope is persona configuration only; no per-agent creation override. TS-11.R22
+  supersedes unconditional prompt injection without changing installed knowledge or tool authority.
 
 - R15–R17 and FS-04.R50–R51 were confirmed on 2026-10-02: coordination stays in Chucky and
   existing legacy roles/references are preserved. The change introduces no permissions, model
   presets, background work or new role configuration schema. Naming follows the independently
   selected product-rename change.
 
-- No UI, REST endpoint, MCP documentation tool, agent-facing release command, mutable knowledge
-  store, or new runtime interface is introduced.
+- The original knowledge-delivery change adds no UI, REST endpoint, MCP documentation tool,
+  agent-facing release command, mutable knowledge store or new runtime interface. Planned R20
+  adds only FS-04.R56's persona checkbox through existing configuration endpoints; no launch
+  override, new runtime interface or knowledge authority is added.
 - Customized Chucky roles remain user-owned even if they contain a stale copy of product
   knowledge. Chuck does not infer that they should migrate. R13 widens the exact-match
   correction to the other seeded roles on the same terms and does not weaken this: a role whose

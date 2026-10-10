@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -1337,6 +1337,27 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   Reuse semantic tokens and phone/desktop spacing; verify focused interaction tests, style and
   presentation checks, development matrix, and FS-02.A54–A57/FS-20.A17–A18 browser journeys in
   Core, Sky & Grove and Studio. Phone is checked at 390px with 360px/430px long-name cases.
+
+- **R120 (planned) — Persona choice is Advanced; awareness stays in persona configuration.**
+  FS-01.R47 and FS-04.R56–R57 refine R69's New Agent composition. Reuse the single feature-owned
+  disclosure, label it **Advanced**, and move the Persona selector there. The visible compact
+  summary names **No persona** or the selected custom persona; opening/closing preserves all
+  draft values and errors reveal the owning control. Apply the same task flow to desktop global/
+  project setup, phone creation and onboarding without introducing another settings panel or
+  disclosure preference. Other automation editors retain their established layouts.
+  Canonical empty Default is filtered from ordinary persona-management lists and represented
+  as No persona in choice/identity presentation; a shared presentation predicate/label helper
+  checks the default id, empty text, inherited permissions and awareness on. Occupied customized
+  same-id definitions retain ordinary named-persona presentation and never masquerade as No
+  persona. API ids/payloads stay the underlying role ids under TS-03.R59.
+  Persona create/edit places the existing checkbox construction labelled **Chuck aware agent**
+  after its prompt field, checked by default, with the FS-04.R56 help sentence directly beneath
+  and associated using the existing accessible description pattern. Use quiet form/hint typography
+  and existing semantic tokens; no accent badge, callout, awareness launch control, animation,
+  new component framework or dependency. No awareness setting appears in creation's Advanced
+  section. Preserve failed drafts and explicit false in the role schema/form submit path.
+  Verify focused components and actual keyboard launch/edit journeys in Core, Sky & Grove and
+  Studio at the desktop floor and phone widths; source inspection is not rendered acceptance.
 
 ## 3. Interfaces & data shapes
 
