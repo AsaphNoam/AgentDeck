@@ -407,7 +407,9 @@ Requirements are user-observable.
   identity header with a monogram tile carrying a state dot, the agent name with its existing
   live-state label (or Stopped / Archived · read-only), a role · project · speed line, and a
   labelled context meter at the right; a separate low runtime band; quiet underline tabs; a
-  centred reading column of roughly 700px with right-aligned tinted user bubbles, softly tinted
+  centred reading column (the panel spans the page and the conversation and composer use about
+  70% of the window width, superseding R54's 680–840px measure on this page; operator request
+  2026-10-10) with right-aligned tinted user bubbles, softly tinted
   assistant bubbles, a ruled quiet activity column, dark technical blocks and a structured
   permission card whose primary Approve sits after Deny; and an inset, softly raised composer box
   whose toolbar carries `@` (file) and `#` (command) insert buttons at the left and the existing

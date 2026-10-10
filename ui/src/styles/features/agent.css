@@ -9,17 +9,10 @@
   grid-template-rows: auto minmax(0, 1fr);
   height: calc(100vh - 140px);
   margin: 0 auto;
-  max-width: 71rem;
+  /* The panel spans the page; the reading column inside it carries the measure,
+     so an open file (FS-03.R53, TS-08.R57) already has the width it needs. */
+  max-width: none;
   min-width: 0;
-}
-
-/* The one thing a container query cannot express: this cap is set outside the
-   transcript container, so the relaxed width an open file needs keys off a state
-   attribute instead — the same kind of attribute the annotation tray's data-state
-   already is, not a measurement (FS-03.R53, TS-08.R57). The viewer then occupies
-   width that is empty today and the transcript keeps its reading measure. */
-.chat-panel[data-file-open="true"] {
-  max-width: 2000px;
 }
 
 .chat-breadcrumb {
@@ -1637,12 +1630,12 @@
   margin: 0;
 }
 
-/* Agent-page reading column (FS-12.R61). Prose and activity share one measure;
-   technical blocks take a wider one; user bubbles sit right, assistant bubbles
-   left, both softly tinted. */
+/* Agent-page reading column (FS-12.R61). Prose and activity share one measure
+   of about 70% of the window (78% of the padded transcript); technical blocks
+   take the full width; user bubbles sit right, assistant bubbles left. */
 .chat-panel .transcript-view {
-  --ad-reading-measure: 44rem;
-  --ad-technical-measure: 58rem;
+  --ad-reading-measure: 78%;
+  --ad-technical-measure: 100%;
 
   background: var(--ad-surface-raised);
   padding: var(--ad-space-6) var(--ad-space-12) var(--ad-space-8);
@@ -1655,6 +1648,16 @@
 
 .chat-panel .transcript-view .transcript-item:is([data-variant="diff"], [data-variant="tool-result"], [data-variant="unknown"]) {
   max-width: var(--ad-technical-measure);
+}
+
+/* The measure is a percentage, so rows nested in opened activity or a tool run
+   fill their already-measured parent instead of shrinking again. */
+.chat-panel .transcript-view :is(.turn-activity-content, .tool-run, .runtime-child) :is(.transcript-item, .tool-run, .runtime-child, .turn-end) {
+  max-width: none;
+}
+
+.chat-panel .assistant-message > :is(p, ul, ol, h1, h2, h3, h4, blockquote) {
+  max-width: none;
 }
 
 .chat-panel .transcript-item {
@@ -1777,7 +1780,7 @@
   flex-direction: column;
   gap: 0;
   margin-inline: auto;
-  max-width: 62rem;
+  max-width: 80%;
   padding: 0;
 }
 
