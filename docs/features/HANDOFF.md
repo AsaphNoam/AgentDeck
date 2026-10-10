@@ -21,9 +21,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
 - **Release preparation — v0.13.0:** user requested a minor release and committing the dirty
-  mobile detail/composer work. Release is blocked by ROOM-WIDTH-01 below; awaiting permission
-  to fix it and a decision to run or waive the pending group-controls, button and room-page
-  reviews. No tag or push performed.
+  mobile detail/composer work. The room-list width finding is closed; release still awaits a
+  decision to run or waive the pending group-controls, button and room-page reviews. No tag or
+  push performed.
 - **Review pending — mobile detail/composer polish:** Files previews expand beneath the selected
   row and collapse in place; Manage has compact rule-separated controls; the composer outlines
   only its textbox. Send retains the newer shared icon-primary construction and 44px touch
@@ -60,13 +60,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Small-change review — 2026-10-10:** mobile spinner `ada153b` (FS-20.R44/A16,
   TS-08.R117), fine right-click menus `083aa23` (FS-12.R66), agent-page width `e2621ac`
   (FS-12.R61), and token-count/stopped-card follow-up `ded893c` (FS-12.R65/R67) closed
-  without findings. Room-list width `ce46d56` (FS-12.R63) remains open for ROOM-WIDTH-01
-  below. The larger group-controls, room-page and base agent-card reviews remain independent.
+  without findings. Room-list width `ce46d56` (FS-12.R63) is now closed for ROOM-WIDTH-01.
+  The larger group-controls, room-page and base agent-card reviews remain independent.
   Source audits, 116 focused UI tests, 41 presentation checks and independent rendered review
   completed; evidence: `/tmp/chuck-small-review-20261010/`.
 - **Settled closures:** Settings composition, desktop agent page, mobile/Think Tank disclosure
-  fixes, mobile history, Think Tank room cards (`578ca50`) and project agent cards (`4dc1b34`)
-  are closed; details are in the archive. ROOM-WIDTH-01 stays open.
+  fixes, mobile history, Think Tank room cards (`578ca50`), project agent cards (`4dc1b34`) and
+  room-list width (`ce46d56`) are closed; details are in the archive.
 - **Review pending — button redesign (FS-12.R68/A38, TS-08.R119):** all buttons adopt the Figma
   `/study/buttons` "Just enough" design via one construction in `primitives.css`; ~300
   desktop/phone call sites mapped. Checks, both Go variants and `ui/scripts/button-sweep.mjs`
@@ -175,22 +175,6 @@ and does not close any manual provider gates.
 
 ## Review findings
 
-### Room-list width follow-up — `ce46d56` — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Must fix** — ROOM-WIDTH-01 (INV §13):
-  `ui/src/styles/features/dashboard.css:5–7` adds auto inline margins to the size-contained
-  `.think-tank-list` without giving it an inline size. Open Archive with retained rooms:
-  its section collapses to 0px wide inside a 960px archive page at 1024px, and room cards
-  overflow as an approximately 80px sliver with word-by-word wrapping and thousands of pixels
-  of vertical content. Reproduced in Core, Sky & Grove and Studio with the actual embedded
-  UI and real fake-provider server. This violates FS-12.R63's Archive room-card composition
-  and FS-05.R39's usable retained-room discovery. Removing only the newly added inline auto
-  margins in the browser restores a 960px list. Give the centered size container an explicit
-  available width while retaining its 1680px cap; verify both Project and Archive at 1024px
-  and wide desktop widths in all appearances. Evidence:
-  `/tmp/chuck-small-review-20261010/evidence/extra-report.json`, `*-archive-width.png`
-  and `*-archive-before-margin.png`. No product fix made during review.
-
 ## Browser-verification permission investigation — 2026-10-09
 
 - **Report (verbatim):** “Blocked why, /investigate-bug Chuck needs to be able to do this”.
@@ -221,10 +205,9 @@ and does not close any manual provider gates.
 
 ## Blocked on human
 
-For `v0.13.0`, authorize the ROOM-WIDTH-01 fix and decide whether to run or waive the
-pending group-controls, button-design and Think Tank room-page reviews. The release launcher
-requires the open Must fix to return to fix work before tagging. Publishing still requires
-explicit authorization to push all unpushed main commits and the release tag.
+For `v0.13.0`, decide whether to run or waive the pending group-controls, button-design and
+Think Tank room-page reviews. Publishing still requires explicit authorization to push all
+unpushed main commits and the release tag.
 
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older
@@ -238,6 +221,12 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Fix:** Closed ROOM-WIDTH-01 (INV §13) by giving the size-contained Think Tank
+  room list its available inline width while retaining the 1680px cap. Project renders passed at
+  1024px, 1440px and 1920px in Core, Sky & Grove and Studio; the same `RoomList` mount serves
+  Archive retained rooms. Focused room tests, 41 presentation checks, UI build/embed and the
+  remaining closure checks are recorded with this fix.
 
 - **2026-10-10 — Implementation:** Button redesign to the Figma "Just enough" study
   (FS-12.R68/A38, TS-08.R119): shared primitive, per-area call-site mapping by four delegated
