@@ -22,18 +22,11 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Active change:** None.
 - **Settled closures:** Settings composition, desktop agent page and the mobile/Think Tank
   disclosure fixes are closed; details moved to the archive's 2026-10-09 settled-closures section.
-- **Review unit available — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
-  project and Archive room cards adopt the Figma Make `RoomSummary` study (shown on its
-  dashboard): section eyebrow/heading, room tile | content | ruled budget column, state chip,
-  GOAL preview, three-column roster with initials, scope/origin + judge footer. Judge text left
-  the status line; narrow layouts use a `room-list` container query. Local choices for review:
-  attention maps to `--ad-state-waiting` (agent-page precedent) where the study used coral; the
-  study's hover transition/shadow were dropped (R96 no-motion, shadow tokens). `RoomTurnNotice`
-  keeps the old `.think-tank-card-roster` pills. 731 UI tests, presentation/style checks, UI
-  build, both Go variants (`CHUCK_RUNTIME_ROOT=`) and `make build` passed. Rendered comparison
-  in all three appearances at 1024/1440 via `ui/scripts/room-render.mjs <out> project`
-  (`ROOM_WIDTHS` selects widths). Reference and renders: shared resources `room-design/`
-  (`ref/`, `runs/final`). Owed: independent rendered review incl. Archive and keyboard focus.
+- **Review closed — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
+  independent source/spec and rendered review passed without findings on 2026-10-10. Project
+  and Archive cards passed in all three appearances at 1024/1440, including removed origins,
+  separate keyboard focus and hover. No pending review unit remains.
+  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
@@ -159,6 +152,22 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Review:** Closed room-card unit `578ca50` without findings. Independent Luna
+  source/spec/caller audit and parent browser comparison against shared `room-design/ref/` passed.
+  Bounded approved loopback-only Vite/Playwright harness stubbed every API/event source; no live
+  provider or operator state was used. Project and Archive in Core, Sky & Grove and Studio at
+  1024/1440 covered concurrent openings, speaking, held, paused, ended/judge, deleted participant,
+  long title, removed origin, hover and separate outlined room/participant Tab stops, with no
+  horizontal overflow or page errors. Development matrix passed at 1024 in all appearances.
+  Focused RoomList tests (3), style checks and presentation-contract checks (41) passed.
+  Local choices accepted: attention uses `--ad-state-waiting`; instant hover and token keyline
+  replace prototype motion/shadow; `RoomTurnNotice` retains its separate pill roster. Existing
+  failed-judge attention tone preserves the ended phase and separate judge footer; an identical
+  title/goal suppresses a duplicate preview while retaining the goal in the title. Both edge cases
+  were rendered. Invariant sweep: §§8/10/13/17 applicable and passed; §§1–7/9/11–12/14–16 have
+  no applicable surface. **Fix model:** none — no open findings. Screenshots and temporary harness
+  retained in `/tmp/chuck-room-review-20261010/`; no product code or specification changed.
 
 - **2026-10-09 — Fix / review closure (INV §10):** Browser verification routes through an
   approval-capable independent agent with bounded approved execution. The fresh desktop-agent-page
