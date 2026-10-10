@@ -48,7 +48,7 @@ export function ConfirmDialog({
           <div data-slot="body">{children}</div>
           <div className="form-actions" data-slot="actions">
             <button type="button" onClick={onCancel} disabled={pending}>Cancel</button>
-            <button type="button" className={destructive ? "btn-danger" : undefined} onClick={onConfirm} disabled={pending || confirmDisabled}>
+            <button type="button" className={destructive ? "btn-danger" : "ad-button-primary"} onClick={onConfirm} disabled={pending || confirmDisabled}>
               {pending ? "Working…" : confirmLabel}
             </button>
           </div>

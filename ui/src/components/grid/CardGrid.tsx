@@ -314,7 +314,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                 <GroupDropSection group={group.key} disabled={moving} key={group.key}>
                 <section className={`agent-group${dropGroup === group.key ? " agent-group-drop" : ""}`} data-ui="agent-group" data-state={collapsed ? "collapsed" : "expanded"} aria-label={`Group ${group.label}`}>
                   <header className="agent-group-header" data-slot="header">
-                    <button type="button" onClick={() => toggleGroupCollapsed(group.key)} aria-expanded={!collapsed}>
+                    <button type="button" className="ad-button-icon" onClick={() => toggleGroupCollapsed(group.key)} aria-expanded={!collapsed}>
                       {collapsed ? ">" : "v"}
                     </button>
                     <strong>{group.label}</strong>
@@ -322,8 +322,8 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                     <span data-slot="summary">{summary(group.agents)}</span>
                     {projectID && group.key !== "_ungrouped" && (
                       <>
-                        <button type="button" className="group-release" disabled={groupActions.pending || !group.agents.some((agent) => agent.running)} onClick={() => groupActions.open("stop", group.key, group.agents)}>Stop group</button>
-                        <button type="button" disabled={groupActions.pending} onClick={() => groupActions.open("archive", group.key, group.agents)}>Archive group</button>
+                        <button type="button" className="group-release ad-button-danger" disabled={groupActions.pending || !group.agents.some((agent) => agent.running)} onClick={() => groupActions.open("stop", group.key, group.agents)}>Stop group</button>
+                        <button type="button" className="ad-button-danger" disabled={groupActions.pending} onClick={() => groupActions.open("archive", group.key, group.agents)}>Archive group</button>
                       </>
                     )}
                   </header>

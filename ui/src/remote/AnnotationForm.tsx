@@ -82,7 +82,7 @@ export function PhoneAnnotationForm({ agent }: { agent: AgentState }) {
           <li key={`${draft.seq}-${index}`} className="phone-annotate-draft">
             <div className="phone-annotate-head">
               <h3>{annotationAnchor(draft)}</h3>
-              <button type="button" className="phone-link" disabled={busy} onClick={() => remove(sourceId, index)}>
+              <button type="button" className="phone-link ad-button-danger" disabled={busy} onClick={() => remove(sourceId, index)}>
                 Remove
               </button>
             </div>
@@ -113,7 +113,7 @@ export function PhoneAnnotationForm({ agent }: { agent: AgentState }) {
             type="button"
             role="radio"
             aria-checked={target === value}
-            className={target === value ? "phone-primary" : undefined}
+            className={target === value ? "phone-target-selected" : undefined}
             disabled={busy || (value === "self" && !agent.running)}
             onClick={() => setTarget(value)}
           >
@@ -144,7 +144,7 @@ export function PhoneAnnotationForm({ agent }: { agent: AgentState }) {
       )}
       {error && <p className="phone-error">{error}</p>}
       <div className="phone-actions">
-        <button type="button" className="phone-primary" disabled={!ready} onClick={() => void send()}>
+        <button type="button" className="ad-button-primary" disabled={!ready} onClick={() => void send()}>
           {busy ? "Sending…" : "Send annotations"}
         </button>
         <button type="button" disabled={busy} onClick={() => discard(sourceId)}>

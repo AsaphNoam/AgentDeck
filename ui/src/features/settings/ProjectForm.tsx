@@ -123,6 +123,7 @@ export function ProjectForm({
               <span>{dir}</span>
               <button
                 type="button"
+                className="ad-button-icon"
                 aria-label={`Remove ${dir}`}
                 onClick={() => setAddDirs((prev) => prev.filter((_, j) => j !== i))}
               >
@@ -210,7 +211,7 @@ export function ProjectForm({
         <button type="button" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="ad-button-primary" disabled={submitting}>
           {submitting ? "Saving…" : isEdit ? "Update" : "Create"}
         </button>
       </div>

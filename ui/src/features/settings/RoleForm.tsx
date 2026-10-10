@@ -103,7 +103,7 @@ export function RoleForm({ initial, onSubmit, onCancel, submitting, error }: Rol
         <button type="button" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="ad-button-primary" disabled={submitting}>
           {submitting ? "Saving…" : isEdit ? "Update" : "Create"}
         </button>
       </div>

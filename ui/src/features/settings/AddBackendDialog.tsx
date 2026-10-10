@@ -151,7 +151,7 @@ export function AddBackendDialog({
             <button type="button" onClick={onCancel} disabled={create.isPending}>
               Cancel
             </button>
-            <button type="button" onClick={() => submit(false)} disabled={create.isPending}>
+            <button type="button" className="ad-button-primary" onClick={() => submit(false)} disabled={create.isPending}>
               {create.isPending ? "Working…" : "Create backend"}
             </button>
             {federated && (

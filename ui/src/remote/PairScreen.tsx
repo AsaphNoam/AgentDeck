@@ -119,7 +119,7 @@ export function PairScreen({ onPaired }: { onPaired: () => void }) {
           <input maxLength={64} value={name} onChange={(event) => setName(event.target.value)} />
         </label>
         {error && <p className="phone-error">{error}</p>}
-        <button type="submit" className="phone-primary" disabled={code.trim().length !== 8 || !name.trim()}>
+        <button type="submit" className="ad-button-primary" disabled={code.trim().length !== 8 || !name.trim()}>
           Pair <PhoneIcon name="arrow" size={17} />
         </button>
       </form>
@@ -135,7 +135,7 @@ export function UnpairedScreen({ onPairAgain }: { onPairAgain: () => void }) {
       <p>It can no longer see or control Chuck. Pair it again from Chuck on your Mac.</p>
       <button
         type="button"
-        className="phone-primary"
+        className="ad-button-primary"
         onClick={() => {
           rememberPaired(false);
           onPairAgain();

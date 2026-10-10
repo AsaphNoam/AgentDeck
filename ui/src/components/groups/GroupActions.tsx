@@ -42,7 +42,7 @@ export function useGroupActions({ project, projectTitle, disabled = false }: { p
       {outcome && <section className="group-action-result" role="status" aria-label="Group action result">
         <p>{outcome.action === "archive" ? "Archive" : "Stop"} group “{outcome.data.group}” in {projectTitle || outcome.data.project}: {outcome.data.results.filter((result) => result.ok).length} succeeded{failures.length ? `, ${failures.length} failed` : "."}</p>
         {failures.length > 0 && <ul>{failures.map((result) => <li key={result.agent_id}>{outcome.names[result.agent_id] || result.agent_id}: {result.error?.message || "Action failed"}</li>)}</ul>}
-        <button type="button" onClick={() => setOutcome(null)}>Dismiss</button>
+        <button type="button" className="ad-button-secondary" onClick={() => setOutcome(null)}>Dismiss</button>
       </section>}
       {selection && <ConfirmDialog open title={`${label} “${selection.group}”?`} confirmLabel={label} destructive pending={pending} confirmDisabled={disabled} onCancel={() => { if (!inFlight.current) setSelection(null); }} onConfirm={() => void submit()}>
         <p>Project: {projectTitle || project}. Group: {selection.group}.</p>

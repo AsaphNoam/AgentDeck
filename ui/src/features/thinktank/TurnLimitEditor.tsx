@@ -22,7 +22,7 @@ export function TurnLimitEditor({ room, member }: { room: ThinkTankDetail; membe
     return (
       <>
         {saved === member.limit && <span role="status">Turn limit saved.</span>}
-        <Button type="button" variant="ghost" onClick={() => { setDraft(member.limit + 1); setError(""); setCommandID(newCommandID()); }}>
+        <Button type="button" onClick={() => { setDraft(member.limit + 1); setError(""); setCommandID(newCommandID()); }}>
           Raise turn limit
         </Button>
       </>
@@ -51,7 +51,7 @@ export function TurnLimitEditor({ room, member }: { room: ThinkTankDetail; membe
       {error && <span className="form-error" role="alert">{error}</span>}
       <span className="think-tank-limit-actions">
         <Button type="submit" variant="primary" busy={save.isPending}>Save</Button>
-        <Button type="button" variant="ghost" onClick={() => { setDraft(null); setError(""); }}>Cancel</Button>
+        <Button type="button" onClick={() => { setDraft(null); setError(""); }}>Cancel</Button>
       </span>
     </form>
   );

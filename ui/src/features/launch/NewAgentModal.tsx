@@ -358,6 +358,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
               <button type="button" onClick={onClose} disabled={launch.isPending}>Cancel</button>
               <button
                 type="submit"
+                className="ad-button-primary"
                 disabled={launch.isPending || !role || !project || unverifiedSelection}
               >
                 {onConfigure ? "Use these settings" : launch.isPending ? "Launching…" : "Launch"}

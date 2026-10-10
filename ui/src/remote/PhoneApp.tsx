@@ -41,7 +41,7 @@ function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
     <div className="phone-app">
       <header className="phone-header">
         <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
-          <Dialog.Trigger className="phone-menu-trigger" aria-label="Open navigation"><PhoneIcon name="menu" size={21} /></Dialog.Trigger>
+          <Dialog.Trigger className="phone-menu-trigger ad-button-icon" aria-label="Open navigation"><PhoneIcon name="menu" size={21} /></Dialog.Trigger>
           <Dialog.Portal>
             <Dialog.Overlay className="phone-navigation-overlay" />
             <Dialog.Content className="phone-navigation" aria-describedby={undefined}>
@@ -57,7 +57,7 @@ function Shell({ children, back }: { children: ReactNode; back?: boolean }) {
       </header>
       <Banner />
       <main className="phone-screen" aria-busy={link === "checking"} data-stale={link === "unreachable" ? "true" : undefined}>
-        {back && !match(path, "agent") && !match(path, "run") && <button type="button" className="phone-back" onClick={() => navigate("/")}><PhoneIcon name="back" size={16} />Home</button>}
+        {back && !match(path, "agent") && !match(path, "run") && <button type="button" className="phone-back ad-button-secondary" onClick={() => navigate("/")}><PhoneIcon name="back" size={16} />Home</button>}
         {children}
       </main>
     </div>

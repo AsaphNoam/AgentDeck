@@ -168,7 +168,7 @@ export function ChuckyBuilder({
       </div>
       <label className="form-field"><span>Describe the pipeline</span><AutoGrowTextarea rows={4} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Implement a change, review it, validate it, and loop through a fix when validation fails." /></label>
       {error && <p className="form-error">{error}</p>}
-      <div className="form-actions"><button type="button" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch Chucky builder"}</button></div>
+      <div className="form-actions"><button type="button" className="ad-button-primary" disabled={!builderReady || launching} onClick={() => void launchBuilder()}>{launching ? "Launching…" : "Launch Chucky builder"}</button></div>
     </div>}
 
     {showLauncher && builderID && <div className="pipeline-builder-session">
@@ -251,8 +251,8 @@ function ProposalCard({
       {!declined && proposal?.kind === "save_template" && <button type="button" onClick={() => onTemplateProposal?.(proposal)}>Review exact Save proposal</button>}
       {!declined && proposal?.kind === "start_run" && <button type="button" onClick={() => onRunProposal?.(proposal)}>Review exact Start proposal</button>}
       {!declined && !proposal && <button type="button" disabled title="This proposal's payload cannot be read, so there is nothing exact to approve.">Review exact proposal</button>}
-      {!declined && <button type="button" disabled={busy} onClick={() => void act(() => decline.mutateAsync(entry.proposal_id))}>Reject</button>}
-      {declined && <button type="button" disabled={busy} onClick={() => void act(() => remove.mutateAsync(entry.proposal_id))}>Delete</button>}
+      {!declined && <button type="button" className="ad-button-danger" disabled={busy} onClick={() => void act(() => decline.mutateAsync(entry.proposal_id))}>Reject</button>}
+      {declined && <button type="button" className="ad-button-danger" disabled={busy} onClick={() => void act(() => remove.mutateAsync(entry.proposal_id))}>Delete</button>}
     </div>
   </article>;
 }

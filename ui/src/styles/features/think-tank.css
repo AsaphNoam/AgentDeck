@@ -123,33 +123,10 @@
   justify-content: flex-end;
 }
 
-/* Quiet outlined controls: forest text on the raised surface. */
-.think-tank .ad-button {
-  border-color: color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
-  color: var(--ad-state-done);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.4;
-  min-height: 0;
-  padding: var(--ad-space-2) calc(var(--ad-space-3) + var(--ad-space-1));
-  white-space: nowrap;
-}
-
 .think-tank .ad-button [data-slot="label"] {
   align-items: center;
   display: inline-flex;
   gap: var(--ad-space-2);
-}
-
-.think-tank .ad-button-primary {
-  background: var(--ad-action-primary);
-  border-color: var(--ad-action-primary);
-  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
-}
-
-.think-tank .think-tank-quiet-danger {
-  border-color: color-mix(in srgb, var(--ad-state-error) 25%, var(--ad-surface-raised));
-  color: var(--ad-state-error);
 }
 
 .think-tank-count {
@@ -700,22 +677,6 @@ a.think-tank-author:hover {
   min-width: 0;
 }
 
-.think-tank-composer .composer-references button {
-  background: transparent;
-  border: 0;
-  color: var(--ad-text-muted);
-  font-size: 1.05rem;
-  min-height: auto;
-  min-width: 0;
-  padding: var(--ad-space-1) var(--ad-space-2);
-}
-
-.think-tank-composer .composer-references button:hover:not(:disabled) {
-  box-shadow: none;
-  color: var(--ad-text-primary);
-  transform: none;
-}
-
 .think-tank-composer-source {
   background: var(--ad-surface-subtle);
   border: 0;
@@ -732,18 +693,6 @@ a.think-tank-author:hover {
   align-items: center;
   display: flex;
   gap: var(--ad-space-2);
-}
-
-.think-tank-composer .composer-actions .composer-icon {
-  background: var(--ad-action-primary);
-  border-color: var(--ad-action-primary);
-  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
-  display: inline-flex;
-  font-size: 0.75rem;
-  gap: var(--ad-space-2);
-  min-height: 0;
-  min-width: 0;
-  padding: var(--ad-space-2) calc(var(--ad-space-3) + var(--ad-space-1));
 }
 
 .think-tank-composer :is(.composer-error, .composer-notice) {
@@ -915,10 +864,9 @@ a.think-tank-author:hover {
   color: var(--ad-text-secondary);
 }
 
-.think-tank-member .ad-button-ghost {
-  border: 0;
+.think-tank-member .ad-button-secondary {
   justify-self: start;
-  padding: var(--ad-space-1) 0 0;
+  margin-top: var(--ad-space-1);
 }
 
 .think-tank-limit {
@@ -1012,14 +960,6 @@ a.think-tank-author:hover {
 
 .think-tank-source-rows span {
   font-size: 0.6875rem;
-}
-
-.think-tank-sources .ad-button {
-  border-color: color-mix(in srgb, var(--ad-state-done) 22%, var(--ad-surface-raised));
-  color: var(--ad-state-done);
-  font-size: 0.75rem;
-  min-height: 0;
-  white-space: nowrap;
 }
 
 .think-tank-list h2 {

@@ -113,7 +113,7 @@ export function ProjectStep({ onDone, claimMutation, releaseMutation }: ProjectS
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-actions" data-slot="actions">
-        <button type="button" onClick={handleCreate} disabled={createProject.isPending}>
+        <button type="button" className="ad-button-primary" onClick={handleCreate} disabled={createProject.isPending}>
           {createProject.isPending ? "Creating…" : "Create project"}
         </button>
       </div>

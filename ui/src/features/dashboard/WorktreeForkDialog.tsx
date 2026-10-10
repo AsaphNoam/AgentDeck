@@ -134,7 +134,7 @@ export function WorktreeForkDialog({ sourceID, sourceTitle, onClose }: WorktreeF
               {error && <p className="form-error">{error}</p>}
               <div className="form-actions" data-slot="actions">
                 <button type="button" onClick={onClose} disabled={fork.isPending}>Cancel</button>
-                <button type="submit" disabled={fork.isPending}>
+                <button type="submit" className="ad-button-primary" disabled={fork.isPending}>
                   {fork.isPending ? "Creating…" : "Create worktree project"}
                 </button>
               </div>

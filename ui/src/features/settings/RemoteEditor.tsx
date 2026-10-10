@@ -90,6 +90,7 @@ function PairingPanel({ status }: { status: RemoteStatus }) {
         <div className="remote-actions" data-slot="actions">
           <button
             type="button"
+            className="ad-button-primary"
             disabled={decide.isPending}
             onClick={() =>
               decide.mutate({ id: pending.id, allow: true }, { onError: (e) => pushError("Allowing the phone failed", errorText(e)) })
@@ -135,6 +136,7 @@ function PairingPanel({ status }: { status: RemoteStatus }) {
       )}
       <button
         type="button"
+        className="ad-button-primary"
         disabled={createPairing.isPending}
         onClick={() =>
           createPairing.mutate(undefined, {
@@ -183,7 +185,7 @@ function DeviceRow({ device }: { device: RemoteDevice }) {
             Phone name
             <input aria-label="Phone name" maxLength={64} value={draft} onChange={(event) => setDraft(event.target.value)} />
           </label>
-          <button type="submit" disabled={!draft.trim() || rename.isPending}>
+          <button type="submit" className="ad-button-primary" disabled={!draft.trim() || rename.isPending}>
             Save
           </button>
           <button type="button" onClick={() => setDraft(null)}>
@@ -193,12 +195,12 @@ function DeviceRow({ device }: { device: RemoteDevice }) {
       )}
       {draft === null && (
         <div className="remote-actions" data-slot="actions">
-          <button type="button" className="config-text-action" onClick={() => setDraft(device.name)}>
+          <button type="button" className="ad-button-secondary" onClick={() => setDraft(device.name)}>
             Rename
           </button>
           <button
             type="button"
-            className="config-text-action config-text-action-danger"
+            className="config-text-action-danger ad-button-danger"
             disabled={revoke.isPending}
             onClick={() => {
               if (!window.confirm(`Revoke ${device.name}? It loses access immediately and must pair again.`)) return;

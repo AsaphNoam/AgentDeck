@@ -105,6 +105,8 @@ export function VisualMatrix() {
           <Button variant="ghost">Quiet action</Button>
           <Button variant="danger">Destructive action</Button>
           <Button disabled>Disabled action</Button>
+          <Button variant="icon" aria-label="Icon action">×</Button>
+          <Button variant="icon-primary" aria-label="Icon primary action">→</Button>
         </div>
         <div className="visual-matrix-row">
           <Badge variant="neutral">Neutral</Badge>
@@ -144,8 +146,8 @@ export function VisualMatrix() {
             </fieldset>
             <div className="chat-runtime-pending">
               <span>Unapplied changes</span>
-              <button className="chat-runtime-switch" type="button">Switch</button>
-              <button className="chat-runtime-discard" type="button">Discard</button>
+              <button className="chat-runtime-switch ad-button-primary" type="button">Switch</button>
+              <button className="ad-button-secondary" type="button">Discard</button>
             </div>
             <p className="form-error" role="alert">Runtime switch failed; current settings were restored.</p>
           </div>
@@ -253,7 +255,7 @@ export function VisualMatrix() {
           <article className="permission-prompt" data-ui="permission-prompt" data-state="pending">
             <strong data-slot="title">Permission required</strong>
             <p data-slot="reason">Run a bounded local verification command.</p>
-            <div data-slot="actions"><button type="button">Approve</button><button type="button">Deny</button></div>
+            <div data-slot="actions"><button type="button" className="ad-button-secondary">Deny</button><button type="button" className="ad-button-primary">Approve</button></div>
           </article>
           <div className="terminal-panel" data-ui="terminal">
             <pre className="visual-matrix-terminal" data-slot="viewport">$ make test{"\n"}all checks passed</pre>

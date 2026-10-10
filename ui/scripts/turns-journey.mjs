@@ -178,7 +178,7 @@ async function main() {
     // Background task row with Stop still visible after completion.
     const bgTask = await page.evaluate(() => {
       const row = document.querySelector('.background-task, [data-ui="runtime-activity"] .background-task');
-      const stopBtn = document.querySelector(".background-task-stop");
+      const stopBtn = document.querySelector(".background-task button");
       return { rowFound: !!row, stopVisible: !!(stopBtn && stopBtn.offsetParent !== null) };
     });
     record("background task row with Stop visible after completion", bgTask.rowFound && bgTask.stopVisible, JSON.stringify(bgTask));

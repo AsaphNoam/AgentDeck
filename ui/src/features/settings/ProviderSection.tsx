@@ -101,7 +101,6 @@ export function ProviderSection({
         )}
         <button
           type="button"
-          className="btn-sm"
           onClick={onRefresh}
           disabled={dirty || !runtime || refreshing || otherRefreshing}
           title={dirty ? "Save your Settings changes first" : undefined}

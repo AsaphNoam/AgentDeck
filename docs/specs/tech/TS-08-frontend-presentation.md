@@ -1338,6 +1338,22 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   presentation checks, development matrix, and FS-02.A54–A57/FS-20.A17–A18 browser journeys in
   Core, Sky & Grove and Studio. Phone is checked at 390px with 360px/430px long-name cases.
 
+- **R119 — One shared button construction owns the action language.** FS-12.R68 lives in
+  `components/primitives.css`: the element baseline `button` is the text-led secondary action,
+  and `.ad-button-{primary,secondary,ghost,danger,icon,icon-primary}` (with the `btn-link`/
+  `btn-danger` aliases) are its variants. The study's tokens map to semantic values:
+  muted foreground → `--ad-text-muted`, foreground → `--ad-text-primary`, secondary surface →
+  `--ad-surface-subtle`, warning tone → `--ad-state-error` mixed with text, radius →
+  `--ad-radius-small`, ring → the base focus ring. The primary outline and tint are a `::before`
+  layer and its arrow a `::after` currentColor mask, so native buttons gain the arrow from a class
+  without markup changes; `Button`/`IconButton` emit the same classes. Feature stylesheets keep
+  only layout (placement, width, gap) for action buttons and drop fills, borders, shadows, lift
+  and highlight; tabs, segmented controls, nav items, rows and menu items keep their own
+  feature construction and override the baseline. Touch sizing uses `(pointer: coarse)` and the
+  phone entry. The public `--ad-text-inverse` token is retired with the filled primary, its only
+  consumer. No new dependency, token or motion is added; verify style/presentation checks,
+  existing focused tests and the FS-12.A38 rendered comparison.
+
 - **R120 (planned) — Persona choice is Advanced; awareness stays in persona configuration.**
   FS-01.R47 and FS-04.R56–R57 refine R69's New Agent composition. Reuse the single feature-owned
   disclosure, label it **Advanced**, and move the Persona selector there. The visible compact

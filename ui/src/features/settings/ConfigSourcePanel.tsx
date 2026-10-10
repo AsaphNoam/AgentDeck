@@ -290,7 +290,7 @@ export function ConfigSourcePanel({
               tooling — without copying or modifying it.
             </p>
             <div className="source-actions" data-slot="actions">
-              <button type="button" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
+              <button type="button" className="ad-button-primary" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
                 {preview.isPending || bind.isPending
                   ? "Connecting…"
                   : `Use my ${providerLabel(provider)} configuration`}
@@ -363,7 +363,7 @@ export function ConfigSourcePanel({
                   {refresh.isPending ? "Refreshing…" : effective ? "Refresh" : "Load effective view"}
                 </button>
               )}
-              <button type="button" className="btn-danger btn-sm" disabled={del.isPending} onClick={runUnlink}>
+              <button type="button" className="btn-danger" disabled={del.isPending} onClick={runUnlink}>
                 Unlink
               </button>
             </div>
@@ -385,7 +385,7 @@ export function ConfigSourcePanel({
           {!binding ? (
             <div className="source-unbound" data-slot="status">
               <div className="source-actions" data-slot="actions">
-                <button type="button" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
+                <button type="button" className="ad-button-primary" disabled={preview.isPending || bind.isPending} onClick={runConnect}>
                   {preview.isPending || bind.isPending ? "Connecting…" : `Use my ${providerLabel(provider)} configuration`}
                 </button>
               </div>

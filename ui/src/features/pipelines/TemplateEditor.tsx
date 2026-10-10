@@ -209,7 +209,7 @@ export function TemplateEditor({
             <input aria-label={`Input ${index + 1} name`} placeholder="spec" value={input.name} onChange={(event) => mutate((next) => { next.inputs[index].name = event.target.value; })} />
             <input aria-label={`Input ${index + 1} description`} placeholder="Description" value={input.description} onChange={(event) => mutate((next) => { next.inputs[index].description = event.target.value; })} />
             <label className="pipeline-check"><input type="checkbox" checked={input.required} onChange={(event) => mutate((next) => { next.inputs[index].required = event.target.checked; })} /> Required</label>
-            <button type="button" onClick={() => mutate((next) => { next.inputs.splice(index, 1); })}>Remove</button>
+            <button type="button" className="ad-button-danger" onClick={() => mutate((next) => { next.inputs.splice(index, 1); })}>Remove</button>
           </div>
         ))}
         </div>
@@ -218,7 +218,7 @@ export function TemplateEditor({
       <div className="pipeline-editor-workspace" data-slot="workspace">
         <aside className="pipeline-stage-navigator" data-slot="navigator">
           <div className="pipeline-stage-nav-heading"><div><p className="pipeline-eyebrow">Flow order</p><h3>Stages</h3></div>
-          <button type="button" onClick={() => mutate((next) => next.stages.push({
+          <button type="button" className="ad-button-icon" onClick={() => mutate((next) => next.stages.push({
             id: `stage-${next.stages.length + 1}`,
             title: "",
             objective: "",
@@ -236,7 +236,7 @@ export function TemplateEditor({
               <div className="pipeline-stage-heading">
                 <span className="pipeline-stage-number">{stageIndex + 1}</span>
                 <strong>{stage.title || stage.id || "Untitled stage"}</strong>
-                <button type="button" disabled={draft.stages.length === 1} onClick={() => { mutate((next) => { next.stages.splice(stageIndex, 1); }); setSelectedStage(Math.max(0, stageIndex - 1)); }}>Remove stage</button>
+                <button type="button" className="ad-button-danger" disabled={draft.stages.length === 1} onClick={() => { mutate((next) => { next.stages.splice(stageIndex, 1); }); setSelectedStage(Math.max(0, stageIndex - 1)); }}>Remove stage</button>
               </div>
               <div className="pipeline-form-grid">
                 <label className="form-field"><span>Stage id</span><input value={stage.id} onChange={(event) => mutate((next) => { next.stages[stageIndex].id = event.target.value; })} /></label>
@@ -275,7 +275,7 @@ export function TemplateEditor({
       <div className="form-actions pipeline-editor-actions" data-slot="actions">
         {savedID && <button type="button" className="btn-danger" disabled={remove.isPending} onClick={deleteDraft}>Delete</button>}
         <button type="button" disabled={!id || save.isPending} onClick={() => void validate()}>Validate</button>
-        <button type="button" disabled={!id || save.isPending} onClick={saveDraft}>
+        <button type="button" className="ad-button-primary" disabled={!id || save.isPending} onClick={saveDraft}>
           {save.isPending ? "Saving…" : proposal ? "Confirm and save exact proposal" : "Save template"}
         </button>
       </div>
@@ -315,7 +315,7 @@ function StageBindings({
           ) : (
             <input aria-label={`${kind} ${index + 1} description`} placeholder="Description" value={(item as StageOutput).description} onChange={(event) => mutate((next) => { next.stages[stageIndex].outputs[index].description = event.target.value; })} />
           )}
-          <button type="button" onClick={() => mutate((next) => { next.stages[stageIndex][kind].splice(index, 1); })}>Remove</button>
+          <button type="button" className="ad-button-danger" onClick={() => mutate((next) => { next.stages[stageIndex][kind].splice(index, 1); })}>Remove</button>
         </div>
       ))}
     </div>

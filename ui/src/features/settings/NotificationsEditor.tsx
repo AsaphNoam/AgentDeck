@@ -49,7 +49,7 @@ export function NotificationsEditor() {
           Desktop notifications
         </label>
         {"Notification" in window && Notification.permission !== "granted" && (
-          <button type="button" className="config-secondary-action" onClick={() => void requestDesktop()}>
+          <button type="button" className="ad-button-secondary" onClick={() => void requestDesktop()}>
             Enable desktop
           </button>
         )}

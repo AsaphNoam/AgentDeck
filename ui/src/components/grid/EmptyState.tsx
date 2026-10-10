@@ -10,7 +10,7 @@ export function EmptyState({ onNewAgent, actions }: EmptyStateProps) {
   return (
     <section className="empty-state" data-ui="dashboard" data-slot="empty">
       <h1>No running agents</h1>
-      <button type="button" onClick={onNewAgent}>
+      <button type="button" className="ad-button-primary" onClick={onNewAgent}>
         New Agent
       </button>
       {actions}

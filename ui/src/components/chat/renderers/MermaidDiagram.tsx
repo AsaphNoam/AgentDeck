@@ -54,7 +54,7 @@ export function MermaidDiagram({ source }: { source: string }) {
       {markup === null ? null : (
         <button
           type="button"
-          className="ad-button ad-button-ghost ad-button-small"
+          className="ad-button ad-button-ghost"
           onClick={() => setShowSource((visible) => !visible)}
         >
           {showSource ? "Show diagram" : "Show source"}

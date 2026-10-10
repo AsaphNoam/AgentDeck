@@ -233,6 +233,7 @@ export function BackendStep({ onDone, claimMutation, releaseMutation }: BackendS
       <div className="form-actions" data-slot="actions">
         <button
           type="button"
+          className="ad-button-primary"
           onClick={handleValidate}
           disabled={putBackends.isPending || !readyToValidate || catalogUnusable}
         >

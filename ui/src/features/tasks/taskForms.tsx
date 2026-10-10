@@ -142,7 +142,7 @@ function PrerequisitePicker({
           {!runsQuery.isLoading && !runsQuery.isError && runs.length === 0 && runsQuery.hasNextPage && <p className="task-query-state">No matching runs in the loaded pages yet.</p>}
           {!runsQuery.isLoading && !runsQuery.isError && runs.length === 0 && !runsQuery.hasNextPage && <p className="task-query-state">No pipeline runs in this project.</p>}
           {runs.length > 0 && <p className="task-query-state">Showing {runs.length} loaded run{runs.length === 1 ? "" : "s"} for this project.</p>}
-          {runsQuery.hasNextPage && <Button size="small" type="button" disabled={runsQuery.isFetchingNextPage} onClick={() => void runsQuery.fetchNextPage()}>{runsQuery.isFetchingNextPage ? "Loading runs…" : "Load more runs"}</Button>}
+          {runsQuery.hasNextPage && <Button type="button" disabled={runsQuery.isFetchingNextPage} onClick={() => void runsQuery.fetchNextPage()}>{runsQuery.isFetchingNextPage ? "Loading runs…" : "Load more runs"}</Button>}
           {runsQuery.isFetchNextPageError && <p className="form-error" role="alert">More runs could not be loaded. The current selection is kept.</p>}
         </div>
       )}
@@ -239,7 +239,7 @@ export function RearmForm({ task, onError }: { task: Task; onError: (message: st
         <label>Wait for signal<input value={signal} onChange={(event) => setSignal(event.target.value)} placeholder="ci-green" /></label>
       </details>
       {validationError && <p className="form-error" role="alert">{validationError}</p>}
-      <Button size="small" type="submit" busy={rearm.isPending}>Re-arm</Button>
+      <Button type="submit" variant="primary" busy={rearm.isPending}>Re-arm</Button>
     </form>
   );
 }
@@ -262,7 +262,7 @@ export function RecordResultForm({ task, onError }: { task: Task; onError: (mess
       <label>Result<select aria-label="Result outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)}><option value="success">Success</option><option value="failure">Failure</option><option value="blocked">Blocked</option></select></label>
       <label>Summary<input aria-label="Result summary" value={summary} onChange={(e) => setSummary(e.target.value)} required /></label>
       <label>Details<AutoGrowTextarea aria-label="Result details" value={details} onChange={(e) => setDetails(e.target.value)} /></label>
-      <Button size="small" type="submit" busy={record.isPending}>Record result</Button>
+      <Button type="submit" variant="primary" busy={record.isPending}>Record result</Button>
     </form>
   );
 }
@@ -432,7 +432,7 @@ export function FireSignalForm({ projects, project, name, onChange }: {
         Signal name
         <input value={name} onChange={(e) => onChange({ project, name: e.target.value })} required />
       </label>
-      <Button type="submit" busy={fire.isPending}>Fire</Button>
+      <Button type="submit" variant="primary" busy={fire.isPending}>Fire</Button>
       {error && <p className="form-error" role="alert">{error}</p>}
       {released && <p className="task-query-state" role="status">{released}</p>}
     </form>

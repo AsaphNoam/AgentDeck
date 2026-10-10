@@ -117,9 +117,9 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
                       <label>Turn limit<input type="number" min={1} max={1000} value={r.limit} onChange={(e) => update(r.key, { limit: Number(e.target.value) })} /></label>
                       <label className="think-tank-check"><input type="checkbox" checked={r.mayLeave} onChange={(e) => update(r.key, { mayLeave: e.target.checked })} /> May leave</label>
                       <div className="think-tank-setup-order">
-                        <button type="button" className="annotation-link" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`Move ${r.label} earlier`}>↑</button>
-                        <button type="button" className="annotation-link" disabled={index === rows.length - 1} onClick={() => move(index, 1)} aria-label={`Move ${r.label} later`}>↓</button>
-                        <button type="button" className="annotation-link" onClick={() => setRows((c) => c.filter((x) => x.key !== r.key))}>Remove</button>
+                        <button type="button" className="ad-button-icon" disabled={index === 0} onClick={() => move(index, -1)} aria-label={`Move ${r.label} earlier`}>↑</button>
+                        <button type="button" className="ad-button-icon" disabled={index === rows.length - 1} onClick={() => move(index, 1)} aria-label={`Move ${r.label} later`}>↓</button>
+                        <button type="button" className="ad-button-danger" onClick={() => setRows((c) => c.filter((x) => x.key !== r.key))}>Remove</button>
                       </div>
                     </li>
                   ))}
@@ -139,12 +139,12 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
               <label className="think-tank-check"><input type="checkbox" checked={openings} onChange={(e) => setOpenings(e.target.checked)} /> Independent openings — each participant answers before seeing the others</label>
               <div className="think-tank-check">
                 <label><input type="checkbox" checked={judge !== null} onChange={(e) => e.target.checked ? setLaunchFor("judge") : setJudge(null)} /> Final synthesis by a fresh judge after the discussion ends</label>
-                {judge && <span className="form-hint">{judge.name || judge.role} in {projectTitle(judge.project)} · <button type="button" className="annotation-link" onClick={() => setLaunchFor("judge")}>Change</button></span>}
+                {judge && <span className="form-hint">{judge.name || judge.role} in {projectTitle(judge.project)} · <button type="button" className="ad-button-secondary" onClick={() => setLaunchFor("judge")}>Change</button></span>}
               </div>
               {error && <p className="form-error" role="alert">{error}</p>}
               <div className="form-actions">
                 <button type="button" onClick={onClose} disabled={create.isPending}>Cancel</button>
-                <button type="submit" disabled={create.isPending}>{create.isPending ? "Starting…" : "Start Think Tank"}</button>
+                <button type="submit" className="ad-button-primary" disabled={create.isPending}>{create.isPending ? "Starting…" : "Start Think Tank"}</button>
               </div>
             </form>
           </Dialog.Content>

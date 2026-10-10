@@ -21,6 +21,7 @@ function FileRow({ file, onDiffClick, onOpenFile }: { file: TrackedFile; onDiffC
         <div className="tracked-row-actions" data-slot="actions">
           <button
             type="button"
+            className="ad-button-secondary"
             title="Copy path"
             onClick={() => copyToClipboard(file.path)}
           >
@@ -29,6 +30,7 @@ function FileRow({ file, onDiffClick, onOpenFile }: { file: TrackedFile; onDiffC
           {file.has_diff && file.diff_refs.length > 0 && (
             <button
               type="button"
+              className="ad-button-secondary"
               title="View diff in transcript"
               onClick={() => onDiffClick(file.diff_refs[0].seq)}
             >

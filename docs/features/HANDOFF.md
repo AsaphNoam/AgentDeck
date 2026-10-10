@@ -52,19 +52,14 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   below. The larger group-controls, room-page and base agent-card reviews remain independent.
   Source audits, 116 focused UI tests, 41 presentation checks and independent rendered review
   completed; evidence: `/tmp/chuck-small-review-20261010/`.
-- **Fix closed — mobile history (MOBILE-HISTORY-01):** phone transcript windows now hold 750
-  events, load older pages automatically on upward scrolling with viewport anchoring, preserve
-  bounded loaded history across live refreshes, and recover intervening gaps. The formerly skipped
-  reproduction and focused server/UI coverage pass; rendered phone evidence is
-  `/tmp/mobile-history-phone.png`.
-- **Settled closures:** Settings composition, desktop agent page and the mobile/Think Tank
-  disclosure fixes are closed; details moved to the archive's 2026-10-09 settled-closures section.
-- **Review closed — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
-  independent source/spec and rendered review passed without findings on 2026-10-10. Project
-  and Archive cards passed in all three appearances at 1024/1440, including removed origins,
-  separate keyboard focus and hover.
-  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below. The later room-list
-  width follow-up `ce46d56` has ROOM-WIDTH-01 open; the original card review stays closed.
+- **Settled closures:** Settings composition, desktop agent page, mobile/Think Tank disclosure
+  fixes, mobile history, Think Tank room cards (`578ca50`) and project agent cards (`4dc1b34`)
+  are closed; details are in the archive. ROOM-WIDTH-01 stays open.
+- **Review pending — button redesign (FS-12.R68/A38, TS-08.R119):** all buttons adopt the Figma
+  `/study/buttons` "Just enough" design via one construction in `primitives.css`; ~300
+  desktop/phone call sites mapped. Checks, both Go variants and `ui/scripts/button-sweep.mjs`
+  (3 appearances, 1024/1440, phone 390: 0 errors/findings) passed. Owed: independent A38
+  comparison. Evidence, scans and reviewer notes: shared resources `button-design/PLAN.md`.
 - **Review pending — Think Tank room page (FS-12.R64/A36, TS-08.R115):** the full room page
   adopts the Figma Make `ThinkTank` study (source: Figma MCP resource
   `file://figma/make/source/OykxmXqZnnyA67QA1lv3AU/src/ThinkTank.tsx` + `think-tank.css`):
@@ -81,13 +76,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   failure with Retry, a pipeline room, Files dialog → file viewer, and keyboard focus.
   Reviewer note: room status chip reuses `roomStatus` tones (Running/Waiting/Needs
   attention/Paused/Ended) rather than the study's openings/judge-failed labels.
-- **Review closed — project-dashboard agent cards (`4dc1b34`, FS-12.R65/A37, TS-08.R116):**
-  independent source/spec and rendered study comparison passed without findings on 2026-10-10.
-  Core/Sky & Grove/Studio at 1024/1280 covered live busy/idle/waiting/error/stopped states,
-  long names, terminal/mail/pipeline presentation, expanded permission/activity/composer,
-  collapse/navigation, pane cycling, focus/hover, Send/Cancel and persisted drag reorder.
-  Evidence: `/tmp/chuck-card-review-20261010/`; closure details below. Other review units and
-  unrelated uncommitted presentation work remain independent.
 - **Design ready — quota continuation:**
   [`continue-chats-after-quota-reset.md`](../ready-changes/continue-chats-after-quota-reset.md)
   is Waiting to start: FS-01.R40–R45/FS-04.R53, TS-02.R45/TS-03.R60,
@@ -175,11 +163,9 @@ and does not close any manual provider gates.
 
 ## Review findings
 
-### Room-list width follow-up — `ce46d56`
+### Room-list width follow-up — `ce46d56` — **Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
 
-**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
-
-- **Must fix — ROOM-WIDTH-01 (INV §13):**
+- **Must fix** — ROOM-WIDTH-01 (INV §13):
   `ui/src/styles/features/dashboard.css:5–7` adds auto inline margins to the size-contained
   `.think-tank-list` without giving it an inline size. Open Archive with retained rooms:
   its section collapses to 0px wide inside a 960px archive page at 1024px, and room cards
@@ -235,6 +221,11 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Implementation:** Button redesign to the Figma "Just enough" study
+  (FS-12.R68/A38, TS-08.R119): shared primitive, per-area call-site mapping by four delegated
+  editors on disjoint files, labelled Send fix, inverse-text token retired, rendered sweep script.
+  Also corrected three HANDOFF spec-check format errors left by concurrent commits.
 
 - **2026-10-10 — Review:** Closed project-dashboard agent-card unit `4dc1b34` without findings
   (FS-12.R65/A37, TS-08.R116); committed card follow-ups through `33439e1` were included,
@@ -335,7 +326,7 @@ updated after publication.
   bidirectional changes, desktop cross-group drag, project-only Stop/Archive and narrow phone
   mutation access. The user waived compatibility; global release will be removed and callers
   migrated to the scoped API. Ready change:
-  [`agent-groups-on-desktop-and-mobile.md`](../ready-changes/agent-groups-on-desktop-and-mobile.md).
+  `agent-groups-on-desktop-and-mobile.md` (since closed and removed).
   FS-02.R72–R76/A54–A57, FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118 and TS-13.R24
   remain planned. No product code, schema migration or retention change; Active change remains None.
 

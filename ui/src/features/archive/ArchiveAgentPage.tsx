@@ -83,7 +83,7 @@ export function ArchiveAgentPage() {
         />
         <button
           type="button"
-          className="resume-btn"
+          className="resume-btn ad-button-primary"
           disabled={resuming}
           onClick={() => void (agent?.archived ? doRestore() : doResume())}
         >

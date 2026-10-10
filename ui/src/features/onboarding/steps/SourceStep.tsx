@@ -43,7 +43,7 @@ export function SourceStep({ backendId, backendType, onDone, claimMutation, rele
       />
 
       <div className="onboarding-actions" data-slot="actions">
-        <button type="button" onClick={handleContinue}>
+        <button type="button" className="ad-button-primary" onClick={handleContinue}>
           Continue
         </button>
       </div>

@@ -369,20 +369,8 @@
   margin-left: auto;
 }
 
-.chat-runtime-pending button {
-  font-size: 0.75rem;
-  min-height: 2rem;
-  padding: var(--ad-space-1) var(--ad-space-3);
-}
-
 .chat-runtime-switch {
   white-space: nowrap;
-}
-
-.chat-runtime-pending .chat-runtime-discard {
-  background: transparent;
-  border-color: transparent;
-  color: var(--ad-text-muted);
 }
 
 .chat-runtime-picker .form-error {
@@ -605,13 +593,7 @@
 }
 
 .annotation-event-trigger {
-  background: var(--ad-surface-panel);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  font-family: var(--ad-font-mono);
-  font-size: 0.66rem;
   margin-bottom: var(--ad-space-1);
-  min-height: auto;
-  padding: var(--ad-space-1) var(--ad-space-2);
 }
 
 .message,
@@ -767,9 +749,7 @@
 
 .tool-toggle:hover:not(:disabled) {
   background: transparent;
-  box-shadow: none;
   color: var(--ad-action-secondary);
-  transform: none;
 }
 
 .tool-args,
@@ -839,23 +819,6 @@
   margin-top: var(--ad-space-3);
 }
 
-.permission-prompt [data-slot="actions"] button {
-  font-size: 0.78rem;
-  min-height: 2.1rem;
-  padding: var(--ad-space-2) var(--ad-space-4);
-}
-
-.permission-prompt .permission-deny {
-  background: var(--ad-surface-raised);
-  border-color: color-mix(in srgb, var(--ad-state-done) 30%, var(--ad-surface-raised));
-  color: var(--ad-state-done);
-}
-
-.permission-prompt .permission-approve {
-  background: var(--ad-action-primary);
-  border-color: var(--ad-action-primary);
-  color: var(--ad-action-primary-ink);
-}
 
 .permission-prompt.resolved {
   align-items: center;
@@ -1008,27 +971,7 @@
    from the markup is what stops a narrowed window from stranding someone with a
    collapsed tray and no control to reopen it. */
 .annotation-tray-collapse {
-  background: transparent;
-  border: 0;
-  color: var(--ad-action-secondary);
   display: none;
-  min-height: auto;
-  padding: 0 var(--ad-space-1);
-}
-
-.annotation-link {
-  background: transparent;
-  border: 0;
-  color: var(--ad-action-secondary);
-  font-family: var(--ad-font-mono);
-  font-size: 0.68rem;
-  min-height: auto;
-  padding: 0;
-}
-
-.annotation-link:hover:not(:disabled) {
-  box-shadow: none;
-  transform: none;
 }
 
 .annotation-drafts {
@@ -1081,14 +1024,12 @@
 }
 
 .annotation-send {
-  background: var(--ad-action-primary);
   margin-top: var(--ad-space-3);
   width: 100%;
 }
 
 .jump-to-latest {
   bottom: var(--ad-space-3);
-  box-shadow: var(--ad-shadow-keyline);
   left: 50%;
   position: absolute;
   transform: translateX(-50%);
@@ -1141,12 +1082,6 @@
   display: flex;
   flex: none;
   gap: var(--ad-space-2);
-}
-
-.file-viewer-actions button {
-  font-size: 0.72rem;
-  min-height: auto;
-  padding: var(--ad-space-1) var(--ad-space-2);
 }
 
 .file-viewer-form button[aria-pressed="true"] {
@@ -1369,25 +1304,6 @@
 
 .composer button {
   align-self: start;
-  background: var(--ad-action-primary);
-  min-width: 100px;
-}
-
-/* Send stays the primary action; the situational ones read as secondary so the
-   safe default is not visually outranked by them. */
-.composer .composer-steer,
-.composer .composer-withdraw,
-.composer .composer-cancel {
-  background: var(--ad-surface-raised);
-}
-
-/* Send and Cancel are icons (FS-02.R67); their names live in aria-label/title. */
-.composer .composer-icon {
-  display: inline-grid;
-  min-height: 40px;
-  min-width: 40px;
-  padding: var(--ad-space-2);
-  place-items: center;
 }
 
 .composer-error,
@@ -1488,13 +1404,6 @@
   display: flex;
   flex-shrink: 0;
   gap: var(--ad-space-1);
-}
-
-.tracked-row-actions button,
-.tracked-row-top > button {
-  font-size: 0.68rem;
-  min-height: 26px;
-  padding: var(--ad-space-1) var(--ad-space-2);
 }
 
 .tracked-row-meta {
@@ -1618,11 +1527,6 @@
   color: var(--ad-text-muted);
   display: block;
   font-size: 0.8rem;
-}
-
-.background-task-stop {
-  min-height: auto;
-  padding: var(--ad-space-1) var(--ad-space-2);
 }
 
 .background-task-error {
@@ -1760,9 +1664,7 @@
   background: var(--ad-surface-raised);
   border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-state-done) 30%, var(--ad-surface-raised));
   border-radius: var(--ad-radius-small);
-  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
   color: var(--ad-state-done);
-  font-size: 0.72rem;
 }
 
 /* Inset composer box: the textarea above a toolbar of @/# inserts and actions. */
@@ -1812,22 +1714,6 @@
   gap: var(--ad-space-1);
 }
 
-.chat-card > [data-slot="composer"] .composer-references button {
-  background: transparent;
-  border: 0;
-  color: var(--ad-text-muted);
-  font-size: 1.05rem;
-  min-height: auto;
-  min-width: 0;
-  padding: var(--ad-space-1) var(--ad-space-2);
-}
-
-.chat-card > [data-slot="composer"] .composer-references button:hover:not(:disabled) {
-  box-shadow: none;
-  color: var(--ad-text-primary);
-  transform: none;
-}
-
 .chat-card > [data-slot="composer"] .composer-actions {
   align-items: center;
   display: flex;
@@ -1836,23 +1722,17 @@
 
 .chat-card > [data-slot="composer"] .composer-actions button {
   align-self: center;
-  font-size: 0.78rem;
-  min-height: 2.25rem;
-  min-width: 0;
-  padding: var(--ad-space-2) var(--ad-space-4);
 }
 
-.chat-card > [data-slot="composer"] .composer-actions .composer-icon {
-  display: inline-flex;
-  gap: var(--ad-space-2);
+/* Send keeps its icon-primary square unless it carries a visible label (agent page,
+   Think Tank room); then it widens around the label and arrow. */
+.composer-icon:has(.composer-send-label) {
+  padding-inline: calc(var(--ad-space-1) * 2.5);
+  width: auto;
 }
 
 .composer-send-label {
   white-space: nowrap;
-}
-
-.chat-card > [data-slot="composer"] .composer-actions .composer-cancel {
-  padding: var(--ad-space-2);
 }
 
 .chat-card > [data-slot="composer"] :is(.composer-error, .composer-notice) {

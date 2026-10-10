@@ -123,7 +123,7 @@ function PermissionCard({ agent, event, latest, disabled, onSettled }: {
         <button type="button" disabled={disabled || busy} onClick={() => void decide("deny")}>
           Deny
         </button>
-        <button type="button" className="phone-primary" disabled={disabled || busy} onClick={() => void decide("approve")}>
+        <button type="button" className="ad-button-primary" disabled={disabled || busy} onClick={() => void decide("approve")}>
           Approve
         </button>
       </div>
@@ -381,7 +381,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
     scrollAnchor.current = null;
   }, [agentId]);
 
-  if (!agent) return <p className="phone-empty">This agent is not on the Mac any more. <button type="button" className="phone-link" onClick={() => navigate("/")}>Home</button></p>;
+  if (!agent) return <p className="phone-empty">This agent is not on the Mac any more. <button type="button" className="phone-link ad-button-secondary" onClick={() => navigate("/")}>Home</button></p>;
   // Archived from either device: the screen stops offering work (FS-20.R39).
   if (agent.archived) {
     return (
@@ -426,13 +426,13 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   return (
     <div className="phone-agent">
       <div className="phone-agent-top">
-        <button type="button" className="phone-agent-back" aria-label={`Back to ${agent.project}`} onClick={() => navigate(`/project/${encodeURIComponent(agent.project)}`)}>
+        <button type="button" className="phone-agent-back ad-button-secondary" aria-label={`Back to ${agent.project}`} onClick={() => navigate(`/project/${encodeURIComponent(agent.project)}`)}>
           <PhoneIcon name="back" size={19} />{agent.project}
         </button>
         {agent.running ? (
-          <button type="button" className="phone-agent-control phone-agent-stop" disabled={offline || busy} onClick={() => setStopOpen(true)}>Stop</button>
+          <button type="button" className="ad-button-danger" disabled={offline || busy} onClick={() => setStopOpen(true)}>Stop</button>
         ) : (
-          <button type="button" className="phone-agent-control" disabled={offline || busy} onClick={() => void act(() => resumeAgent(agentId))}>Resume</button>
+          <button type="button" className="ad-button-secondary" disabled={offline || busy} onClick={() => void act(() => resumeAgent(agentId))}>Resume</button>
         )}
       </div>
       <header className="phone-agent-header phone-agent-identity">
@@ -515,7 +515,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
                     Steer
                   </button>
                 )}
-                <button type="submit" className="phone-send-icon" aria-label="Send" title="Send" disabled={offline || busy || !text.trim()}>
+                <button type="submit" className="phone-send-icon ad-button-icon-primary" aria-label="Send" title="Send" disabled={offline || busy || !text.trim()}>
                   <PhoneIcon name="up" size={19} />
                 </button>
               </div>
@@ -594,7 +594,7 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename, error }
       <div className="phone-card">
         <button type="button" disabled={offline || busy || !agent.clone?.available} title={agent.clone?.reason} onClick={() => act(() => cloneAgent(agent.agent_id), false, (result) => navigate(`/agent/${encodeURIComponent((result as { agent: { agent_id: string } }).agent.agent_id)}`))}>Clone</button>
         {agent.clone && !agent.clone.available && <p className="phone-meta">{agent.clone.reason}</p>}
-        <button type="button" className="phone-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>
+        <button type="button" className="ad-button-danger" disabled={offline || busy} onClick={() => setArchiveConfirm(true)}>Archive</button>
       </div>
       {!archiveConfirm && error && <p className="phone-error" role="alert">{error}</p>}
       <ConfirmDialog

@@ -61,7 +61,7 @@ function TaskRow({ agentId, task, controllable, onStop }: { agentId: string; tas
         </span>
       )}
       {controllable && task.state === "running" && task.canStop && !task.fenced && (
-        <button type="button" className="background-task-stop" disabled={stopping} onClick={stop}>
+        <button type="button" className="ad-button-danger" disabled={stopping} onClick={stop}>
           Stop
         </button>
       )}

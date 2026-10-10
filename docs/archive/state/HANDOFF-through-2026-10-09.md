@@ -358,3 +358,22 @@ The observability **Worth fixing** finding was fixed 2026-10-09 (see Changelog).
   Vite, and fresh review-owned `CHUCK_HOME` fixtures. Both review-owned harness sessions shut down;
   existing processes were preserved. Fresh captures were compared with `agent-design/ref/` study
   renders.
+
+## Settled closures moved from the live handoff — 2026-10-10
+
+- **Fix closed — mobile history (MOBILE-HISTORY-01):** phone transcript windows now hold 750
+  events, load older pages automatically on upward scrolling with viewport anchoring, preserve
+  bounded loaded history across live refreshes, and recover intervening gaps. The formerly skipped
+  reproduction and focused server/UI coverage pass; rendered phone evidence is
+  `/tmp/mobile-history-phone.png`.
+- **Review closed — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
+  independent source/spec and rendered review passed without findings on 2026-10-10. Project
+  and Archive cards passed in all three appearances at 1024/1440, including removed origins,
+  separate keyboard focus and hover. Evidence: `/tmp/chuck-room-review-20261010/`. The later
+  room-list width follow-up `ce46d56` has ROOM-WIDTH-01 open; the original card review stays closed.
+- **Review closed — project-dashboard agent cards (`4dc1b34`, FS-12.R65/A37, TS-08.R116):**
+  independent source/spec and rendered study comparison passed without findings on 2026-10-10.
+  Core/Sky & Grove/Studio at 1024/1280 covered live busy/idle/waiting/error/stopped states,
+  long names, terminal/mail/pipeline presentation, expanded permission/activity/composer,
+  collapse/navigation, pane cycling, focus/hover, Send/Cancel and persisted drag reorder.
+  Evidence: `/tmp/chuck-card-review-20261010/`.

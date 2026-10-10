@@ -128,8 +128,8 @@ export function FileViewer({ agentId, link, onClose, onOpenFile, onPathResolved,
               <button type="button" aria-pressed={!rendered} onClick={() => setRendered(false)}>Source</button>
             </div>
           )}
-          <button type="button" onClick={() => setReloadKey((key) => key + 1)}>Reload</button>
-          <button type="button" onClick={onClose}>Close</button>
+          <button type="button" className="ad-button-secondary" onClick={() => setReloadKey((key) => key + 1)}>Reload</button>
+          <button type="button" className="ad-button-secondary" onClick={onClose}>Close</button>
         </div>
       </header>
       {view.status === "loaded" && (

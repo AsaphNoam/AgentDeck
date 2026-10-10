@@ -123,7 +123,7 @@ export function ProjectsEditor() {
   return (
     <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="projects">
       <SettingsHeader eyebrow="Projects" title="Projects">
-        <button className="ad-button-primary config-primary-action" onClick={openCreate}>New project</button>
+        <button className="ad-button-primary" onClick={openCreate}>New project</button>
       </SettingsHeader>
 
       {entries.length === 0 && (
@@ -151,16 +151,16 @@ export function ProjectsEditor() {
               <span className="config-cwd">{proj.cwd}</span>
             </div>
             <div className="config-list-item-actions" data-slot="actions">
-              <button className="config-text-action" onClick={() => openEdit(id, proj)}>Edit</button>
+              <button className="ad-button-secondary" onClick={() => openEdit(id, proj)}>Edit</button>
               {proj.archived ? (
-                <button className="config-text-action config-text-action-quiet" onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
+                <button className="config-text-action-quiet ad-button-secondary" onClick={() => restore.mutate(id)} disabled={restore.isPending}>Restore</button>
               ) : (
-                <button className="config-text-action config-text-action-quiet" onClick={() => {
+                <button className="config-text-action-quiet ad-button-secondary" onClick={() => {
                   setArchiveError("");
                   setArchiveID(id);
                 }} disabled={archive.isPending}>Archive</button>
               )}
-              <button onClick={() => setDeleting({ id, ownsCheckout: proj.worktree?.owned ?? false, resourceDir: proj.resource_dir })} className="config-text-action config-text-action-danger">
+              <button onClick={() => setDeleting({ id, ownsCheckout: proj.worktree?.owned ?? false, resourceDir: proj.resource_dir })} className="config-text-action-danger ad-button-danger">
                 Delete
               </button>
             </div>

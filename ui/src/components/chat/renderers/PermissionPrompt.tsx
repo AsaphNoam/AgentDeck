@@ -39,8 +39,8 @@ export function PermissionPrompt({ agentId, event }: { agentId: string; event: T
       {error && <p className="permission-error" data-slot="error">{error}</p>}
       {/* The primary Approve sits last, after the safer Deny (FS-12.R61). */}
       <div data-slot="actions">
-        <button type="button" className="permission-deny" onClick={() => void decide("deny")}>Deny</button>
-        <button type="button" className="permission-approve" onClick={() => void decide("approve")}>Approve</button>
+        <button type="button" className="ad-button-secondary" onClick={() => void decide("deny")}>Deny</button>
+        <button type="button" className="ad-button-primary" onClick={() => void decide("approve")}>Approve</button>
       </div>
     </article>
   );

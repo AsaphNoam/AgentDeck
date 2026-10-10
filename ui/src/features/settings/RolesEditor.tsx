@@ -81,7 +81,7 @@ export function RolesEditor() {
   return (
     <div className="config-editor" data-ui="config-editor" data-state={formError ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="roles">
       <SettingsHeader eyebrow="Roles" title="Roles">
-        <button className="ad-button-primary config-primary-action" onClick={openCreate}>New role</button>
+        <button className="ad-button-primary" onClick={openCreate}>New role</button>
       </SettingsHeader>
 
       {entries.length === 0 && (
@@ -103,8 +103,8 @@ export function RolesEditor() {
               )}
             </div>
             <div className="config-list-item-actions" data-slot="actions">
-              <button className="config-text-action" onClick={() => openEdit(id, role)}>Edit</button>
-              <button onClick={() => setDeleting({ id })} className="config-text-action config-text-action-danger">
+              <button className="ad-button-secondary" onClick={() => openEdit(id, role)}>Edit</button>
+              <button onClick={() => setDeleting({ id })} className="config-text-action-danger ad-button-danger">
                 Delete
               </button>
             </div>

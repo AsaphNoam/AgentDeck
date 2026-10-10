@@ -133,87 +133,12 @@
 }
 
 /* Actions. */
-.config-primary-action {
-  border: 0;
-  border-radius: var(--ad-radius-small);
-  box-shadow: var(--ad-settings-press-shadow);
-  font-size: 0.75rem;
-  font-weight: 600;
-  min-height: 0;
-  padding: var(--ad-space-2) var(--ad-space-3);
-}
-
-.config-primary-action:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ad-action-primary) 90%, var(--ad-text-primary));
-  box-shadow: var(--ad-settings-press-shadow);
-  transform: none;
-}
-
-.config-primary-action:active:not(:disabled) {
-  box-shadow: var(--ad-settings-pressed-shadow);
-  transform: translateY(2px);
-}
-
-.config-primary-action:disabled {
-  background: var(--ad-surface-subtle);
-  box-shadow: none;
-  color: var(--ad-text-muted);
-  opacity: 1;
-}
-
-.config-secondary-action {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--ad-state-done) 32%, var(--ad-surface-raised));
-  border-radius: var(--ad-radius-small);
-  color: var(--ad-settings-selected-text);
-  font-size: 0.75rem;
-  font-weight: 600;
-  min-height: 0;
-  padding: var(--ad-space-2) var(--ad-space-3);
-}
-
-.config-secondary-action:hover:not(:disabled) {
-  background: var(--ad-settings-selected);
-  box-shadow: none;
-  transform: none;
-}
-
-.config-text-action {
-  background: transparent;
-  border: 0;
-  border-radius: var(--ad-radius-small);
-  color: var(--ad-settings-selected-text);
-  font-size: 0.75rem;
-  font-weight: 500;
-  min-height: 0;
-  padding: var(--ad-space-1) 0;
-}
-
-.config-text-action:hover:not(:disabled) {
-  background: transparent;
-  box-shadow: none;
-  text-decoration: underline;
-  transform: none;
-}
-
 .backend-card .btn-link {
-  color: var(--ad-settings-selected-text);
-  font-size: 0.75rem;
-  font-weight: 500;
   justify-self: start;
-  padding: var(--ad-space-1) 0;
-}
-
-.backend-card .btn-link:hover:not(:disabled) {
-  background: transparent;
 }
 
 .config-text-action-quiet {
   color: var(--ad-text-muted);
-}
-
-.config-text-action-danger {
-  color: var(--ad-state-error);
 }
 
 /* Notices and empty states. */
@@ -723,7 +648,6 @@ p.model-capability-note {
 
 .project-color-preset:hover:not(:disabled) {
   box-shadow: var(--ad-shadow-keyline);
-  transform: translate(-1px, -1px);
 }
 
 .project-color-preset[aria-pressed="true"] {

@@ -26,7 +26,7 @@ function Toast({ toast, dismiss }: { toast: ToastItem; dismiss: (id: string) => 
         <strong data-slot="title">{toast.title}</strong>
         {toast.body && <span data-slot="body">{toast.body}</span>}
       </button>
-      <button type="button" data-slot="close" aria-label="Dismiss notification" onClick={() => dismiss(toast.id)}>
+      <button type="button" className="ad-button-icon" data-slot="close" aria-label="Dismiss notification" onClick={() => dismiss(toast.id)}>
         ×
       </button>
     </div>

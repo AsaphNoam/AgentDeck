@@ -80,7 +80,7 @@ function EnvEditor({ pairs, onChange }: { pairs: Pair[]; onChange: (p: Pair[]) =
               onChange(next);
             }}
           />
-          <button type="button" onClick={() => onChange(pairs.filter((_, j) => j !== i))}>×</button>
+          <button type="button" className="ad-button-icon" onClick={() => onChange(pairs.filter((_, j) => j !== i))}>×</button>
         </div>
       ))}
       <button type="button" className="btn-link" onClick={() => onChange([...pairs, { key: "", value: "" }])}>
@@ -324,7 +324,7 @@ export function BackendsEditor() {
   return (
     <div className="config-editor backends-editor" data-ui="config-editor" data-state={error ? "error" : entries.length === 0 ? "empty" : undefined} data-variant="backends">
       <SettingsHeader eyebrow="Backends" title="Configured backends">
-        <button type="button" className="ad-button-primary config-primary-action" onClick={() => setAddOpen(true)}>Add backend</button>
+        <button type="button" className="ad-button-primary" onClick={() => setAddOpen(true)}>Add backend</button>
       </SettingsHeader>
 
       <AddBackendDialog
@@ -376,7 +376,7 @@ export function BackendsEditor() {
               ))}
             </select>
             {credentials[id] && credChip(credentials[id])}
-            <button type="button" className="config-text-action config-text-action-danger" onClick={() => removeBackend(id)}>
+            <button type="button" className="config-text-action-danger ad-button-danger" onClick={() => removeBackend(id)}>
               Remove
             </button>
           </div>
@@ -492,7 +492,7 @@ export function BackendsEditor() {
       {error && <p className="form-error">{error}</p>}
 
       <div className="backends-footer" data-slot="actions">
-        <button type="button" className="ad-button-primary config-primary-action" onClick={handleSave} disabled={putBackends.isPending}>
+        <button type="button" className="ad-button-primary" onClick={handleSave} disabled={putBackends.isPending}>
           {putBackends.isPending ? "Saving…" : "Save"}
         </button>
       </div>

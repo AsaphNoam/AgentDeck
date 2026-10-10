@@ -104,7 +104,7 @@ export function ProjectDashboard() {
     <section className="project-dashboard" data-ui="project-dashboard" onContextMenu={openBackgroundMenu}>
       <div className="project-dashboard-header">
         <h1>Projects</h1>
-        <button type="button" onClick={openCreate}>New project</button>
+        <button type="button" className="ad-button-primary" onClick={openCreate}>New project</button>
       </div>
       <div className="project-card-grid">
         {dashboardProjects.map((project) => {
@@ -255,7 +255,7 @@ function ProjectEditDialog({ edit, onCancel, onSave }: { edit: ProjectEdit; onCa
           <form className="config-form" onSubmit={submit}>
             <div className="form-field"><label htmlFor="project-title">Name</label><input id="project-title" value={title} onChange={(event) => setTitle(event.target.value)} /></div>
             {error && <p className="form-error">{error}</p>}
-            <div className="form-actions" data-slot="actions"><button type="button" onClick={onCancel}>Cancel</button><button type="submit">Save</button></div>
+            <div className="form-actions" data-slot="actions"><button type="button" onClick={onCancel}>Cancel</button><button type="submit" className="ad-button-primary">Save</button></div>
           </form>
         </Dialog.Content>
       </Dialog.Portal>

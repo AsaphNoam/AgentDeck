@@ -62,7 +62,7 @@ function LinkItem({ link, hiddenBy, onReveal }: { link: TaskLink; hiddenBy: Map<
       {hidden && (
         <span className="task-link-boundary" data-slot="boundary">
           {" "}· hidden under a collapsed stage{" "}
-          <Button size="small" variant="ghost" onClick={() => onReveal(hidden.path)}>Reveal</Button>
+          <Button onClick={() => onReveal(hidden.path)}>Reveal</Button>
         </span>
       )}
     </span>
@@ -86,8 +86,6 @@ function CollapseToggle({ taskID, collapsed, summary, childIDs, onToggle }: {
   return (
     <Button
       id={`task-collapse-toggle-${taskID}`}
-      size="small"
-      variant="ghost"
       className="task-collapse-toggle"
       data-slot="collapse-toggle"
       aria-expanded={!collapsed}
@@ -198,7 +196,7 @@ function TaskDetail({ id, row, onSignal, onBusyChange, hiddenBy, onReveal }: {
             {row.external.map((wait, index) => wait.kind === "signal" ? (
               <li key={`e${index}`}>
                 signal {wait.name} ({wait.state === "satisfied" ? "fired" : "waiting"})
-                {wait.state === "unsatisfied" && <Button size="small" variant="ghost" onClick={() => onSignal(task.project, wait.name)}>Go to signal control</Button>}
+                {wait.state === "unsatisfied" && <Button onClick={() => onSignal(task.project, wait.name)}>Go to signal control</Button>}
               </li>
             ) : (
               <li key={`e${index}`}>pipeline run <Link to={`/pipelines/runs/${encodeURIComponent(wait.runID)}`}>{wait.runID}</Link> → {wait.outcomes.join(" or ")} ({wait.state})</li>
@@ -227,9 +225,9 @@ function TaskDetail({ id, row, onSignal, onBusyChange, hiddenBy, onReveal }: {
         </p>
       )}
       <div className="task-row-actions" data-slot="actions">
-        {actions.cancel && <Button size="small" onClick={() => act(() => cancel.mutateAsync(task.task_id))}>Cancel</Button>}
-        {actions.retry && <Button size="small" onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>}
-        {!restricted && <Button size="small" variant="ghost" onClick={() => act(() => remove.mutateAsync(task.task_id))}>Delete</Button>}
+        {actions.cancel && <Button onClick={() => act(() => cancel.mutateAsync(task.task_id))}>Cancel</Button>}
+        {actions.retry && <Button onClick={() => act(() => retry.mutateAsync(task.task_id))}>Retry</Button>}
+        {!restricted && <Button variant="danger" onClick={() => act(() => remove.mutateAsync(task.task_id))}>Delete</Button>}
       </div>
       {actions.recordResult && !restricted && <RecordResultForm task={task} onError={setError} />}
       {actions.rearm && !restricted && <RearmForm task={task} onError={setError} />}
@@ -370,7 +368,7 @@ function ProjectSection({ project, title, query, focused, open, onToggle, onSign
       {query.isError && (
         <p className="form-error" role="alert">
           {work ? "Refreshing failed; showing the last loaded tasks, which may be stale. " : `Tasks for ${title} could not be loaded. `}
-          <Button size="small" variant="ghost" onClick={() => void query.refetch()}>Try again</Button>
+          <Button onClick={() => void query.refetch()}>Try again</Button>
         </p>
       )}
       {work && query.data!.length === 0 && <p className="tasks-empty">No tasks in this project. Tasks agents create for dependent work appear here.</p>}

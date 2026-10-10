@@ -269,23 +269,7 @@
 }
 
 .agent-card .agent-card-toggle {
-  background: var(--ad-surface-raised);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-small);
-  color: var(--ad-text-muted);
   flex: none;
-  height: 26px;
-  min-height: 26px;
-  min-width: 26px;
-  padding: 0;
-  width: 26px;
-}
-
-.agent-card .agent-card-toggle:hover:not(:disabled) {
-  background: var(--ad-surface-subtle);
-  box-shadow: none;
-  color: var(--ad-text-primary);
-  transform: none;
 }
 
 .agent-card-runtime {
@@ -553,30 +537,6 @@
   justify-content: flex-end;
 }
 
-.dashboard-chat-composer .composer button {
-  font-size: 0.75rem;
-  min-height: 32px;
-  min-width: 0;
-}
-
-.dashboard-chat-composer .composer .composer-icon {
-  background: var(--ad-surface-subtle);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-medium);
-  color: var(--ad-text-muted);
-  height: 32px;
-  min-height: 32px;
-  min-width: 32px;
-  padding: 0;
-  width: 32px;
-}
-
-.dashboard-chat-composer .composer button:hover:not(:disabled) {
-  box-shadow: none;
-  color: var(--ad-text-primary);
-  transform: none;
-}
-
 .state-badge {
   align-items: center;
   display: inline-flex;
@@ -619,7 +579,6 @@
 }
 
 .empty-state button {
-  background: var(--ad-action-primary);
   justify-self: start;
 }
 

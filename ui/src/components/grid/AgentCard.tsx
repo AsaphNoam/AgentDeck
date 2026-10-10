@@ -62,7 +62,6 @@ export function AgentCard({ agent, lastLine, projectTitle, showProject = true, e
           {expandable && <IconButton
             className="agent-card-toggle"
             data-slot="collapse-control"
-            size="small"
             type="button"
             aria-expanded={expanded}
             aria-label={expanded ? "Collapse" : "Expand"}

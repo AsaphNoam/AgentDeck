@@ -166,7 +166,7 @@ export function ChatPanel() {
         {pendingAnnotations > 0 && (
           <div>
             <p>{pendingAnnotations} pending annotation{pendingAnnotations === 1 ? "" : "s"} cannot be sent because the source agent no longer exists.</p>
-            <button type="button" onClick={() => discardAnnotations(id)}>Discard pending annotations</button>
+            <button type="button" className="ad-button-secondary" onClick={() => discardAnnotations(id)}>Discard pending annotations</button>
           </div>
         )}
         <Link to="/">Back</Link>
@@ -306,8 +306,8 @@ export function ChatPanel() {
           {runtimeChanged ? (
             <div className="chat-runtime-pending">
               <span>Unapplied changes</span>
-              <button className="chat-runtime-switch" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>
-              <button className="chat-runtime-discard" type="button" disabled={switching} onClick={() => setRuntime(currentRuntime)}>Discard</button>
+              <button className="chat-runtime-switch ad-button-primary" type="button" disabled={!runtimeListed || switching} onClick={() => void submitRuntimeSwitch()}>{switching ? "Switching…" : "Switch"}</button>
+              <button className="ad-button-secondary" type="button" disabled={switching} onClick={() => setRuntime(currentRuntime)}>Discard</button>
             </div>
           ) : sessionSettings && (
             <span className="chat-runtime-hint">Effort and speed apply to the next turn</span>

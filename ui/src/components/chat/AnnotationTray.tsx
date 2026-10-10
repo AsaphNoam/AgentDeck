@@ -74,14 +74,14 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
         <div>
           <button
             type="button"
-            className="annotation-tray-collapse"
+            className="annotation-tray-collapse ad-button-icon"
             aria-expanded={!collapsed}
             aria-label={collapsed ? "Expand pending annotations" : "Collapse pending annotations"}
             onClick={() => setCollapsed(sourceId, !collapsed)}
           >
             {collapsed ? "‹" : "›"}
           </button>
-          <button type="button" className="annotation-link annotation-tray-discard" onClick={() => discard(sourceId)} disabled={sending}>Discard all</button>
+          <button type="button" className="annotation-tray-discard ad-button-danger" onClick={() => discard(sourceId)} disabled={sending}>Discard all</button>
         </div>
       </header>
       <div className="annotation-tray-body">
@@ -106,7 +106,7 @@ export function AnnotationTray({ sourceId, sourceActive }: { sourceId: string; s
           )}
         </div>
         {error && <p className="annotation-error">{error}</p>}
-        <button type="button" className="annotation-send" onClick={() => void send()} disabled={sending}>{sending ? "Sending…" : target === "new" ? "Continue to launch" : "Send annotations"}</button>
+        <button type="button" className="annotation-send ad-button-primary" onClick={() => void send()} disabled={sending}>{sending ? "Sending…" : target === "new" ? "Continue to launch" : "Send annotations"}</button>
       </footer>
       <NewAgentModal open={showLaunch} onClose={() => setShowLaunch(false)} initialRole={source?.role} initialProject={source?.project} onLaunched={onLaunched} />
     </aside>
@@ -126,7 +126,7 @@ function AnnotationDraftRow({ draft, index, sourceId, onRemove, onUpdate, disabl
     <li className="annotation-draft">
       {/* The anchor is what the reader scans for, so it is the row's heading
           rather than bold text sharing a line with a control (FS-13.R22). */}
-      <div className="annotation-draft-head"><h3 className="annotation-draft-anchor">{anchor}</h3><button type="button" className="annotation-link" onClick={() => onRemove(sourceId, index)} disabled={disabled}>Remove</button></div>
+      <div className="annotation-draft-head"><h3 className="annotation-draft-anchor">{anchor}</h3><button type="button" className="ad-button-danger" onClick={() => onRemove(sourceId, index)} disabled={disabled}>Remove</button></div>
       <blockquote>{draft.excerpt}</blockquote>
       <label>Instruction<AutoGrowTextarea value={draft.instruction} maxLength={2000} onChange={(event) => onUpdate(sourceId, index, event.target.value)} disabled={disabled} /></label>
     </li>

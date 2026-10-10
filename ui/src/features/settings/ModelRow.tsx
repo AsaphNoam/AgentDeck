@@ -116,7 +116,7 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
         <button type="button" className="btn-link" onClick={() => setExpanded((x) => !x)}>
           {showEditor ? "▴ env" : `▾ env (${pairs.length})`}
         </button>
-        <button type="button" className="config-text-action config-text-action-danger" onClick={onRemove}>Remove</button>
+        <button type="button" className="config-text-action-danger ad-button-danger" onClick={onRemove}>Remove</button>
       </div>
       {showEditor && (
         <div className="model-env-editor">
@@ -181,7 +181,7 @@ export function ModelRow({ modelId, model, isDefault, radioGroup, capability, on
                   updateEnv(next);
                 }}
               />
-              <button type="button" onClick={() => updateEnv(pairs.filter((_, j) => j !== i))}>×</button>
+              <button type="button" className="ad-button-icon" onClick={() => updateEnv(pairs.filter((_, j) => j !== i))}>×</button>
             </div>
           ))}
           <button type="button" className="btn-link" onClick={() => updateEnv([...pairs, { key: "", value: "" }])}>

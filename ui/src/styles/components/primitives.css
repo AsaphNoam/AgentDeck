@@ -1,75 +1,121 @@
 @layer ad-components {
+/* FS-12.R68 "Just enough": the baseline button is the text-led secondary action. */
 .ad-button,
 button {
+  --ad-button-height: 32px;
+  --ad-button-fill: transparent;
+  --ad-button-line: transparent;
+  --ad-button-inset: 0px;
   align-items: center;
-  background: var(--ad-surface-raised);
-  border: var(--ad-border-thin) solid var(--ad-border-strong);
-  border-radius: var(--ad-radius-medium);
-  color: var(--ad-text-primary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-text-muted);
   cursor: pointer;
   display: inline-flex;
   font-family: var(--ad-font-text);
-  font-weight: 650;
+  font-size: 0.75rem;
+  font-weight: 500;
+  gap: var(--ad-space-2);
   justify-content: center;
-  line-height: 1.1;
-  min-height: 36px;
-  padding: var(--ad-space-2) var(--ad-space-3);
-  transition: background-color 120ms ease, color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  line-height: 1.4;
+  min-height: var(--ad-button-height);
+  padding: 0 var(--ad-space-1);
+  text-underline-offset: var(--ad-space-1);
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .ad-button:hover:not(:disabled),
 button:hover:not(:disabled) {
-  background: var(--ad-highlight);
-  box-shadow: var(--ad-shadow-keyline);
-  transform: translate(-1px, -1px);
+  color: var(--ad-text-primary);
 }
 
-.ad-button:active:not(:disabled),
-button:active:not(:disabled) {
-  box-shadow: none;
-  transform: translate(0, 0);
+button:not([class]):hover:not(:disabled),
+.ad-button-secondary:hover:not(:disabled),
+.ad-button-ghost:hover:not(:disabled),
+.ad-button-danger:hover:not(:disabled),
+.btn-link:hover:not(:disabled),
+.btn-danger:hover:not(:disabled) {
+  text-decoration: underline;
 }
 
 .ad-button:disabled,
 button:disabled {
+  color: var(--ad-text-muted);
   cursor: not-allowed;
-  opacity: 0.48;
+  opacity: 0.45;
 }
 
-.ad-button-primary {
-  background: var(--ad-action-primary);
-  color: var(--ad-action-primary-ink, var(--ad-text-inverse));
+/* Primary and Send carry a faint outline layer; the visible surface insets on touch targets. */
+.ad-button-primary,
+.ad-button-icon-primary {
+  color: var(--ad-text-primary);
+  isolation: isolate;
+  padding-inline: calc(var(--ad-space-1) * 2.5);
+  position: relative;
+  --ad-button-line: color-mix(in srgb, var(--ad-text-muted) 22%, transparent);
 }
 
-.ad-button-secondary {
-  background: var(--ad-surface-raised);
+.ad-button-primary::before,
+.ad-button-icon-primary::before {
+  background: var(--ad-button-fill);
+  border: var(--ad-border-thin) solid var(--ad-button-line);
+  border-radius: var(--ad-radius-small);
+  content: "";
+  inset: var(--ad-button-inset) 0;
+  pointer-events: none;
+  position: absolute;
+  transition: background-color 150ms ease, border-color 150ms ease;
+  z-index: -1;
 }
 
+.ad-button-primary:hover:not(:disabled),
+.ad-button-icon-primary:hover:not(:disabled) {
+  --ad-button-fill: color-mix(in srgb, var(--ad-surface-subtle) 35%, transparent);
+  --ad-button-line: color-mix(in srgb, var(--ad-text-muted) 40%, transparent);
+}
+
+.ad-button-primary:active:not(:disabled),
+.ad-button-icon-primary:active:not(:disabled) {
+  --ad-button-fill: var(--ad-surface-subtle);
+}
+
+.ad-button-primary::after {
+  background: currentColor;
+  content: "";
+  flex-shrink: 0;
+  height: 14px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h16m-6-6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  width: 14px;
+}
+
+.ad-button-secondary,
 .ad-button-ghost,
 .btn-link {
-  background: transparent;
-  border-color: transparent;
-  color: var(--ad-action-secondary);
+  color: var(--ad-text-muted);
 }
 
 .ad-button-danger,
-.btn-danger {
-  border-color: var(--ad-state-error);
-  color: var(--ad-state-error);
-}
-
+.btn-danger,
 .ad-button-danger:hover:not(:disabled),
 .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ad-state-error) 10%, var(--ad-surface-raised));
+  color: color-mix(in srgb, var(--ad-state-error) 65%, var(--ad-text-primary));
 }
 
-.ad-button-icon {
-  aspect-ratio: 1;
-  min-width: 36px;
-  padding: var(--ad-space-2);
+.ad-button-icon,
+.ad-button-icon-primary {
+  flex-shrink: 0;
+  min-width: var(--ad-button-height);
+  padding: 0;
+  width: var(--ad-button-height);
 }
 
-.ad-button-icon [data-slot="label"] {
+.ad-button-icon:hover:not(:disabled) {
+  background: var(--ad-surface-subtle);
+}
+
+.ad-button-icon [data-slot="label"],
+.ad-button-icon-primary [data-slot="label"] {
   display: inline-grid;
   place-items: center;
 }
@@ -79,27 +125,21 @@ button:disabled {
   flex-shrink: 0;
 }
 
-.ad-button-small,
-.btn-sm {
-  font-size: 0.75rem;
-  min-height: 28px;
-  padding: var(--ad-space-1) var(--ad-space-2);
+@media (pointer: coarse) {
+  .ad-button,
+  button {
+    --ad-button-height: 44px;
+    --ad-button-inset: var(--ad-space-2);
+  }
 }
 
-.ad-button-medium {
-  min-height: 36px;
-}
-
-.btn-link {
-  min-height: auto;
-  padding: var(--ad-space-1) var(--ad-space-2);
-}
-
-.btn-link:hover:not(:disabled) {
-  background: var(--ad-surface-emphasis);
-  box-shadow: none;
-  text-decoration: underline;
-  transform: none;
+@media (prefers-reduced-motion: reduce) {
+  .ad-button,
+  button,
+  .ad-button-primary::before,
+  .ad-button-icon-primary::before {
+    transition: none;
+  }
 }
 
 .ad-badge {

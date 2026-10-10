@@ -343,7 +343,7 @@ export function RunStartForm({
         <strong>Shared project workspace</strong>
         <p>These active agents or runs use the same project directory. Chuck does not isolate their filesystem changes.</p>
         <ul>{conflicts.map((conflict) => <li key={`${conflict.kind}-${conflict.id}`}>{conflict.kind}: {conflict.name} <code>{conflict.id}</code></li>)}</ul>
-        <button type="button" disabled={start.isPending} onClick={() => submit(true)}>Confirm shared workspace and start</button>
+        <button type="button" className="ad-button-primary" disabled={start.isPending} onClick={() => submit(true)}>Confirm shared workspace and start</button>
       </div>}
       {notice && <p className="form-info">{notice}</p>}
       {diagnostics.length > 0 && (
@@ -355,10 +355,10 @@ export function RunStartForm({
       {stepMode ? <div className="pipeline-start-actions" data-slot="actions">
         <button type="button" onClick={onCancel}>Cancel</button>
         <span className="pipeline-start-blocker">{blocker}</span>
-        {step === 0 && <button type="button" disabled={setupIncomplete || assignmentsMissing} onClick={() => setStep(1)}>Review</button>}
+        {step === 0 && <button type="button" className="ad-button-primary" disabled={setupIncomplete || assignmentsMissing} onClick={() => setStep(1)}>Review</button>}
         {step === 1 && <button type="button" onClick={() => setStep(0)}>Back</button>}
-        {step === 1 && <button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
-      </div> : <div className="form-actions"><span className="pipeline-start-blocker">{blocker}</span><button type="button" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
+        {step === 1 && <button type="button" className="ad-button-primary" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button>}
+      </div> : <div className="form-actions"><span className="pipeline-start-blocker">{blocker}</span><button type="button" className="ad-button-primary" disabled={cannotStart} onClick={() => submit(false)}>{start.isPending ? "Starting…" : proposal ? "Confirm and start exact proposal" : "Start run"}</button></div>}
     </section>
   );
 }

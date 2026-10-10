@@ -45,7 +45,7 @@ export function ThinkTankStageFields({ stage, stageIndex, roleOptions, mutate }:
             <label className="form-field"><span>Role</span>{roleSelect(participant.role, (role) => edit((r) => { r.participants[index].role = role; }), `Participant ${index + 1} role`)}</label>
             <label className="form-field"><span>Contribution limit</span><input type="number" min={1} max={1000} value={participant.limit} onChange={(event) => edit((r) => { r.participants[index].limit = Number(event.target.value); })} /></label>
             <label className="pipeline-check"><input type="checkbox" checked={participant.may_leave} onChange={(event) => edit((r) => { r.participants[index].may_leave = event.target.checked; })} /> May leave</label>
-            <button type="button" disabled={room.participants.length <= 2} onClick={() => edit((r) => { r.participants.splice(index, 1); })}>Remove</button>
+            <button type="button" className="ad-button-danger" disabled={room.participants.length <= 2} onClick={() => edit((r) => { r.participants.splice(index, 1); })}>Remove</button>
           </li>
         ))}
       </ol>

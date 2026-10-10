@@ -42,7 +42,7 @@ export function TaskConcurrencyEditor() {
           />
         </label>
         {!valid && <p className="form-error">Enter a positive whole number.</p>}
-        <button type="submit" className="ad-button-primary config-primary-action" disabled={!valid || putConfig.isPending || config.isLoading}>
+        <button type="submit" className="ad-button-primary" disabled={!valid || putConfig.isPending || config.isLoading}>
           {putConfig.isPending ? "Saving…" : "Save"}
         </button>
       </form>

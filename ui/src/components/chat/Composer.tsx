@@ -214,22 +214,22 @@ export function Composer({ agentId, busy, running = true, steerable = false, var
       <div className="composer-toolbar">
       {!variant && (
         <div className="composer-references">
-          <button type="button" aria-label="Reference a file" title="Reference a file" onClick={() => insertTrigger("@")}>@</button>
-          <button type="button" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
+          <button type="button" className="ad-button-icon" aria-label="Reference a file" title="Reference a file" onClick={() => insertTrigger("@")}>@</button>
+          <button type="button" className="ad-button-icon" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
         </div>
       )}
       <div className="composer-actions">
-        <button type="submit" className="composer-icon" aria-label="Send" title="Send">{!variant && <span className="composer-send-label">Send</span>}<SendIcon /></button>
+        <button type="submit" className="composer-icon ad-button-icon-primary" aria-label="Send" title="Send">{!variant && <span className="composer-send-label">Send</span>}<SendIcon /></button>
         {busy && steerable && (
-          <button type="button" className="composer-steer" disabled={steering} onClick={() => void steer()}>Steer</button>
+          <button type="button" className="ad-button-secondary" disabled={steering} onClick={() => void steer()}>Steer</button>
         )}
         {held && (
-          <button type="button" className="composer-withdraw" onClick={() => void withdraw()}>Withdraw queued</button>
+          <button type="button" className="ad-button-secondary" onClick={() => void withdraw()}>Withdraw queued</button>
         )}
         {busy && (
           <button
             type="button"
-            className="composer-cancel composer-icon"
+            className="composer-icon ad-button-icon"
             aria-label="Cancel"
             title="Cancel"
             onClick={() => {

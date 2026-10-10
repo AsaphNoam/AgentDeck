@@ -134,7 +134,7 @@ export function PhoneSettings() {
         ) : lapsed ? (
           <>
             <p className="phone-error">Notifications are off: this phone stopped accepting them.</p>
-            <button type="button" className="phone-primary" disabled={offline || busy} onClick={() => void enable()}>
+            <button type="button" disabled={offline || busy} onClick={() => void enable()}>
               Turn notifications back on
             </button>
           </>
@@ -143,7 +143,7 @@ export function PhoneSettings() {
             Turn notifications off
           </button>
         ) : (
-          <button type="button" className="phone-primary" disabled={offline || busy} onClick={() => void enable()}>
+          <button type="button" disabled={offline || busy} onClick={() => void enable()}>
             Turn notifications on
           </button>
         )}
@@ -160,7 +160,7 @@ export function PhoneSettings() {
       {error && <p className="phone-error" role="alert">{error}</p>}
       <button
         type="button"
-        className="phone-danger"
+        className="ad-button-danger"
         disabled={offline || busy}
         onClick={() => setUnpairOpen(true)}
       >

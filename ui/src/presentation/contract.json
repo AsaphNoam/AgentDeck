@@ -13,7 +13,6 @@
     "--ad-text-primary",
     "--ad-text-secondary",
     "--ad-text-muted",
-    "--ad-text-inverse",
     "--ad-border-default",
     "--ad-border-strong",
     "--ad-action-primary",
@@ -87,7 +86,8 @@
         "secondary",
         "ghost",
         "danger",
-        "icon"
+        "icon",
+        "icon-primary"
       ]
     },
     "badge": {

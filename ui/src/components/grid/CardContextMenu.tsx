@@ -199,14 +199,14 @@ export function CardContextMenu() {
                 <form className="config-form" onSubmit={(event) => { event.preventDefault(); submitRename(); }}>
                   <div className="form-field"><label htmlFor="agent-name">Name</label><input id="agent-name" value={name} onChange={(event) => setName(event.target.value)} /></div>
                   {dialogError && <p className="form-error">{dialogError}</p>}
-                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit">Rename</button></div>
+                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" className="ad-button-primary">Rename</button></div>
                 </form>
               )}
               {dialog.kind === "group" && (
                 <form className="config-form" onSubmit={(event) => { event.preventDefault(); submitMoveGroup(); }}>
                   <div className="form-field"><label htmlFor="agent-group">Group</label><GroupPicker id="agent-group" value={group} groups={groupLabels} onChange={setGroup} /><span className="form-hint">Leave blank to remove this agent from its group.</span></div>
                   {dialogError && <p className="form-error">{dialogError}</p>}
-                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit">Move</button></div>
+                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" className="ad-button-primary">Move</button></div>
                 </form>
               )}
               {dialog.kind === "switch" && (
@@ -218,11 +218,11 @@ export function CardContextMenu() {
                   {terminalSupportMissing && (
                     <div className="form-warning" role="status">
                       <p>Launch options could not be loaded, so Terminal is not offered.{terminalUnverified && " Retry to verify the Terminal switch."}</p>
-                      <button type="button" onClick={() => void refetchBackends()} disabled={backendsFetching}>{backendsFetching ? "Retrying…" : "Retry"}</button>
+                      <button type="button" className="ad-button-secondary" onClick={() => void refetchBackends()} disabled={backendsFetching}>{backendsFetching ? "Retrying…" : "Retry"}</button>
                     </div>
                   )}
                   {dialogError && <p className="form-error">{dialogError}</p>}
-                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" disabled={!runtime.backend || !runtime.model || terminalUnverified}>Switch runtime</button></div>
+                  <div className="form-actions" data-slot="actions"><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" className="ad-button-primary" disabled={!runtime.backend || !runtime.model || terminalUnverified}>Switch runtime</button></div>
                 </form>
               )}
             </Dialog.Content>

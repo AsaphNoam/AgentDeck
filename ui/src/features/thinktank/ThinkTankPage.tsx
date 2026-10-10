@@ -231,9 +231,9 @@ function Room({ room }: { room: ThinkTankDetail }) {
           {(!ended || room.deletable) && <span className="think-tank-action-rule" aria-hidden="true" />}
           {!ended && room.control === "running" && <Button type="button" onClick={() => act(() => control.mutateAsync("pause"))} busy={control.isPending}><PauseIcon />Pause</Button>}
           {!ended && room.control === "pause_requested" && <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))}>Keep going</Button>}
-          {!ended && room.control === "paused" && <Button type="button" variant="primary" onClick={() => act(() => control.mutateAsync("resume"))} busy={control.isPending}>Resume</Button>}
-          {!ended && room.control !== "end_requested" && <Button type="button" className="think-tank-quiet-danger" onClick={() => setConfirm("end")}>End discussion</Button>}
-          {room.deletable && <Button type="button" className="think-tank-quiet-danger" onClick={() => setConfirm("delete")}>Delete</Button>}
+          {!ended && room.control === "paused" && <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))} busy={control.isPending}>Resume</Button>}
+          {!ended && room.control !== "end_requested" && <Button type="button" variant="danger" onClick={() => setConfirm("end")}>End discussion</Button>}
+          {room.deletable && <Button type="button" variant="danger" onClick={() => setConfirm("delete")}>Delete</Button>}
         </div>
       </header>
       <div className="think-tank-context">
@@ -336,12 +336,12 @@ function Room({ room }: { room: ThinkTankDetail }) {
             <div className="think-tank-status-actions">
               {room.phase === "setup" && room.hold && <Button type="button" onClick={() => act(() => retry.mutateAsync({ target: "setup" }))}>Retry launch</Button>}
               {failedOpenings.map((a) => (
-                <Button key={a.attempt_id} type="button" variant="primary" onClick={() => act(() => retry.mutateAsync({ target: "turn", attempt_id: a.attempt_id }))}>
+                <Button key={a.attempt_id} type="button" onClick={() => act(() => retry.mutateAsync({ target: "turn", attempt_id: a.attempt_id }))}>
                   Retry {memberName(room, a.agent_id)}&rsquo;s opening
                 </Button>
               ))}
               {room.phase !== "setup" && room.hold && !ended && failedOpenings.length === 0 && (
-                <Button type="button" variant="primary" onClick={() => act(() => retry.mutateAsync({ target: "turn" }))}>{failedTurn ? "Retry turn" : "Resume"}</Button>
+                <Button type="button" onClick={() => act(() => retry.mutateAsync({ target: "turn" }))}>{failedTurn ? "Retry turn" : "Resume"}</Button>
               )}
               {failedOpenings.length > 0 && room.control === "paused" && (
                 <Button type="button" onClick={() => act(() => control.mutateAsync("resume"))}>Resume</Button>

@@ -22,7 +22,7 @@ export function PhoneSheet({ title, onClose, children }: { title: string; onClos
           restoreFocusRef.current = null;
         }}
       >
-        <div className="phone-section-title"><Dialog.Title data-slot="title">{title}</Dialog.Title><Dialog.Close className="phone-sheet-close" aria-label="Close dialog">×</Dialog.Close></div>
+        <div className="phone-section-title"><Dialog.Title data-slot="title">{title}</Dialog.Title><Dialog.Close className="phone-sheet-close ad-button-icon" aria-label="Close dialog">×</Dialog.Close></div>
         {children}
       </Dialog.Content>
     </Dialog.Portal>

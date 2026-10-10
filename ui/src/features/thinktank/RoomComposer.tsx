@@ -149,8 +149,8 @@ export function RoomComposer({ room }: { room: ThinkTankDetail }) {
         </div>
         <div className="composer-toolbar">
           <div className="composer-references">
-            <button type="button" aria-label="Address a participant or reference a file" title="Address a participant or reference a file" onClick={() => insertTrigger("@")}>@</button>
-            <button type="button" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
+            <button type="button" className="ad-button-icon" aria-label="Address a participant or reference a file" title="Address a participant or reference a file" onClick={() => insertTrigger("@")}>@</button>
+            <button type="button" className="ad-button-icon" aria-label="Insert a command" title="Insert a command" onClick={() => insertTrigger("#")}>#</button>
             {sources.length > 0 && (
               <select className="think-tank-composer-source" aria-label="Files and commands from" title="Files and commands from" value={selectedSource?.agent_id ?? ""} onChange={(event) => { setSourceId(event.target.value); autocomplete.reset(); }}>
                 {sources.map((m) => <option key={m.agent_id} value={m.agent_id}>{m.name}</option>)}
@@ -158,7 +158,7 @@ export function RoomComposer({ room }: { room: ThinkTankDetail }) {
             )}
           </div>
           <div className="composer-actions">
-            <button type="submit" className="composer-icon" aria-label="Send to room" title="Send to room" disabled={!text.trim() || send.isPending}><span className="composer-send-label">Send to room</span><SendIcon /></button>
+            <button type="submit" className="composer-icon ad-button-icon-primary" aria-label="Send to room" title="Send to room" disabled={!text.trim() || send.isPending}><span className="composer-send-label">Send to room</span><SendIcon /></button>
           </div>
         </div>
         {addressed.length > 0 && (

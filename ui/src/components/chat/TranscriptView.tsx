@@ -137,7 +137,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         {results.isError && (
           <p className="form-error" role="status" data-ui="think-tank" data-slot="results-error">
             Think Tank synthesis could not be loaded.{" "}
-            <Button type="button" onClick={() => void results.refetch()}>Retry</Button>
+            <Button type="button" variant="secondary" onClick={() => void results.refetch()}>Retry</Button>
           </p>
         )}
         <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
@@ -145,7 +145,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
         {held !== undefined && <HeldMessage agentId={agentId} text={held} />}
       </div>
       {!atBottom && (
-        <button type="button" className="jump-to-latest" onClick={jumpToLatest}>
+        <button type="button" className="jump-to-latest ad-button-secondary" onClick={jumpToLatest}>
           Jump to latest
         </button>
       )}
@@ -215,7 +215,7 @@ function HeldMessage({ agentId, text }: { agentId: string; text: string }) {
       <p className="transcript-held-text">{text}</p>
       <button
         type="button"
-        className="transcript-held-withdraw"
+        className="transcript-held-withdraw ad-button-secondary"
         onClick={() => {
           setError(null);
           withdrawHeldMessage(agentId).catch(() => setError("Could not withdraw — it may already have been sent."));

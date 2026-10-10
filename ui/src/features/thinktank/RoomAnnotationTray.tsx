@@ -70,7 +70,7 @@ export function RoomAnnotationTray({ room }: { room: ThinkTankDetail }) {
       <header className="annotation-tray-header">
         <div><strong className="annotation-tray-title">Pending annotations</strong><span>{drafts.length}/20</span></div>
         <div>
-          <button type="button" className="annotation-link annotation-tray-discard" onClick={() => discard(sourceId)} disabled={send.isPending}>Discard all</button>
+          <button type="button" className="annotation-tray-discard ad-button-danger" onClick={() => discard(sourceId)} disabled={send.isPending}>Discard all</button>
         </div>
       </header>
       <div className="annotation-tray-body">
@@ -79,7 +79,7 @@ export function RoomAnnotationTray({ room }: { room: ThinkTankDetail }) {
             <li className="annotation-draft" key={`${draft.room_anchor}-${draft.seq ?? draft.path}-${index}`}>
               <div className="annotation-draft-head">
                 <h3 className="annotation-draft-anchor">{roomAnchorLabel(draft)}</h3>
-                <button type="button" className="annotation-link" onClick={() => remove(sourceId, index)} disabled={send.isPending}>Remove</button>
+                <button type="button" className="ad-button-danger" onClick={() => remove(sourceId, index)} disabled={send.isPending}>Remove</button>
               </div>
               <blockquote>{draft.excerpt}</blockquote>
               <label>Instruction<AutoGrowTextarea value={draft.instruction} maxLength={2000} onChange={(event) => updateInstruction(sourceId, index, event.target.value)} disabled={send.isPending} /></label>
@@ -106,7 +106,7 @@ export function RoomAnnotationTray({ room }: { room: ThinkTankDetail }) {
           )}
         </div>
         {error && <p className="annotation-error" role="alert">{error}</p>}
-        <button type="button" className="annotation-send" onClick={submit} disabled={send.isPending}>
+        <button type="button" className="annotation-send ad-button-primary" onClick={submit} disabled={send.isPending}>
           {send.isPending ? "Sending…" : effectiveTarget === "new" ? "Continue to launch" : effectiveTarget === "room" ? "Send to room" : "Send annotations"}
         </button>
       </footer>

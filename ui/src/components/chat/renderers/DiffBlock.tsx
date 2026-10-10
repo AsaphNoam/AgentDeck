@@ -38,7 +38,7 @@ export function DiffBlock({ event, onAnnotate, onOpenFile, selectHint = "Click l
           <button type="button" className="file-link" data-file-path={String(event.path)} onClick={() => onOpenFile({ path: String(event.path) })}><strong>{String(event.path)}</strong></button>
         ) : (
           <strong>{String(event.path ?? "diff")}</strong>
-        )}<small>{selectHint}</small>{selection && <button type="button" className="annotation-event-trigger" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
+        )}<small>{selectHint}</small>{selection && <button type="button" className="annotation-event-trigger ad-button-secondary" onClick={addSelection}>Annotate lines {Math.min(selection.start, selection.end)}–{Math.max(selection.start, selection.end)}</button>}</div>
       <ReactDiffViewer oldValue={String(event.old_text ?? event.old ?? "")} newValue={String(event.new_text ?? event.new ?? "")} splitView={false} styles={diffTheme} onLineNumberClick={chooseLine} />
     </article>
   );

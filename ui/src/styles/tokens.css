@@ -63,7 +63,6 @@
   --ad-text-primary: var(--ad-core-ink);
   --ad-text-secondary: var(--ad-core-text);
   --ad-text-muted: var(--ad-core-muted);
-  --ad-text-inverse: var(--ad-core-raised);
   --ad-border-default: var(--ad-core-line);
   --ad-border-strong: var(--ad-core-line-strong);
   --ad-action-primary: var(--ad-core-primary);

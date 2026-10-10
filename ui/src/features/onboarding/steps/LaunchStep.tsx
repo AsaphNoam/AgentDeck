@@ -119,7 +119,7 @@ export function LaunchStep({ onDone, initialProject, claimMutation, releaseMutat
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-actions" data-slot="actions">
-        <button type="button" onClick={handleLaunch} disabled={launch.isPending || putConfig.isPending || !role || !project}>
+        <button type="button" className="ad-button-primary" onClick={handleLaunch} disabled={launch.isPending || putConfig.isPending || !role || !project}>
           {launch.isPending ? "Launching…" : putConfig.isPending ? "Completing setup…" : "Launch"}
         </button>
         {launchSucceeded && !putConfig.isSuccess && (

@@ -546,6 +546,26 @@ Requirements are user-observable.
   form. This supersedes FS-02.R62's unabridged display only; the percentage, the
   percentage-only fallback, and the retained raw integers are unchanged.
 
+- **R68 — Every button speaks the Figma "Just enough" action language.** The
+  `/study/buttons` study and its `ActionButton` in AgentDeck — Theme Exploration
+  (`OykxmXqZnnyA67QA1lv3AU`) govern every action button on desktop and phone. A primary action
+  (the one forward or confirming action of its form, dialog or section) has a faint thin outline,
+  no fill, foreground text and a small trailing arrow; hovering adds a faint tint and strengthens
+  the outline. Secondary actions are text-led: no border or fill, muted text that turns to
+  foreground and underlines on hover. Destructive actions are text-led in the appearance's error
+  tone. Icon-only actions are compact, unboxed squares with a quiet tinted hover; Send-style icon
+  actions keep the faint outline without an arrow. Every action is low and small (12px medium
+  text, 32px tall, a small radius) with no raised shadow, lift or highlight fill; disabled
+  actions fade; focus shows the appearance's ring. On the phone and on touch pointers every
+  action keeps a 44px target around the same light surface. Navigation controls (tabs, segmented
+  choices, toggles, filters, nav items) keep their structure and selected-state cues and only
+  adopt the small type; clickable content rows, cards, menu items and picker options keep their
+  layout. All three appearances express the language through their semantic palettes. This
+  supersedes, for buttons only, the raised bordered button with highlight-fill hover and lift of
+  §2.1 and the button construction inherited by R52–R67's compositions (R65's quiet square Send
+  stays, now the shared icon-primary action). Labels, placement, order, disabled reasons and
+  actions are unchanged.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -801,6 +821,15 @@ Requirements are user-observable.
   the name opens the agent page, drag reorder, context menu, Send/Cancel and pane cycling still
   work, and keyboard focus is visible on the name, chevron and grip.
   *Verify:* focused component tests plus the working tree's real-browser comparison.
+
+- **A38** (R68) — Compare the rendered `/study/buttons` study with real surfaces at 1024px and
+  1440px desktop and 390px phone in Core, Sky & Grove and Studio: dashboard and agent page
+  (composer, permission card, header actions), launch and confirm dialogs, Settings, onboarding,
+  Tasks, Pipelines, Think Tank room and Archive, and the phone home, agent, pipeline and pairing
+  screens. Primary, secondary, destructive, icon and Send actions match the study's construction
+  in rest, hover, focus and disabled states without overflow; navigation controls keep a
+  visible selected state; phone actions measure at least 44px.
+  *Verify:* style/presentation checks plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions
 
