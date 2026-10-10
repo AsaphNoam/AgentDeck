@@ -562,6 +562,10 @@ Suggestions retain the existing all-project scope and unique trimmed labels. The
 Ungrouped key is not a usable name. Groups remain agent identity labels stored on the Mac;
 there is no independently retained empty group. Confirmed membership changes are visible on
 desktop and phone through shared live state, regardless of which device made the change.
+Filtering matches substrings without case sensitivity, while stored names remain case-sensitive;
+trimmed exact matches reuse the existing label. Phone section collapse is local presentation state,
+not a membership change. Existing room-deployment and annotation-assignment creation flows retain
+their own grouping behavior; this change adds the editable picker to ordinary New agent.
 
 **R73 (planned).** New agent offers an optional Group field with R72's selection, filtering
 and new-name choice. Blank launches an ungrouped agent; success places the agent in its chosen
@@ -581,9 +585,11 @@ desktop and phone. Stop group replaces the user-facing Release group label, stop
 members while retaining the group, stopped agents and conversations. Archive group stops running
 members and archives every non-archived member under FS-05.R32/R34's preservation and individual
 restoration rules; it does not archive the project or delete conversations. Both actions first
-show the named group, action scope and member count in a confirmation with Cancel focused.
-The proposal limits actions to the current project's members; final scope awaits confirmation.
-Ungrouped has no bulk action in this proposal.
+show the named group, project, total non-archived member count and running count in a confirmation
+with Cancel focused. Stop is unavailable when no member is running; Archive includes stopped members.
+Ungrouped has no bulk action. Both actions affect only members in the current project;
+same-named groups in other projects are untouched. This supersedes R20's dashboard Release
+group scope and label; compatibility for existing API clients is specified separately.
 
 **R76 (planned).** Group actions disable repeat submission while pending and report
 success or the identities and reasons of failed members. A lifecycle conflict discovered before
@@ -948,11 +954,10 @@ failure with per-member feedback and retry. — server/UI tests and a fake-provi
 
 ## 6. Deviations & open decisions
 
-- R72–R73/A54–A55 scope confirmed: all-project suggestions, desktop/phone creation,
-  collapsible phone sections and bidirectional membership updates. Expanded R74–R76/A56–A57
-  await confirmation of project-scoped bulk actions and desktop drag with phone picker, versus
-  mobile drag too. Proposed named-group bulk actions preserve conversations and allow individual
-  Restore. No technical design or ready change yet.
+- R72–R76/A54–A57 scope confirmed: all-project suggestions, desktop/phone creation,
+  collapsible phone sections, bidirectional membership updates, project-only bulk actions,
+  desktop drag and phone picker. Archive preserves conversations and individual Restore.
+  Technical protocol and narrow paired-phone route extension await confirmation; no ready change yet.
 
 - R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
   creation and the conversation-page behavior.

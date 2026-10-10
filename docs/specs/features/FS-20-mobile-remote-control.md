@@ -279,8 +279,8 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   and blank removal. Group headers offer FS-02.R75–R76's Stop group and Archive group with their
   confirmations and result feedback. Offline disables these actions under R23; a refused move or
   launch retains entered values. This supersedes R35's groups exclusion and extends phone
-  management only for these group actions. Desktop drag and the phone picker are the proposed move
-  controls; mobile drag scope awaits confirmation.
+  management only for these group actions. Desktop uses drag and the picker; the phone uses
+  the picker, with no mobile drag. These actions update desktop and other phones live.
 
 ## 3. States & transitions
 
@@ -417,9 +417,9 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 
 ## 6. Deviations & open decisions
 
-- R45/A17's collapsible sections and bidirectional updates are confirmed. R46/A18 add requested
-  phone reassignment and bulk group actions; project scope and mobile drag remain open with
-  FS-02.R75. New group controls remain planned; shipped exclusions are superseded only on delivery.
+- R45–R46/A17–A18 are confirmed, including project-only bulk actions and mobile picker
+  without drag. The narrow paired-phone route extension awaits technical confirmation.
+  New controls remain planned; shipped exclusions are superseded only on delivery.
 
 - R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of

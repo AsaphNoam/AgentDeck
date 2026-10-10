@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Current
+**Status:** Partial
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -242,6 +242,18 @@ the installed app on iOS.
   the agent's current runtime respectively; effort defaults to the model's `default_effort`
   (FS-20.R35/R36).
 
+- **R24 (planned) — Paired phones gain only the confirmed group controls.** Extend R21's
+  launch field allowlist with `group`. Allow existing `POST /api/sessions/{id}/identity` only
+  with a required string `group`; reject name, project, role, runtime and all other fields with
+  `remote_field_not_allowed`. Allow TS-03.R57's project-scoped group stop/archive routes with
+  exactly the required string `group`, rejecting all other fields; keep global
+  `/api/groups/{group}/release` denied. All use R4's guard,
+  device authentication, R6's 1 MiB body bound/device attribution and the shared desktop services
+  and group validator. No phone-only persistence or broad identity/config access is added.
+  Archive reads, Restore and layout writes remain denied. Inventory tests independently cover
+  the new route producers and rejection of forbidden fields, revoked/unpaired devices and global
+  group release. This narrowly supersedes R5/R21's group and identity exclusions.
+
 ## 3. Interfaces & data shapes
 
 Loopback-only: `GET /api/remote`, `PUT /api/remote` `{enabled, keep_awake}`, `POST
@@ -281,6 +293,8 @@ listener by R4's guard), INV §15 (commit device rows before releasing cookies o
 INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
+
+- R24's narrow paired-phone group mutation access awaits human confirmation with TS-03.R57.
 
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.

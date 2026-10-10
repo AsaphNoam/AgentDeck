@@ -40,8 +40,8 @@ the relevant feature and technical specifications; it does not change product co
   on mobile. The operator confirmed all-project suggestions, desktop/phone creation and
   collapsible phone sections with Ungrouped last, adding bidirectional updates, cross-group
   drag, Stop group and Archive group. Expanded draft: FS-02.R72–R76/A54–A57 and
-  FS-20.R45–R46/A17–A18. Awaiting confirmation of bulk-action scope (current project recommended)
-  and desktop drag with phone picker versus phone drag too. Proposal: named-group confirmations,
+  FS-20.R45–R46/A17–A18. Confirmed current-project bulk scope and desktop drag with phone picker.
+  Named-group confirmations,
   archive preserves conversation/history and individual restoration; preflight conflicts change
   nothing, operational member failures retain successes and identify failures for retry.
   Existing groups are labels on agent identities, not separately retained empty records.
@@ -51,7 +51,12 @@ the relevant feature and technical specifications; it does not change product co
   globally, and drag only changes order. Tailnet currently rejects group launch values and omits
   identity/group release routes, so phone group mutation needs an explicit narrow route extension.
   Cross-group drag overlaps the recorded drag-usability idea; whole-card dragging stays separate.
-  No technical design, product code or ready change yet.
+  Technical draft: TS-03.R56–R58, TS-08.R118, TS-13.R24. Add project-scoped
+  `POST /api/projects/{project}/groups/stop|archive` with `{group}`, preserving the existing global
+  release API; paired phones may use those routes, group launch and group-only identity updates.
+  Shared validation, existing lifecycle/archive gates, bounded member execution and per-member
+  errors preserve local truth and history. No schema migration or new retention. Await approval
+  of these additive API/phone access boundaries before promotion; no product code or ready change.
 
 - **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
   when a provider interrupts work because its quota is exhausted, show a system quota-limit

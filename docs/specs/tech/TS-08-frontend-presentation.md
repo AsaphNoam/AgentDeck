@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -1312,6 +1312,28 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   the project accent leaves agent cards (project cards keep it). No token, skin rule, motion or
   dependency is added. Verify with focused tests, the presentation checks and the A37 browser
   comparison.
+
+- **R118 (planned) — Group controls extend the existing feature-owned seams.** One shared
+  searchable group picker serves desktop Move/New agent and phone Manage/New agent; its owner
+  supplies loaded non-archived agent labels across projects and owns draft/commit/errors. Use
+  existing dialog, focus, keyboard and popover conventions with a visible list on opening,
+  case-insensitive substring filtering, exact stored-name selection and an explicit create option;
+  retain case-sensitive stored label identity. Trim before comparison so a whitespace variant
+  cannot create a duplicate label. Empty input offers Ungrouped; reserved names cannot be committed.
+  Existing shared NewAgentModal callers preserve their grouping behavior: room deployment
+  stays under FS-21.R51 and annotation assignment retains its existing behavior; ordinary New agent
+  flow owns the editable picker. No new UI dependency, token layer or motion is added.
+  CardGrid uses existing drag sensors and membership mutation, distinguishing section targets from
+  sortable cards: cross-group drop changes only identity, leaves persisted flat manual order
+  unchanged, then renders normal running-first placement. Same-group drops keep R45/R53 and
+  expanded panes remain non-draggable. The destination has a token-based highlight and named
+  drop target; the picker remains the keyboard alternative. Only server success commits membership.
+  A shared pure group projection supplies project membership/counts and running-first order to
+  desktop and phone. Phone collapse is transient view state and never writes desktop layout.
+  Group actions/results remain owned by a mounted project surface after archived rows disappear.
+  Reuse semantic tokens and phone/desktop spacing; verify focused interaction tests, style and
+  presentation checks, development matrix, and FS-02.A54–A57/FS-20.A17–A18 browser journeys in
+  Core, Sky & Grove and Studio. Phone is checked at 390px with 360px/430px long-name cases.
 
 ## 3. Interfaces & data shapes
 

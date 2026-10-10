@@ -768,6 +768,48 @@ retained source ids through the existing local file reader. Reconnect refills co
 SSE is never canonical history. Archive fetches rooms separately and preserves existing agent
 Archive wire shapes. Every room route remains desktop `localOnly`, outside the phone allowlist.
 
+**R56 (planned) — Group identity stays in the existing launch and identity contracts.**
+Desktop `LaunchParams` admits optional `group`, matching the existing server and phone client.
+Launch and identity updates share trimmed-name validation: blank means ungrouped and `_ungrouped`
+is reserved, returning `invalid_group_name`. No group resource, schema migration or retained empty
+record is added. Group edits take the existing per-agent lifecycle exclusion and archive/start
+gate before rereading and writing identity, preventing a move during an admitted bulk action;
+conflicts use R3's structured error. Persist identity before publishing the existing full
+`state_update`; connected desktop/phone entries and reconnect hydration consume that same truth.
+
+**R57 (planned) — Project group actions are additive, scoped lifecycle operations.** Add
+`POST /api/projects/{project}/groups/stop` and `/groups/archive`, each accepting exactly
+`{group:string}`. Carry the existing unrestricted trimmed label in JSON rather than imposing
+a path-safe name grammar. Resolve a deterministic snapshot of non-archived identities
+matching both project and normalized named group; empty membership returns `group_not_found`.
+The project is never archived by these routes. Existing `/api/groups/{group}/release` keeps its
+global semantics and response for compatibility; dashboard and phone use the scoped routes.
+Both new routes return `200 {project, group, results:[{agent_id, ok, error?:{code,message}}]}`
+after execution, including mixed member outcomes. Preflight failures return R3's envelope;
+empty collections serialize as `[]`. A disconnect/cancellation never rolls back already
+completed member changes, and retries resolve a new eligible snapshot.
+
+**R58 (planned) — Group lifecycle work reuses reservations and member services.** Reserve
+the complete snapshot before member side effects: Stop uses TS-01.R16's lifecycle claim and
+shared stop/teardown; Archive joins TS-01.R13's agent archive gate and the lifecycle exclusions
+needed against Stop/move/start. For Archive, take all agent archive reservations before all
+lifecycle claims; never acquire an archive reservation while holding a lifecycle claim. Acquire
+each set in stable agent-id order; release
+all on preflight conflict with no member changes, and release on every completion/error path.
+Reread the snapshot members under reservation to validate project/group/archive state; a
+changed member aborts preflight with conflict, and newly joined members are excluded. Do not
+take a project-archive claim or call HTTP handlers internally. Factor the existing individual
+archive member service for callers that already own its claim, preserving stop/teardown,
+durable archive flags, history and SSE publication. Member failure does not archive that member;
+if stop succeeded before archive persistence failed, its resulting stopped state remains visible
+and its error explicitly says it stopped but could not be archived. Archive flag commits use the
+existing transactional `SetAgentsArchived` seam; a failed batch commit archives none of that batch
+and reports failure for each otherwise successful member, without restarting stopped agents.
+Use at most four concurrent member workers, reuse Stop's existing cap, retain only the admitted
+snapshot/results for the request, and honor request cancellation between member operations.
+No new group job scheduler or persistence is introduced. Verify conflicts with Resume, Stop,
+Archive and regrouping, cross-project isolation, and failures after stop/before archive commit.
+
 ## 3. Interfaces & data shapes
 
 Planned additive backend response field (R47; the example shows one entry, but all registered
@@ -811,6 +853,9 @@ integers instead of silently applying defaults.
   together; no API field or directory is left unreachable or undocumented.
 
 ## 5. Deviations & open decisions
+
+- R56–R58 are the group-design technical draft; additive project action routes, legacy release
+  compatibility and TS-13.R24's narrow phone access extension await human confirmation.
 
 - **Pipeline replacement:** TS-09.R44 changes pipeline template/start/detail payloads to version 2
   without retaining old pipeline payload compatibility, under FS-14.R69. Existing route families,
