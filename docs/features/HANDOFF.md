@@ -6,13 +6,16 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Current position
 
-- **Release preparation:** `v0.13.0` approved for publication on 2026-10-10 after ROOM-WIDTH-01
+- **Release:** `v0.13.0` tagged at `b3ccae0` and published on 2026-10-10 after ROOM-WIDTH-01
   was fixed. User's “go ahead and release” waives pending reviews for this release and authorizes
   pushing all unpushed main commits and the tag. Independent reviews remain available below;
   waiver is not completed review. Both Go variants, go vet, FTS5 build proof, shell syntax and
   `make dist VERSION=0.13.0` passed. Operator package and component pins already match the range.
   README install/update examples now use the renamed repository. 758 UI tests and 41
   style/presentation checks passed.
+  Release run `38073052316` and general CI `38073052277` succeeded. Archive, installer and
+  checksum manifest are uploaded; manifest size (323869523) and SHA-256 match GitHub's
+  archive metadata. Readable notes are published. Manual provider gates below remain owed.
 - **Repository:** `AsaphNoam/Chuck`; branch `main`.
 - **Review pending — desktop/phone group controls:** FS-02.R72–R76/A54–A57,
   FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118, TS-13.R24.
@@ -68,8 +71,7 @@ None.
 - **FS-21 / TS-06.R33:** credentialed Claude/Codex Think Tank smoke covering room read/submit,
   addressed input, approval/denial, private Send/Steer, native resume, end-only judge, and retained
   exact result. Fake-provider journey and automated/race closure passed; live receipt is owed.
-- **FS-10.R25/A14 / TS-02.R41:** supervised disposable-real-home cutover rehearsal with receipt;
-  GitHub rename to `AsaphNoam/Chuck` remains owed.
+- **FS-10.R25/A14 / TS-02.R41:** supervised disposable-real-home cutover rehearsal with receipt.
 - **FS-02.A46 / A27:** real-browser toast and macOS notification clicks; six-tab shared-stream,
   J14 real-browser, and Sky & Grove with Codex capabilities.
 - **FS-14.A54:** packaged Claude/Codex probe that a standing owner/dedicated coordinator adopts
@@ -120,4 +122,4 @@ Editing that older release is separate publication work.
 ## Release record
 
 See [`RELEASE-v0.13.0-notes.md`](../archive/state/RELEASE-v0.13.0-notes.md).
-Publication verification is pending.
+Publication verified; settled pre-release evidence is in the handoff archive.
