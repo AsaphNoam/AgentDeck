@@ -93,7 +93,8 @@ terminal agents from becoming statusless or unmessageable.
   per-agent transcript and upsert the sessions row, so it appears in the archive and can be resumed
   (into either interface).
 - **R18** — Terminal agents carry an optional `group` label like chat agents and are stopped by
-  `POST /api/groups/{group}/release` alongside chat members.
+  `POST /api/projects/{project}/groups/stop` alongside chat members; group Archive uses the
+  corresponding `/groups/archive` route and preserves their transcripts.
 - **R19** — Terminal agents do not participate in agent-to-agent messaging: the reserved per-session
   messaging MCP is not wired into the interactive CLI, so a terminal agent cannot call
   `send_message`/`check_messages` and is not a messaging peer. This is a deliberate boundary (see
@@ -151,7 +152,7 @@ terminal agents from becoming statusless or unmessageable.
 
 ## 6. Deviations & open decisions
 
-- **Planned group API replacement:** FS-02.R75–R76 and TS-03.R57–R58 supersede R18's
+- **Group API replacement (shipped 2026-10-10):** FS-02.R75–R76 and TS-03.R57–R58 supersede R18's
   old release endpoint with project-scoped group Stop/Archive. Terminal and chat members remain
   subject to the same group membership, orphan cleanup, archive preservation and lifecycle claims.
 

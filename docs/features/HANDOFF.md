@@ -99,7 +99,12 @@ mobile detail/composer edits are unrelated and must be preserved.
 Checkpoint: shared group projection, project-owned bulk confirmation/results and desktop section
 drop targets are implemented. Cross-group moves issue identity only; persisted manual order is
 unchanged on success/refusal. 37 focused grid/action tests and the presentation contract pass.
-Backend, picker and phone slices are being integrated; final acceptance and closure remain owed.
+Backend, picker and phone slices are integrated. 88 focused picker/launch/phone tests pass;
+server tests prove scoped actions, narrow remote fields, lifecycle conflicts and batch archive
+failure with stopped-state publication. Authenticated fake-peer browser run passed 31 checks
+across all appearances at 1024/1440 desktop and 360/390/430 phone, including cross-device drag,
+regroup, Stop/Archive and Restore (`/tmp/chuck-group-journey/`). Long phone header composition
+was improved after inspection; rerender and final closure matrix remain owed.
 
 Direction: experienced operators organize active work with compact incumbent group headers and
 dialogs. Group labels remain quiet identity metadata; explicit project/member/running counts make

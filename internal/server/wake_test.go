@@ -550,12 +550,12 @@ func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
 	// The release reserves every member claim before stopping any, so a member
 	// mid-wake makes the whole release fail closed with a retryable 409 and stops
 	// nobody (FS-02.R20/TS-03.R27, all-or-none).
-	resp, body = post(t, ts.URL+"/api/groups/auth/release", nil)
+	resp, body = post(t, ts.URL+"/api/projects/tmpproj/groups/stop", map[string]string{"group": "auth"})
 	if resp.StatusCode != http.StatusConflict || apiErrorCode(t, body) != runtime.CodeConflict {
 		t.Fatalf("release during wake = %d %s, want 409 conflict", resp.StatusCode, body)
 	}
 	var released struct {
-		Stopped []releaseGroupResult `json:"stopped"`
+		Results []groupActionResult `json:"results"`
 	}
 
 	if got := <-resumed; got != http.StatusOK {
@@ -575,16 +575,16 @@ func TestReleaseGroupDuringWakeKeepsRegistration(t *testing.T) {
 	}
 
 	// Once the transition settles, the retried release stops the member normally.
-	resp, body = post(t, ts.URL+"/api/groups/auth/release", nil)
+	resp, body = post(t, ts.URL+"/api/projects/tmpproj/groups/stop", map[string]string{"group": "auth"})
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("retried release = %d: %s", resp.StatusCode, body)
 	}
-	released.Stopped = nil
+	released.Results = nil
 	if err := json.Unmarshal(body, &released); err != nil {
 		t.Fatalf("decode retried release (%v): %s", err, body)
 	}
-	if len(released.Stopped) != 1 || !released.Stopped[0].OK {
-		t.Fatalf("retried release = %+v, want one OK result: %s", released.Stopped, body)
+	if len(released.Results) != 1 || !released.Results[0].OK {
+		t.Fatalf("retried release = %+v, want one OK result: %s", released.Results, body)
 	}
 	waitRunning(t, srv, id, false)
 }
@@ -812,7 +812,7 @@ func TestReleaseGroupRespectsLifecycleClaim(t *testing.T) {
 	}
 	defer srv.releaseLifecycle(id)
 
-	resp, body := post(t, ts.URL+"/api/groups/release/release", nil)
+	resp, body := post(t, ts.URL+"/api/projects/tmpproj/groups/stop", map[string]string{"group": "release"})
 	if resp.StatusCode != http.StatusConflict || apiErrorCode(t, body) != runtime.CodeConflict {
 		t.Fatalf("release during lifecycle transition = %d %s, want 409 conflict", resp.StatusCode, body)
 	}

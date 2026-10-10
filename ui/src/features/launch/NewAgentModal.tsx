@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { getCapabilities } from "../../api/client";
 import { useRoles } from "../../api/config";
@@ -12,6 +12,8 @@ import { resetRuntimeForBackend, resetRuntimeForModel } from "../../lib/runtimeS
 import { displayLabel } from "../../lib/labels";
 import { describeProviderRuntime, hasProviderSource } from "../../lib/providerRuntime";
 import { useSuggestedName } from "./useSuggestedName";
+import { useAgentStore } from "../../store/agentStore";
+import { GroupPicker } from "../../components/ui/GroupPicker";
 
 interface NewAgentModalProps {
   open: boolean;
@@ -29,14 +31,17 @@ interface NewAgentModalProps {
   onConfigure?: (params: LaunchParams) => void;
   /** Dialog title; defaults to "New agent". */
   title?: string;
+  /** Enable the ordinary dashboard group assignment. Room setup callers leave it off. */
+  groupPicker?: boolean;
 }
 
-export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched, onConfigure, title = "New agent" }: NewAgentModalProps) {
+export function NewAgentModal({ open, onClose, initialRole, initialProject, fixedProject, onLaunched, onConfigure, title = "New agent", groupPicker = true }: NewAgentModalProps) {
   const { data: rolesData } = useRoles();
   const { data: projectsData } = useProjects();
   const { data: backendsData, refetch: refetchBackends, isFetching: backendsFetching } = useBackends();
   const { data: configData } = useConfig();
   const launch = useLaunchAgent();
+  const agents = useAgentStore((state) => state.agents);
 
   const roleEntries = Object.entries(rolesData ?? {});
   const projectEntries = Object.entries(projectsData ?? {}).filter(([, project]) => !project.archived);
@@ -58,6 +63,8 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [terminalAvailable, setTerminalAvailable] = useState(true);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const [group, setGroup] = useState("");
+  const groups = useMemo(() => Object.values(agents).filter((agent) => !agent.archived).map((agent) => agent.group?.trim()).filter((label): label is string => !!label), [agents]);
 
   const [name, setName] = useSuggestedName(role);
 
@@ -187,6 +194,7 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
     const params: LaunchParams = {
       name: name || undefined, role, project, backend: backendId || undefined, model: modelId || undefined,
       effort: (offerEffort && effort) || undefined, fast: offerFast && fast, interface: agentInterface,
+      ...(groupPicker && group.trim() ? { group: group.trim() } : {}),
     };
     if (onConfigure) {
       onConfigure({ ...params, interface: "chat" });
@@ -263,6 +271,14 @@ export function NewAgentModal({ open, onClose, initialRole, initialProject, fixe
                   <label htmlFor="new-agent-name">Name</label>
                   <input id="new-agent-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Atlas" />
                 </div>
+
+                {groupPicker && (
+                  <div className="form-field">
+                    <label htmlFor="new-agent-group">Group</label>
+                    <GroupPicker id="new-agent-group" value={group} groups={groups} onChange={setGroup} />
+                    <span className="form-hint">Leave blank to launch ungrouped.</span>
+                  </div>
+                )}
 
                 <div className="form-field">
                   <label htmlFor="new-agent-backend">Backend</label>

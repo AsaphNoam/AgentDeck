@@ -152,6 +152,7 @@ export function ThinkTankSetupDialog({ open, onClose, originProject }: { open: b
       </Dialog.Root>
       <NewAgentModal
         open={launchFor !== ""}
+        groupPicker={false}
         title={launchFor === "judge" ? "Judge settings" : "New participant"}
         initialProject={originProject}
         onClose={() => setLaunchFor("")}

@@ -6,6 +6,7 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { NewAgentModal } from "./NewAgentModal";
 import { BACKEND_SUPPORT_WIRE } from "../../test/backendSupport";
+import { useAgentStore } from "../../store/agentStore";
 
 const server = setupServer(
   http.get("/api/roles", () =>
@@ -82,6 +83,7 @@ function backendsFixture() {
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   cleanup();
+  useAgentStore.setState({ agents: {}, order: [] });
   server.resetHandlers();
 });
 afterAll(() => server.close());
@@ -618,5 +620,56 @@ describe("NewAgentModal", () => {
     // BEFORE launch, rather than only surfacing as a late server error.
     expect(await screen.findByText(/linked configuration needs attention/)).toBeInTheDocument();
     expect(screen.getByText(/source_invalid/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["existing", "Core", "Core"],
+    ["new", "New team", "New team"],
+  ])("launches with an %s selected group", async (_kind, typed, expected) => {
+    let capturedBody: Record<string, unknown> | undefined;
+    useAgentStore.setState({ agents: { existing: { group: "Core", archived: false } as never }, order: ["existing"] });
+    server.use(http.post("/api/sessions", async ({ request }) => {
+      capturedBody = await request.json() as Record<string, unknown>;
+      return HttpResponse.json({ agent: { agent_id: "a1", name: "Atlas" } }, { status: 201 });
+    }));
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    await openOptions();
+    const picker = screen.getByRole("combobox", { name: "Group" });
+    fireEvent.focus(picker);
+    fireEvent.change(picker, { target: { value: typed } });
+    fireEvent.click(screen.getByRole("button", { name: expected === "Core" ? "Core" : /Create group/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(capturedBody).toBeDefined());
+    expect(capturedBody?.group).toBe(expected);
+  });
+
+  it("launches blank as ungrouped and retains a selected group after refusal", async () => {
+    let calls = 0;
+    const bodies: Record<string, unknown>[] = [];
+    server.use(http.post("/api/sessions", async ({ request }) => {
+      calls += 1;
+      bodies.push(await request.json() as Record<string, unknown>);
+      return calls === 1
+        ? HttpResponse.json({ agent: { agent_id: "a1", name: "Atlas" } }, { status: 201 })
+        : calls === 2
+          ? HttpResponse.json({ error: { message: "runtime unavailable" } }, { status: 422 })
+          : HttpResponse.json({ agent: { agent_id: "a2", name: "Atlas 2" } }, { status: 201 });
+    }));
+    renderWithQuery(<NewAgentModal open={true} onClose={() => {}} />);
+    await screen.findByRole("option", { name: "Implementer (implementer)" });
+    await openOptions();
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(bodies[0]).toBeDefined());
+    expect(bodies[0].group).toBeUndefined();
+    const picker = screen.getByRole("combobox", { name: "Group" });
+    fireEvent.focus(picker);
+    fireEvent.change(picker, { target: { value: "Retry group" } });
+    fireEvent.click(screen.getByRole("button", { name: /Create group/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Group" })).toHaveValue("Retry group"));
+    expect(bodies[1]?.group).toBe("Retry group");
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(calls).toBe(3));
   });
 });

@@ -1,6 +1,6 @@
 # TS-08 — Frontend presentation architecture
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src`, `ui/package.json`, `ui/vite.config.ts`
 **Absorbed:** —
 
@@ -1313,7 +1313,7 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   dependency is added. Verify with focused tests, the presentation checks and the A37 browser
   comparison.
 
-- **R118 (planned) — Group controls extend the existing feature-owned seams.** One shared
+- **R118 — Group controls extend the existing feature-owned seams.** One shared
   searchable group picker serves desktop Move/New agent and phone Manage/New agent; its owner
   supplies loaded non-archived agent labels across projects and owns draft/commit/errors. Use
   existing dialog, focus, keyboard and popover conventions with a visible list on opening,

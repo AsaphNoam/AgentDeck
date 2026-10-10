@@ -4,6 +4,7 @@ export { BrowseDirectoryButton } from "./BrowseDirectoryButton";
 export { Button, IconButton } from "./Button";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { FieldFrame } from "./FieldFrame";
+export { GroupPicker } from "./GroupPicker";
 export { PageHeader } from "./PageHeader";
 export { ProjectColorPicker } from "./ProjectColorPicker";
 export { Surface } from "./Surface";

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -347,7 +348,8 @@ func TestReleaseGroupStopsMembers(t *testing.T) {
 			t.Fatalf("WriteAgent %s: %v", id, err)
 		}
 	}
-	req := newLocalRequest(http.MethodPost, "/api/groups/auth/release", nil)
+	req := newLocalRequest(http.MethodPost, "/api/projects/my-app/groups/stop", bytes.NewBufferString(`{"group":"auth"}`))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.routes().ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -355,16 +357,137 @@ func TestReleaseGroupStopsMembers(t *testing.T) {
 	}
 	var body struct {
 		Group   string `json:"group"`
-		Stopped []struct {
+		Results []struct {
 			AgentID string `json:"agent_id"`
 			OK      bool   `json:"ok"`
-		} `json:"stopped"`
+		} `json:"results"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("release body: %v", err)
 	}
-	if body.Group != "auth" || len(body.Stopped) != 2 || !body.Stopped[0].OK || !body.Stopped[1].OK {
+	if body.Group != "auth" || len(body.Results) != 2 || !body.Results[0].OK || !body.Results[1].OK {
 		t.Fatalf("release body = %+v", body)
+	}
+}
+
+func TestProjectGroupArchiveScopesAndArchivesOnlyActiveMembers(t *testing.T) {
+	srv := testServer(t, true)
+	now := time.Now().UTC()
+	for _, agent := range []state.Agent{
+		{AgentID: "a_archive_group", Name: "Archive", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet-4-6", Interface: "chat", Group: "auth", CreatedAt: now},
+		{AgentID: "a_other_project", Name: "Other", Role: "implementer", Project: "other-app", Backend: "claude", Model: "sonnet-4-6", Interface: "chat", Group: "auth", CreatedAt: now},
+		{AgentID: "a_already_archived", Name: "Archived", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet-4-6", Interface: "chat", Group: "auth", Archived: true, CreatedAt: now},
+	} {
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := newLocalRequest(http.MethodPost, "/api/projects/my-app/groups/archive", bytes.NewBufferString(`{"group":"auth"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body groupActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Project != "my-app" || body.Group != "auth" || len(body.Results) != 1 || !body.Results[0].OK {
+		t.Fatalf("archive response = %+v", body)
+	}
+	got, err := srv.stateStore.ReadAgent("a_archive_group")
+	if err != nil || !got.Archived {
+		t.Fatalf("group member archive = %+v err=%v", got, err)
+	}
+	other, err := srv.stateStore.ReadAgent("a_other_project")
+	if err != nil || other.Archived {
+		t.Fatalf("other project member changed = %+v err=%v", other, err)
+	}
+}
+
+func TestProjectGroupActionRequiresExactGroupBody(t *testing.T) {
+	srv := testServer(t, true)
+	for _, raw := range []string{`{}`, `{"group":"auth","extra":true}`} {
+		req := newLocalRequest(http.MethodPost, "/api/projects/my-app/groups/stop", bytes.NewBufferString(raw))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		srv.routes().ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnprocessableEntity && rec.Code != http.StatusBadRequest {
+			t.Fatalf("body %s status = %d, want validation", raw, rec.Code)
+		}
+	}
+}
+
+func TestIdentityGroupMoveRespectsLifecycleClaim(t *testing.T) {
+	srv := testServer(t, true)
+	agent := state.Agent{AgentID: "a_move_claim", Name: "Move", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet-4-6", Interface: "chat", Group: "old", CreatedAt: time.Now().UTC()}
+	if err := srv.stateStore.WriteAgent(agent); err != nil {
+		t.Fatal(err)
+	}
+	if !srv.claimLifecycle(agent.AgentID) {
+		t.Fatal("claimLifecycle failed")
+	}
+	req := newLocalRequest(http.MethodPost, "/api/sessions/"+agent.AgentID+"/identity", bytes.NewBufferString(`{"group":"new"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	srv.releaseLifecycle(agent.AgentID)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("identity conflict status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	got, _ := srv.stateStore.ReadAgent(agent.AgentID)
+	if got.Group != "old" {
+		t.Fatalf("group changed after conflict: %q", got.Group)
+	}
+}
+
+func TestProjectGroupArchivePersistenceFailureRetainsStoppedState(t *testing.T) {
+	srv := testServer(t, true)
+	for _, id := range []string{"a_archive_write_fail", "a_archive_write_fail_two"} {
+		agent := state.Agent{AgentID: id, Name: "Archive", Role: "implementer", Project: "my-app", Backend: "claude", Model: "sonnet-4-6", Interface: "chat", Group: "auth", CreatedAt: time.Now().UTC()}
+		if err := srv.stateStore.WriteAgent(agent); err != nil {
+			t.Fatal(err)
+		}
+		if err := srv.stateStore.WriteRunning(state.RunningEntry{AgentID: id, PID: -42, SessionID: id, Interface: "chat", StartedAt: time.Now().UTC()}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	srv.setAgentsArchived = func([]string, bool) error { return errors.New("injected archive write failure") }
+	ch, unsub := srv.eventBus.Subscribe()
+	defer unsub()
+	req := newLocalRequest(http.MethodPost, "/api/projects/my-app/groups/archive", bytes.NewBufferString(`{"group":"auth"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.routes().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	var body groupActionResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Results) != 2 || body.Results[0].OK || body.Results[1].OK || body.Results[0].Error == nil || body.Results[1].Error == nil || !strings.Contains(body.Results[0].Error.Message, "stopped but could not be archived") {
+		t.Fatalf("archive failure response = %+v", body.Results)
+	}
+	for _, id := range []string{"a_archive_write_fail", "a_archive_write_fail_two"} {
+		got, err := srv.stateStore.ReadAgent(id)
+		if err != nil || got.Archived {
+			t.Fatalf("agent archive flag = %+v err=%v, want false", got, err)
+		}
+		if _, err := srv.stateStore.ReadRunning(id); err == nil {
+			t.Fatalf("running row for %s remained after archive preparation", id)
+		}
+	}
+	for range []string{"one", "two"} {
+		select {
+		case ev := <-ch:
+			if ev.Type != "state_update" {
+				t.Fatalf("event type = %q, want state_update", ev.Type)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("missing stopped state_update")
+		}
 	}
 }
 

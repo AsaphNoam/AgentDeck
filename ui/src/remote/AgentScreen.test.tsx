@@ -27,6 +27,8 @@ let permissionStatus = 200;
 let promptStatus = 200;
 let annotationStatus = 202;
 let resumeStatus = 200;
+let identityStatus = 200;
+let identityBodies: unknown[] = [];
 const posts: string[] = [];
 const events = [
   { agent_id: "a1", seq: 1, type: "user_text", ts: "", data: { text: "Clean the build" } },
@@ -72,6 +74,10 @@ const server = setupServer(
     ? HttpResponse.json({ error: { code: "conflict", message: "Resume refused for review" } }, { status: 409 })
     : HttpResponse.json({ resumed: true })),
   http.post("/api/sessions/a1/archive", () => HttpResponse.json({})),
+  http.post("/api/sessions/a1/identity", async ({ request }) => {
+    identityBodies.push(await request.json());
+    return identityStatus === 409 ? HttpResponse.json({ error: { code: "conflict", message: "group update refused" } }, { status: 409 }) : HttpResponse.json({});
+  }),
   http.get("/api/sessions/a1/files", () => HttpResponse.json({ agent_id: "a1", files: [] })),
   http.get("/api/remote/runtime-options", () => HttpResponse.json({ backends: [] })),
 );
@@ -82,6 +88,8 @@ beforeEach(() => {
   promptStatus = 200;
   annotationStatus = 202;
   resumeStatus = 200;
+  identityStatus = 200;
+  identityBodies = [];
   posts.length = 0;
   reads.length = 0;
   live = fullWindow;
@@ -651,5 +659,31 @@ describe("AgentScreen diff annotations", () => {
     const conversation = await screen.findByRole("list", { name: "Conversation" });
     await waitFor(() => expect(conversation).toHaveTextContent("All tests pass now."));
     expect(within(conversation).getAllByRole("listitem")).toHaveLength(2);
+  });
+});
+
+describe("AgentScreen group management", () => {
+  it("saves only the group identity and keeps the draft after refusal", async () => {
+    const current = { ...agent, group: "Alpha" };
+    const other = { ...agent, agent_id: "a2", name: "other", group: "Beta" };
+    useConnection.setState({ agents: { a1: current, a2: other } });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Manage" }));
+    const picker = await screen.findByRole("combobox", { name: "Group" });
+    fireEvent.change(picker, { target: { value: "Beta" } });
+    fireEvent.click(screen.getByRole("button", { name: "Beta" }));
+    identityStatus = 409;
+    fireEvent.click(screen.getByRole("button", { name: "Save group" }));
+    expect(await screen.findByText("group update refused")).toBeInTheDocument();
+    expect(picker).toHaveValue("Beta");
+    expect(identityBodies).toEqual([{ group: "Beta" }]);
+  });
+
+  it("disables group reassignment while offline", async () => {
+    useConnection.setState({ link: "unreachable", agents: { a1: { ...agent, group: "Alpha" } } });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Manage" }));
+    expect(screen.getByRole("combobox", { name: "Group" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save group" })).toBeDisabled();
   });
 });

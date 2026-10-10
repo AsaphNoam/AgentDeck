@@ -39,7 +39,7 @@ delta; clients must not assume every existing endpoint already uses R3.
 | Config | role/project CRUD and project `archive`/`restore`; `GET/PUT /api/backends`, `/api/config`, `/api/layout`; `POST /api/directory-picker` |
 | Archive/tracking | `GET /api/archive`, `GET /api/archive/projects/{project}`, session files/commands/messages |
 | Composer autocomplete | session-scoped file search and available-command snapshot reads |
-| Coordination | `POST /api/groups/{group}/release`, `/mcp` GET/POST/DELETE |
+| Coordination | `POST /api/projects/{project}/groups/stop|archive` with `{group}`, `/mcp` GET/POST/DELETE |
 | Dependent work | `GET/POST /api/tasks`, `GET/DELETE /api/tasks/{id}`, task `cancel`/`result`/`retry`/`rearm`; `POST /api/signals` |
 | Federation | config-source list, preview, bind, refresh, delete |
 | Producers/terminal | `POST /api/hook`, terminal WebSocket |
@@ -768,7 +768,7 @@ retained source ids through the existing local file reader. Reconnect refills co
 SSE is never canonical history. Archive fetches rooms separately and preserves existing agent
 Archive wire shapes. Every room route remains desktop `localOnly`, outside the phone allowlist.
 
-**R56 (planned) — Group identity stays in the existing launch and identity contracts.**
+**R56 — Group identity stays in the existing launch and identity contracts.**
 Desktop `LaunchParams` admits optional `group`, matching the existing server and phone client.
 Launch and identity updates share trimmed-name validation: blank means ungrouped and `_ungrouped`
 is reserved, returning `invalid_group_name`. No group resource, schema migration or retained empty
@@ -777,7 +777,7 @@ gate before rereading and writing identity, preventing a move during an admitted
 conflicts use R3's structured error. Persist identity before publishing the existing full
 `state_update`; connected desktop/phone entries and reconnect hydration consume that same truth.
 
-**R57 (planned) — Project group actions replace global release with scoped lifecycle operations.** Add
+**R57 — Project group actions replace global release with scoped lifecycle operations.**
 `POST /api/projects/{project}/groups/stop` and `/groups/archive`, each accepting exactly
 `{group:string}`. Carry the existing unrestricted trimmed label in JSON rather than imposing
 a path-safe name grammar. Resolve a deterministic snapshot of non-archived identities
@@ -791,7 +791,7 @@ after execution, including mixed member outcomes. Preflight failures return R3's
 empty collections serialize as `[]`. A disconnect/cancellation never rolls back already
 completed member changes, and retries resolve a new eligible snapshot.
 
-**R58 (planned) — Group lifecycle work reuses reservations and member services.** Reserve
+**R58 — Group lifecycle work reuses reservations and member services.** Reserve
 the complete snapshot before member side effects: Stop uses TS-01.R16's lifecycle claim and
 shared stop/teardown; Archive joins TS-01.R13's agent archive gate and the lifecycle exclusions
 needed against Stop/move/start. For Archive, take all agent archive reservations before all
@@ -856,8 +856,8 @@ integers instead of silently applying defaults.
 
 ## 5. Deviations & open decisions
 
-- R56–R58 are confirmed planned group contracts. The user waived legacy release compatibility:
-  remove that route and move its functionality to project-scoped actions. TS-13.R24 defines the
+- R56–R58 shipped 2026-10-10. The user waived legacy release compatibility:
+  that route is removed and replaced by project-scoped actions. TS-13.R24 defines the
   confirmed paired-phone group access extension; no database migration or retention change.
 
 - **Pipeline replacement:** TS-09.R44 changes pipeline template/start/detail payloads to version 2

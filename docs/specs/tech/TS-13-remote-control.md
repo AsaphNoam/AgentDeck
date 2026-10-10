@@ -1,6 +1,6 @@
 # TS-13 — Remote control
 
-**Status:** Partial
+**Status:** Current
 **Code:** `internal/remote/`, `internal/server/remote*.go`, `ui/remote.html`, `ui/src/remote/`
 **Absorbed:** —
 
@@ -242,7 +242,7 @@ the installed app on iOS.
   the agent's current runtime respectively; effort defaults to the model's `default_effort`
   (FS-20.R35/R36).
 
-- **R24 (planned) — Paired phones gain only the confirmed group controls.** Extend R21's
+- **R24 — Paired phones gain only the confirmed group controls.** Extend R21's
   launch field allowlist with `group`. Allow existing `POST /api/sessions/{id}/identity` only
   with a required string `group`; reject name, project, role, runtime and all other fields with
   `remote_field_not_allowed`. Allow TS-03.R57's project-scoped group stop/archive routes with
@@ -295,7 +295,7 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
 
-- R24 is the confirmed planned paired-phone group mutation extension with TS-03.R57.
+- R24 shipped 2026-10-10 as the paired-phone group mutation extension with TS-03.R57.
 
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.

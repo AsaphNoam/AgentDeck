@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Partial
+**Status:** Current
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -98,7 +98,7 @@ overflow cannot clip it.
 silently.
 
 **R37.** Dashboard confirmations and inputs use core application dialogs rather than
-browser `prompt`/`confirm` (FS-12.R26). **Stop** (R16) and **Release group** open consequence-aware
+browser `prompt`/`confirm` (FS-12.R26). **Stop** (R16) and project **Stop group**/**Archive group** open consequence-aware
 confirmation dialogs that state the effect and default focus to Cancel. **Move to group** (R16)
 opens a combobox that suggests the current group labels, where a blank value clears the group. A
 configured active project card's **Rename**, **Change color**, and **Archive** (R34) open,
@@ -116,10 +116,9 @@ shows the group label, member count, and a per-state count summary.
 **R19.** A group section's collapsed/expanded state is toggled from its header and is persisted per
 group in `layout.json` (`groups.<name>.collapsed`).
 
-**R20.** A named group header offers **Release group**, which — after a confirm — stops every agent in
-that group in one action. A lifecycle transition already in progress for any member rejects the
-whole release before it stops a member; the existing action-error toast says the person can retry
-once that transition settles. The Ungrouped section has no release control.
+**R20.** A named group header offers project-scoped **Stop group** and **Archive group**
+under R75–R76. A lifecycle transition already in progress for any member rejects the whole
+operation before it changes a member. Ungrouped has no bulk control.
 
 ### Empty state & removal
 
@@ -556,7 +555,7 @@ project that is not repo-backed, or is archived, shows no such action.
   displacing the state badge, context figure, or Collapse action. This adds no runtime picker to the
   card and changes no launch, switch, expansion, or project-summary behavior.
 
-**R72 (planned).** Move to group lists available group names when opened. Typing filters
+**R72.** Move to group lists available group names when opened. Typing filters
 the list; a new non-empty name offers an explicit **Create group “<name>”** choice. Selecting
 an existing name reuses it; confirming a new name assigns the agent to it. Blank clears the
 assignment; Cancel changes nothing. Typing alone never creates or assigns a group. This extends R37.
@@ -569,11 +568,11 @@ trimmed exact matches reuse the existing label. Phone section collapse is local 
 not a membership change. Existing room-deployment and annotation-assignment creation flows retain
 their own grouping behavior; this change adds the editable picker to ordinary New agent.
 
-**R73 (planned).** New agent offers an optional Group field with R72's selection, filtering
+**R73.** New agent offers an optional Group field with R72's selection, filtering
 and new-name choice. Blank launches an ungrouped agent; success places the agent in its chosen
 group immediately. A refused launch retains the group and other entered values for retry.
 
-**R74 (planned).** Dragging a collapsed agent card into a different group section moves
+**R74.** Dragging a collapsed agent card into a different group section moves
 its membership to that group, including from Ungrouped. Dropping into Ungrouped clears it.
 Both a section's header and its agent area accept a drop, including collapsed sections. A
 different group's running/stopped boundary never prevents a membership move; after success
@@ -582,7 +581,7 @@ R45/R53. A valid destination is visibly highlighted; Escape or an outside drop d
 Failure shows the server reason and leaves membership and persisted order unchanged. This
 supersedes only R45's statement that separate cross-group drag behavior is unchanged.
 
-**R75 (planned).** Named group headers offer **Stop group** and **Archive group** on
+**R75.** Named group headers offer **Stop group** and **Archive group** on
 desktop and phone. Stop group replaces the user-facing Release group label, stopping running
 members while retaining the group, stopped agents and conversations. Archive group stops running
 members and archives every non-archived member under FS-05.R32/R34's preservation and individual
@@ -593,7 +592,7 @@ Ungrouped has no bulk action. Both actions affect only members in the current pr
 same-named groups in other projects are untouched. This supersedes R20's dashboard Release
 group scope and label; the old global release API is replaced by the scoped action API.
 
-**R76 (planned).** Group actions disable repeat submission while pending and report
+**R76.** Group actions disable repeat submission while pending and report
 success or the identities and reasons of failed members. A lifecycle conflict discovered before
 execution affects no member. Once execution begins, successful member changes remain if another
 member fails; retry targets remaining eligible members. Normal per-agent lifecycle restrictions
@@ -934,21 +933,21 @@ all three appearances at 1024px and a wider desktop. Existing density/group/card
 new room deployments get FS-21.R51's title group. *Verify:* dashboard/wire tests and that real-binary
 rendered journey.
 
-**A54 (planned)** (R72) — Open Move to group, filter existing names, select and confirm;
+**A54** (R72) — Open Move to group, filter existing names, select and confirm;
 then choose a new name and confirm Create. Verify membership, blank removal, Cancel, keyboard
 selection and a visible assignment error. — focused dialog tests and a desktop browser journey.
 
-**A55 (planned)** (R73) — Create agents with existing, new and blank groups and verify
+**A55** (R73) — Create agents with existing, new and blank groups and verify
 initial membership. Refuse a launch and verify all entered values remain for retry. — launch
 form tests and a desktop browser journey.
 
-**A56 (planned)** (R74) — Drag between named groups, from Ungrouped and back; use a
+**A56** (R74) — Drag between named groups, from Ungrouped and back; use a
 collapsed header and a destination with the other running/stopped status. Verify live membership
 on a second device, running-first placement, unchanged same-group reorder restrictions, Cancel,
 outside drop and rejected mutation without order/membership changes. — focused drag tests and
 a real desktop browser journey at 1024px and a wider viewport in all three appearances.
 
-**A57 (planned)** (R75–R76) — Seed the same label in two projects with running and
+**A57** (R75–R76) — Seed the same label in two projects with running and
 stopped members. Confirm Stop group and Archive group from desktop and phone, checking the
 confirmed scope, retained conversations, active project, individual Restore and live updates on
 the other device. Verify Cancel, a pre-execution lifecycle conflict with zero changes, and partial
@@ -962,7 +961,8 @@ actual JSON wire and confirm the old global release route is absent on both list
   collapsible phone sections, bidirectional membership updates, project-only bulk actions,
   desktop drag and phone picker. Archive preserves conversations and individual Restore.
   Project action API replacement and narrow paired-phone route extension are confirmed; the
-  legacy global release API has no compatibility requirement. All new behavior remains planned.
+  legacy global release API has no compatibility requirement and is removed. Shipped 2026-10-10;
+  focused UI/server checks and authenticated desktop/phone browser receipts cover the new controls.
 
 - R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
   creation and the conversation-page behavior.

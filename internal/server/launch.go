@@ -201,6 +201,10 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	if ae != nil {
 		return runtime.LaunchSpec{}, state.Agent{}, ae
 	}
+	normalizedGroup, ae := normalizeGroup(req.Group)
+	if ae != nil {
+		return runtime.LaunchSpec{}, state.Agent{}, ae
+	}
 
 	role, err := s.configStore.ReadRole(req.Role)
 	if err != nil {
@@ -340,7 +344,7 @@ func (s *Server) composeLaunchWithOptions(ctx context.Context, req launchRequest
 	agent := state.Agent{
 		AgentID: agentID, Name: name, Role: req.Role, Project: req.Project,
 		Backend: backendID, Model: modelID, Effort: resolvedEffort, Interface: iface,
-		CreatedAt: time.Now().UTC(), Group: req.Group,
+		CreatedAt: time.Now().UTC(), Group: normalizedGroup,
 	}
 
 	token := mintHookToken()

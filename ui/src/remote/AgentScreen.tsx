@@ -18,6 +18,7 @@ import {
   stopAgent,
   switchRuntime,
   withdrawPrompt,
+  updateAgentIdentity,
 } from "../api/client";
 import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types";
 import { useAnnotationStore } from "../store/annotationStore";
@@ -40,6 +41,7 @@ import { useConnection, watchReasoning, type OpenTranscript } from "./connection
 import { getRuntimeOptions } from "./api";
 import { navigate } from "./router";
 import { PhoneIcon } from "./PhoneIcon";
+import { GroupPicker } from "../components/ui/GroupPicker";
 
 // The phone reads a bounded window and keeps at most EARLIER_PAGES older ones
 // (FS-20.R13).
@@ -549,10 +551,14 @@ export function AgentScreen({ agentId }: { agentId: string }) {
 function AgentManagement({ agent, offline, busy, act, rename, setRename, error }: { agent: AgentState; offline: boolean; busy: boolean; act: (fn: () => Promise<unknown>, clears?: boolean, after?: (result: unknown) => void) => void; rename: string; setRename: (value: string) => void; error: string | null }) {
   const options = useQuery({ queryKey: ["runtime-options"], queryFn: getRuntimeOptions });
   const [runtime, setRuntime] = useState({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" });
+  const allAgents = useConnection((state) => state.agents);
+  const groups = useMemo(() => Object.values(allAgents).filter((item) => !item.archived).map((item) => item.group?.trim()).filter((label): label is string => !!label), [allAgents]);
+  const [group, setGroup] = useState(agent.group ?? "");
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   // A runtime change from either device restarts the switch draft from the
   // agent's live runtime (FS-20.R17).
   useEffect(() => setRuntime({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" }), [agent.backend, agent.model, agent.effort]);
+  useEffect(() => setGroup(agent.group ?? ""), [agent.agent_id]);
   const findModel = (backendID: string, modelID: string) => options.data?.backends.find((item) => item.id === backendID)?.models.find((item) => item.id === modelID);
   const backend = options.data?.backends.find((item) => item.id === runtime.backend);
   const model = findModel(runtime.backend, runtime.model);
@@ -569,6 +575,10 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename, error }
       <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); if (rename.trim()) act(() => renameAgent(agent.agent_id, rename.trim()), false, () => setRename("")); }}>
         <label className="phone-field">Name<input value={rename} placeholder={agent.name || agent.role} onChange={(event) => setRename(event.target.value)} /></label>
         <button type="submit" disabled={offline || busy || !rename.trim()}>Rename</button>
+      </form>
+      <form className="phone-card phone-form phone-manage-group" onSubmit={(event) => { event.preventDefault(); act(() => updateAgentIdentity(agent.agent_id, { group: group.trim() }), false, () => setGroup(group.trim())); }}>
+        <label className="phone-field">Group<GroupPicker id="phone-manage-group" value={group} groups={groups} onChange={setGroup} disabled={offline || busy} /></label>
+        <button type="submit" disabled={offline || busy}>Save group</button>
       </form>
       {agent.running && agent.interface === "chat" && (
         <form className="phone-card phone-form" onSubmit={(event) => { event.preventDefault(); act(() => switchRuntime(agent.agent_id, runtime)); }}>

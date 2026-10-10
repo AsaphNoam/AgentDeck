@@ -207,22 +207,22 @@ a snapshot inside that window walked past the agent and let the resume register 
 an already-cleared registry (INV §4/§9). Because the claim is
 the only thing standing between a stop and a live resume's registration, **every** stopping verb runs
 one shared server-side stop-and-teardown helper rather than its own spelling of stop + cleanup
-(INV §2): the Stop route and group release (FS-02.R20) both call it, since a second unclaimed stop
+(INV §2): the Stop route and project group Stop (FS-02.R75) both call it, since a second unclaimed stop
 path reintroduces the identical defect through a different door.
 
 **Every lifecycle transition that starts, stops, or resumes an agent's registration takes this one
 claim**, not only explicit resume/wake and Stop: runtime switch's stop→resume window
 (`handleSwitchRuntime`), pipeline stage launch/initial prompt (`LaunchStage`), and pipeline stage
 resume/stop (`ContinueStage`/`StopStage`) all take it before any registration side effect and hold it
-across the whole transition. Bulk group release (`releaseAgents`) first reserves every member's
+across the whole transition. Bulk project group actions (`groupAction`) first reserve every member's
 claim, then stops and cleans them up in parallel; if one member is busy it releases its reservations
 and returns conflict before stopping any member. Because wake-on-message makes a stopped agent's transient window
 wakeable and `acquireSwitch`/`acquireAgentStart` are switch-scoped or counting (not mutually
 exclusive with a resume), these paths were otherwise reachable by a concurrent wake or explicit
 resume/stop that minted a second registration whose teardown then revoked the winner's
-token/MCP/hook-settings (INV §4). Agent/project **archive** stop is exempt because its exclusion
-already holds: `beginAgentArchive`/`beginProjectArchive` set flags that make a concurrent resume or
-wake fail `acquireAgentStart`, so archive can never mint a competing registration.
+token/MCP/hook-settings (INV §4). Agent and group **archive** reserve the archive gate before
+the lifecycle claim (TS-03.R58); project archive's exclusion remains sufficient because
+`beginProjectArchive` blocks new starts and waits for admitted transitions before its snapshot.
 
 **R17 — Chat drafts stay in one bounded browser-local seam.** One feature-local UI module
 owns a single `localStorage` record containing non-empty draft text and last-edited timestamps keyed

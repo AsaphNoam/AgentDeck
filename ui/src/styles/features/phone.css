@@ -123,6 +123,16 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-actions > button { align-items: center; display: flex; justify-content: center; gap: var(--ad-space-2); flex: 1 1 120px; min-height: 46px; font-size: 0.8125rem; }
 .phone-primary { background: var(--ad-action-primary); border-color: var(--ad-action-primary); color: var(--ad-action-primary-ink); min-height: 46px; }
 .phone-danger { border-color: color-mix(in srgb, var(--ad-state-error) 40%, var(--ad-border-default)); color: var(--ad-state-error); }
+.phone-agent-groups { display: grid; gap: var(--ad-space-3); }
+.phone-agent-group { border-top: var(--ad-border-thin) solid var(--ad-border-default); }
+.phone-agent-group-header { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-3) 0; }
+.phone-agent-group-header > button:first-child { background: transparent; border: 0; color: var(--ad-text-primary); display: grid; gap: var(--ad-space-1); min-width: 0; padding: 0; text-align: left; overflow-wrap: anywhere; }
+.phone-agent-group-header > button:first-child span { color: var(--ad-text-muted); font-size: 0.6875rem; white-space: nowrap; }
+.phone-agent-group-actions { display: flex; gap: var(--ad-space-1); justify-content: flex-end; }
+.phone-agent-group-actions button { background: transparent; border: 0; color: var(--ad-state-done); font-size: 0.6875rem; padding: var(--ad-space-1); }
+.phone-agent-group-actions button:disabled { color: var(--ad-text-muted); }
+.phone-manage-group { display: flex; align-items: flex-end; }
+.phone-manage-group .phone-field { flex: 1; min-width: 0; }
 .phone-error { color: var(--ad-state-error); font-size: 0.8125rem; margin: 0; overflow-wrap: anywhere; }
 .phone-check { align-items: center; display: flex; gap: var(--ad-space-2); min-height: 44px; }
 .phone-controls { border-top: var(--ad-border-thin) solid var(--ad-border-default); padding-top: var(--ad-space-3); }

@@ -191,7 +191,8 @@ hook and MCP producer routes use per-launch tokens. Full surface in
 - **Config CRUD:** `GET/POST /api/roles`, `PUT/DELETE /api/roles/{role}` (same
   shape for `/api/projects`) · `GET/PUT /api/backends` · `GET/PUT /api/config` ·
   `GET/PUT /api/layout`
-- **Groups:** `POST /api/groups/{group}/release`
+- **Groups:** `POST /api/projects/{project}/groups/stop|archive` with `{group}`; actions
+  affect only that project's members and return per-agent results.
 - **Config federation:** `GET /api/config-sources` · `POST .../preview` ·
   `PUT .../{backend_id}` · `POST .../{backend_id}/refresh` · `DELETE .../{backend_id}`
 - **Producers / live channels:** `POST /api/hook` (agent lifecycle, token-authed)

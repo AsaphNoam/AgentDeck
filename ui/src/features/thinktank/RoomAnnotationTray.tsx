@@ -112,6 +112,7 @@ export function RoomAnnotationTray({ room }: { room: ThinkTankDetail }) {
       </footer>
       <NewAgentModal
         open={showLaunch}
+        groupPicker={false}
         onClose={() => setShowLaunch(false)}
         initialProject={room.origin_project}
         onLaunched={(agentId) => deliver(agentId)}

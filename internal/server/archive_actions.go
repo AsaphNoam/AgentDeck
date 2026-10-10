@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,8 +11,8 @@ import (
 	"github.com/AsaphNoam/Chuck/internal/state"
 )
 
-func (s *Server) stopForArchive(r *http.Request, id string) *runtime.APIError {
-	if err := s.registry.Stop(r.Context(), id); err != nil {
+func (s *Server) stopForArchive(ctx context.Context, id string) *runtime.APIError {
+	if err := s.registry.Stop(ctx, id); err != nil {
 		if !errors.Is(err, runtime.ErrNoHandle) {
 			return apiError(runtime.CodeInternal, "stop agent: "+err.Error())
 		}
@@ -20,6 +21,41 @@ func (s *Server) stopForArchive(r *http.Request, id string) *runtime.APIError {
 		}
 	}
 	s.teardownAgentRegistration(id)
+	return nil
+}
+
+// prepareArchiveMember performs the stop/reap transition while the caller owns
+// the archive reservation. Individual and group archive share this member seam;
+// the group batches only the durable archive write.
+func (s *Server) prepareArchiveMember(ctx context.Context, id string) *runtime.APIError {
+	agent, err := s.stateStore.ReadAgent(id)
+	if errors.Is(err, state.ErrNotFound) {
+		return apiError(runtime.CodeNotFound, "no such agent: "+id)
+	}
+	if err != nil {
+		return apiError(runtime.CodeInternal, err.Error())
+	}
+	if agent.Archived {
+		return nil
+	}
+	if ae := s.projectArchiveGate(agent.Project, "project is archived; restore it first"); ae != nil {
+		return ae
+	}
+	if ae := s.stopForArchive(ctx, id); ae != nil {
+		return ae
+	}
+	return nil
+}
+
+func (s *Server) archiveAgentClaimed(ctx context.Context, id string) *runtime.APIError {
+	if ae := s.prepareArchiveMember(ctx, id); ae != nil {
+		return ae
+	}
+	if err := s.setAgentsArchived([]string{id}, true); err != nil {
+		_, _ = s.stateMgr.Touch(id)
+		return apiError(runtime.CodeInternal, "stopped but could not be archived: "+err.Error())
+	}
+	_, _ = s.stateMgr.Touch(id)
 	return nil
 }
 
@@ -39,6 +75,11 @@ func (s *Server) handleArchiveAgentAction(w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer s.endAgentArchive(agent.Project, id)
+	if !s.claimLifecycle(id) {
+		writeAPIError(w, apiError(runtime.CodeConflict, "a lifecycle transition is already in progress"))
+		return
+	}
+	defer s.releaseLifecycle(id)
 	agent, err = s.stateStore.ReadAgent(id)
 	if errors.Is(err, state.ErrNotFound) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
@@ -52,20 +93,10 @@ func (s *Server) handleArchiveAgentAction(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, s.readSession(id))
 		return
 	}
-	project, err := s.configStore.ReadProject(agent.Project)
-	if err == nil && project.Archived {
-		writeAPIError(w, apiError(runtime.CodeProjectArchived, "project is archived"))
-		return
-	}
-	if ae := s.stopForArchive(r, id); ae != nil {
+	if ae := s.archiveAgentClaimed(r.Context(), id); ae != nil {
 		writeAPIError(w, ae)
 		return
 	}
-	if err := s.setAgentsArchived([]string{id}, true); err != nil {
-		writeAPIError(w, apiError(runtime.CodeInternal, err.Error()))
-		return
-	}
-	_, _ = s.stateMgr.Touch(id)
 	writeJSON(w, http.StatusOK, s.readSession(id))
 }
 
@@ -151,7 +182,7 @@ func (s *Server) handleArchiveProjectAction(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	for _, agentID := range ids {
-		if ae := s.stopForArchive(r, agentID); ae != nil {
+		if ae := s.stopForArchive(r.Context(), agentID); ae != nil {
 			writeAPIError(w, ae)
 			return
 		}

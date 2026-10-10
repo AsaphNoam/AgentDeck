@@ -151,7 +151,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
   run launches is created carrying its stage's group label — the stage title and the run's display
   name, the same pair the stage agent is already named for — as its ordinary task group. A stage's
   agents therefore land in one collapsible dashboard section with the member count, per-state
-  summary, persisted collapse, and **Release group** any group has (FS-02.R18–R20) instead of
+  summary, persisted collapse, and project-scoped **Stop group**/**Archive group** (FS-02.R75–R76) instead of
   scattering through Ungrouped, and a retried or loop-revisited stage collects its later agents in
   the same section. Nothing about the group is special: it is the same visual label a person sets by
   hand, and the run neither owns it nor defends it. A person may rename it, clear it, or move a
@@ -1050,12 +1050,12 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 - **A33** (R58) — A fake run whose second stage is retried creates each stage agent
   with that stage's group label stored on it, putting the retried stage's two agents in one section
   and each other stage's agent in its own; those sections carry the member count, per-state summary,
-  persisted collapse, and **Release group**; a member moved out with **Move to group** keeps both
-  its run/stage card badge and its place on the run's page; and releasing a stage's group stops its
+  persisted collapse, and **Stop group**/**Archive group**; a member moved out with **Move to group** keeps both
+  its run/stage card badge and its place on the run's page; and stopping a stage's group stops its
   members and leaves the run paused with recovery actions rather than finished. —
   `internal/pipeline/manager_test.go` for the label a retried stage composes,
   `internal/server/pipeline_handlers_test.go` for that label reaching the agent's group and for the
-  ordinary stop that release uses leaving the run paused and retryable, and
+  ordinary stop that group Stop uses leaving the run paused and retryable, and
   `ui/src/components/grid/CardGrid.test.tsx` for the sections it produces.
 
 - **A34** (R59) — Run setup offers a fast-mode control only for a stage
@@ -1078,7 +1078,7 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
-- **Planned group action replacement:** FS-02.R75–R76 and TS-03.R57–R58 replace R58's
+- **Group action replacement (shipped 2026-10-10):** FS-02.R75–R76 and TS-03.R57–R58 replace R58's
   Release group action with current-project Stop/Archive. Stage groups remain ordinary editable
   labels; these actions retain existing per-agent owner/lifecycle behavior and do not acquire a
   new run-wide Stop meaning merely because members share a label.

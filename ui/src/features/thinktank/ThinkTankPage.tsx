@@ -476,6 +476,7 @@ function Room({ room }: { room: ThinkTankDetail }) {
       </ConfirmDialog>
       <NewAgentModal
         open={judgeRepair}
+        groupPicker={false}
         title="Judge settings"
         initialProject={room.origin_project}
         onClose={() => setJudgeRepair(false)}

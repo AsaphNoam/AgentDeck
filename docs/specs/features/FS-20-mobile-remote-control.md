@@ -269,12 +269,12 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   while thinking or streaming. Idle, waiting for input, stopped, terminal and disconnected
   views show no working indicator. Reduced motion uses the desktop's slower rotation.
 
-- **R45 (planned) — Group membership is visible on the phone.** A project's agent list
+- **R45 — Group membership is visible on the phone.** A project's agent list
   displays collapsible named group sections with member counts and Ungrouped last, retaining each
   agent's name and live state and running-first placement within each section. Membership changes
   from either device reach both desktop and phone through shared live state. This extends R34.
 
-- **R46 (planned) — Group selection and actions work on the phone.** Phone New agent
+- **R46 — Group selection and actions work on the phone.** Phone New agent
   offers FS-02.R72–R73's optional Group picker. Manage offers the same picker for reassignment
   and blank removal. Group headers offer FS-02.R75–R76's Stop group and Archive group with their
   confirmations and result feedback. Offline disables these actions under R23; a refused move or
@@ -405,12 +405,12 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   and terminal agents show none. Verify focused state-transition tests and a real-phone-width
   browser pass across all three appearances, including reduced motion.
 
-- **A17 (planned)** (R45) — At 390px with agents in two groups and without a group,
+- **A17** (R45) — At 390px with agents in two groups and without a group,
   verify sections, counts, collapse, long names without horizontal overflow and bidirectional
   reassignment with a desktop session open.
   — phone component tests and a browser pass in all three appearances.
 
-- **A18 (planned)** (R46) — Create in an existing/new/blank group, move through Manage,
+- **A18** (R46) — Create in an existing/new/blank group, move through Manage,
   Stop group and Archive group; verify desktop reflects each accepted change and each device
   reflects changes from the other. Offline permits no action; refusals preserve the form values.
   — focused remote route/form tests and FS-02.A57's two-device browser journey at 390px.
@@ -419,7 +419,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 
 - R45–R46/A17–A18 are confirmed, including project-only bulk actions and mobile picker
   without drag and the narrow paired-phone route extension.
-  New controls remain planned; shipped exclusions are superseded only on delivery.
+  Shipped 2026-10-10; the previous group exclusions are superseded by these controls.
 
 - R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of

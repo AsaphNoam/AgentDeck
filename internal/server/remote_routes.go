@@ -34,7 +34,7 @@ var remoteAllowed = map[string][]string{
 	"GET /api/pipelines/{id}": nil,
 
 	"GET /api/sessions":                      nil,
-	"POST /api/sessions":                     {"role", "project", "name", "backend", "model", "effort", "fast"},
+	"POST /api/sessions":                     {"role", "project", "name", "group", "backend", "model", "effort", "fast"},
 	"GET /api/sessions/{id}":                 nil,
 	"GET /api/sessions/{id}/transcript":      nil,
 	"POST /api/sessions/{id}/prompt":         nil,
@@ -53,6 +53,7 @@ var remoteAllowed = map[string][]string{
 	"GET /api/sessions/{id}/file":            nil,
 	"POST /api/sessions/{id}/resume":         nil,
 	"POST /api/sessions/{id}/permission":     nil,
+	"POST /api/sessions/{id}/identity":       {"group"},
 	// Diff-line annotate-and-assign (FS-20.R32, TS-13.R16); nested anchors,
 	// limits, and targets are validated by the shared FS-13 handler.
 	"POST /api/sessions/{id}/annotations": {"annotations", "overall_instruction", "target"},
@@ -65,6 +66,8 @@ var remoteAllowed = map[string][]string{
 	"POST /api/pipeline-runs/{id}/replace":        {"revision", "orchestrator"},
 	"POST /api/pipeline-runs/{id}/repair-cleanup": nil,
 	"POST /api/pipeline-runs/{id}/stop":           nil,
+	"POST /api/projects/{project}/groups/stop":    {"group"},
+	"POST /api/projects/{project}/groups/archive": {"group"},
 }
 
 // remoteDenied names every loopback route deliberately unreachable from a
@@ -103,14 +106,13 @@ var remoteDenied = map[string]bool{
 	"GET /api/tasks":                 true, "POST /api/tasks": true, "GET /api/tasks/{id}": true,
 	"DELETE /api/tasks/{id}": true, "POST /api/tasks/{id}/cancel": true,
 	"POST /api/tasks/{id}/result": true, "POST /api/tasks/{id}/retry": true,
-	"POST /api/tasks/{id}/rearm":       true,
-	"POST /api/signals":                true,
-	"POST /api/sessions/{id}/identity": true, "POST /api/sessions/{id}/background-task-stop": true,
-	"POST /api/sessions/{id}/restore":           true,
-	"GET /api/sessions/{id}/file-search":        true,
-	"GET /api/sessions/{id}/available-commands": true, "GET /api/sessions/{id}/messages": true,
-	"POST /api/groups/{group}/release": true,
-	"GET /api/config-sources":          true, "POST /api/config-sources/preview": true,
+	"POST /api/tasks/{id}/rearm":                   true,
+	"POST /api/signals":                            true,
+	"POST /api/sessions/{id}/background-task-stop": true,
+	"POST /api/sessions/{id}/restore":              true,
+	"GET /api/sessions/{id}/file-search":           true,
+	"GET /api/sessions/{id}/available-commands":    true, "GET /api/sessions/{id}/messages": true,
+	"GET /api/config-sources": true, "POST /api/config-sources/preview": true,
 	"PUT /api/config-sources/{backend_id}": true, "POST /api/config-sources/{backend_id}/refresh": true,
 	"DELETE /api/config-sources/{backend_id}": true,
 	"GET /api/sessions/{id}/terminal/ws":      true,
@@ -269,6 +271,9 @@ func (s *Server) remoteRoutes(domain string, whois func(context.Context, string)
 		}
 		if fields != nil {
 			h = remoteFieldFilter(fields, h)
+		}
+		if e.pattern == "POST /api/sessions/{id}/identity" {
+			h = remoteRequiredStringField("group", h)
 		}
 		authed.Handle(e.pattern, remoteProviderErrorFilter(h))
 	}
@@ -457,6 +462,30 @@ func remoteFieldFilter(allowed []string, next http.Handler) http.Handler {
 				writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "field not allowed from a phone: "+name)
 				return
 			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		next.ServeHTTP(w, r)
+	})
+}
+
+func remoteRequiredStringField(name string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		var fields map[string]json.RawMessage
+		var value string
+		if err == nil {
+			err = json.Unmarshal(body, &fields)
+		}
+		if err == nil {
+			raw, ok := fields[name]
+			if !ok || json.Unmarshal(raw, &value) != nil {
+				writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "field required from a phone: "+name)
+				return
+			}
+		}
+		if err != nil {
+			writeRemoteError(w, http.StatusBadRequest, codeRemoteFieldNotAllowed, "invalid JSON body")
+			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		next.ServeHTTP(w, r)

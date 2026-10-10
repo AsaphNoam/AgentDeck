@@ -1,11 +1,12 @@
 import React from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { ProjectScreen } from "./ProjectScreen";
 import { useConnection } from "./connection";
+import type { AgentState } from "../api/types";
 
 const server = setupServer(
   http.get("/api/projects", () => HttpResponse.json({ app: { title: "App", color: [1, 2, 3] } })),
@@ -17,6 +18,10 @@ const server = setupServer(
     launches.push(await request.json());
     if (launchStatus === 400) return HttpResponse.json({ error: { code: "invalid_request", message: "unknown model" } }, { status: 400 });
     return HttpResponse.json({ agent: { agent_id: "a9" } }, { status: 201 });
+  }),
+  http.post("/api/projects/:project/groups/:action", async ({ params, request }) => {
+    groupActions.push({ project: params.project, action: params.action, body: await request.json() });
+    return HttpResponse.json({ project: params.project, group: "Alpha", results: [{ agent_id: "a", ok: true }, { agent_id: "b", ok: true }] });
   }),
   http.get("/api/pipelines", () => HttpResponse.json([{ id: "delivery", template, valid: true, diagnostics: [] }])),
   http.post("/api/pipeline-runs", async ({ request }) => {
@@ -31,10 +36,17 @@ const controls = { continue: { eligible: false, reason: "" }, retry: { eligible:
 const run = { run_id: "run_1", template_id: "delivery", template_snapshot: template, display_name: "Delivery", project: "app", goal: "Ship it", inputs: {}, assignments: {}, orchestrator: { backend: "codex", model: "preferred" }, dedicated_assignments: {}, state: "running", revision: 1, pending_action: "", current_stage_id: "work", current_task_id: "", current_attempt_id: "", current_agent_id: "", attention_reason: "", final_outcome: "", created_at: "2026-10-05T00:00:00Z", updated_at: "2026-10-05T00:00:00Z" };
 const detail = { run, template, inputs: {}, orchestrator: run.orchestrator, dedicated_assignments: {}, stage_tasks: [], assignments: {}, values: [], diagnostics: [], controls };
 
+const phoneAgent = (agent_id: string, group: string | undefined, running: boolean): AgentState => ({
+  agent_id, name: agent_id, role: "implementer", project: "app", backend: "codex", model: "preferred", fast: false,
+  fast_available: false, steering_available: false, interface: "chat", group, created_at: "", running,
+  state: running ? "busy" : "idle", detail: "", context_pct: 0, updated_at: 0, archived: false,
+});
+
 let launches: unknown[] = [];
 let starts: unknown[] = [];
 let launchStatus = 201;
 let startStatus = 201;
+let groupActions: unknown[] = [];
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
@@ -42,6 +54,7 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/");
   launches = [];
   starts = [];
+  groupActions = [];
   launchStatus = 201;
   startStatus = 201;
 });
@@ -142,5 +155,66 @@ describe("ProjectScreen archival", () => {
     act(() => useConnection.setState({ revision: 1 }));
     expect(await screen.findByText(/Archived on the Mac/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New agent" })).toBeNull();
+  });
+});
+
+describe("ProjectScreen groups", () => {
+  it("projects collapsible groups with counts, running-first order, and Ungrouped last", async () => {
+    useConnection.setState({ agents: {
+      z: phoneAgent("z", undefined, false),
+      b: phoneAgent("b", "Beta", false),
+      a: phoneAgent("a", "Alpha", true),
+      c: phoneAgent("c", "Alpha", false),
+    } });
+    renderScreen();
+    expect(await screen.findByRole("region", { name: "Alpha group" })).toBeInTheDocument();
+    expect([...document.querySelectorAll(".phone-agent-group")].map((node) => node.textContent?.split(" agents")[0])).toHaveLength(3);
+    const sections = [...document.querySelectorAll<HTMLElement>(".phone-agent-group")];
+    expect(sections.map((section) => section.querySelector("strong")?.textContent)).toEqual(["Alpha", "Beta", "Ungrouped"]);
+    expect(within(sections[0]).getAllByRole("button").map((button) => button.textContent).join(" ")).toContain("a");
+    fireEvent.click(within(sections[0]).getByRole("button", { name: /Alpha/ }));
+    expect(within(sections[0]).queryByText("a")).toBeNull();
+    act(() => useConnection.setState({ agents: { ...useConnection.getState().agents, d: phoneAgent("d", "Alpha", true) } }));
+    expect(await within(sections[0]).findByText(/2 running/)).toBeInTheDocument();
+  });
+
+  it("sends explicit existing, new, and blank group values and retains a refused launch", async () => {
+    useConnection.setState({ agents: { existing: phoneAgent("existing", "Existing", true) } });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "New agent" }));
+    const picker = await screen.findByRole("combobox", { name: "Group" });
+    fireEvent.focus(picker);
+    fireEvent.click(screen.getByRole("button", { name: "Existing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+    await waitFor(() => expect(launches[0]).toEqual(expect.objectContaining({ group: "Existing" })));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    launchStatus = 400;
+    fireEvent.click(screen.getByRole("button", { name: "New agent" }));
+    const secondPicker = await screen.findByRole("combobox", { name: "Group" });
+    fireEvent.change(secondPicker, { target: { value: "Fresh" } });
+    fireEvent.click(screen.getByRole("button", { name: 'Create group “Fresh”' }));
+    fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+    expect(await screen.findByText("unknown model")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Group" })).toHaveValue("Fresh");
+    fireEvent.focus(screen.getByRole("combobox", { name: "Group" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ungrouped" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+    await waitFor(() => expect(launches[2]).not.toHaveProperty("group"));
+    expect(screen.getByRole("combobox", { name: "Group" })).toHaveValue("");
+  });
+
+  it("keeps scoped group action feedback after members disappear", async () => {
+    useConnection.setState({ agents: { a: phoneAgent("a", "Alpha", true), b: phoneAgent("b", "Alpha", false) } });
+    renderScreen();
+    const section = await screen.findByRole("region", { name: "Alpha group" });
+    fireEvent.click(within(section).getByRole("button", { name: "Archive group" }));
+    const dialog = await screen.findByRole("dialog", { name: /Archive group/ });
+    expect(dialog).toHaveTextContent("2 members · 1 running");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Archive group" }));
+    await waitFor(() => expect(screen.getByRole("status", { name: "Group action result" })).toHaveTextContent("2 succeeded"));
+    expect(groupActions).toEqual([{ project: "app", action: "archive", body: { group: "Alpha" } }]);
+    act(() => useConnection.setState({ agents: {} }));
+    expect(screen.getByRole("status", { name: "Group action result" })).toBeInTheDocument();
   });
 });

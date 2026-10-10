@@ -309,6 +309,7 @@ export interface LaunchParams {
   effort?: string;
   fast?: boolean;
   interface: "chat" | "terminal";
+  group?: string;
 }
 
 export function useLaunchAgent() {

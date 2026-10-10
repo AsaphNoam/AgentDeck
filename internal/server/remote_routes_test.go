@@ -46,6 +46,33 @@ func TestRemoteRouteInventoryIsClassified(t *testing.T) {
 	}
 }
 
+func TestRemoteGroupRoutesUseNarrowBodiesAndRemoveLegacyRoute(t *testing.T) {
+	s := testServer(t, true)
+	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "node-phone"}))
+	token := pairTestDevice(t, s, "d-group", "node-phone")
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/sessions/a_missing/identity", `{}`, token))
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
+		t.Fatalf("missing remote identity group = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/projects/my-app/groups/stop", `{"group":"auth","project":"other"}`, token))
+	if rec.Code != http.StatusBadRequest || errorCode(t, rec) != codeRemoteFieldNotAllowed {
+		t.Fatalf("forbidden group field = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/groups/auth/release", "{}", token))
+	if rec.Code != http.StatusNotFound || errorCode(t, rec) != codeRemoteRouteNotAvailable {
+		t.Fatalf("legacy remote route = %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, phoneRequest(http.MethodPost, "/api/projects/my-app/groups/stop", `{}`, ""))
+	if rec.Code != http.StatusUnauthorized || errorCode(t, rec) != codeRemoteUnpaired {
+		t.Fatalf("unpaired group route = %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func testWhoIs(peers map[string]string) func(context.Context, string) (remote.Peer, error) {
 	return func(_ context.Context, addr string) (remote.Peer, error) {
 		if id, ok := peers[addr]; ok {

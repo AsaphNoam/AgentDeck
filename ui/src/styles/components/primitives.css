@@ -185,6 +185,37 @@ button:disabled {
   font-size: 0.78rem;
 }
 
+.group-picker { position: relative; }
+.group-action-result {
+  padding: var(--ad-space-3);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  overflow-wrap: anywhere;
+}
+.group-picker-options {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  box-shadow: var(--ad-shadow-keyline);
+  list-style: none;
+  margin: var(--ad-space-1) 0 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0;
+  position: absolute;
+  width: 100%;
+  z-index: 2;
+}
+.group-picker-options button {
+  background: transparent;
+  border: 0;
+  display: block;
+  padding: var(--ad-space-2) var(--ad-space-3);
+  text-align: left;
+  width: 100%;
+}
+.group-picker-options button:hover,
+.group-picker-options button:focus-visible { background: var(--ad-surface-subtle); }
+
 .form-warning {
   color: var(--ad-state-busy);
 }

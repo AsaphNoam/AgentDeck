@@ -164,7 +164,8 @@ func (s *Server) routeTable() []routeEntry {
 	// coder/websocket handshake manages its own headers, and the CORS wrapper's
 	// OPTIONS short-circuit / header rewriting would interfere with the upgrade.
 	api("GET /api/capabilities", s.handleCapabilities)
-	api("POST /api/groups/{group}/release", s.handleReleaseGroup)
+	api("POST /api/projects/{project}/groups/stop", s.handleProjectGroupAction)
+	api("POST /api/projects/{project}/groups/archive", s.handleProjectGroupAction)
 
 	// Phase 7 configuration federation (techspec §2.7): discovery/preview/bind/
 	// refresh/detach over Claude/Codex native config. Method-specific patterns keep

@@ -669,6 +669,21 @@ func (s *Server) handleIdentity(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
 		return
 	}
+	if !s.claimLifecycle(id) {
+		writeAPIError(w, apiError(runtime.CodeConflict, "a lifecycle transition is already in progress"))
+		return
+	}
+	defer s.releaseLifecycle(id)
+	if ae := s.acquireAgentStart(agent.Project, id); ae != nil {
+		writeAPIError(w, ae)
+		return
+	}
+	defer s.releaseAgentStart(agent.Project, id)
+	agent, err = s.stateStore.ReadAgent(id)
+	if err != nil {
+		writeAPIError(w, apiError(runtime.CodeNotFound, "no such agent: "+id))
+		return
+	}
 	if body.Name != nil {
 		name, ae := normalizeAgentName(*body.Name, false)
 		if ae != nil {
@@ -678,9 +693,9 @@ func (s *Server) handleIdentity(w http.ResponseWriter, r *http.Request) {
 		agent.Name = name
 	}
 	if body.Group != nil {
-		group := strings.TrimSpace(*body.Group)
-		if group == "_ungrouped" {
-			writeAPIError(w, apiError(runtime.CodeInvalidGroupName, "_ungrouped is reserved"))
+		group, ae := normalizeGroup(*body.Group)
+		if ae != nil {
+			writeAPIError(w, ae)
 			return
 		}
 		agent.Group = group
