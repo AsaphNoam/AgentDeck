@@ -527,6 +527,15 @@ Requirements are user-observable.
   Cancel, Withdraw queued), pane cap, recency, persistence, keyboard pane cycling, header-region
   collapse, context menu, drag reorder and running/stopped placement are unchanged.
 
+- **R66 — Right-click menus share the session-card's fine construction.** Every pointer context
+  menu (agent card, project card and projects-home background, agent header, transcript link and
+  annotation menus) is one compact raised panel with a thin border, medium radius and soft
+  shadow. Items are low single-line rows of regular-weight small body text with no border or
+  lift, a quiet tinted hover and focus row, muted disabled rows that keep their tooltip,
+  hairline separators, and a small muted section label above the project color swatches, which
+  shrink to small rings. All three appearances express it through their semantic palettes. The
+  items, order, placement, dismissal, keyboard behavior and actions are unchanged.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route

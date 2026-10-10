@@ -608,48 +608,78 @@
   justify-self: start;
 }
 
+/* Right-click menus: a compact raised panel of low, regular-weight rows (FS-12.R66). */
 .context-menu {
   background: var(--ad-surface-raised);
   border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-large);
-  box-shadow: var(--ad-shadow-offset);
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
   display: grid;
+  gap: 0;
   /* A menu taller than the short viewport is clamped to the top margin by
      useMenuPlacement and scrolls from there, so no item is unreachable (J5). */
   max-block-size: calc(100vh - 16px);
-  min-width: 210px;
+  min-width: 184px;
   overflow-y: auto;
   padding: var(--ad-space-1);
   position: fixed;
   z-index: 30;
 }
 
-.context-menu button {
+.context-menu > button {
   background: transparent;
-  border-color: transparent;
+  border: 0;
   border-radius: var(--ad-radius-small);
+  color: var(--ad-text-primary);
+  font-size: 0.8125rem;
+  font-weight: 450;
   justify-content: flex-start;
+  line-height: 1.4;
+  min-height: 0;
+  padding: var(--ad-space-1) var(--ad-space-2);
   text-align: left;
+  transition: background-color 120ms ease, color 120ms ease;
+  white-space: nowrap;
 }
 
-.context-menu button:hover:not(:disabled) {
-  background: var(--ad-highlight);
+.context-menu > button:hover:not(:disabled),
+.context-menu > button:focus-visible {
+  background: color-mix(in srgb, var(--ad-text-primary) 6%, var(--ad-surface-raised));
   box-shadow: none;
   transform: none;
 }
 
+.context-menu > button:focus-visible {
+  outline: var(--ad-border-thin) solid var(--ad-action-secondary);
+  outline-offset: 0;
+}
+
+.context-menu > button:disabled {
+  color: var(--ad-text-muted);
+  opacity: 0.6;
+}
+
+.context-menu hr {
+  border: 0;
+  border-top: var(--ad-border-thin) solid var(--ad-border-default);
+  margin: var(--ad-space-1) var(--ad-space-2);
+}
+
 .context-menu .project-color-preset {
-  border: var(--ad-border-thick) solid var(--ad-border-strong);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-text-primary) 18%, transparent);
   border-radius: var(--ad-radius-round);
+  height: 18px;
+  width: 18px;
 }
 
 .context-menu .project-color-preset:hover:not(:disabled) {
   box-shadow: var(--ad-shadow-keyline);
-  transform: translate(-1px, -1px);
+  transform: none;
 }
 
-.context-menu hr {
-  margin: var(--ad-space-1) 0;
+.context-menu .project-color-preset[aria-pressed="true"] {
+  outline: var(--ad-border-thick) solid var(--ad-text-primary);
+  outline-offset: var(--ad-border-thick);
 }
 .project-dashboard { align-content: start; display: grid; gap: var(--ad-space-4); min-block-size: 100%; padding: var(--ad-space-8); }
 .project-dashboard-header { align-items: center; display: flex; gap: var(--ad-space-4); justify-content: space-between; }
@@ -657,7 +687,7 @@
 .project-card { --ad-project-accent: var(--ad-project-fallback); background: color-mix(in srgb, var(--ad-project-accent) 9%, var(--ad-surface-panel)); border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-project-accent) 50%, var(--ad-border-strong)); border-radius: var(--ad-radius-large); box-shadow: var(--ad-shadow-project-edge); cursor: pointer; display: grid; gap: var(--ad-space-2); padding: var(--ad-space-4) var(--ad-space-4) var(--ad-space-4) var(--ad-space-6); position: relative; }
 .project-card-color { inline-size: var(--ad-space-4); block-size: var(--ad-space-4); border-radius: var(--ad-radius-round); border: var(--ad-border-thin) solid var(--ad-border-strong); }
 .context-menu-color { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-2); }
-.context-menu-color > span { color: var(--ad-text-muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.context-menu-color > span { color: var(--ad-text-muted); font-size: 0.625rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .project-card.unavailable { opacity: .75; }
 /* A worktree project names its branch on the card so parallel streams stay
    distinguishable at a glance (FS-19.R6). It is quiet by design: the branch

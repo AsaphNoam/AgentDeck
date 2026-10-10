@@ -60,28 +60,18 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   failure with Retry, a pipeline room, Files dialog → file viewer, and keyboard focus.
   Reviewer note: room status chip reuses `roomStatus` tones (Running/Waiting/Needs
   attention/Paused/Ended) rather than the study's openings/judge-failed labels.
-- **Review pending — project-dashboard agent cards (FS-12.R65/A37, TS-08.R116):** agent cards
-  on a scoped project grid adopt the Figma Make `SessionCard` study (source: Figma MCP resource
-  `file://figma/make/source/OykxmXqZnnyA67QA1lv3AU/src/SessionCard.tsx` + `session-card.css`):
-  raised panel with a 3px state-tone leading edge, state line (dot + `StateBadge` label, or
-  Stopped) with a quiet grip, name link to `/agent/:id` beside an Expand/Collapse chevron (chat
-  only), backend | mono model | effort row, labelled context row on every card (`ContextBar`'s
-  `compact` form is now its only non-detailed layout), two-line preview, footer with role,
-  pipeline, terminal and Mail/Sent. Expanded cards keep the head above the pane (760px); pane
-  bubbles, activity and an inset composer with a quiet square Send are scoped to
-  `.dashboard-chat-pane`. Supersedes on these cards FS-02.R2/R59 (collapsed context), R3 pill,
-  R5 single line, R6 dimming, R40 project wash/top bar, R58 size, R67/R68 header placement. The
-  visual matrix now renders the real `AgentCard`. Figma px values snap to Chuck tokens (style
-  checker requires token-only spacing/radius/shadow). 734 UI tests, presentation/style checks,
-  UI build, `make build` and `make test` passed. Rendered with fake-backend agents (idle with
-  activity, busy, waiting, crashed→stopped, stopped, long name) in Core, Sky & Grove and Studio
-  at 1024/1280, no overflow or page errors; study reference and receipts in shared project
-  resources `session-card-design/` (`ref/`, `runs/final/`, harness on :4393/:5177).
-  Owed for review: independent A37 comparison including a live error state, a terminal agent,
-  unread mail, a pipeline stage agent, a pending permission in an expanded pane, drag reorder
-  and keyboard focus. Reviewer notes: card name is now a link, so a click on it navigates
-  rather than expanding (body and chevron expand); state labels keep Chuck's vocabulary
-  (Busy/Waiting) rather than the study's Running/Needs input.
+- **Review pending — project-dashboard agent cards (`4dc1b34`, FS-12.R65/A37, TS-08.R116):**
+  `AgentCard` adopts the Figma `SessionCard` study; supersessions of FS-02 are listed in R65.
+  Tests, build and `make test` passed; Core/Sky & Grove/Studio renders at 1024/1280 with the
+  fake-backend harness are in shared resources `session-card-design/` (`ref/`, `runs/final/`).
+  Owed: independent A37 comparison incl. live error, terminal agent, unread mail, pipeline
+  agent, permission in an expanded pane, drag reorder, keyboard focus. Notes: the name is a
+  link (body/chevron expand); state labels keep Chuck's Busy/Waiting vocabulary.
+- **Review pending — fine right-click menus (FS-12.R66):** CSS-only restyle of the shared
+  `.context-menu` (`styles/features/dashboard.css`); the presentation test now holds menus to
+  R66's medium radius. 739 UI tests, style checks and build passed; renders of agent card,
+  project card and agent header menus in all three appearances are in
+  `session-card-design/runs/menus/`. Owed: link/annotation menus, focus row, short viewport.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
