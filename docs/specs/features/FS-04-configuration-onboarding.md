@@ -234,6 +234,17 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   unchanged. Running sessions are not restarted and existing launch snapshots stay frozen under
   R13. All roles still receive the shared context in FS-18.R15 at its stated lifecycle boundary.
 
+- **R54 (planned) — Default launches add no specialized persona.** A fresh home offers a
+  **Default** role with an empty `system_prompt` and inherited global permission policy alongside
+  the four specialized roles in R50. Fresh configuration chooses Default for ordinary new agents;
+  desktop and phone New Agent setup and onboarding use that preference unless the operator or
+  caller explicitly selects another role. Role definitions and the saved default remain local
+  Chuck configuration exposed through the existing role/configuration surfaces. This supersedes
+  R50 only for the seeded set and fresh default; existing role-editing contracts still apply.
+  Upgrade behavior for a saved `implementer` default is awaiting confirmation in §6; no migration
+  is authorized by this draft. Existing persona files, agent/session identities and saved explicit
+  task, pipeline and Think Tank assignments are preserved.
+
 ### 2.7 Onboarding wizard
 
 - **R16 — retired 2026-07-22:** The no-exit first-run wizard was replaced by the explicit
@@ -466,7 +477,22 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   reason. Unrelated config and frozen sessions remain intact. *Verify:* config/API and Settings
   tests plus the FS-01.A26 browser journey.
 
+- **A34 (planned)** (R54) — On a fresh home, inspect the role/configuration API and Settings:
+  Default has no persona text, inherits permissions, and is the saved ordinary launch default;
+  all four specialized roles remain available. Select a custom default and verify desktop,
+  phone and onboarding use it, while an explicit launch role wins. *Verify:* configuration seed/API
+  tests and the FS-01.A29 selection journeys. Upgrade acceptance remains pending the §6 decision.
+
 ## 6. Deviations & open decisions
+
+- **Default-persona upgrade decision (R54):** Recommend adding Default on existing installations,
+  changing a saved `implementer` default to Default, and preserving other saved defaults and all
+  existing agents/explicit automation assignments. A saved `implementer` id does not establish
+  whether the operator deliberately chose it; this proposal therefore needs human confirmation.
+  Preserving every saved default is the alternative, but existing installations would continue
+  creating Implementer agents until the operator changes their preference. Product scope is
+  awaiting confirmation before technical design; customized/conflicting Default definitions will
+  need an explicit preservation rule during that design.
 
 - **Invalid seeded-project `cwd`.** An invalid seeded-project `cwd` is still explained only after a
   launch fails rather than by preflight; reverse that part by adding a stricter preflight.

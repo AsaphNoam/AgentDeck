@@ -33,6 +33,15 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Agents without a persona by default.** Requested with `/design-feature` on 2026-10-10.
+  Let operators create agents with no specialized persona and make this the ordinary default.
+  The user's optional suggestion is an empty **Default** persona with the shared Chuck context
+  all agents already receive. Draft behavior: FS-01.R46/A29 and FS-04.R54/A34; project context,
+  native provider guidance, permissions and operating knowledge retain their existing contracts.
+  Await product-scope confirmation, especially whether upgrades replace a saved `implementer`
+  default while preserving other configured defaults. Existing agents and explicit task/pipeline/
+  Think Tank role assignments would remain unchanged. No technical design or ready change yet.
+
 - **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
   when a provider interrupts work because its quota is exhausted, show a system quota-limit
   indicator and the reported reset time, then schedule continuation. The operator confirmed a

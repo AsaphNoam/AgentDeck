@@ -20,6 +20,12 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Design awaiting product confirmation — agents without a persona by default:**
+  [`ideas.md`](../ideas.md) records the request and draft FS-01.R46/A29, FS-04.R54/A34.
+  Propose empty Default alongside existing personas, ordinary desktop/phone/onboarding defaults,
+  and retained shared/project/native guidance. Await scope and whether upgrades change saved
+  `implementer` defaults while preserving other preferences. No technical design or ready change;
+  existing agents and explicit automation assignments remain unchanged.
 - **Review pending — desktop/phone group controls (FS-02.R72–R76/A54–A57,
   FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118, TS-13.R24):**
   shared searchable picker in ordinary launch/reassignment, collapsible phone sections,
@@ -220,6 +226,16 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design:** Recorded the persona-free default request and drafted launch
+  and configuration behavior/acceptance. Reviewed existing empty-prompt context composition,
+  desktop/phone/onboarding defaults and role/configuration preservation contracts. Product
+  confirmation and the upgrade-default decision are pending before technical design. No product
+  code changed; unrelated phone edits preserved.
+  Focused FS-01/FS-04 lint, launcher contract/twin checks and whitespace checks pass. Full
+  `make check-specs` is blocked by pre-existing ROOM-WIDTH-01 severity/fix-model formatting and
+  the deleted group-change link in this handoff. Scoped ideas lint additionally reports the
+  pre-existing deleted installed-provider change link; none comes from this draft.
 
 - **2026-10-10 — Review:** Reviewed all five small committed changes in one session.
   Independent bounded Luna source/spec audits found no source defects; parent rendered review
