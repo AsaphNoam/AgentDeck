@@ -97,9 +97,16 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   viewable) and a composer offering Send, the held follow-up while the agent is busy, and Steer where
   the runtime supports it (FS-03.R6/R48–R50). Cancel, Stop, and Resume follow FS-01.R6/R7/R10.
   Terminal-interface agents show status only; the terminal itself is desktop-only. The phone loads
-  the latest bounded window of the conversation and offers **Show earlier** for up to three older
-  windows; a pending permission request or the latest reply that falls before the window still
-  appears (TS-13.R18).
+  the latest bounded window of the conversation and automatically loads up to three older windows
+  when the person scrolls upward near the top. Each window holds at most 750 events and about 1 MiB;
+  the phone retains at most 3,000 events and about 4 MiB across the live and older windows. One
+  older or gap-recovery read runs at a time. Loading preserves the visible message position; an
+  exhausted history stops fetching, while a failed read states the error and retries on the next
+  upward scroll. Live refreshes preserve contiguous loaded history and recover intervening pages
+  without duplicates; recovery is limited to three reads, after which the phone visibly states
+  that it returned to the latest window instead of showing a gap. Changing agents clears retained
+  history and pending recovery. A pending
+  permission request or the latest reply that falls before the window still appears (TS-13.R18).
 - **R14 — Tasks and runs can be redirected.** A task offers Retry, Re-arm (reusing its
   existing prerequisites or removing them), Record result, and Cancel under their FS-16.R22–R25 rules.
   A pipeline run offers Continue (with optional input for a blocked stage), Retry stage, Replace

@@ -70,8 +70,8 @@ func getWindow(t *testing.T, h http.Handler, r *http.Request) windowBody {
 func TestTranscriptWindowBoundsAndContinues(t *testing.T) {
 	s := testServer(t, false)
 	h := s.routes()
-	seedWindowTranscript(t, s, "a_long", 600, 10)
-	const total = 606
+	seedWindowTranscript(t, s, "a_long", 900, 10)
+	const total = 906
 
 	full := getWindow(t, h, newLocalRequest(http.MethodGet, "/api/sessions/a_long/transcript", nil))
 	if len(full.Events) != total || full.HasMore != nil {
@@ -143,7 +143,7 @@ func TestTranscriptWindowBoundsBytes(t *testing.T) {
 // limit, so no phone request can read the whole session (FS-20.R13).
 func TestRemoteTranscriptIsAlwaysWindowed(t *testing.T) {
 	s := testServer(t, true)
-	seedWindowTranscript(t, s, "a_phone", 600, 10)
+	seedWindowTranscript(t, s, "a_phone", 900, 10)
 	h := s.remoteRoutes(testDomain, testWhoIs(map[string]string{"100.64.0.2:5000": "node-phone"}))
 	token := pairTestDevice(t, s, "d1", "node-phone")
 	page := getWindow(t, h, phoneRequest(http.MethodGet, "/api/sessions/a_phone/transcript", "", token))

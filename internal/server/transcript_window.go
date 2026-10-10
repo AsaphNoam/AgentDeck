@@ -13,8 +13,8 @@ import (
 // phone refresh of a long-lived agent never decodes, retains, or ships the
 // whole session (FS-20.R13, INV §16). Older windows continue by before_seq.
 const (
-	transcriptWindowDefault  = 150     // events when a windowed request names no limit
-	transcriptWindowMax      = 500     // larger limits are clamped
+	transcriptWindowDefault  = 750     // events when a windowed request names no limit
+	transcriptWindowMax      = 750     // larger limits are clamped
 	transcriptWindowMaxBytes = 1 << 20 // approximate encoded event bytes per window
 	transcriptPendingKeep    = 4       // unresolved permission requests tracked
 	latestAssistantRunes     = 600

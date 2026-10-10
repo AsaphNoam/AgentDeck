@@ -87,6 +87,8 @@ beforeEach(() => {
   live = fullWindow;
   useConnection.setState({ link: "connected", agents: { a1: agent }, transcriptRev: {} });
   useAnnotationStore.setState({ bySource: {}, overallBySource: {}, editedAt: {}, collapsedBySource: {} });
+  Object.defineProperty(window, "scrollY", { value: 300, writable: true, configurable: true });
+  window.scrollTo = vi.fn();
 });
 afterEach(() => {
   cleanup();
@@ -186,7 +188,7 @@ describe("AgentScreen", () => {
     const card = await screen.findByRole("region", { name: "Permission request" });
     expect(card).toHaveTextContent("rm -rf dist");
     expect(card).toHaveTextContent("Reply from before the window");
-    expect(reads[0]).toContain("limit=150");
+    expect(reads[0]).toContain("limit=750");
   });
 
   it("folds tool results into their collapsed tool line", async () => {
@@ -249,7 +251,7 @@ describe("AgentScreen", () => {
     expect(await screen.findByText("Continues in background")).toBeInTheDocument();
   });
 
-  it("loads earlier windows on request and keeps them contiguous with the live one", async () => {
+  it("loads earlier windows on upward scroll and keeps the viewport anchored", async () => {
     live = {
       agent_id: "a1",
       events: [{ agent_id: "a1", seq: 151, type: "user_text", ts: "", data: { text: "Newest question" } }],
@@ -268,18 +270,19 @@ describe("AgentScreen", () => {
     await screen.findByText("Newest question");
     expect(screen.queryByRole("region", { name: "Permission request" })).toBeNull();
     live = { ...live, has_more: false };
-    fireEvent.click(screen.getByRole("button", { name: "Show earlier" }));
+    window.scrollY = 100;
+    fireEvent.scroll(window);
     expect(await screen.findByText("Older question")).toBeInTheDocument();
-    expect(reads).toContain("?limit=150&before_seq=151");
-    await waitFor(() => expect(reads).toContain("?limit=150&since_seq=150"));
+    expect(reads).toContain("?limit=750&before_seq=151");
+    await waitFor(() => expect(reads).toContain("?limit=750&since_seq=151"));
+    expect(window.scrollTo).toHaveBeenCalled();
     expect(screen.getByText("Newest question")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show earlier" })).toBeNull();
   });
 
-  it.skip("keeps requested earlier history when one live event arrives during pagination", async () => {
+  it("keeps requested earlier history when one live event arrives during pagination", async () => {
     // MOBILE-HISTORY-01: the anchor refetch currently drops all older pages
     // when one new event pushes the original full tail past its window limit.
-    const history = Array.from({ length: 300 }, (_, index) => ({
+    const history = Array.from({ length: 1500 }, (_, index) => ({
       agent_id: "a1", seq: index + 1, type: "user_text", ts: "",
       data: { text: `History question ${index + 1}` },
     }));
@@ -289,15 +292,90 @@ describe("AgentScreen", () => {
       const before = Number(url.searchParams.get("before_seq"));
       const since = Number(url.searchParams.get("since_seq"));
       const eligible = history.filter((event) => (!before || event.seq < before) && event.seq > since);
-      const response = { agent_id: "a1", events: eligible.slice(-150), has_more: eligible.length > 150, pending_permission: null, latest_assistant: "" };
-      if (before) history.push({ agent_id: "a1", seq: 301, type: "user_text", ts: "", data: { text: "New live question" } });
+      const response = { agent_id: "a1", events: eligible.slice(-750), has_more: eligible.length > 750, pending_permission: null, latest_assistant: "" };
+      if (before) history.push({ agent_id: "a1", seq: 1501, type: "user_text", ts: "", data: { text: "New live question" } });
       return HttpResponse.json(response);
     }));
     renderScreen();
-    await screen.findByText("History question 151");
-    fireEvent.click(screen.getByRole("button", { name: "Show earlier" }));
+    await screen.findByText("History question 751");
+    window.scrollY = 100;
+    fireEvent.scroll(window);
     await screen.findByText("New live question");
     expect(screen.getByText("History question 1")).toBeInTheDocument();
+  });
+
+  it("loads three older windows on repeated upward scrolls without duplicate events", async () => {
+    const history = Array.from({ length: 2251 }, (_, index) => ({
+      agent_id: "a1", seq: index + 1, type: "user_text", ts: "", data: { text: `Paged question ${index + 1}` },
+    }));
+    server.use(http.get("/api/sessions/a1/transcript", ({ request }) => {
+      const url = new URL(request.url);
+      reads.push(url.search);
+      const before = Number(url.searchParams.get("before_seq"));
+      const since = Number(url.searchParams.get("since_seq"));
+      const eligible = history.filter((event) => (!before || event.seq < before) && event.seq > since);
+      return HttpResponse.json({ agent_id: "a1", events: eligible.slice(-750), has_more: eligible.length > 750, pending_permission: null, latest_assistant: "" });
+    }));
+    renderScreen();
+    await screen.findByText("Paged question 1502");
+    for (const expected of ["Paged question 752", "Paged question 2"]) {
+      window.scrollY = 300;
+      fireEvent.scroll(window);
+      window.scrollY = 100;
+      fireEvent.scroll(window);
+      await screen.findByText(expected);
+    }
+    expect(screen.getAllByText("Paged question 1502")).toHaveLength(1);
+    expect(reads.filter((read) => read.includes("before_seq"))).toHaveLength(2);
+  });
+
+  it("bounds retained older payload bytes while keeping the adjoining live edge", async () => {
+    live = { agent_id: "a1", events: [{ agent_id: "a1", seq: 801, type: "user_text", ts: "", data: { text: "Live edge" } }], has_more: true, pending_permission: null, latest_assistant: "" };
+    earlierPage = { agent_id: "a1", events: Array.from({ length: 800 }, (_, index) => ({
+      agent_id: "a1", seq: index + 1, type: "user_text", ts: "", data: { text: `${index + 1}:${"x".repeat(5000)}` },
+    })), has_more: false, pending_permission: null, latest_assistant: "" };
+    renderScreen();
+    await screen.findByText("Live edge");
+    window.scrollY = 100;
+    fireEvent.scroll(window);
+    await screen.findByText(/^800:/);
+    expect(screen.queryByText(/^1:/)).toBeNull();
+    expect(screen.getByText("Live edge")).toBeInTheDocument();
+  });
+
+  it("recovers two successive live gaps without losing the loaded history", async () => {
+    const history = Array.from({ length: 1500 }, (_, index) => ({ agent_id: "a1", seq: index + 1, type: "user_text", ts: "", data: { text: `Gap question ${index + 1}` } }));
+    let failNextGapRead = false;
+    server.use(http.get("/api/sessions/a1/transcript", ({ request }) => {
+      const url = new URL(request.url);
+      const before = Number(url.searchParams.get("before_seq"));
+      const since = Number(url.searchParams.get("since_seq"));
+      if (before && failNextGapRead) {
+        failNextGapRead = false;
+        return HttpResponse.json({ error: { code: "internal", message: "temporary history read failure" } }, { status: 500 });
+      }
+      const eligible = history.filter((event) => (!before || event.seq < before) && event.seq > since);
+      return HttpResponse.json({ agent_id: "a1", events: eligible.slice(-750), has_more: eligible.length > 750, pending_permission: null, latest_assistant: "" });
+    }));
+    renderScreen();
+    await screen.findByText("Gap question 751");
+    window.scrollY = 100;
+    fireEvent.scroll(window);
+    await screen.findByText("Gap question 1");
+    for (const end of [3100, 4700]) {
+      for (let seq = history.length + 1; seq <= end; seq++) history.push({ agent_id: "a1", seq, type: "user_text", ts: "", data: { text: `Gap question ${seq}` } });
+      if (end === 3100) failNextGapRead = true;
+      act(() => useConnection.setState({ transcriptRev: { a1: end } }));
+      if (end === 3100) {
+        await screen.findByText("temporary history read failure");
+        window.scrollY = 300;
+        fireEvent.scroll(window);
+        window.scrollY = 100;
+        fireEvent.scroll(window);
+      }
+      await screen.findByText(`Gap question ${end}`, {}, { timeout: 5000 });
+    }
+    expect(screen.getAllByText("Gap question 4700")).toHaveLength(1);
   });
 
   it("shows only status for a terminal agent", async () => {

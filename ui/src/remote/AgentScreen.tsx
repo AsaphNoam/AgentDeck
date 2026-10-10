@@ -1,5 +1,5 @@
 import { AutoGrowTextarea, ConfirmDialog, VisuallyHidden } from "../components/ui";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelTurn,
@@ -42,9 +42,25 @@ import { PhoneIcon } from "./PhoneIcon";
 
 // The phone reads a bounded window and keeps at most EARLIER_PAGES older ones
 // (FS-20.R13).
-const TRANSCRIPT_PAGE = 150;
+const TRANSCRIPT_PAGE = 750;
 const EARLIER_PAGES = 3;
+const EARLIER_EVENTS = TRANSCRIPT_PAGE * EARLIER_PAGES;
+const EARLIER_BYTES = 3 * 1024 * 1024;
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+function retainEarlier(events: TranscriptEvent[]) {
+  const unique = [...new Map(events.map((event) => [event.seq, event])).values()].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+  const encoder = new TextEncoder();
+  let bytes = 0;
+  let start = unique.length;
+  while (start > 0 && unique.length - start < EARLIER_EVENTS) {
+    const size = encoder.encode(JSON.stringify(unique[start - 1])).byteLength;
+    if (bytes + size > EARLIER_BYTES && start < unique.length) break;
+    bytes += size;
+    start--;
+  }
+  return unique.slice(start);
+}
 
 export function agentTitle(agent: Pick<AgentState, "name" | "role" | "project">) {
   return agent.name || `${agent.role}@${agent.project}`;
@@ -201,21 +217,21 @@ export function AgentScreen({ agentId }: { agentId: string }) {
 
   // Older windows cover seqs before `anchor`; while they are shown, the live
   // window reads from the anchor so the two stay contiguous.
-  const [earlier, setEarlier] = useState<{ anchor: number; events: TranscriptEvent[]; pages: number; hasMore: boolean } | null>(null);
+  const [earlier, setEarlier] = useState<{ anchor: number; events: TranscriptEvent[]; pages: number; hasMore: boolean; recoveredLiveStart?: number; recoveryPages?: number } | null>(null);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [gapRetry, setGapRetry] = useState(0);
+  const loadingEarlierRef = useRef(false);
+  const scrollAnchor = useRef<{ height: number; top: number } | null>(null);
+  const generation = useRef(0);
 
   const transcript = useQuery({
     queryKey: ["transcript", agentId, rev, earlier?.anchor],
-    queryFn: () => getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, sinceSeq: earlier ? earlier.anchor - 1 : undefined }),
+    queryFn: () => getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, sinceSeq: earlier?.anchor }),
     enabled: chat,
-    placeholderData: (prev) => prev,
+    placeholderData: (prev) => prev?.agent_id === agentId ? prev : undefined,
   });
-  // More than a window arrived after the anchor: the older pages no longer
-  // adjoin the live window, so drop them rather than show a gap.
-  const gap = !!earlier && !transcript.isPlaceholderData && !!transcript.data?.has_more;
-  useEffect(() => {
-    if (gap) setEarlier(null);
-  }, [gap]);
+  const liveStart = transcript.data?.events[0]?.seq;
+  const gap = !!earlier && !transcript.isPlaceholderData && !!transcript.data?.has_more && earlier.recoveredLiveStart !== liveStart;
   const held = useQuery({
     queryKey: ["held", agentId, rev, agent?.state],
     queryFn: () => getHeldPrompt(agentId).catch(() => null),
@@ -224,10 +240,10 @@ export function AgentScreen({ agentId }: { agentId: string }) {
 
   // Fold the joined windows as the desktop does, so streamed deltas coalesce
   // into one message even across a window edge (TS-08.R73).
-  const events = useMemo(
-    () => foldTranscript([...(earlier?.events ?? []), ...(transcript.data?.events ?? [])]),
-    [earlier, transcript.data],
-  );
+  const events = useMemo(() => {
+    const joined = [...(earlier?.events ?? []), ...(gap ? [] : (transcript.data?.events ?? []))];
+    return foldTranscript([...new Map(joined.map((event) => [event.seq, event])).values()].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0)));
+  }, [earlier, gap, transcript.data]);
   // Live reasoning arrives on the same authenticated stream as the desktop's and
   // shares its bounded store (TS-08.R104). The phone's window slides as the
   // conversation grows, so a span anchors after the last seq it saw rather than
@@ -261,24 +277,106 @@ export function AgentScreen({ agentId }: { agentId: string }) {
   const olderAvailable = earlier ? earlier.hasMore : !!transcript.data?.has_more;
 
   const showEarlier = async () => {
+    if (loadingEarlierRef.current) return;
+    if (gap) {
+      setGapRetry((value) => value + 1);
+      return;
+    }
+    if ((earlier?.pages ?? 0) >= EARLIER_PAGES) return;
     const anchor = earlier?.anchor ?? transcript.data?.events[0]?.seq;
     const before = earlier?.events[0]?.seq ?? anchor;
     if (!anchor || !before) return;
+    const requestGeneration = generation.current;
+    loadingEarlierRef.current = true;
     setLoadingEarlier(true);
+    scrollAnchor.current = { height: document.documentElement.scrollHeight, top: window.scrollY };
     try {
       const page = await getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, beforeSeq: before });
+      if (requestGeneration !== generation.current) return;
       setEarlier((prev) => ({
         anchor,
-        events: [...page.events, ...(prev?.events ?? [])],
+        events: retainEarlier([...page.events, ...(prev?.events ?? []), ...(!prev ? transcript.data?.events.slice(0, 1) ?? [] : [])]),
         pages: (prev?.pages ?? 0) + 1,
         hasMore: page.has_more,
       }));
+      setError(null);
     } catch (err) {
+      if (requestGeneration !== generation.current) return;
+      scrollAnchor.current = null;
       setError(errorText(err));
     } finally {
+      if (requestGeneration !== generation.current) return;
+      loadingEarlierRef.current = false;
       setLoadingEarlier(false);
     }
   };
+
+  useLayoutEffect(() => {
+    if (!scrollAnchor.current) return;
+    const { height, top } = scrollAnchor.current;
+    scrollAnchor.current = null;
+    window.scrollTo(0, top + document.documentElement.scrollHeight - height);
+  }, [earlier?.events]);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y < lastY && y <= 200 && (gap || olderAvailable)) void showEarlier();
+      lastY = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [gap, olderAvailable, earlier, transcript.data]);
+
+  useEffect(() => {
+    if (!gap || loadingEarlierRef.current || !earlier || !liveStart) return;
+    if (earlier.recoveredLiveStart && earlier.recoveredLiveStart !== liveStart) {
+      setEarlier({ ...earlier, events: earlier.events.filter((event) => (event.seq ?? 0) <= earlier.anchor), recoveredLiveStart: undefined, recoveryPages: 0 });
+      return;
+    }
+    if ((earlier.recoveryPages ?? 0) >= EARLIER_PAGES) {
+      setEarlier(null);
+      setError("New activity exceeded the phone's retained history. The phone returned to the latest messages.");
+      return;
+    }
+    const recover = async () => {
+      const requestGeneration = generation.current;
+      loadingEarlierRef.current = true;
+      setLoadingEarlier(true);
+      try {
+        const bridge = earlier.events.filter((event) => (event.seq ?? 0) > earlier.anchor);
+        const beforeSeq = bridge[0]?.seq ?? liveStart;
+        const page = await getTranscriptWindow(agentId, { limit: TRANSCRIPT_PAGE, beforeSeq });
+        if (requestGeneration !== generation.current) return;
+        setEarlier((prev) => prev && ({
+          ...prev,
+          events: retainEarlier([...prev.events, ...page.events.filter((event) => (event.seq ?? 0) >= prev.anchor)]),
+          recoveryPages: (prev.recoveryPages ?? 0) + 1,
+          recoveredLiveStart: (page.events[0]?.seq ?? 0) <= prev.anchor ? liveStart : prev.recoveredLiveStart,
+        }));
+        setError(null);
+      } catch (err) {
+        if (requestGeneration !== generation.current) return;
+        setError(errorText(err));
+      } finally {
+        if (requestGeneration !== generation.current) return;
+        loadingEarlierRef.current = false;
+        setLoadingEarlier(false);
+      }
+    };
+    void recover();
+  }, [agentId, gap, gapRetry, earlier, liveStart]);
+
+  useEffect(() => {
+    generation.current++;
+    setEarlier(null);
+    setGapRetry(0);
+    setLoadingEarlier(false);
+    setError(null);
+    loadingEarlierRef.current = false;
+    scrollAnchor.current = null;
+  }, [agentId]);
 
   if (!agent) return <p className="phone-empty">This agent is not on the Mac any more. <button type="button" className="phone-link" onClick={() => navigate("/")}>Home</button></p>;
   // Archived from either device: the screen stops offering work (FS-20.R39).
@@ -364,14 +462,10 @@ export function AgentScreen({ agentId }: { agentId: string }) {
         <p className="phone-empty">This is a terminal agent. Its terminal is on the Mac; the phone shows its status only.</p>
       ) : (
         <>
-          {olderAvailable &&
-            ((earlier?.pages ?? 0) < EARLIER_PAGES ? (
-              <button type="button" className="phone-link" disabled={offline || loadingEarlier} onClick={() => void showEarlier()}>
-                Show earlier
-              </button>
-            ) : (
-              <p className="phone-meta">Earlier messages are not loaded on the phone.</p>
-            ))}
+          {loadingEarlier && <p className="phone-meta" role="status">Loading earlier messages…</p>}
+          {olderAvailable && (earlier?.pages ?? 0) >= EARLIER_PAGES && (
+            <p className="phone-meta">Earlier messages are outside the phone's retained history.</p>
+          )}
           <div className="phone-transcript phone-transcript-bubbles" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
             <TurnList agentId={agentId} events={rows} lead={lead} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
           </div>

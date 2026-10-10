@@ -173,13 +173,14 @@ the installed app on iOS.
   schema-validates the request, while the shared handler remains the one graph/state validator
   (FS-20.R30).
 - **R18 — Phone transcript reads are windowed.** `GET /api/sessions/{id}/transcript` accepts
-  `limit` (clamped to 500) and `before_seq`; a windowed read streams the file and retains at most
+  `limit` (clamped to 750) and `before_seq`; a windowed read streams the file and retains at most
   that many events and about 1 MiB of event payload, answering `{agent_id, events, has_more,
   pending_permission, latest_assistant}`. The newest unresolved permission request and the latest
   top-level assistant reply are derived from the whole session in constant space, so they survive
-  the window boundary. A tailnet read is always windowed (150 events by default); a loopback read
+  the window boundary. A tailnet read is always windowed (750 events by default); a loopback read
   without `limit` or `before_seq` keeps the unwindowed `{agent_id, events}` shape (FS-20.R13,
-  INV §16).
+  INV §16). The phone serializes older and gap-recovery reads, bounds a gap recovery to three
+  windows, and rebases visibly to the latest window if that bound cannot reconnect retained history.
 - **R19 (shipped 2026-10-02) — The phone mirrors the desktop dashboard from existing data.** Phone routes
   are `/` (project dashboard), `/project/{id}`, `/agent/{id}`, `/run/{id}`, `/phone`, and `/pair`;
   `/new`, `/task/{id}`, and any other path render Home. Home and the project page are derived in the
