@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Button, IconButton, PageHeader, ProjectColorPicker, Surface, VisuallyHidden } from "../components/ui";
+import { Badge, Button, PageHeader, ProjectColorPicker, Surface, VisuallyHidden } from "../components/ui";
 import { AgentIdentity } from "../components/chat/ChatPanel";
-import { CollapseIcon } from "../components/ui/icons";
 import { ContextBar } from "../components/grid/ContextBar";
 import { StateBadge } from "../components/grid/StateBadge";
 import { EmptyState } from "../components/grid/EmptyState";
@@ -11,13 +10,28 @@ import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { ToolCall } from "../components/chat/renderers/ToolCall";
 import { ToolResult } from "../components/chat/renderers/ToolResult";
 import { Composer } from "../components/chat/Composer";
-import type { AgentStatus } from "../api/types";
+import type { AgentState, AgentStatus } from "../api/types";
+import { DndContext } from "@dnd-kit/core";
+import { SortableContext } from "@dnd-kit/sortable";
+import { AgentCard } from "../components/grid/AgentCard";
 import { applyAppearance, effectiveAppearance, type EffectiveAppearance } from "../features/appearance/appearance";
 import { PROJECT_COLOR_PRESETS } from "../lib/projectColors";
 import { ProjectNav } from "../components/shell/ActiveProjectNav";
 import "./contract-fixture.css";
 
 const agentStates: AgentStatus[] = ["busy", "idle", "waiting_input", "done", "error", "unknown"];
+
+// The dashboard fixture renders the real AgentCard (TS-08.R116), so this fills only
+// the fields a card reads.
+function matrixAgent(overrides: Partial<AgentState> & Pick<AgentState, "agent_id" | "name">): AgentState {
+  return {
+    role: "builder", project: "chuck-demo", backend: "codex", model: "gpt-fixture", interface: "chat",
+    fast: false, fast_available: false, steering_available: false, created_at: "", running: true,
+    state: "idle", detail: "Long operational detail remains bounded inside the card surface.",
+    context_pct: 0, updated_at: 0, archived: false,
+    ...overrides,
+  };
+}
 
 export function VisualMatrix() {
   const [highVariance, setHighVariance] = useState(false);
@@ -141,62 +155,46 @@ export function VisualMatrix() {
       <section className="visual-matrix-section" data-ui="dashboard">
         <h2>Dashboard states</h2>
         <div className="visual-matrix-agent-grid" data-slot="groups">
+          <DndContext>
+          <SortableContext items={[]}>
           {agentStates.map((state, index) => (
-            <article
-              className="agent-card"
-              data-ui="agent-card"
-              data-state={state}
-              data-variant="default"
+            <AgentCard
               key={state}
-              style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[index].color.join(",")})` } as React.CSSProperties}
-            >
-              <div className="agent-card-top" data-slot="header">
-                <button className="drag-handle" aria-label={`Reorder ${state}`} type="button">::</button>
-                <strong data-slot="identity">{state === "waiting_input" ? "Needs a decision from the orchestration and delivery reviewer" : state === "error" ? "unbroken-agent-name-that-must-not-escape-the-card-boundary" : `${state} agent`}</strong>
-                <StateBadge state={state} />
-              </div>
-              <p className="agent-subtitle" data-slot="metadata">builder · Chuck demo</p>
-              <span className="model-pill">codex · gpt-fixture-{index + 1}</span>
-              <div className="message-indicators" data-slot="indicators">
-                {index === 2 && <span className="mail-badge">Mail 3</span>}
-                {index === 3 && <span className="sent-pulse">Sent</span>}
-              </div>
-              <p className="agent-preview" data-slot="preview">Long operational detail remains bounded inside the card surface.</p>
-            </article>
+              showProject={false}
+              onToggle={() => undefined}
+              agent={matrixAgent({
+                agent_id: `matrix-${state}`,
+                name: state === "waiting_input" ? "Needs a decision from the orchestration and delivery reviewer" : state === "error" ? "unbroken-agent-name-that-must-not-escape-the-card-boundary" : `${state} agent`,
+                state,
+                model: `gpt-fixture-${index + 1}`,
+                context_pct: index * 0.17,
+                unread_messages: index === 2 ? 3 : undefined,
+                last_sent_at: index === 3 ? "2026-10-10T00:00:00Z" : undefined,
+              })}
+            />
           ))}
-          <article className="agent-card stopped" data-ui="agent-card" data-state="stopped" data-variant="default" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[0].color.join(",")})` } as React.CSSProperties}>
-            <div className="agent-card-top" data-slot="header">
-              <button className="drag-handle" aria-label="Reorder stopped" type="button">::</button>
-              <strong data-slot="identity">Stopped agent</strong>
-              <StateBadge state="busy" />
-            </div>
-            <p className="agent-subtitle" data-slot="metadata">reviewer · Chuck demo</p>
-            <span className="terminal-pill">terminal · xterm</span>
-            <small className="stopped-label">stopped</small>
-          </article>
-          <article className="agent-card" data-ui="agent-card" data-state={liveState} data-variant="expanded" style={{ "--ad-project-accent": `rgb(${PROJECT_COLOR_PRESETS[1].color.join(",")})` } as React.CSSProperties}>
-            <div className="agent-card-top" data-slot="header">
-              <div className="agent-card-header-content">
-                <a className="agent-card-name-link" data-slot="identity" href="/agent/expanded-fixture">Expanded long-name agent fixture</a>
-                <span className="model-pill" data-slot="metadata">anthropic-extended-thinking-partner · claude-opus-4-fixture-long-runtime-identity-string · effort: maximum-reasoning-depth</span>
-              </div>
-              <div className="agent-card-header-actions">
-                <StateBadge state={liveState === "stopped" ? "busy" : liveState} />
-                <IconButton data-slot="collapse-control" size="small" aria-label="Collapse" title="Collapse"><CollapseIcon /></IconButton>
-              </div>
-            </div>
-            <div className="agent-card-context" data-slot="context"><ContextBar value={0.74} used={153482} size={200000} compact /></div>
-            <div className="dashboard-chat-pane" data-slot="chat-pane">
-              <div className="transcript-wrap">
-                <div className="transcript-view" data-ui="transcript" data-slot="list">
-                  <AssistantText event={{ kind: "assistant_text", text: "A populated conversation keeps the remaining card height.\n\n```ts\nconst result = await verify();\n```" }} />
-                </div>
-              </div>
-              <div className="dashboard-chat-composer">
-                <Composer agentId="expanded-fixture" busy={liveState === "busy"} running={liveState !== "stopped"} variant="dashboard" />
-              </div>
-            </div>
-          </article>
+          <AgentCard showProject={false} agent={matrixAgent({ agent_id: "matrix-stopped", name: "Stopped agent", role: "reviewer", interface: "terminal", driver: "xterm", running: false, detail: "" })} />
+          <AgentCard
+            expanded
+            showProject={false}
+            onToggle={() => undefined}
+            agent={matrixAgent({
+              agent_id: "expanded-fixture",
+              name: "Expanded long-name agent fixture",
+              backend: "anthropic-extended-thinking-partner",
+              model: "claude-opus-4-fixture-long-runtime-identity-string",
+              effort: "maximum-reasoning-depth",
+              state: liveState === "stopped" ? "busy" : liveState,
+              running: liveState !== "stopped",
+              context_pct: 0.74,
+              context_used: 153482,
+              context_size: 200000,
+            })}
+          >
+            <MatrixChatPane liveState={liveState} />
+          </AgentCard>
+          </SortableContext>
+          </DndContext>
         </div>
         <label className="visual-matrix-toggle">Expanded card state
           <select aria-label="Expanded card state" value={liveState} onChange={(event) => setLiveState(event.target.value as AgentStatus | "stopped")}>
@@ -317,6 +315,23 @@ export function VisualMatrix() {
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+// The expanded card's pane, outside the dashboard section so its slot belongs to the
+// agent card it renders in.
+function MatrixChatPane({ liveState }: { liveState: AgentStatus | "stopped" }) {
+  return (
+    <div className="dashboard-chat-pane" data-slot="chat-pane">
+      <div className="transcript-wrap">
+        <div className="transcript-view" data-ui="transcript" data-slot="list">
+          <AssistantText event={{ kind: "assistant_text", text: "A populated conversation keeps the remaining card height.\n\n```ts\nconst result = await verify();\n```" }} />
+        </div>
+      </div>
+      <div className="dashboard-chat-composer">
+        <Composer agentId="expanded-fixture" busy={liveState === "busy"} running={liveState !== "stopped"} variant="dashboard" />
+      </div>
     </div>
   );
 }

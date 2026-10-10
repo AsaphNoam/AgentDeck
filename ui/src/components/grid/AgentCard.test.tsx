@@ -120,34 +120,66 @@ describe("AgentCard", () => {
     const collapse = screen.getByRole("button", { name: "Collapse" });
     expect(collapse).toHaveAttribute("title", "Collapse");
     expect(collapse.querySelector("svg")).not.toBeNull();
-    // FS-02.A50 — badge and Collapse share the identity header row; the context
-    // meter is the next row below it.
+    // FS-12.A37 — the expanded card keeps the whole session-card head: state line,
+    // name with the collapse chevron beside it, then the context row; the pane follows.
     const header = screen.getByText("idle").closest('[data-slot="header"]')!;
     expect(header).toContainElement(collapse);
     expect(header).toContainElement(screen.getByRole("link", { name: "Atlas" }));
-    const meter = screen.getByLabelText("72% context used");
-    expect(header).not.toContainElement(meter);
-    expect(header.nextElementSibling).toContainElement(meter);
+    expect(collapse).toHaveAttribute("aria-expanded", "true");
+    expect(collapse.parentElement).toContainElement(screen.getByRole("link", { name: "Atlas" }));
+    expect(header).toContainElement(screen.getByLabelText("72% context used"));
+    expect(header.nextElementSibling).toContainElement(screen.getByText("Send"));
     fireEvent.click(collapse);
     expect(toggle).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByText("idle").closest('[data-slot="header"]')!);
     expect(toggle).toHaveBeenCalledTimes(2);
   });
 
-  // FS-02.A41 — collapsed cards carry no context figure; the same shared
-  // ContextBar appears in compact form only after expansion.
-  it("omits context usage while collapsed", () => {
+  // FS-12.R65/A37 — a collapsed chat card carries the context row (superseding
+  // FS-02.R59), an Expand chevron that toggles without navigating, and a name link
+  // to the agent page.
+  it("shows context, an Expand chevron and a name link while collapsed", () => {
+    const toggle = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/"]}><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
+        <Routes>
+          <Route path="/" element={<AgentCard onToggle={toggle} agent={{
+            agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
+            backend: "claude", model: "sonnet", interface: "chat", state: "idle",
+            detail: "ready", running: true, context_pct: 0,
+          }} />} />
+          <Route path="/agent/:id" element={<div>Chat view</div>} />
+        </Routes>
+      </SortableContext></DndContext></MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("0% context used")).toHaveAttribute("data-state", "compact");
+    const expand = screen.getByRole("button", { name: "Expand" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(expand);
+    expect(toggle).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByText("ready"));
+    expect(toggle).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("link", { name: "Atlas" }));
+    expect(toggle).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Chat view")).toBeInTheDocument();
+  });
+
+  // FS-12.R65 — a stopped agent reads "Stopped" on the state line instead of its last state.
+  it("marks a stopped agent on the state line", () => {
     render(
       <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
         <AgentCard agent={{
           agent_id: "a_1", name: "Atlas", role: "implementer", project: "my-app",
-          backend: "claude", model: "sonnet", interface: "chat", state: "idle",
-          detail: "ready", running: true, context_pct: 0,
+          backend: "claude", model: "sonnet", interface: "terminal", state: "busy",
+          detail: "", running: false, context_pct: 0,
         }} />
       </SortableContext></DndContext></MemoryRouter>,
     );
 
-    expect(screen.queryByLabelText("0% context used")).not.toBeInTheDocument();
+    expect(screen.getByText("Stopped")).toBeInTheDocument();
+    expect(screen.queryByTestId("state-badge")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
   });
 
   // FS-02.R62/R63, A44/A45: the expanded card states the exact figure and the
@@ -164,7 +196,7 @@ describe("AgentCard", () => {
     );
 
     expect(screen.getByLabelText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
-    expect(screen.getByText("claude · sonnet · high")).toBeInTheDocument();
+    expect(runtimeParts()).toEqual(["claude", "sonnet", "high"]);
 
     // A live update replaces both numbers (and the percentage) in place.
     rerender(
@@ -181,8 +213,8 @@ describe("AgentCard", () => {
     expect(screen.queryByLabelText("12,345 / 200,000 tokens · 6% context used")).not.toBeInTheDocument();
   });
 
-  // An empty effort must not leave a dangling " · " separator in the reused
-  // runtime-identity string (FS-02.R63/A45).
+  // An empty effort must not leave a dangling separator rule in the runtime row
+  // (FS-02.R63/A45).
   it("renders the runtime identity with no dangling separator when effort is empty", () => {
     render(
       <MemoryRouter><DndContext><SortableContext items={["a_1"]} strategy={rectSortingStrategy}>
@@ -194,6 +226,11 @@ describe("AgentCard", () => {
       </SortableContext></DndContext></MemoryRouter>,
     );
 
-    expect(screen.getByText("claude · sonnet")).toBeInTheDocument();
+    expect(runtimeParts()).toEqual(["claude", "sonnet"]);
+    expect(document.querySelector(".agent-card-effort")).toBeNull();
   });
 });
+
+function runtimeParts() {
+  return [...document.querySelector('[data-slot="metadata"]')!.children].map((part) => part.textContent);
+}

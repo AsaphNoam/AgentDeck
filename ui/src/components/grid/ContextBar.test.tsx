@@ -20,15 +20,22 @@ describe("ContextBar", () => {
   // low/medium/high tone through the contract attribute a skin can select on — density is a
   // separate dimension, not a replacement for the tone.
   it("keeps the shared value derivation and its tone in compact form", () => {
-    render(<ContextBar value={2} compact />);
+    render(<ContextBar value={2} />);
     const meter = screen.getByLabelText("100% context used");
     expect(meter).toHaveClass("high");
     expect(meter).toHaveAttribute("data-variant", "high");
     expect(meter).toHaveAttribute("data-state", "compact");
   });
 
-  it("marks only the compact form with the density state", () => {
-    render(<ContextBar value={0.7} />);
+  // FS-12.R65: the card row leads with the percentage and follows with the exact pair.
+  it("labels the card row with Context and the percentage before the pair", () => {
+    render(<ContextBar value={0.26} used={52680} size={200000} />);
+    const meter = screen.getByLabelText("52,680 / 200,000 tokens · 26% context used");
+    expect(meter).toHaveTextContent("Context26% · 52,680 / 200,000 tokens");
+  });
+
+  it("marks only the card form with the density state", () => {
+    render(<ContextBar value={0.7} detailed />);
     const meter = screen.getByLabelText("70% context used");
     expect(meter).toHaveAttribute("data-variant", "medium");
     expect(meter).not.toHaveAttribute("data-state");

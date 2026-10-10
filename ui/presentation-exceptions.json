@@ -2,7 +2,7 @@
   {
     "file": "src/components/grid/AgentCard.tsx",
     "rule": "inline-style",
-    "reason": "Transform/transition are live drag state, span is persisted dashboard density, and the accent is persisted project RGB data"
+    "reason": "Transform/transition are live drag state"
   },
   {
     "file": "src/components/grid/CardGrid.tsx",
@@ -48,11 +48,6 @@
     "file": "src/remote/HomeScreen.tsx",
     "rule": "inline-style",
     "reason": "Phone project mark uses the persisted project RGB accent under TS-08.R14"
-  },
-  {
-    "file": "src/presentation/VisualMatrix.tsx",
-    "rule": "inline-style",
-    "reason": "Fixture cards render the fixed declared project-accent palette"
   },
   {
     "file": "src/components/chat/renderers/MermaidDiagram.tsx",

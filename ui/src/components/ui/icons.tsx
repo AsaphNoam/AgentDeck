@@ -26,6 +26,14 @@ export function CollapseIcon() {
   return <Icon><path d="M4 10 8 6l4 4" /></Icon>;
 }
 
+export function ExpandIcon() {
+  return <Icon><path d="M4 6l4 4 4-4" /></Icon>;
+}
+
+export function GripIcon() {
+  return <Icon fill="currentColor" stroke="none"><circle cx="6" cy="4" r="1.1" /><circle cx="10" cy="4" r="1.1" /><circle cx="6" cy="8" r="1.1" /><circle cx="10" cy="8" r="1.1" /><circle cx="6" cy="12" r="1.1" /><circle cx="10" cy="12" r="1.1" /></Icon>;
+}
+
 export function FileIcon() {
   return <Icon><path d="M9.5 2H4v12h8V4.5zM9.5 2v3H12M6 9h4m-4 2.5h4" /></Icon>;
 }

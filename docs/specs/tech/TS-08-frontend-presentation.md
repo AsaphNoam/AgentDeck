@@ -1292,6 +1292,21 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   tones from `--ad-state-*`, the eyebrow from `--ad-state-done`. The live dots are state
   indication with a `prefers-reduced-motion` stop; no token, skin rule or dependency is added.
   Verify with focused tests, the presentation checks and the A36 browser comparison.
+- **R116 — The session-card composition stays in `AgentCard`.** FS-12.R65 lives in
+  `components/grid/AgentCard`, `ContextBar` and `styles/features/dashboard.css`; the pane's
+  transcript and composer rules are scoped to `.dashboard-chat-pane`, so the agent page and phone
+  keep theirs. The card keeps `data-ui="agent-card"`, its `data-state`/`data-variant` values and
+  the `header`/`identity`/`metadata`/`context`/`preview`/`indicators`/`collapse-control`/
+  `chat-pane` slots: `header` is the whole head region (FS-02.R52), and the chevron carries
+  `collapse-control` in both directions. The state label reuses `StateBadge` drawn as dot + text;
+  `ContextBar`'s existing `compact` state becomes the labelled card row on collapsed and expanded
+  cards with the same accessible label and tone variants (low stays neutral; medium/high keep the
+  busy/error tones). The visual matrix renders the real `AgentCard` rather than copied markup.
+  Icons join `components/ui/icons.tsx`. Colors map onto semantic tokens: state tones from
+  `--ad-state-*`, bubble tints from `--ad-action-secondary`, focus from `--ad-action-primary`;
+  the project accent leaves agent cards (project cards keep it). No token, skin rule, motion or
+  dependency is added. Verify with focused tests, the presentation checks and the A37 browser
+  comparison.
 
 ## 3. Interfaces & data shapes
 

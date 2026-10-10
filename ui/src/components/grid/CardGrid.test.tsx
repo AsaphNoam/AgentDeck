@@ -106,6 +106,12 @@ function renderWithQuery(ui: React.ReactElement) {
   );
 }
 
+// The card body toggles a chat pane (FS-02.R46); the name itself is a link to the
+// agent page (FS-12.R65), so expansion clicks land on the card.
+async function cardOf(id: string) {
+  return (await screen.findByText(id)).closest('[data-ui="agent-card"]')!;
+}
+
 describe("CardGrid", () => {
 
   // FS-02.A29/A37 — the render and interaction half only: click-to-expand, header
@@ -120,8 +126,7 @@ describe("CardGrid", () => {
     });
     renderWithQuery(<CardGrid />);
 
-    const chat = await screen.findByText("a_chat");
-    fireEvent.click(chat);
+    fireEvent.click(await cardOf("a_chat"));
     const expandedCard = screen.getByLabelText("Composer a_chat").closest('[data-ui="agent-card"]');
     expect(expandedCard).toHaveAttribute("data-variant", "expanded");
     expect(expandedCard?.getAttribute("style") ?? "").not.toContain("grid-column");
@@ -190,9 +195,9 @@ describe("CardGrid", () => {
     }));
     renderWithQuery(<CardGrid />);
 
-    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await screen.findByText(id));
+    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await cardOf(id));
     fireEvent.pointerDown(screen.getByLabelText("Composer a_1"));
-    fireEvent.click(screen.getByText("a_5"));
+    fireEvent.click(await cardOf("a_5"));
 
     expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
     expect(screen.queryByLabelText("Composer a_2")).not.toBeInTheDocument();
@@ -232,7 +237,7 @@ describe("CardGrid", () => {
     seedGrid(["a_1", "a_2", "a_3"], { a_1: agent("a_1"), a_2: agent("a_2"), a_3: agent("a_3") });
     Element.prototype.scrollIntoView = vi.fn();
     renderWithQuery(<CardGrid />);
-    for (const id of ["a_1", "a_2", "a_3"]) fireEvent.click(await screen.findByText(id));
+    for (const id of ["a_1", "a_2", "a_3"]) fireEvent.click(await cardOf(id));
     const first = screen.getByLabelText("Composer a_1");
     const second = screen.getByLabelText("Composer a_2");
     const third = screen.getByLabelText("Composer a_3");
@@ -262,7 +267,7 @@ describe("CardGrid", () => {
       a_2: agent("a_2", { group: "beta" }),
     });
     renderWithQuery(<CardGrid />);
-    for (const id of ["a_1", "a_2"]) fireEvent.click(await screen.findByText(id));
+    for (const id of ["a_1", "a_2"]) fireEvent.click(await cardOf(id));
     expect(document.querySelectorAll('[data-ui="agent-group"]')).toHaveLength(2);
 
     const first = screen.getByLabelText("Composer a_1");
@@ -282,7 +287,7 @@ describe("CardGrid", () => {
   it("keeps a stopped pane open, opens nothing on a done transition, and removes a pane with its card", async () => {
     seedHydratedGrid(["a_1", "a_2"], { a_1: agent("a_1"), a_2: agent("a_2") });
     renderWithQuery(<CardGrid />);
-    fireEvent.click(await screen.findByText("a_1"));
+    fireEvent.click(await cardOf("a_1"));
     expect(screen.getByLabelText("Composer a_1")).toBeInTheDocument();
 
     act(() => useAgentStore.getState().applyStateUpdate(agent("a_1", { running: false, state: "done" })));
@@ -393,7 +398,7 @@ describe("CardGrid", () => {
       return HttpResponse.json(body);
     }));
     renderWithQuery(<CardGrid projectID="my-app" />);
-    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await screen.findByText(id));
+    for (const id of ["a_1", "a_2", "a_3", "a_4"]) fireEvent.click(await cardOf(id));
 
     act(() => useAgentStore.getState().applyStateUpdate(agent("a_5", { state: "waiting_input", updated_at: 5 })));
 

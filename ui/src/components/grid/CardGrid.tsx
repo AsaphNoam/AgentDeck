@@ -305,7 +305,6 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                             <LiveAgentCard
                               key={agent.agent_id}
                               agent={agent}
-                              projectColor={projects.data?.[agent.project]?.color}
                               projectTitle={projects.data?.[agent.project]?.title}
                               showProject={!projectID}
                               expanded={expanded.includes(agent.agent_id)}

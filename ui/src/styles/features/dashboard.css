@@ -94,135 +94,344 @@
   display: grid;
 }
 
+/* Project-dashboard agent card: the Figma session-card composition (FS-12.R65,
+   TS-08.R116). One raised panel whose leading edge carries the live state tone. */
 .agent-card {
-  container: agent-card / inline-size;
-  --ad-project-accent: var(--ad-project-fallback);
-  background: var(--ad-surface-panel);
+  --ad-agent-card-tone: var(--ad-state-unknown);
+  background: var(--ad-surface-raised);
   border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-inline-start: 3px solid color-mix(in srgb, var(--ad-project-accent) 65%, var(--ad-border-default));
-  border-radius: var(--ad-radius-large);
-  box-shadow: var(--ad-shadow-offset);
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline);
+  container: agent-card / inline-size;
   cursor: pointer;
-  display: grid;
-  align-content: start;
-  gap: var(--ad-space-2);
-  min-height: 196px;
+  min-width: 0;
   overflow: hidden;
-  padding: var(--ad-space-4);
   position: relative;
-  transition: box-shadow 120ms ease;
+  transition: border-color 200ms ease;
 }
 
-.agent-card::after {
-  background: var(--ad-state-unknown);
+.agent-card::before {
+  background: var(--ad-agent-card-tone);
   content: "";
-  height: 3px;
-  left: 0;
+  inset: 0 auto 0 0;
+  opacity: 0.65;
+  pointer-events: none;
   position: absolute;
-  top: 0;
-  width: 100%;
+  width: 3px;
+  z-index: 1;
 }
 
-.agent-card:hover {
-  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
-}
-
+.agent-card:hover,
 .agent-card[data-variant="expanded"] {
-  cursor: default;
-  height: 640px;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  min-height: 0;
-  overflow-anchor: none;
-  padding-bottom: 0;
+  border-color: color-mix(in srgb, var(--ad-text-muted) 40%, var(--ad-border-default));
 }
 
-.agent-card[data-variant="expanded"]:hover {
-  box-shadow: var(--ad-shadow-offset);
+.agent-card[data-state="busy"] { --ad-agent-card-tone: var(--ad-state-busy); }
+.agent-card[data-state="idle"] { --ad-agent-card-tone: var(--ad-state-idle); }
+.agent-card[data-state="waiting_input"] { --ad-agent-card-tone: var(--ad-state-waiting); }
+.agent-card[data-state="done"] { --ad-agent-card-tone: var(--ad-state-done); }
+.agent-card[data-state="error"] { --ad-agent-card-tone: var(--ad-state-error); }
+.agent-card.stopped { --ad-agent-card-tone: var(--ad-text-muted); }
+
+.agent-card-head {
+  padding: var(--ad-space-4);
+}
+
+.agent-card-topline,
+.agent-card-title-row {
+  align-items: center;
+  display: flex;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
+}
+
+.agent-card-topline {
+  margin-bottom: var(--ad-space-3);
+  min-height: 20px;
+}
+
+/* The state label reads as a dot and tone-colored text rather than a pill. */
+.agent-card .state-badge,
+.agent-card .stopped-label {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--ad-agent-card-tone);
+  display: inline-flex;
+  font-family: var(--ad-font-text);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  gap: var(--ad-space-1);
+  min-height: 0;
+  padding: 0;
+  text-transform: capitalize;
+}
+
+.agent-card .state-badge .ad-badge-indicator,
+.agent-card .stopped-label::before {
+  background: currentcolor;
+  border-radius: var(--ad-radius-round);
+  height: 6px;
+  width: 6px;
+}
+
+.agent-card .stopped-label::before {
+  content: "";
+}
+
+.agent-card[data-state="busy"] .state-badge .ad-badge-indicator {
+  animation: ad-state-pulse 2.4s ease-in-out infinite;
+  outline: 3px solid color-mix(in srgb, var(--ad-agent-card-tone) 12%, transparent);
+}
+
+.agent-card[data-state="error"] .state-badge .ad-badge-indicator,
+.agent-card[data-state="waiting_input"] .state-badge .ad-badge-indicator {
+  animation: ad-state-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ad-state-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-card .state-badge .ad-badge-indicator {
+    animation: none;
+  }
+}
+
+.drag-handle {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ad-text-muted);
+  cursor: grab;
+  min-height: 24px;
+  min-width: 24px;
+  opacity: 0.55;
+  padding: var(--ad-space-1);
+}
+
+.agent-card:hover .drag-handle,
+.drag-handle:focus-visible {
+  opacity: 1;
+}
+
+.drag-handle:hover:not(:disabled) {
+  background: var(--ad-surface-subtle);
+  box-shadow: none;
   transform: none;
 }
 
-.agent-card[data-variant="expanded"] .agent-card-top {
-  align-items: start;
-  cursor: pointer;
-  grid-template-columns: minmax(0, 1fr) auto;
+.drag-handle:active {
+  cursor: grabbing;
 }
 
+.agent-card-title-row {
+  align-items: start;
+  gap: var(--ad-space-2);
+}
+
+/* Long generated names wrap to three lines and break unbroken tokens (FS-02.R58). */
 .agent-card-name-link {
   color: var(--ad-text-primary);
-  font-family: var(--ad-font-display);
   display: -webkit-box;
-  font-size: 1.15rem;
-  font-weight: 700;
-  line-height: 1.3;
+  font-family: var(--ad-font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.4;
   overflow: hidden;
   overflow-wrap: anywhere;
+  text-decoration: none;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
 
-/* Badge and Collapse sit top-right beside the identity (FS-02.R68). */
-.agent-card-header-actions {
+.agent-card-name-link:hover {
+  text-decoration: underline;
+}
+
+.agent-card .agent-card-toggle {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-small);
+  color: var(--ad-text-muted);
+  flex: none;
+  height: 26px;
+  min-height: 26px;
+  min-width: 26px;
+  padding: 0;
+  width: 26px;
+}
+
+.agent-card .agent-card-toggle:hover:not(:disabled) {
+  background: var(--ad-surface-subtle);
+  box-shadow: none;
+  color: var(--ad-text-primary);
+  transform: none;
+}
+
+.agent-card-runtime {
+  align-items: center;
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.625rem;
+  gap: var(--ad-space-2);
+  margin-top: var(--ad-space-4);
+}
+
+.agent-card-runtime strong {
+  color: var(--ad-text-primary);
+  font-family: var(--ad-font-mono);
+  font-weight: 500;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agent-card-effort {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  padding-left: var(--ad-space-2);
+}
+
+.agent-card-context {
+  margin-top: var(--ad-space-3);
+}
+
+.agent-preview {
+  color: var(--ad-text-primary);
+  display: -webkit-box;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: var(--ad-space-4) 0 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agent-card-footer {
+  align-items: center;
+  color: var(--ad-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.625rem;
+  gap: var(--ad-space-1) var(--ad-space-3);
+  margin-top: var(--ad-space-3);
+}
+
+.agent-subtitle {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pipeline-association {
+  color: var(--ad-action-secondary);
+}
+
+.terminal-pill {
+  font-family: var(--ad-font-mono);
+}
+
+.message-indicators {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--ad-space-2);
+  margin-left: auto;
+}
+
+.message-indicators:empty {
+  display: none;
+}
+
+.mail-badge {
+  color: var(--ad-action-primary);
+  font-weight: 600;
+}
+
+.sent-pulse {
+  animation: ad-sent-pulse 2s ease-out forwards;
+  color: var(--ad-action-secondary);
+  font-weight: 500;
+}
+
+@keyframes ad-sent-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.18; }
+}
+
+/* Labelled context row: "Context" and the figure above a thin track (FS-12.R65). */
+.context-bar {
+  color: var(--ad-text-muted);
+  font-size: 0.625rem;
+}
+
+.context-bar-row {
   align-items: center;
   display: flex;
-  gap: var(--ad-space-2);
-  justify-content: flex-end;
+  gap: var(--ad-space-3);
+  justify-content: space-between;
 }
 
-/* The meter's label can carry the exact used/total figure (TS-08.R81), so the
-   meter takes its own full-width row below the header. */
-.agent-card-context {
-  padding-bottom: var(--ad-space-3);
+.context-bar-row strong {
+  color: var(--ad-text-primary);
+  font-weight: 500;
 }
 
-/* The expanded card's header "content side" (name + quiet runtime metadata,
-   TS-08.R81) stacks independently of the "action side" (context/state/Collapse)
-   so a long backend/model/effort string wraps or clips without displacing them
-   or overlapping across the single-column expanded header grid. */
-.agent-card-header-content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ad-space-1);
-  min-width: 0;
+.context-bar-track {
+  background: var(--ad-surface-subtle);
+  border-radius: var(--ad-radius-round);
+  height: 4px;
+  margin-top: var(--ad-space-2);
+  overflow: hidden;
 }
 
-.agent-card-header-content .model-pill {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  white-space: normal;
+.context-bar-track span {
+  border-radius: var(--ad-radius-round);
+  display: block;
+  height: 100%;
 }
 
-@container agent-card (max-width: 260px) {
-  .agent-card-top {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
+.context-bar.low .context-bar-track span { background: color-mix(in srgb, var(--ad-text-primary) 45%, var(--ad-surface-subtle)); }
+.context-bar.medium .context-bar-track span { background: var(--ad-state-busy); }
+.context-bar.high .context-bar-track span { background: var(--ad-state-error); }
 
-  .agent-card-top > .state-badge {
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .dashboard-chat-composer .composer {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .dashboard-chat-composer .composer-actions {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .dashboard-chat-composer .composer button {
-    min-width: 0;
-  }
+.agent-card.dragging {
+  opacity: 0.7;
 }
 
-@container agent-card (max-width: 180px) {
-  .agent-card-header-actions {
-    justify-content: flex-start;
-  }
+/* A drop across the running/stopped boundary is refused (FS-02.R45), so the drag says
+   so while it is still in flight rather than only snapping back (FS-02.R53). The card
+   under the pointer wins hit testing and sets its own `cursor: pointer`, as the drag
+   handle sets `grab`/`grabbing` and every button inherits one, so the refused state has
+   to reach every descendant rather than the stack alone. `*` is used instead of naming
+   those surfaces because an opt-out list drifts the moment a control is added
+   (INV §2/§10); the repeated `[data-slot="groups"]` raises the selector above the
+   expanded card's own head cursor, which is the most specific competitor. */
+.group-stack[data-drop="refused"],
+.group-stack[data-drop="refused"][data-slot="groups"] * {
+  cursor: not-allowed;
+}
+
+.group-stack[data-drop="refused"] .agent-card.dragging {
+  opacity: 0.4;
+}
+
+/* Expanded: the head stays and the chat pane fills the fixed height below a rule
+   (FS-02.R47/R55); only the head toggles and opens the card menu (FS-02.R52). */
+.agent-card[data-variant="expanded"] {
+  cursor: default;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 760px;
+  overflow-anchor: none;
+}
+
+.agent-card[data-variant="expanded"] .agent-card-head {
+  cursor: pointer;
 }
 
 .dashboard-chat-pane {
-  background: var(--ad-surface-raised);
   border-top: var(--ad-border-thin) solid var(--ad-border-default);
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -236,180 +445,119 @@
 }
 
 .dashboard-chat-pane .transcript-view {
+  background: var(--ad-surface-raised);
   overflow-wrap: anywhere;
-  padding-inline: 0;
+  padding: var(--ad-space-3) var(--ad-space-4) var(--ad-space-4);
 }
 
-.dashboard-chat-composer {
-  background: var(--ad-surface-panel);
-  border-top: var(--ad-border-thin) solid var(--ad-border-default);
-  padding-block: var(--ad-space-3);
+.dashboard-chat-pane .message {
+  color: var(--ad-text-primary);
+  font-size: 0.8125rem;
+  line-height: 1.75;
 }
 
-.dashboard-chat-composer .composer {
-  border: 0;
-  border-radius: 0;
+.dashboard-chat-pane .assistant-message {
+  background: color-mix(in srgb, var(--ad-action-secondary) 5%, var(--ad-surface-raised));
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-border-default) 60%, var(--ad-surface-raised));
+  border-radius: var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium) var(--ad-radius-medium);
+  max-width: none;
+  padding: var(--ad-space-3) var(--ad-space-4);
 }
 
-.agent-card[data-state="busy"]::after {
-  background: var(--ad-state-busy);
+.dashboard-chat-pane .assistant-message > :first-child {
+  margin-top: 0;
 }
 
-.agent-card[data-state="idle"]::after {
-  background: var(--ad-state-idle);
+.dashboard-chat-pane .assistant-message > :last-child {
+  margin-bottom: 0;
 }
 
-.agent-card[data-state="waiting_input"] {
-  background: var(--ad-surface-emphasis);
-}
-
-.agent-card[data-state="waiting_input"]::after {
-  background: var(--ad-state-waiting);
-}
-
-.agent-card[data-state="done"]::after {
-  background: var(--ad-state-done);
-}
-
-.agent-card[data-state="error"]::after,
-.agent-card[data-state="stopped"]::after {
-  background: var(--ad-state-error);
-}
-
-.agent-card.dragging {
-  opacity: 0.7;
-}
-
-/* A drop across the running/stopped boundary is refused (FS-02.R45), so the drag says
-   so while it is still in flight rather than only snapping back (FS-02.R53). The card
-   under the pointer wins hit testing and sets its own `cursor: pointer`, as the drag
-   handle sets `grab`/`grabbing` and every button inherits one, so the refused state has
-   to reach every descendant rather than the stack alone. `*` is used instead of naming
-   those surfaces because an opt-out list drifts the moment a control is added
-   (INV §2/§10); the repeated `[data-slot="groups"]` raises the selector above the
-   expanded card's own `.agent-card-top` cursor, which is the most specific competitor. */
-.group-stack[data-drop="refused"],
-.group-stack[data-drop="refused"][data-slot="groups"] * {
-  cursor: not-allowed;
-}
-
-.group-stack[data-drop="refused"] .agent-card.dragging {
-  opacity: 0.4;
-}
-
-.agent-card.stopped {
-  filter: grayscale(0.55);
-  opacity: 0.68;
-}
-
-.agent-card-top {
-  align-items: center;
-  display: grid;
-  gap: var(--ad-space-2);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
-.agent-card-top strong {
-  display: -webkit-box;
-  font-family: var(--ad-font-display);
-  font-size: 1.15rem;
-  line-height: 1.3;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-.drag-handle {
-  background: transparent;
-  border-color: transparent;
-  color: var(--ad-text-muted);
-  cursor: grab;
-  font-family: var(--ad-font-mono);
-  min-height: 28px;
-  min-width: 28px;
-  padding: var(--ad-space-1);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.agent-subtitle,
-.agent-preview,
-.stopped-label {
-  color: var(--ad-text-muted);
-}
-
-.agent-subtitle,
-.agent-preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-subtitle {
-  font-family: var(--ad-font-text);
-  font-size: 0.8rem;
-}
-
-.agent-preview {
-  color: var(--ad-text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.45;
-  padding-top: 0;
-}
-
-.model-pill,
-.terminal-pill,
-.mail-badge,
-.sent-pulse {
+.dashboard-chat-pane .user-message {
+  background: color-mix(in srgb, var(--ad-action-secondary) 10%, var(--ad-surface-raised));
   border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-round);
-  display: inline-flex;
-  font-family: var(--ad-font-mono);
-  font-size: 0.65rem;
-  line-height: 1;
-  padding: var(--ad-space-1) var(--ad-space-2);
-}
-
-.model-pill {
-  background: var(--ad-technical-surface);
-  color: var(--ad-technical-text);
+  border-radius: var(--ad-radius-medium) var(--ad-border-thick) var(--ad-radius-medium) var(--ad-radius-medium);
+  font-weight: 400;
+  margin-right: 0;
+  max-width: calc(100% - 20px);
+  padding: var(--ad-space-3) var(--ad-space-4);
   width: fit-content;
 }
 
-.terminal-pill {
-  border-color: var(--ad-state-done);
-  color: var(--ad-state-done);
-  margin-left: var(--ad-space-1);
+/* Activity reads as a quiet ruled column under the turn. */
+.dashboard-chat-pane :is(.tool-run, .thinking, .runtime-child, .turn-activity-toggle, .background-tasks) {
+  border-left: var(--ad-border-thin) solid var(--ad-border-default);
+  color: var(--ad-text-muted);
+  font-size: 0.6875rem;
+  padding-left: var(--ad-space-3);
 }
 
-.message-indicators {
+.dashboard-chat-pane :is(.turn-activity-toggle, .tool-toggle) {
+  font-family: var(--ad-font-text);
+}
+
+.dashboard-chat-pane .turn-activity-content :is(.tool-run, .thinking, .runtime-child, .background-tasks) {
+  border-left: 0;
+  padding-left: 0;
+}
+
+/* Inset, softly raised composer box with a quiet square Send. */
+.dashboard-chat-composer {
+  padding: 0 var(--ad-space-4) var(--ad-space-4);
+}
+
+.dashboard-chat-composer .composer {
+  background: var(--ad-surface-raised);
+  border: var(--ad-border-thin) solid color-mix(in srgb, var(--ad-text-muted) 25%, var(--ad-border-default));
+  border-radius: var(--ad-radius-medium);
+  box-shadow: var(--ad-shadow-keyline), var(--ad-shadow-offset);
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--ad-space-3);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.dashboard-chat-composer .composer:focus-within {
+  border-color: var(--ad-action-primary);
+  box-shadow: var(--ad-shadow-offset);
+  outline: 2px solid color-mix(in srgb, var(--ad-action-primary) 12%, transparent);
+}
+
+.dashboard-chat-composer .composer textarea {
+  background: transparent;
+  min-height: 78px;
+  outline: none;
+  padding: 0 0 var(--ad-space-2);
+}
+
+.dashboard-chat-composer .composer-actions {
   align-items: center;
   display: flex;
-  gap: var(--ad-space-1);
+  flex-wrap: wrap;
+  gap: var(--ad-space-2);
+  justify-content: flex-end;
 }
 
-.message-indicators:empty {
-  display: none;
+.dashboard-chat-composer .composer button {
+  font-size: 0.75rem;
+  min-height: 32px;
+  min-width: 0;
 }
 
-.mail-badge {
-  background: color-mix(in srgb, var(--ad-action-primary) 12%, var(--ad-surface-panel));
-  border-color: var(--ad-action-primary);
+.dashboard-chat-composer .composer .composer-icon {
+  background: var(--ad-surface-subtle);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  color: var(--ad-text-muted);
+  height: 32px;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+  width: 32px;
+}
+
+.dashboard-chat-composer .composer button:hover:not(:disabled) {
+  box-shadow: none;
   color: var(--ad-text-primary);
-}
-
-.sent-pulse {
-  animation: ad-sent-pulse 2s ease-out forwards;
-  border-color: var(--ad-action-secondary);
-  color: var(--ad-action-secondary);
-}
-
-@keyframes ad-sent-pulse {
-  from { opacity: 1; }
-  to { opacity: 0.18; }
+  transform: none;
 }
 
 .state-badge {
@@ -419,41 +567,6 @@
   font-size: 0.63rem;
   gap: var(--ad-space-1);
   text-transform: uppercase;
-}
-
-/* The card's effective live state owns recurring indication (FS-12.R59).
-   Stopped cards keep the last badge label without animating it. */
-.agent-card .state-badge {
-  background: color-mix(in srgb, currentcolor 14%, var(--ad-surface-raised));
-  border-color: currentcolor;
-  font-family: var(--ad-font-text);
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: var(--ad-space-2);
-  text-transform: none;
-  white-space: nowrap;
-}
-
-.agent-card[data-state="busy"] .state-badge.busy .ad-badge-indicator {
-  animation: ad-state-pulse 2.4s ease-in-out infinite;
-}
-
-.agent-card[data-state="error"] .state-badge.error .ad-badge-indicator,
-.agent-card[data-state="waiting_input"] .state-badge.waiting_input .ad-badge-indicator {
-  animation: ad-state-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes ad-state-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-card[data-state="busy"] .state-badge.busy .ad-badge-indicator,
-  .agent-card[data-state="error"] .state-badge.error .ad-badge-indicator,
-  .agent-card[data-state="waiting_input"] .state-badge.waiting_input .ad-badge-indicator {
-    animation: none;
-  }
 }
 
 .state-badge .ad-badge-indicator {
@@ -469,47 +582,6 @@
 .state-badge.done .ad-badge-indicator { background: var(--ad-state-done); }
 .state-badge.error .ad-badge-indicator { background: var(--ad-state-error); }
 .state-badge.unknown .ad-badge-indicator { background: var(--ad-state-unknown); }
-
-.context-bar {
-  background: var(--ad-surface-subtle);
-  border: var(--ad-border-thin) solid var(--ad-border-default);
-  border-radius: var(--ad-radius-round);
-  height: 11px;
-  margin: var(--ad-space-2) 0;
-  position: relative;
-}
-
-.context-bar span {
-  background: var(--ad-state-done);
-  border-radius: var(--ad-radius-round);
-  display: block;
-  height: 100%;
-}
-
-.context-bar.low span { background: var(--ad-state-done); }
-.context-bar.medium span { background: var(--ad-state-busy); }
-.context-bar.high span { background: var(--ad-state-error); }
-
-.context-bar em {
-  color: var(--ad-text-muted);
-  font-family: var(--ad-font-mono);
-  font-size: 0.62rem;
-  font-style: normal;
-  position: absolute;
-  right: 0;
-  top: 14px;
-}
-
-.context-bar[data-state="compact"] {
-  margin: 0;
-}
-
-.context-bar[data-state="compact"] em {
-  left: 0;
-  right: auto;
-  top: 14px;
-  white-space: nowrap;
-}
 
 .empty-state {
   align-content: center;

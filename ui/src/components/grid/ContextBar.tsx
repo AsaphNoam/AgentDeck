@@ -1,4 +1,4 @@
-export function ContextBar({ value, used, size, compact = false, detailed = false }: { value: number; used?: number; size?: number; compact?: boolean; detailed?: boolean }) {
+export function ContextBar({ value, used, size, detailed = false }: { value: number; used?: number; size?: number; detailed?: boolean }) {
   const pct = Math.max(0, Math.min(1, value || 0));
   const label = Math.round(pct * 100);
   const tone = pct > 0.85 ? "high" : pct >= 0.6 ? "medium" : "low";
@@ -19,13 +19,15 @@ export function ContextBar({ value, used, size, compact = false, detailed = fals
       </div>
     );
   }
+  // The agent card's labelled row (FS-12.R65): "Context" over a thin track, with the
+  // percentage leading the exact pair; the accessible label stays the one sentence.
+  // Tone and density are orthogonal, so they take separate contract dimensions: folding
+  // the compact form into `data-variant` would leave it with no tone a skin can read
+  // (TS-08.R14/R48).
   return (
-    // Tone and density are orthogonal, so they take separate contract dimensions: folding the
-    // compact form into `data-variant` would leave the compact meter with no tone a skin can
-    // read (TS-08.R14/R48).
-    <div className={`context-bar ${tone}`} data-ui="context-meter" data-slot="track" data-variant={tone} data-state={compact ? "compact" : undefined} aria-label={text}>
-      <span data-slot="fill" style={{ width: `${label}%` }} />
-      <em data-slot="label">{text}</em>
+    <div className={`context-bar ${tone}`} data-ui="context-meter" data-variant={tone} data-state="compact" aria-label={text}>
+      <div className="context-bar-row" data-slot="label"><span>Context</span><span><strong>{label}%</strong>{hasExactPair ? ` · ${pair}` : " context used"}</span></div>
+      <div className="context-bar-track" data-slot="track"><span data-slot="fill" style={{ width: `${label}%` }} /></div>
     </div>
   );
 }

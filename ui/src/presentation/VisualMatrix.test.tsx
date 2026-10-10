@@ -13,7 +13,7 @@ describe("VisualMatrix", () => {
   it("changes only presentation when the high-variance contract fixture is enabled", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;
-    expect(screen.getByText("153,482 / 200,000 tokens · 74% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("153,482 / 200,000 tokens · 74% context used")).toBeInTheDocument();
     const copyBefore = root.textContent;
     const routesBefore = [...root.querySelectorAll("a")].map((link) => link.getAttribute("href"));
     const actionsBefore = [...root.querySelectorAll("button")].map((button) => button.textContent);
@@ -28,31 +28,24 @@ describe("VisualMatrix", () => {
     expect([...root.querySelectorAll("[data-state]")].map((node) => node.getAttribute("data-state"))).toEqual(statesBefore);
   });
 
-  // FS-02.A23: the visual fixture carries every declared project accent while
-  // preserving the independent live-state top bars.
-  it("renders all six project accents on dashboard cards", () => {
+  // FS-12.A37 (superseding FS-02.A23 on agent cards): the fixture renders the real
+  // AgentCard for every live state plus stopped and expanded, toned by state alone.
+  it("renders every agent-card state from the real card", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const cards = [...container.querySelectorAll('[data-ui="agent-card"]')];
     expect(cards).toHaveLength(8);
-    expect(cards.slice(0, 6).map((card) => card.getAttribute("style"))).toEqual([
-      expect.stringContaining("rgb(100,116,139)"),
-      expect.stringContaining("rgb(59,130,246)"),
-      expect.stringContaining("rgb(34,197,94)"),
-      expect.stringContaining("rgb(245,158,11)"),
-      expect.stringContaining("rgb(244,63,94)"),
-      expect.stringContaining("rgb(139,92,246)"),
-    ]);
+    expect(cards.map((card) => card.getAttribute("data-state"))).toEqual(["busy", "idle", "waiting_input", "done", "error", "unknown", "stopped", "busy"]);
+    expect(cards.every((card) => !(card.getAttribute("style") ?? "").includes("--ad-project-accent"))).toBe(true);
   });
 
-  // FS-02.A40/A41 and FS-12.A16: the deterministic dashboard fixture carries
-  // wrapped, unbroken, collapsed-without-context, and expanded-context cases.
+  // FS-02.A40 and FS-12.A16/A37: the deterministic dashboard fixture carries
+  // wrapped and unbroken names and the context row on collapsed and expanded cards.
   it("renders the card legibility and context-placement matrix", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     expect(screen.getByText("Needs a decision from the orchestration and delivery reviewer")).toBeInTheDocument();
     expect(screen.getByText("unbroken-agent-name-that-must-not-escape-the-card-boundary")).toBeInTheDocument();
-    const collapsed = [...container.querySelectorAll('[data-ui="agent-card"][data-variant="default"]')];
-    expect(collapsed.every((card) => !card.querySelector('[data-ui="context-meter"]'))).toBe(true);
-    expect(container.querySelector('[data-ui="agent-card"][data-variant="expanded"] [data-ui="context-meter"][data-state="compact"]')).toBeTruthy();
+    const cards = [...container.querySelectorAll('[data-ui="agent-card"]')];
+    expect(cards.every((card) => card.querySelector('[data-ui="context-meter"][data-state="compact"]'))).toBe(true);
   });
 
   it("renders the project color picker inside its context menu fixture", () => {

@@ -496,6 +496,35 @@ Requirements are user-observable.
   held-message bubbles are excluded; real entries, activity, annotations, file viewer, mentions,
   turn-limit, retry, pause/end/delete and judge-repair behavior is unchanged (FS-21).
 
+- **R65 — Project-dashboard agent cards adopt the Figma session-card composition.** The
+  `SessionCard` study in AgentDeck — Theme Exploration (`OykxmXqZnnyA67QA1lv3AU`), shown on its
+  project dashboard, governs every agent card on a scoped project grid, collapsed and expanded.
+  The card is one softly raised, rounded panel with a thin border that strengthens on hover and
+  while expanded, and a 3px leading edge in the agent's state tone. Its head reads top to bottom:
+  a state line (a small dot and the existing state label in that tone, or "Stopped" with a
+  neutral tone for an agent that is not running) with the drag grip quietly at its right; the
+  agent name as a link to `/agent/:id` beside a small chevron button that expands (chevron down)
+  or collapses (chevron up) a chat card; a quiet runtime row of backend, mono model and effort
+  separated by a thin rule; a labelled context row ("Context" at the left, "N% · used / size
+  tokens" or the percentage-only label at the right) over a thin track; the preview in body text
+  over at most two lines; and a footer with role (· project off the scoped grid), pipeline link,
+  terminal driver and the Mail/Sent indicators. Expanding keeps the whole head and opens the
+  chat pane below a rule: transcript with softly tinted assistant bubbles and right-aligned
+  user bubbles, a quiet ruled activity column, and an inset, softly raised composer box whose
+  Send is a quiet square arrow button. This supersedes, on these cards only: FS-02.R2/R59's
+  collapsed card without context (the context row returns on every card); R3's pill badge
+  and the actionable highlighted background (the state line and leading edge carry state);
+  R5's single line (two lines); R6's dimming (the neutral Stopped line marks a stopped agent);
+  R40's project wash, tinted border and top state bar (a scoped grid shows one project, so the
+  leading edge carries state instead); R58's larger title size; and R67/R68's header placement
+  (the state line sits above the name, the collapse chevron beside it, the context row below the
+  runtime row). A terminal card has no chevron and still opens its agent page. All three
+  appearances express the composition through their semantic palettes. The study's sample data,
+  "Needs input"/"Running" wording, attention copy and its static transcript excerpt are
+  excluded; the real live transcript, activity, permission cards, composer actions (Steer,
+  Cancel, Withdraw queued), pane cap, recency, persistence, keyboard pane cycling, header-region
+  collapse, context menu, drag reorder and running/stopped placement are unchanged.
+
 ## 3. States & transitions
 
 - **Route change:** the persistent shell remains visually stable while the current-route
@@ -740,6 +769,16 @@ Requirements are user-observable.
   card, discussion, current-action band, composer and participant column match the study's
   hierarchy and spacing without horizontal overflow; Files/Commands dialogs open the file viewer;
   mentions, annotations, Raise turn limit, retries and Delete still work.
+  *Verify:* focused component tests plus the working tree's real-browser comparison.
+
+- **A37** (R65) — Compare the rendered study with real fake-backend agent cards at 1024px and
+  1280px in Core, Sky & Grove and Studio: busy, idle, waiting, error and stopped chat agents, a
+  terminal agent, a long unbroken name, unread mail, a pipeline stage agent, and an expanded pane
+  with a completed turn, activity and a pending permission. State line, title row, runtime row,
+  context row, preview, footer, leading edge and expanded composer match the study's hierarchy
+  and spacing without horizontal overflow; the chevron and the header region collapse the pane,
+  the name opens the agent page, drag reorder, context menu, Send/Cancel and pane cycling still
+  work, and keyboard focus is visible on the name, chevron and grip.
   *Verify:* focused component tests plus the working tree's real-browser comparison.
 
 ## 6. Deviations & open decisions
