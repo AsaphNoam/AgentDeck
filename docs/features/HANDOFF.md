@@ -20,6 +20,9 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Investigation pending fix — mobile history (MOBILE-HISTORY-01):** reproduced older
+  pages being discarded when a live event arrives during pagination. See Review findings;
+  the user also requests 5× larger windows and automatic older-page loading on scroll up.
 - **Settled closures:** Settings composition, desktop agent page and the mobile/Think Tank
   disclosure fixes are closed; details moved to the archive's 2026-10-09 settled-closures section.
 - **Review closed — Think Tank room cards (`578ca50`, FS-12.R63/A35, TS-08.R114):**
@@ -146,7 +149,42 @@ and does not close any manual provider gates.
 
 ## Review findings
 
-None. Existing live-provider and real-device acceptance gates above remain owed.
+### Mobile history investigation — 2026-10-10
+
+- **Report (verbatim):** “/investigate-bug the 'show earlier ' on mobile doesn't do anything,
+  the conversation only shows the last bit, while we're at it, let's also expand the amount
+  that loads by a lot (5x what is now) and auto fetch more pages on scroll up rather than the
+  load more button”. Phone/browser/version and affected agent were not supplied; no logs
+  supplied. Investigation used the clean local `main` tree.
+- **Must fix — MOBILE-HISTORY-01 — confirmed; fix complexity medium:**
+  `ui/src/remote/AgentScreen.tsx:205–219,263–282`: after loading an older page, the phone
+  refetches the live tail from the original anchor with the same 150-event limit. If the
+  original tail filled that limit, even one newly arriving event makes `has_more` true;
+  the `gap` effect unconditionally clears every older page. This contradicts FS-20.R13's
+  older-window access during ordinary active conversations. A component reproduction with
+  300 events and one event arriving during the older-page read fails because the requested
+  first page disappears. The realistic window mock implements the server's since/before
+  filtering and newest-150 selection. Preserve contiguous loaded history across tail refresh
+  and recover any intervening gap without silently discarding the requested page. Regression:
+  unskip the MOBILE-HISTORY-01 test in `ui/src/remote/AgentScreen.test.tsx`; verify event/byte
+  overflow, repeated upward pagination and live refresh with no duplicate or missing events.
+  The test confirms this trigger, not that it was the trigger on the reporting phone.
+- **Requested behavior change (authorized, not a current specification violation):** use
+  750 events per initial/older window (5 × 150) and automatically fetch older pages on upward
+  scrolling instead of Show earlier. FS-20.R13 currently specifies the button and three older
+  windows; TS-13.R18 specifies 150 default/500 maximum events and about 1 MiB payload.
+  Update those requirements before implementation and coordinate the phone's page size with
+  `internal/server/transcript_window.go` and `handleTranscript`'s clamp. Define retained
+  event/byte limits, one in-flight older read, exhaustion/retry behavior, agent-switch cleanup,
+  and scroll anchoring under INV §1/§8/§16; do not merely change the UI constant to 750, since
+  the server would return at most 500. Cover automatic loading and stable viewport in a
+  rendered phone check. Route this requested scope with the pagination fix.
+
+**Fix model:** medium — Codex Terra or Claude Opus.
+
+Verification: reproduction failed at the expected missing older-message assertion before being
+marked skipped; the focused AgentScreen suite passed with the reproduction skipped. No product
+code or specifications changed. Existing live-provider and real-device acceptance gates remain owed.
 
 ## Browser-verification permission investigation — 2026-10-09
 

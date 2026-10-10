@@ -276,6 +276,30 @@ describe("AgentScreen", () => {
     expect(screen.queryByRole("button", { name: "Show earlier" })).toBeNull();
   });
 
+  it.skip("keeps requested earlier history when one live event arrives during pagination", async () => {
+    // MOBILE-HISTORY-01: the anchor refetch currently drops all older pages
+    // when one new event pushes the original full tail past its window limit.
+    const history = Array.from({ length: 300 }, (_, index) => ({
+      agent_id: "a1", seq: index + 1, type: "user_text", ts: "",
+      data: { text: `History question ${index + 1}` },
+    }));
+    server.use(http.get("/api/sessions/a1/transcript", ({ request }) => {
+      const url = new URL(request.url);
+      reads.push(url.search);
+      const before = Number(url.searchParams.get("before_seq"));
+      const since = Number(url.searchParams.get("since_seq"));
+      const eligible = history.filter((event) => (!before || event.seq < before) && event.seq > since);
+      const response = { agent_id: "a1", events: eligible.slice(-150), has_more: eligible.length > 150, pending_permission: null, latest_assistant: "" };
+      if (before) history.push({ agent_id: "a1", seq: 301, type: "user_text", ts: "", data: { text: "New live question" } });
+      return HttpResponse.json(response);
+    }));
+    renderScreen();
+    await screen.findByText("History question 151");
+    fireEvent.click(screen.getByRole("button", { name: "Show earlier" }));
+    await screen.findByText("New live question");
+    expect(screen.getByText("History question 1")).toBeInTheDocument();
+  });
+
   it("shows only status for a terminal agent", async () => {
     useConnection.setState({ agents: { a1: { ...agent, interface: "terminal", state: "busy" } } });
     renderScreen();
