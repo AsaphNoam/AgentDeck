@@ -241,9 +241,24 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   caller explicitly selects another role. Role definitions and the saved default remain local
   Chuck configuration exposed through the existing role/configuration surfaces. This supersedes
   R50 only for the seeded set and fresh default; existing role-editing contracts still apply.
-  Upgrade behavior for a saved `implementer` default is awaiting confirmation in §6; no migration
-  is authorized by this draft. Existing persona files, agent/session identities and saved explicit
-  task, pipeline and Think Tank assignments are preserved.
+  Existing installations switch a saved `implementer` default to Default once on upgrade; every
+  other saved default is preserved. An operator may subsequently choose Implementer or another
+  persona as their default without a later restart reversing that choice. Existing persona files,
+  agent/session identities and saved explicit task, pipeline and Think Tank assignments are
+  preserved. This is an explicit exception to R14's absent-only configuration seeding, limited to
+  the saved default preference; R55 governs role-content conflicts and failures.
+
+- **R55 (planned) — Default follows ordinary role ownership.** Default is seeded with empty
+  persona text and inherited permissions, remains editable/selectable through existing role
+  controls, and is recreated on startup if deleted, like other shipped roles. A deliberate edit
+  can give it persona text or a permission override; Chuck does not overwrite that customization
+  or claim it is still persona-free. Existing same-id role files are never replaced. Before the
+  first upgrade selects Default automatically, its existing definition must have empty persona
+  text and inherited permissions. If it has conflicting custom text or a permission override,
+  startup reports an actionable conflict identifying the occupied role and leaves the saved
+  default unchanged; the operator must preserve/rename the custom role or restore an empty
+  Default before retrying. Read/write failures preserve existing content and report the failed
+  upgrade; no running agents or explicit assignments are rewritten.
 
 ### 2.7 Onboarding wizard
 
@@ -481,18 +496,24 @@ semantics live in **FS-09**; Claude/Codex configuration federation lives in **FS
   Default has no persona text, inherits permissions, and is the saved ordinary launch default;
   all four specialized roles remain available. Select a custom default and verify desktop,
   phone and onboarding use it, while an explicit launch role wins. *Verify:* configuration seed/API
-  tests and the FS-01.A29 selection journeys. Upgrade acceptance remains pending the §6 decision.
+  tests and the FS-01.A29 selection journeys.
+
+- **A35 (planned)** (R54–R55) — Upgrade a home with saved Implementer: only its default preference
+  changes and Default is seeded empty with inherited permissions. Restart, explicitly select
+  Implementer as the default, and restart again: that later choice survives. Upgrade homes with
+  other defaults; preserve them and all role content, existing agents, frozen sessions and explicit
+  automation assignments. Exercise an occupied customized `default` id, corrupt/unreadable config,
+  role-write/config-write/completion-write failures and retry: no custom role is overwritten, no
+  dangling default or completed-upgrade claim appears, and diagnostics identify the repair.
+  After successful upgrade, editing/deleting Default retains ordinary role behavior. *Verify:*
+  real config fixtures, startup/failure-injection tests and focused role/configuration API tests.
 
 ## 6. Deviations & open decisions
 
-- **Default-persona upgrade decision (R54):** Recommend adding Default on existing installations,
-  changing a saved `implementer` default to Default, and preserving other saved defaults and all
-  existing agents/explicit automation assignments. A saved `implementer` id does not establish
-  whether the operator deliberately chose it; this proposal therefore needs human confirmation.
-  Preserving every saved default is the alternative, but existing installations would continue
-  creating Implementer agents until the operator changes their preference. Product scope is
-  awaiting confirmation before technical design; customized/conflicting Default definitions will
-  need an explicit preservation rule during that design.
+- **Persona-free default (planned):** The user confirmed on 2026-10-10 that Implementer must stop
+  being the default and approved the remaining scope. R54–R55/A34–A35 are ready under
+  [`agents-without-a-persona-by-default.md`](../../ready-changes/agents-without-a-persona-by-default.md).
+  Empty text is the seed contract; deliberate role edits retain ordinary ownership semantics.
 
 - **Invalid seeded-project `cwd`.** An invalid seeded-project `cwd` is still explained only after a
   launch fails rather than by preflight; reverse that part by adding a stricter preflight.

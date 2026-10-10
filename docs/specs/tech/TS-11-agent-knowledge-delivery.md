@@ -263,6 +263,34 @@ capability, regular-message bootstrap, role-file migration or provider-global co
 Refresh the pipeline authoring reference for the optional field when shipping; FS-14.A54–A55
 exercise actual provider parameters and frozen recovery independently of the composition helper.
 
+**R21 (planned) — Empty Default reuses ordinary role and prompt composition.** For
+FS-01.R46 and FS-04.R54–R55, add `default` to `config.seedRoles()` with title `Default`, empty
+`system_prompt` and nil `skip_permissions`; set `DefaultConfig().DefaultRole` to `default`.
+This supersedes R16 only for seed inventory/default selection: retain Chucky, Implementer,
+Reviewer and Researcher and all existing custom/legacy definitions. `SeedIfAbsent` remains the
+single absent-only role writer. TS-02.R43 separately owns the once-only saved-preference upgrade;
+Default has no historical prompt, no digest entry and no package-gated prompt migration.
+
+The role stays a normal filename-addressed Role. Existing `composeLaunch`, snapshot, resume,
+clone and switch paths carry the selected id and frozen persona base; no nullable-role branch,
+synthetic persona, extra prompt template or provider override is introduced. The empty persona
+contribution is skipped by normal joining, while project guidance, resources, native-provider
+instruction delivery and R15's shared runtime overlay keep their existing owners and boundaries.
+Do not copy shared Chuck text into Default or persist its runtime suffix in the role/snapshot.
+
+Ordinary desktop, phone and onboarding role selection waits for role and config reads, honors an
+explicit selection or valid saved default, then prefers available `default` over a first-role
+fallback when the preference is absent/invalid. Onboarding removes its hardcoded Implementer
+fallback and follows the same precedence. Late config arrival or refetch cannot overwrite a user's
+selection or silently submit the former first-role default while queries are pending. Reuse the
+existing form controls, labels, validation, name suggestion and draft-preserving error handling.
+CLI/API retain required explicit role selection; shared-form callers with explicit roles and
+saved automation assignments retain them. Focused seed/startup/API/composition/lifecycle/UI tests
+prove FS-01.A29 and FS-04.A34–A35; enumerate all five seeded ids independently of `seedRoles`.
+Provider prompt-preservation assertions use existing pinned contracts rather than claiming model
+behavior from a fake peer. Run the applicable TS-06 closure matrix once at implementation closure
+and verify the Default/custom-role launch journey on desktop and phone.
+
 ## 3. Interfaces & data shapes
 
 The new agent-facing delivery contracts are:

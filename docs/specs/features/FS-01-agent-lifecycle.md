@@ -91,7 +91,7 @@ orphaned processes.
   persona prompt. The agent still receives project context, the shared Chuck operating context
   and operating-knowledge delivery under FS-18.R15, and native provider guidance under FS-18.R17;
   empty persona text does not imply an empty effective prompt. Specialized and custom roles stay
-  selectable. Default selection follows FS-04.R54 once its upgrade decision is confirmed; an
+  selectable. Default selection follows FS-04.R54–R55; an
   explicit role selection takes precedence. The resulting agent is an ordinary agent under the
   existing identity, permissions, history, stop, resume, clone and switch contracts. This feature
   does not change the roles of existing agents or explicit task, pipeline or Think Tank assignments.
@@ -475,11 +475,11 @@ transitions:
 
 ## 6. Deviations & open decisions
 
-- **Persona-free launch scope awaiting confirmation:** R46/A29 are a feature-side draft only.
-  Proposed Default is an empty ordinary persona; FS-04.R54 owns default selection and the pending
-  upgrade decision. CLI/API can select it through their existing explicit-role launch contracts;
-  omitting the API role or introducing new CLI syntax is outside this draft. No technical design
-  or implementation-ready change exists yet.
+- **Persona-free launch (planned):** R46/A29 are approved for
+  [`agents-without-a-persona-by-default.md`](../../ready-changes/agents-without-a-persona-by-default.md).
+  FS-04.R54–R55 own default selection, customization and upgrade preservation. CLI/API select
+  `default` through their existing explicit-role contracts (`chuck default@<project>` or
+  `POST /api/sessions` with `role:"default"`); omitted API roles and new CLI syntax are excluded.
 
 - **Group API replacement (shipped 2026-10-10):** FS-02.R75–R76 and TS-03.R57–R58 replace the
   dashboard's global Release group with project-scoped Stop group and Archive group. R21/R34's

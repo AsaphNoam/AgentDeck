@@ -43,6 +43,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`agents-without-a-persona-by-default.md`](agents-without-a-persona-by-default.md) — make an empty
+  Default persona the ordinary launch default, with a once-only upgrade from Implementer and
+  preserved customized roles, explicit choices and existing sessions.
+
 - [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
   by default with a backend-level bundle choice, scoped runtime feedback, local model refresh and
   explicitly capped compatibility work.

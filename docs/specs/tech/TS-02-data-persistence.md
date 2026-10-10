@@ -561,6 +561,31 @@ checkpoint and control progression share one transaction. The generic activation
 attempt without becoming room history. Commit setup/dispatch intent before provider effects and
 publish SSE only after durable mutation; no agent-written canonical file or second DB writer.
 
+**R43 (planned) — The persona default upgrades once without changing public schemas.** For
+FS-04.R54–R55, the config store owns one installation-local completion file
+`$CHUCK_HOME/default-persona-upgrade.json`, containing only `{ "version": 1 }`. It is internal
+bookkeeping, excluded from configuration APIs and agent context; no SQLite table or config/Role
+schema version changes. Reuse R3's atomic owner-only JSON writer, not a generic migration registry.
+Dashboard preparation performs the upgrade after `SeedIfAbsent` and before serving or consuming
+effective configuration. A missing marker means pending; a valid marker means complete; a corrupt,
+unreadable or unsupported marker is an actionable startup error, never treated as completion.
+
+Read valid configuration first. With no completion marker, change only `default_role:"implementer"`
+to `"default"`; preserve every other preference. Before that change, read Default and require
+empty persona text and inherited permissions under FS-04.R55; an occupied custom definition is an
+actionable startup conflict. Ensure the role exists before writing the preference, then publish
+completion only after the config write succeeds. For an already non-Implementer default, publish
+completion without rewriting configuration. A missing/corrupt/unreadable config retains existing
+warning/fallback behavior and is never overwritten or marked complete; retry when it becomes
+readable. Role, preference or completion write failures stop startup with the concrete error before
+the server accepts edits; retry uses the current durable state. A crash between preference and
+completion writes safely retries from the now-valid Default preference. Successful completion
+survives role deletion/reseeding and later explicit default changes, including back to Implementer.
+The marker contains no agent data and lives with the installation; only removal of the home or
+deliberate removal of that internal file resets this upgrade. Existing frozen sessions, role files
+and explicit task/pipeline/room assignments are outside its write set. This narrowly supersedes
+R4's no-overwrite rule for the user-approved legacy preference change.
+
 ## 3. Interfaces & data shapes
 
 The durable layout is:

@@ -20,12 +20,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
-- **Design awaiting product confirmation — agents without a persona by default:**
-  [`ideas.md`](../ideas.md) records the request and draft FS-01.R46/A29, FS-04.R54/A34.
-  Propose empty Default alongside existing personas, ordinary desktop/phone/onboarding defaults,
-  and retained shared/project/native guidance. Await scope and whether upgrades change saved
-  `implementer` defaults while preserving other preferences. No technical design or ready change;
-  existing agents and explicit automation assignments remain unchanged.
+- **Design ready — agents without a persona by default:**
+  [`agents-without-a-persona-by-default.md`](../ready-changes/agents-without-a-persona-by-default.md)
+  is Waiting to start: FS-01.R46/A29, FS-04.R54–R55/A34–A35, TS-02.R43, TS-11.R21.
+  User confirmed replacing Implementer as the default; empty ordinary Default retains shared/
+  project/native context. A once-only installation marker preserves later explicit preferences.
+  Existing role files, frozen agents and explicit automation assignments are preserved.
+  No product code changed and no active implementation selected.
 - **Review pending — desktop/phone group controls (FS-02.R72–R76/A54–A57,
   FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118, TS-13.R24):**
   shared searchable picker in ordinary launch/reassignment, collapsible phone sections,
@@ -226,6 +227,17 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design complete:** Confirmed that Implementer must stop being the ordinary
+  default and promoted the empty Default persona to a waiting ready change. Bounded independent
+  Luna discovery plus parent source verification found existing role/prompt composition seams,
+  onboarding's hardcoded Implementer and the need for once-only preference upgrade bookkeeping.
+  Planned FS-01/FS-04 and TS-02/TS-11 requirements cover selection, customization/conflicts,
+  atomic upgrade/retry and existing data preservation. No product code changed; phone work stays
+  untouched. Local completion-marker/conflict choices are documented for independent review.
+  Focused lint passes for FS-01, FS-04, TS-02, TS-11 and the ready change; launcher contract/twin
+  checks and whitespace checks pass. Full `make check-specs` still reports only the three existing
+  handoff issues recorded below (ROOM-WIDTH-01 formatting and the deleted group-change link).
 
 - **2026-10-10 — Feature design:** Recorded the persona-free default request and drafted launch
   and configuration behavior/acceptance. Reviewed existing empty-prompt context composition,
