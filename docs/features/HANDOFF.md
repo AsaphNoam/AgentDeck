@@ -88,16 +88,22 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   Owed: independent A37 comparison incl. live error, terminal agent, unread mail, pipeline
   agent, permission in an expanded pane, drag reorder, keyboard focus. Notes: the name is a
   link (body/chevron expand); state labels keep Chuck's Busy/Waiting vocabulary.
-- **Design awaiting technical decisions:** Quota indicator and automatic continuation in
-  [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
-  including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
-  FS-01.R40–R45/FS-04.R53 and TS-04.R86–R88/TS-10.R39–R44 cover detection and same-owner
-  recovery. Await confirmation of additive config/session API + existing Cancel semantics and
-  one-record-per-agent retention, plus structured Codex reset forwarding through the existing
-  pinned adapter patch. Codex privately receives reset data but does not forward it over ACP;
-  provider text parsing is unsupported. No ready change/product code yet. Specification lint,
-  launcher twin comparison and diff whitespace checks passed for the partial design; rerun after
-  the pending decisions and boundary specifications before promotion.
+- **Design ready — quota continuation:**
+  [`continue-chats-after-quota-reset.md`](../ready-changes/continue-chats-after-quota-reset.md)
+  is Waiting to start: FS-01.R40–R45/FS-04.R53, TS-02.R45/TS-03.R60,
+  TS-04.R86–R88/TS-10.R39–R44. Global on by default, every chat agent, exact attributed notice,
+  one-record-per-conversation retention and API replacement approved. Current Cancel clients move
+  to an explicit target; no backwards API compatibility is required. Codex reset forwarding is
+  absent and stays an ACP wishlist dependency per the 2026-10-10 instruction; unknown reset means
+  indication/manual recovery, never a guessed schedule. No product code or active unit selected.
+- **Design prepared/TBD — subscription quota views:** FS-09.R80–R81/A49–A50,
+  TS-04.R89/TS-03.R61 prepare Claude and Codex 5-hour/Weekly views. Chat-header disclosure confirmed.
+  Full passive paired snapshots/reads remain TBD for both providers: Claude only has partial live
+  metadata; full `/usage` and Codex `/status` occupy the provider turn queue and return text.
+  Verified gaps and source evidence are in [`ideas.md`](../ideas.md)'s design entry/ACP Wait-list.
+  Live Claude percentage/timestamp units also need a verified producer/provider receipt; bare
+  numeric declarations are not unit evidence. The full view is not a ready implementation unit.
+  Do not implement a hidden prompt, command parser, login side client or new adapter patch.
 - **Paused work:** `migrate-internal-actions-from-mcp.md` remains paused on its transport blocker.
 - **Branch:** `main`.
 - **Known flaky check:** `internal/server` `TestOrdinaryStageAgentStopPausesPipelineRun`
@@ -229,6 +235,15 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Quota design:** Approved recovery retention/API replacement and promoted
+  default-on all-chat quota continuation to a waiting ready change. Prepared 5-hour/weekly
+  subscription views; independently verified that complete passive ACP reads are absent for both
+  providers and added the typed read/update/units wishlist. Chat-header placement confirmed and
+  local observation contract prepared; full passive delivery remains TBD. No product code changed.
+  Focused quota-document lint, launcher/twin checks and whitespace checks pass; full
+  `make check-specs` remains blocked by the same three pre-existing handoff errors: ROOM-WIDTH-01
+  severity/fix-model formatting and the deleted group-change link.
 
 - **2026-10-10 — Feature design revision complete:** Finalized invisible No persona and Advanced
   persona selection. User chose the on-by-default Chuck aware agent checkbox/help text only in

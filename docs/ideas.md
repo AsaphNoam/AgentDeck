@@ -33,42 +33,25 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
-- **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
-  when a provider interrupts work because its quota is exhausted, show a system quota-limit
-  indicator and the reported reset time, then schedule continuation. The operator confirmed a
-  global toggle **on by default** and coverage for **every quota-interrupted chat agent**, including
-  durable tasks, pipeline owners/coordinators/delegates and all Think Tank phases. Once work
-  actually continues, append the exact system message **Chuck continued this conversation when
-  the quota reset**. Planned feature requirements: FS-01.R40–R45/A23–A28 and FS-04.R53/A33;
-  owner-boundary clarifications are in FS-03/FS-14/FS-16/FS-21 §6. The same-work, manual-control,
-  unknown-reset, future-reset-only retry and overdue-restart recovery rules from the earlier
-  proposal are preserved. Technical core: TS-04.R86–R88, TS-10.R39–R44; owner exceptions in
-  TS-09/TS-14 §5. No product code or ready change yet.
-  **Waiting on two technical decisions:** (1) extend existing config/session APIs with
-  `auto_continue`, quota/reset/schedule projections and existing Cancel also cancelling the
-  pending continuation; retain one bounded local recovery record per agent until conversation
-  deletion and retain notices under normal transcript rules; (2) extend the existing hash-checked
-  Codex adapter patch to forward structured quota/reset metadata, or accept that Codex normally
-  has no trustworthy reset time and must recover manually. Recommendation: approve both.
-  **Verified provider evidence:** `scripts/release/package.json`/lock pin Claude ACP 0.85.1 and
-  Codex ACP 2.1.1. Both emit `_meta.jetbrains.air.sessionFailure`, but Chuck's
-  `internal/runtime/capabilities.go` does not offer it and `acpmap.go` drops prompt `_meta`.
-  Their wire drops the internal failure kind; pinned policy `error` + `limit` + empty `actions`
-  identifies account quota, distinct from `retry` rate limits and `new_session` context budgets.
-  Claude's `dist/acp-agent.js:4919` forwards SDK rejected rate-limit/reset data through
-  `usage_update._meta["_claude/rateLimit"]` only after assistant usage is known. Codex's
-  `dist/index.js:30460` consumes `account/rateLimits/updated` but returns no ACP update; its
-  `account/rateLimits/read` is a private app-server call. The failure record carries no reset time,
-  and neither provider has a verified terminal-text reset format; do not invent a date parser or
-  another authenticated provider client. Source evidence is in the pinned installed packages under
-  `scripts/release/node_modules`; the existing reviewed patch/input/output hashes are in
-  `scripts/release/assemble.sh:68` and `scripts/release/patches/`.
-  Official [failure-extension contract](https://github.com/agentclientprotocol/claude-agent-acp/blob/main/docs/session-failure-extension.md),
-  [Claude releases](https://github.com/agentclientprotocol/claude-agent-acp/releases),
-  [Codex package](https://github.com/agentclientprotocol/codex-acp/blob/main/package.json) and
-  [Codex releases](https://github.com/agentclientprotocol/codex-acp/releases) were checked: no
-  already-forwarded Codex reset surface avoids the proposed patch. Packaged/installed provider
-  classification/reset/delivery gates remain implementation acceptance, not fake-provider proof.
+- **5-hour and weekly subscription quota views.** Added by the operator on 2026-10-10 alongside
+  the approved [quota continuation design](ready-changes/continue-chats-after-quota-reset.md).
+  Prepare separate Claude/Codex 5-hour and Weekly percentages, reset times and last-checked state;
+  missing data stays unknown and no conversation work is interrupted to retrieve it.
+  Prepared behavior: FS-09.R80–R81/A49–A50; technical observation contract TS-04.R89/TS-03.R61.
+  The operator confirmed a compact **Subscription quota** disclosure in each chat header,
+  separate from context usage. No placement decision remains.
+  Full passive snapshot/read/refresh is **TBD for both providers**, with ACP gaps below. Claude's
+  partial live events can supply an observed window; do not mistake them for a complete snapshot.
+  Pinned Claude ACP 0.85.1's SDK usage-control call has both windows, but `/usage` retrieves them
+  only in a queued `session/prompt` and returns Markdown (`dist/acp-agent.js:101`, `:1848`,
+  `:2698`; `dist/usage-markdown.js:1`, `:117`). Codex ACP 2.1.1 privately reads full snapshots but
+  only renders `/status` text (`dist/index.js:35250`, `:36069`); private update handling at
+  `:30460` returns no ACP event. Official releases/current source were also checked; a newer
+  version does not yet establish passive typed support. No command scraper, hidden turn, extra
+  authenticated provider client or new adapter patch is approved for this view. Define the
+  full passive delivery after verified ACP availability. Pinned live Claude utilization/reset
+  declarations have no explicit units; expose numeric percentages/time conversion only after
+  provider/primary-code evidence resolves them. No guessed percent scaling or epoch arithmetic.
 - **Choose an external base for AgentDeck-owned worktrees.** Support a deterministic per-project or
   per-repository checkout layout outside `$AGENTDECK_HOME` for operators whose repositories live
   under a separate workspace base. Define ownership records, base-directory changes, recovery,
@@ -129,6 +112,19 @@ These are capabilities AgentDeck implements above ACP, or has deliberately defer
 pinned adapter contract is missing or unverified. An adapter release is a reason to recheck the
 capability; it is not by itself authority to remove the fallback or ship the deferred feature.
 
+- **Passive subscription quota snapshot/read/updates — Claude and Codex (TBD, 2026-10-10).**
+  Needed for FS-09.R80–R81's 5-hour/weekly views and complete reset evidence for quota recovery.
+  Request a negotiated typed ACP read/bootstrap and change update carrying provider/account scope,
+  window identity/duration, utilization or remaining percentage, reset instant, observed timestamp,
+  explicit percentage/timestamp units, availability and model-specific blocking scope.
+  Claude 0.85.1 only forwards partial
+  `_claude/rateLimit` change events; its full SDK usage data is available only through a queued
+  `/usage` turn rendered as Markdown. Codex 2.1.1 holds `account/rateLimits/read`/`updated` privately
+  and renders `/status` text; it forwards no typed snapshot/reset update. Map Codex windows by
+  verified duration, not assumed primary/secondary names. Recheck official adapter capability,
+  wire shape and provider evidence before completing TBD. Do not silently substitute command-text
+  parsing, provider credential probes or an unrequested adapter patch.
+
 - **Steering.** The pinned Claude 0.85.1 and Codex 2.1.1 adapters advertise
   `_session/steering`, and AgentDeck uses it. Codex 2.1.1 still starts a detached turn when a steer
   arrives idle and ignores AgentDeck's `promptRequired` metadata, so the packaged steering patch
@@ -161,12 +157,11 @@ capability; it is not by itself authority to remove the fallback or ship the def
   `CODEX_CONFIG.developer_instructions` because Codex ACP does not consume generic ACP
   `systemPrompt`. Keep and reverify the overlay on every adapter bump until the adapter exposes a
   proven portable replacement.
-- **Codex executable authority (current release).** The release wrapper defaults `CODEX_PATH` to AgentDeck's directly
-  pinned private Codex executable and the assembled tree proves there is exactly one Codex at the
-  pinned compatible version (currently adapter/CLI 2.1.1/0.159.3). This remains shipped behavior;
-  [`use-installed-provider-clis.md`](ready-changes/use-installed-provider-clis.md) deliberately
-  supersedes provider selection while retaining adapter patches and deterministic inventory.
-  Explicit `CODEX_PATH` overrides remain supported in both policies.
+- **Codex executable authority.** [FS-09](specs/features/FS-09-backends.md)'s shipped
+  installed-provider default and explicit bundle selection govern the native executable; the
+  packaged adapter patches and deterministic bundled inventory remain required. Recheck those
+  adapter/provider boundaries on updates rather than reviving the completed provider-selection
+  ready change.
 
 ## Known things to improve
 

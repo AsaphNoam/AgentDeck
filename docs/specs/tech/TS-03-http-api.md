@@ -826,6 +826,55 @@ real role API and frontend decoder round-trip true/false/legacy omission and rej
 
 ## 3. Interfaces & data shapes
 
+**R61 (planned) — Subscription quota is a scoped observation, not a probe.** FS-09.R80–R81 and
+TS-04.R89 add optional `subscription_quota` to the existing live session/agent read and SSE
+projections. It contains the source `provider`, `availability:"partial" | "unavailable"`,
+fixed `windows:{five_hour:{},weekly:{}}` objects whose individually optional fields are
+`used_percent`, UTC `reset_at` and `observed_at`, plus `refresh_available:false` while ACP lacks
+a passive read, and an optional declared `reason_code`. Missing fields are unknown, not zero;
+the runtime source generation/session is validated server-side, not caller-selected. No account
+identifier, credential, raw provider payload, billing data or data from another session is exposed.
+Fetching/opening the view reads local normalized observations and makes no provider request;
+it does not advance `observed_at`. Omitted or stopped source data maps to unavailable. Preserve
+the current authorized session scope on desktop/phone and add no remote account-read permission.
+No provider-refresh endpoint or agent tool is added before the passive ACP transport is verified.
+Update current Go/TypeScript schemas and consumers together; the operator's API compatibility
+waiver applies, with no need for old-client aliases. Verify real serialized partial/unknown shapes,
+read failure, source change and stopped-session behavior independently of UI fixtures.
+
+**R60 (planned) — Quota recovery uses explicit session control and live config.** For
+FS-01.R40–R45/FS-04.R53, GET/PUT `/api/config` exposes effective boolean `auto_continue`;
+PUT merges an explicit boolean and rejects invalid values under the existing config validation.
+Disabling serializes with quota admission: save the disabled policy before cancelling pending
+rows; a partial cancellation failure reports the actual saved false state and a readable failure,
+while the durable policy already prevents new admission. Re-enable does not revive cancelled
+episodes. Config-read failures refuse automatic admission instead of assuming enabled.
+
+All ordinary session/agent read and SSE snapshot/update projections carry one optional `quota`
+object while the quota episode remains active: `episode_id`, `revision`, `observed_at`, nullable
+UTC RFC3339 `reset_at` and `due_at`, `continuation_state` from
+`disabled | unknown_reset | scheduled | waiting | starting | cancelled | needs_attention`, and
+an optional bounded declared `reason_code`. Successful continuation clears this active projection;
+TS-02.R45 retains the latest durable receipt. A quota object is distinct from context-token usage,
+the existing lifecycle state and per-provider subscription-window views. Reconnect and ordinary
+refetch restore the same recorded truth. No raw provider payload reaches API/SSE consumers.
+
+Keep POST `/api/sessions/{id}/cancel`, with an explicit body discriminator
+`target:"turn" | "quota_continuation"`. Turn cancellation keeps the existing turn-cancel semantics.
+Quota cancellation requires the displayed `episode_id` and `revision`, cancels only that pending
+intent even when its runtime is stopped, and cannot cancel another executing turn. Return
+`{cancelled:boolean}` for the selected target; stale episode/revision returns typed 409 conflict,
+unknown identity 404, and malformed/unsupported target 400. Replay against the same already
+cancelled episode is a successful no-op. Extend the existing authorized phone Cancel route under
+its current session grant; add no remote config/usage permission or scoped-agent policy tool.
+
+The operator waived backwards compatibility for this feature's API. Replace the implicit empty
+Cancel body with the explicit target instead of maintaining aliases or transitional handlers.
+Update every current UI/CLI/internal client, schema, fixture and operator reference in lockstep;
+old client contracts need no compatibility matrix. Existing local/remote guards and error
+envelopes remain. Verify serialized Go responses, client decoders, known-stopped quota cancellation,
+stale-target races, failed config writes and global disable versus provider admission.
+
 Planned additive backend response field (R47; the example shows one entry, but all registered
 types are returned):
 

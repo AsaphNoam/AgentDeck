@@ -350,6 +350,32 @@ Configuration-source federation for Claude/Codex is FS-08.
   runtime reports as active, never the requested one. Chuck does not pick a substitute model, retry
   with another model or hide catalog entries from provider policy it cannot read.
 
+### Subscription quota views (planned)
+
+- **R80 (planned)** — **Claude and Codex have distinct subscription-window views.** Each
+  supported subscription view names its provider and shows separate **5-hour** and **Weekly**
+  windows with used percentage, the corresponding reset date/time/timezone and last checked time.
+  Values describe that provider session's subscription, never Chuck's context meter, token counts,
+  spend estimate or an inferred installation-wide account. Do not combine unrelated backend
+  credentials or sessions without provider account identity evidence. Missing percentages/times
+  read unknown individually; absent subscription support reads unavailable, never zero usage.
+  Passing a reset or restoring an old observation does not claim refreshed allowance. Retained
+  stale data remains visibly last observed, and a failed read preserves it with its failure reason.
+- **R81 (planned)** — **Availability does not interrupt work or fabricate quota.** Use only
+  provider-owned ACP subscription data. An ordinary usage update may populate an observed window
+  but never imply the other window is known, and quota utilization alone does not authorize
+  FS-01.R40's interrupted-work continuation. No background conversation prompts, `/usage` or
+  `/status` injection, transcript-text scraping, account-login side channel or periodic model turn
+  is used to fill the view. Complete Claude/Codex snapshot/read/refresh delivery stays **TBD** until
+  an ACP surface supplies it without occupying or changing the agent's work; the desired windows
+  are prepared and missing capabilities recorded in `docs/ideas.md`'s ACP Wait-list. A compact,
+  keyboard-operable **Subscription quota** disclosure in the chat header shows the active
+  provider's two quiet rows, separately from context usage. Known usage has a labelled percentage
+  meter; unknown/unavailable values have explicit text rather than an empty zero-valued bar.
+  Unavailable passive refresh names the ACP limitation instead of offering a falsely usable
+  Refresh action. Closing/opening the disclosure does not start a runtime or a provider turn.
+  Use the current header's type/spacing/semantic colors and no new motion, theme or preference.
+
 ## 3. States & transitions
 
 - **R20** — Saving Settings transitions the submitted catalog through validation → deterministic
@@ -736,7 +762,32 @@ Configuration-source federation for Claude/Codex is FS-08.
   active model; the refusal shows the provider's reason and no substitute model is sent. *Verify by*
   fake ACP runtime switch tests and the `ChatPanel` runtime-picker component test.
 
+- **A49 (planned)** (R80–R81) — Feed independently serialized provider-owned observations for
+  five-hour only, weekly only, both, null percentages/reset times, non-subscription authentication,
+  stale data and read failure. Only supplied windows display known values; contexts/tokens and
+  another backend/session cannot fill gaps or authorize a continuation. Inspect labels, reset
+  timezone and stale/failed/unavailable treatment. *Verify:* provider-boundary/API/projection/UI
+  tests and a focused desktop/phone browser journey in all supported appearances, including
+  keyboard disclosure/focus, long reset labels and the current header/context-meter composition.
+- **A50 (planned)** (R81) — Observe a running ordinary, task, pipeline and room turn while the
+  quota view opens/updates. No extra provider prompt, command or owner transition occurs.
+  Full snapshot/refresh remains unavailable when ACP lacks a passive read. Once upstream exposes
+  it, verify actual paired-window identities, percentage units, reset instants, account scope and
+  availability on packaged/installed Claude and Codex before closing TBD. *Verify:* captured
+  pinned-adapter contract fixtures, fake-provider ownership tests and bounded live-provider receipts.
+
 ## 6. Deviations & open decisions
+
+- **Subscription views prepared/TBD (2026-10-10):** R80–R81/A49–A50 prepare both providers;
+  the operator confirmed chat-header disclosure. Claude ACP 0.85.1 sends partial
+  `usage_update._meta["_claude/rateLimit"]` change events but no passive paired-window snapshot.
+  Its `/usage` can obtain full SDK data only as a queued conversation turn, rendered as Markdown.
+  Codex ACP 2.1.1 keeps full rate-limit snapshots private; `/status` returns formatted text and
+  `account/rateLimits/updated` emits no ACP update. Complete passive snapshot/read/refresh is TBD
+  for both providers, rather than implemented by parsing commands or probing another account API.
+  The pinned live `SDKRateLimitInfo.utilization` and `resetsAt` declarations specify only numbers,
+  not their units; percentages and time conversion require a provider/source receipt, not a guess
+  based on magnitude. Full `/usage` utilization is explicitly 0..100 but is a different surface.
 
 - **Installed-provider default and explicit bundle shipped 2026-10-04.** R68/R70–R72/R74–R77:
   one resolver selects each backend's Installed or Bundle provider for every process start,

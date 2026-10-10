@@ -608,6 +608,29 @@ R12/INV §17; verify explicit false through durable storage, metadata, reindex a
 
 ## 3. Interfaces & data shapes
 
+**R45 (planned) — Quota recovery is one bounded record per conversation.** For
+FS-01.R40–R45/TS-10.R39–R44, one forward-only migration adds a state-owned quota-recovery row
+keyed uniquely by `agent_id`, plus an indexed nullable UTC due time for dispatch. It holds only
+the current episode id/revision, source runtime generation/executing turn, a validated closed
+source-owner descriptor, observed/reset/due instants, continuation state/attempt token and
+provider-start/notice receipts. Owner references identify existing work; they do not copy its
+instruction, transcript, result, staged room submission or authority. Bound the owner descriptor
+to 1 KiB and store only declared reason codes, never raw provider/account/credential data.
+States distinguish disabled/unknown-reset, scheduled/deferred, claimed, continued, cancelled and
+needs-attention. At most one pending source activation is associated with the current episode;
+replacement, cancellation and receipt writes compare that episode/revision in one transaction.
+Retain the one current record until conversation deletion; normal agent deletion removes it and
+its pending activation. A newer episode replaces the current record without rewriting transcript
+history. Startup preserves its exact unfinished owner before generic task/run/room recovery.
+
+Version-1 `config.json` adds optional boolean `auto_continue`, with omission resolving true and
+explicit false preserved for fresh and existing installations. It is live server policy, never
+frozen into role/session launch configuration. Notice payloads may carry a bounded Chuck-origin
+continuation-attempt key (at most 128 runes) for idempotent append/recovery under TS-10.R44;
+the exact visible sentence is FS-01.R45's. Notice retention/search behavior stays TS-04.R80's.
+Use the existing atomic owner-only config writer, sole SQLite writer and ordered transcript
+writer; add no second database, quota-history log, generic schedule table or raw provider cache.
+
 The durable layout is:
 
 ```text

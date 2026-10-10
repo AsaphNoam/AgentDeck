@@ -1097,8 +1097,11 @@ never inferred from child activity, current counters, arbitrary message text or 
 
 **R87 (planned) — Only applicable reset evidence can authorize timed continuation.** Decode
 Claude `usage_update._meta["_claude/rateLimit"]` separately from context usage; its subscription
-`status:"rejected"`, `rateLimitType` and finite Unix-second `resetsAt` can describe the blocking
-window. Correlate evidence to the same provider session/executing quota episode, not another
+`status:"rejected"`, `rateLimitType` and finite `resetsAt` can describe the blocking window only
+after the supported source's timestamp unit has a verified provider/primary-code receipt. The
+pinned SDK's number declaration alone does not establish epoch seconds. Until verified, retain
+reset as unknown; never infer its unit from numeric magnitude. Correlate evidence to the same
+provider session/executing quota episode, not another
 agent, old runtime, model or earlier allowance. Do not substitute an allowed/warning window,
 an overage timestamp when ordinary usage is blocked, or an unrelated future reset. If several
 applicable exhausted windows all block execution, the reset is the latest of their required
@@ -1117,6 +1120,29 @@ quota continuation may enter the ordinary turn gate; a successful turn clears th
 quota failure renews it, and an unrelated failure remains needs-attention. Shared turn preparation,
 inline-mail confirmation and exact source generation/turn-end fan-out retain TS-01.R31–R32's
 contracts. This is neither a permission policy nor a new agent lifecycle state vocabulary.
+
+**R89 (planned) — Subscription-window views consume verified passive data only.** For
+FS-09.R80–R81, normalize a provider/session-scoped observation into at most two display windows,
+`five_hour` and `weekly`, each with optional `used_percent`, UTC `reset_at` and `observed_at`.
+Validate the source's explicit identity/duration, percentage unit and reset unit before conversion;
+do not infer a percentage from a small number or assume Codex primary/secondary window identity.
+Claude's full `/usage` validator accepts 0..100 percentages but its passive live declaration gives
+no utilization/timestamp unit contract. A field whose units are unverified stays unknown; model/
+overage-specific windows cannot silently substitute for all-model Weekly. Receipt/profile tests
+must be independent of the mapper and tied to the actual pinned producer or a recorded provider
+observation before exposing a value. Update time is the observation time, never HTTP read time.
+
+Consume valid partial Claude `_claude/rateLimit` updates alongside R87 without changing context
+usage, transcript authorship, outcomes or quota-interruption eligibility. Hold only the latest two
+observations in the existing runtime/session scope; add no durable account history, second
+machine-state record or cross-session provider cache. Relaunch/switch/server restart clears the
+derived observation; absent/stopped sources expose unknown/unavailable, never auto-wake to read.
+Existing live session reads/SSE project observations under TS-03.R61. Complete typed snapshot/
+read/refresh remains TBD for Claude and Codex; implement no invented ACP method, hidden `/usage`
+or `/status` prompt, parsed command output, private provider-client call or new adapter patch.
+Revisit that transport only when an advertised primary wire surface and provider evidence resolve
+the wishlist. The chat disclosure uses existing UI primitives, semantic tokens and supported
+header layout under TS-08; it adds no new public presentation hook or dynamic-style exception.
 
 ## 3. Interfaces & data shapes
 
@@ -1188,6 +1214,16 @@ contracts. This is neither a permission policy nor a new agent lifecycle state v
   local turn state is committed before the provider frame is written (R27).
 
 ## 5. Deviations & open decisions
+
+- **Quota-reset ACP gap (checked 2026-10-10):** R86–R88 use verified typed terminal failure and
+  applicable Claude live reset metadata. Codex ACP 2.1.1 privately receives
+  `account/rateLimits/updated`/`read` but does not forward typed reset windows over ACP. The operator
+  requested preparation as TBD and an ACP wishlist when absent; this change adds no Codex reset
+  patch, authenticated side client or terminal-text date parser. Codex quota indication is supported;
+  timed continuation stays unscheduled unless a future verified ACP surface supplies an applicable
+  reset. Claude's partial change event is not a complete account bootstrap and may omit the reset
+  on a first-request limit; unknown stays unknown. Full 5-hour/weekly subscription reads are
+  separately prepared under FS-09.R80–R81 and the ACP Wait-list in `docs/ideas.md`.
 
 - **Mail delivery extension specified:** R53, TS-01.R31–R33 and TS-02.R34 implement FS-06.R30–R36
   and replace R27's mandatory payload-free
