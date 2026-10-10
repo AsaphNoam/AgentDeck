@@ -269,6 +269,11 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   while thinking or streaming. Idle, waiting for input, stopped, terminal and disconnected
   views show no working indicator. Reduced motion uses the desktop's slower rotation.
 
+- **R45 (planned) — Group membership is visible on the phone.** A project's agent list
+  exposes each agent's named group or Ungrouped status while retaining its name and live state.
+  Desktop membership changes reach the phone through existing live refresh behavior. This extends
+  R34; section layout and phone group editing/creation scope await confirmation.
+
 ## 3. States & transitions
 
 Desktop remote connection: `Off → Needs Tailscale sign-in → Connecting → On`; `On → Connecting` on
@@ -392,7 +397,14 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   and terminal agents show none. Verify focused state-transition tests and a real-phone-width
   browser pass across all three appearances, including reduced motion.
 
+- **A17 (planned)** (R45) — At 390px with agents in two groups and without a group,
+  verify membership, long names without horizontal overflow and live desktop reassignment.
+  — phone component tests and a browser pass in all three appearances.
+
 ## 6. Deviations & open decisions
+
+- R45/A17 await confirmation of collapsible sections versus row labels, and group selection
+  in phone New agent. R35's shipped group exclusion remains until its planned extension is confirmed.
 
 - R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of

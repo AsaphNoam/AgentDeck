@@ -28,7 +28,7 @@ operates on all of this is [`AGENT-WORKFLOW.md`](../features/AGENT-WORKFLOW.md).
 |----|------|--------|--------|
 | FS-00 | [features/FS-00-product-overview.md](features/FS-00-product-overview.md) | Current | Product summary, goals/non-goals, core concepts, orchestration planes, glossary |
 | FS-01 | [features/FS-01-agent-lifecycle.md](features/FS-01-agent-lifecycle.md) | Partial | Launch, stop, cancel, resume, clone, rename, switch runtime, crash handling, identity, wake on message |
-| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Current | Card grid, live status, layout/density, auto-grow fields, icon actions, plain labels, task groups, notifications that open the agent conversation, project creation and titled Think Tank cards |
+| FS-02 | [features/FS-02-dashboard.md](features/FS-02-dashboard.md) | Partial | Card grid, live status, layout/density, task groups, notifications, project creation and Think Tank cards; planned group selection and creation during launch |
 | FS-03 | [features/FS-03-chat.md](features/FS-03-chat.md) | Partial | Streaming chat, tools/diffs, permissions, runtime picker, file/skill mentions, drafts, queued follow-up and steering; planned open live thoughts and compact completed-turn activity |
 | FS-04 | [features/FS-04-configuration-onboarding.md](features/FS-04-configuration-onboarding.md) | Partial | Roles/projects/backends CRUD, settings/onboarding, seed-prompt migration and planned global quota auto-continuation setting |
 | FS-05 | [features/FS-05-archive-tracking.md](features/FS-05-archive-tracking.md) | Current | Session archive, full-text search, resume from archive, file/command tracking and Think Tank discovery; command history stays tracked without a Commands tab |

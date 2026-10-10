@@ -1,6 +1,6 @@
 # FS-02 — Dashboard (card grid home view)
 
-**Status:** Current
+**Status:** Partial
 **Code:** `ui/src/components/grid/`, `ui/src/store/`, `ui/src/components/shell/NotificationCenter.tsx`, `ui/src/features/settings/NotificationsEditor.tsx`, `ui/src/api/sse.ts` · `internal/bus/`, `internal/state/`, `internal/server/handlers.go` (layout, reconcile) · **Journeys:** J5 (grid & layout), J11 (failure & recovery), J12 (restart durability)
 **Absorbed:** [`agent-dashboard-prd.md`](../../archive/agent-dashboard-prd.md) F1/F2/F11 and the [phase archive manifest](../../archive/phases/README.md)
 
@@ -554,6 +554,15 @@ project that is not repo-backed, or is archived, shows no such action.
   displacing the state badge, context figure, or Collapse action. This adds no runtime picker to the
   card and changes no launch, switch, expansion, or project-summary behavior.
 
+**R72 (planned).** Move to group lists available group names when opened. Typing filters
+the list; a new non-empty name offers an explicit **Create group “<name>”** choice. Selecting
+an existing name reuses it; confirming a new name assigns the agent to it. Blank clears the
+assignment; Cancel changes nothing. Typing alone never creates or assigns a group. This extends R37.
+
+**R73 (planned).** New agent offers an optional Group field with R72's selection, filtering
+and new-name choice. Blank launches an ungrouped agent; success places the agent in its chosen
+group immediately. A refused launch retains the group and other entered values for retry.
+
 ## 5. Acceptance criteria
 
 **A1.** Launching an agent adds its card within ~1s with no manual refresh; a status change flips the
@@ -888,7 +897,18 @@ all three appearances at 1024px and a wider desktop. Existing density/group/card
 new room deployments get FS-21.R51's title group. *Verify:* dashboard/wire tests and that real-binary
 rendered journey.
 
+**A54 (planned)** (R72) — Open Move to group, filter existing names, select and confirm;
+then choose a new name and confirm Create. Verify membership, blank removal, Cancel, keyboard
+selection and a visible assignment error. — focused dialog tests and a desktop browser journey.
+
+**A55 (planned)** (R73) — Create agents with existing, new and blank groups and verify
+initial membership. Refuse a launch and verify all entered values remain for retry. — launch
+form tests and a desktop browser journey.
+
 ## 6. Deviations & open decisions
+
+- R72–R73/A54–A55 await scope confirmation: project-local versus cross-project suggestions,
+  and whether creation includes phone New agent. No technical design or ready change yet.
 
 - R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
   creation and the conversation-page behavior.

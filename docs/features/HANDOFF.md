@@ -183,6 +183,13 @@ and does not close any manual provider gates.
 
 ## Blocked on human
 
+- **Group selection and mobile visibility design:** feature drafts FS-02.R72–R73/A54–A55
+  and FS-20.R45/A17 are in `docs/ideas.md`. Await scope confirmation: retain all-project name
+  suggestions; explicit select/create in desktop and phone New agent; collapsible phone project
+  groups, Ungrouped last; phone reassignment/bulk actions excluded. Existing labels live on agent
+  identities on the Mac, with no separate empty-group records. Next: confirm scope, complete
+  feature acceptance and then technical design. No product code or ready change.
+
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older
 release is separate publication work. Do not retag or recut it.
@@ -195,6 +202,11 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design:** Recorded group selection/creation and mobile visibility;
+  drafted FS-02/FS-20 behavior and acceptance. Read-only audit confirmed global suggestions,
+  existing launch group support and phone group data. Await product scope confirmation before
+  technical design; unrelated mobile presentation edits preserved.
 
 - **2026-10-10 — Review:** Closed room-card unit `578ca50` without findings. Independent Luna
   source/spec/caller audit and parent browser comparison against shared `room-design/ref/` passed.

@@ -34,6 +34,18 @@ Example:
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
 
+- **Group selection, creation and mobile visibility.** Requested with `/design-feature` on
+  2026-10-10: list existing groups when assigning an agent, filter them while typing and offer
+  a new name to create a group; include a group option when creating an agent; expose groups
+  on mobile. Planned draft: FS-02.R72–R73/A54–A55 and FS-20.R45/A17. Awaiting product
+  confirmation before technical design: retain existing all-project suggestions, add group
+  selection to desktop and phone New agent, and use collapsible phone project sections with
+  Ungrouped last. Phone reassignment and bulk group actions are excluded from the proposal.
+  Existing groups are labels on agent identities, not separately retained empty records.
+  Evidence: CardContextMenu derives all loaded labels and uses input/datalist; desktop launch
+  and phone launch API already accept group, while the desktop form/type omit it. Phone
+  ProjectScreen already receives group but never displays it. No product code or ready change yet.
+
 - **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
   when a provider interrupts work because its quota is exhausted, show a system quota-limit
   indicator and the reported reset time, then schedule continuation. The operator confirmed a
