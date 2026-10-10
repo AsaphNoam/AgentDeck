@@ -224,9 +224,11 @@ updated after publication.
 
 - **2026-10-10 — Fix:** Closed ROOM-WIDTH-01 (INV §13) by giving the size-contained Think Tank
   room list its available inline width while retaining the 1680px cap. Project renders passed at
-  1024px, 1440px and 1920px in Core, Sky & Grove and Studio; the same `RoomList` mount serves
-  Archive retained rooms. Focused room tests, 41 presentation checks, UI build/embed and the
-  remaining closure checks are recorded with this fix.
+  1024px, 1440px and 1920px in Core, Sky & Grove and Studio. Archive retained-room renders
+  measured 960px at 1024px and 1120px at 1920px in all three appearances, with receipts in
+  `/tmp/room-width-fix-archive-20261010/`; the Project matrix receipts are in
+  `/tmp/room-width-fix-20261010/`. Focused room tests, 41 presentation checks, UI build/embed
+  and the remaining closure checks are recorded with this fix.
 
 - **2026-10-10 — Implementation:** Button redesign to the Figma "Just enough" study
   (FS-12.R68/A38, TS-08.R119): shared primitive, per-area call-site mapping by four delegated
