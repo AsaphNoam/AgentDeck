@@ -545,7 +545,9 @@ project that is not repo-backed, or is archived, shows no such action.
   existing percentage-only label and does not invent `0 / 0` or infer integers from the rounded
   percentage. Raw counts update and survive reload, server restart, stop, and resume on the same
   last-known basis as the percentage. Collapsed cards remain without context usage under R59, and
-  project-summary cards gain no per-agent or aggregate context figure.
+  project-summary cards gain no per-agent or aggregate context figure. FS-12.R67 now displays
+  the pair in whole thousands (**12K / 200K tokens**); FS-12.R65 restores context to collapsed
+  cards.
 
 - **R63** — An expanded agent card on a scoped project dashboard shows the same compact
   runtime identity already present on its collapsed form: backend, model, and resolved reasoning

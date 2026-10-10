@@ -1,3 +1,8 @@
+// Token counts read in whole thousands, e.g. 44K; below 1,000 the count is shown as is (FS-12.R67).
+function thousands(count: number) {
+  return count < 1000 ? String(count) : `${Math.round(count / 1000)}K`;
+}
+
 export function ContextBar({ value, used, size, detailed = false }: { value: number; used?: number; size?: number; detailed?: boolean }) {
   const pct = Math.max(0, Math.min(1, value || 0));
   const label = Math.round(pct * 100);
@@ -6,7 +11,7 @@ export function ContextBar({ value, used, size, detailed = false }: { value: num
   // TS-08.R81); a lone value or a missing pair keeps the percentage-only label
   // rather than inventing a fraction from the rounded percentage (INV §2).
   const hasExactPair = typeof used === "number" && typeof size === "number";
-  const pair = hasExactPair ? `${used.toLocaleString("en-US")} / ${size.toLocaleString("en-US")} tokens` : "";
+  const pair = hasExactPair ? `${thousands(used)} / ${thousands(size)} tokens` : "";
   const text = hasExactPair ? `${pair} · ${label}% context used` : `${label}% context used`;
   // The agent page's labelled meter splits the same facts into a heading row and
   // a token line; the accessible label stays the one sentence (FS-12.R61).

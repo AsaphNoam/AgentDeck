@@ -140,9 +140,9 @@ it("shows the exact used/total token figure when both raw counts are known", () 
   renderPanel("a_exact");
 
   // FS-12.R61 — the header splits the same facts into a labelled meter.
-  const meter = screen.getByLabelText("12,345 / 200,000 tokens · 6% context used");
+  const meter = screen.getByLabelText("12K / 200K tokens · 6% context used");
   expect(meter).toHaveTextContent("Context usage6%");
-  expect(meter).toHaveTextContent("12,345 / 200,000 tokens");
+  expect(meter).toHaveTextContent("12K / 200K tokens");
 });
 
 // A state with no raw pair keeps the existing percentage-only label.

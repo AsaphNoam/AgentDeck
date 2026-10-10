@@ -195,7 +195,7 @@ describe("AgentCard", () => {
       </SortableContext></DndContext></MemoryRouter>,
     );
 
-    expect(screen.getByLabelText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("12K / 200K tokens · 6% context used")).toBeInTheDocument();
     expect(runtimeParts()).toEqual(["claude", "sonnet", "high"]);
 
     // A live update replaces both numbers (and the percentage) in place.
@@ -209,8 +209,8 @@ describe("AgentCard", () => {
       </SortableContext></DndContext></MemoryRouter>,
     );
 
-    expect(screen.getByLabelText("100,000 / 200,000 tokens · 50% context used")).toBeInTheDocument();
-    expect(screen.queryByLabelText("12,345 / 200,000 tokens · 6% context used")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("100K / 200K tokens · 50% context used")).toBeInTheDocument();
+    expect(screen.queryByLabelText("12K / 200K tokens · 6% context used")).not.toBeInTheDocument();
   });
 
   // An empty effort must not leave a dangling separator rule in the runtime row

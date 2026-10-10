@@ -133,7 +133,14 @@
 .agent-card[data-state="waiting_input"] { --ad-agent-card-tone: var(--ad-state-waiting); }
 .agent-card[data-state="done"] { --ad-agent-card-tone: var(--ad-state-done); }
 .agent-card[data-state="error"] { --ad-agent-card-tone: var(--ad-state-error); }
-.agent-card.stopped { --ad-agent-card-tone: var(--ad-text-muted); }
+/* A stopped agent is grayed out so it reads apart from a running idle one (FS-02.R6,
+   FS-12.R65). */
+.agent-card.stopped {
+  --ad-agent-card-tone: var(--ad-text-muted);
+
+  filter: grayscale(0.85);
+  opacity: 0.6;
+}
 
 .agent-card-head {
   padding: var(--ad-space-4);

@@ -30,8 +30,8 @@ describe("ContextBar", () => {
   // FS-12.R65: the card row leads with the percentage and follows with the exact pair.
   it("labels the card row with Context and the percentage before the pair", () => {
     render(<ContextBar value={0.26} used={52680} size={200000} />);
-    const meter = screen.getByLabelText("52,680 / 200,000 tokens · 26% context used");
-    expect(meter).toHaveTextContent("Context26% · 52,680 / 200,000 tokens");
+    const meter = screen.getByLabelText("53K / 200K tokens · 26% context used");
+    expect(meter).toHaveTextContent("Context26% · 53K / 200K tokens");
   });
 
   it("marks only the card form with the density state", () => {
@@ -41,23 +41,28 @@ describe("ContextBar", () => {
     expect(meter).not.toHaveAttribute("data-state");
   });
 
-  // FS-02.R62/TS-08.R81: the exact pair renders digit-grouped, unabridged
-  // integers beside the existing rounded percentage, never a second label.
-  it("renders the exact used/size pair with digit grouping beside the percentage", () => {
+  // FS-12.R67 (superseding FS-02.R62's unabridged display): the pair reads in whole
+  // thousands beside the existing rounded percentage, never a second label.
+  it("renders the used/size pair in whole thousands beside the percentage", () => {
     render(<ContextBar value={0.06} used={12345} size={200000} />);
-    expect(screen.getByLabelText("12,345 / 200,000 tokens · 6% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("12K / 200K tokens · 6% context used")).toBeInTheDocument();
+  });
+
+  it("rounds to the nearest thousand and shows counts below 1,000 as is", () => {
+    render(<ContextBar value={0.01} used={999} size={1500} />);
+    expect(screen.getByLabelText("999 / 2K tokens · 1% context used")).toBeInTheDocument();
   });
 
   it("renders zero used as zero rather than an empty track", () => {
     render(<ContextBar value={0} used={0} size={200000} />);
-    expect(screen.getByLabelText("0 / 200,000 tokens · 0% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("0 / 200K tokens · 0% context used")).toBeInTheDocument();
   });
 
-  // A1.R62: a reported used count beyond size still reports the raw integers;
+  // A1.R62: a reported used count beyond size is still reported as given;
   // only the percentage is capped by the shared clamp.
-  it("keeps the reported raw integers when used exceeds size, capping only the percentage", () => {
+  it("keeps the reported counts when used exceeds size, capping only the percentage", () => {
     render(<ContextBar value={1.25} used={250000} size={200000} />);
-    expect(screen.getByLabelText("250,000 / 200,000 tokens · 100% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("250K / 200K tokens · 100% context used")).toBeInTheDocument();
   });
 
   it("falls back to the percentage-only label when the pair is absent", () => {

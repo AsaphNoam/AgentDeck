@@ -13,7 +13,7 @@ describe("VisualMatrix", () => {
   it("changes only presentation when the high-variance contract fixture is enabled", () => {
     const { container } = render(<MemoryRouter><VisualMatrix /></MemoryRouter>);
     const root = container.querySelector(".visual-matrix")!;
-    expect(screen.getByLabelText("153,482 / 200,000 tokens · 74% context used")).toBeInTheDocument();
+    expect(screen.getByLabelText("153K / 200K tokens · 74% context used")).toBeInTheDocument();
     const copyBefore = root.textContent;
     const routesBefore = [...root.querySelectorAll("a")].map((link) => link.getAttribute("href"));
     const actionsBefore = [...root.querySelectorAll("button")].map((button) => button.textContent);

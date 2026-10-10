@@ -518,11 +518,12 @@ Requirements are user-observable.
   Send is a quiet square arrow button. This supersedes, on these cards only: FS-02.R2/R59's
   collapsed card without context (the context row returns on every card); R3's pill badge
   and the actionable highlighted background (the state line and leading edge carry state);
-  R5's single line (two lines); R6's dimming (the neutral Stopped line marks a stopped agent);
-  R40's project wash, tinted border and top state bar (a scoped grid shows one project, so the
+  R5's single line (two lines); R40's project wash, tinted border and top state bar (a scoped grid shows one project, so the
   leading edge carries state instead); R58's larger title size; and R67/R68's header placement
   (the state line sits above the name, the collapse chevron beside it, the context row below the
-  runtime row). A terminal card has no chevron and still opens its agent page. All three
+  runtime row). R6 stands: a stopped card is grayed out (desaturated and faded) so it reads
+  apart from a running idle card (operator request 2026-10-10, replacing this requirement's
+  first undimmed form). A terminal card has no chevron and still opens its agent page. All three
   appearances express the composition through their semantic palettes. The study's sample data,
   "Needs input"/"Running" wording, attention copy and its static transcript excerpt are
   excluded; the real live transcript, activity, permission cards, composer actions (Steer,
@@ -537,6 +538,13 @@ Requirements are user-observable.
   hairline separators, and a small muted section label above the project color swatches, which
   shrink to small rings. All three appearances express it through their semantic palettes. The
   items, order, placement, dismissal, keyboard behavior and actions are unchanged.
+
+- **R67 — Context token counts read in thousands.** Wherever the context meter states the exact
+  used / window pair (agent cards and the agent page), each number at or above 1,000 is shown in
+  whole thousands with a K suffix and no decimals, rounded to the nearest thousand (for example
+  **44K / 200K tokens**); a number below 1,000 is shown as is. The accessible label uses the same
+  form. This supersedes FS-02.R62's unabridged display only; the percentage, the
+  percentage-only fallback, and the retained raw integers are unchanged.
 
 ## 3. States & transitions
 
