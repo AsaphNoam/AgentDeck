@@ -264,6 +264,11 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   the phone follows the desktop's durable appearance preference without offering a skin picker.
   This supersedes R16's skins exclusion only for applying the configured appearance.
 
+- **R44 — Live chat work is visible on the phone.** At the conversation tail,
+  a running, busy chat agent shows the desktop's spinner and **Working…** label, including
+  while thinking or streaming. Idle, waiting for input, stopped, terminal and disconnected
+  views show no working indicator. Reduced motion uses the desktop's slower rotation.
+
 ## 3. States & transitions
 
 Desktop remote connection: `Off → Needs Tailscale sign-in → Connecting → On`; `On → Connecting` on
@@ -381,6 +386,11 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   launch, conversation/permission, pipeline and unpair actions with existing refusal/draft
   preservation. Verify focused remote tests, presentation checks, development visual matrix
   and real-browser screenshots of the actual phone entry.
+
+- **A16** (R44) — A phone chat entering busy shows the working indicator;
+  leaving busy or losing the connection removes it. Waiting for approval, idle, stopped
+  and terminal agents show none. Verify focused state-transition tests and a real-phone-width
+  browser pass across all three appearances, including reduced motion.
 
 ## 6. Deviations & open decisions
 

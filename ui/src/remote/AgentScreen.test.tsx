@@ -106,6 +106,27 @@ function renderScreen() {
 }
 
 describe("AgentScreen", () => {
+  // FS-20.A16: live busy state, connection loss and inactive agents.
+  it("shows live work and removes it when busy ends or the connection is lost", async () => {
+    renderScreen();
+    expect(screen.queryByText("Working…")).not.toBeInTheDocument();
+    act(() => useConnection.setState({ agents: { a1: { ...agent, state: "busy" } } }));
+    expect(screen.getByText("Working…")).toBeInTheDocument();
+    act(() => useConnection.setState({ link: "unreachable" }));
+    expect(screen.queryByText("Working…")).not.toBeInTheDocument();
+    act(() => useConnection.setState({ link: "connected" }));
+    expect(screen.getByText("Working…")).toBeInTheDocument();
+    for (const state of ["idle", "waiting_input", "error"] as const) {
+      act(() => useConnection.setState({ agents: { a1: { ...agent, state } } }));
+      expect(screen.queryByText("Working…")).not.toBeInTheDocument();
+    }
+    for (const stopped of [{ ...agent, state: "busy" as const, running: false }, { ...agent, state: "busy" as const, interface: "terminal" as const }]) {
+      act(() => useConnection.setState({ agents: { a1: stopped } }));
+      expect(screen.queryByText("Working…")).not.toBeInTheDocument();
+    }
+    await screen.findByText("This is a terminal agent. Its terminal is on the Mac; the phone shows its status only.");
+  });
+
   it("shows a permission with its command and latest message and approves it", async () => {
     renderScreen();
     const card = await screen.findByRole("region", { name: "Permission request" });

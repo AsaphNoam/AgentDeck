@@ -1244,6 +1244,11 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   geometry through focused tests, the development matrix and actual remote-entry browser review.
   This supersedes the Core-only phone verification clauses in R110 and FS-12.R60/A32.
 
+- **R117 — Phone and desktop share the working indicator.** FS-20.R44 uses
+  the same stateless transcript indicator component, existing `.transcript-pending` and
+  `.spinner` selectors, and reduced-motion treatment as `TranscriptView`. The phone derives
+  visibility from connected, running chat state `busy`, independently of mutation pending state.
+
 - **R112 — The agent-page composition is scoped to the full workspace.** FS-12.R61
   lives in `styles/features/agent.css` under the workspace's `.chat-panel` root, so the shared
   transcript renderers keep their dashboard-pane and phone presentation. `ChatPanel` and

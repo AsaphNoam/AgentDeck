@@ -20,6 +20,17 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
 - **Active change:** None.
+- **Review pending — mobile working spinner (FS-20.R44/A16, TS-08.R117):** phone Chat
+  now shares the desktop's `WorkingIndicator` at the transcript tail for connected, running,
+  busy chat agents. Thinking/streaming show it; idle, approval waiting, stopped, terminal and
+  disconnected views do not. Existing animation and reduced-motion slowdown are shared.
+  Focused desktop/phone tests and state transitions pass; actual phone-entry browser checks
+  passed in Core, Sky & Grove and Studio, with normal/reduced motion and no overflow.
+  Evidence: `/tmp/mobile-spinner-*-busy.png`; development matrix: `/tmp/mobile-spinner-matrix-*.png`.
+  Both Go variants, tagged build and UI embed passed. Spinner-only index snapshot verified in
+  `/tmp/mobile-spinner-verify-final/`: 739 UI tests, 41 presentation checks and UI build passed.
+  Shared-worktree pretest encountered an unrelated in-progress context-menu contract mismatch;
+  that work and the existing mobile detail/composer edits remain unstaged and untouched.
 - **Fix closed — mobile history (MOBILE-HISTORY-01):** phone transcript windows now hold 750
   events, load older pages automatically on upward scrolling with viewport anchoring, preserve
   bounded loaded history across live refreshes, and recover intervening gaps. The formerly skipped

@@ -23,6 +23,7 @@ import type { AgentState, AnnotationDraft, TranscriptEvent } from "../api/types"
 import { useAnnotationStore } from "../store/annotationStore";
 import { useReasoningStore } from "../store/reasoningStore";
 import { foldTranscript, normalizeEvent } from "../store/transcriptStore";
+import { WorkingIndicator } from "../components/chat/WorkingIndicator";
 import { AssistantText } from "../components/chat/renderers/AssistantText";
 import { DiffBlock } from "../components/chat/renderers/DiffBlock";
 import { NoticeRow } from "../components/chat/renderers/NoticeRow";
@@ -468,6 +469,7 @@ export function AgentScreen({ agentId }: { agentId: string }) {
           )}
           <div className="phone-transcript phone-transcript-bubbles" role="list" aria-label="Conversation" ref={listRef} onFocus={trackFocus}>
             <TurnList agentId={agentId} events={rows} lead={lead} choices={choices} renderEvents={(list) => renderRows(list, annotate, [], 1)} />
+            {!offline && agent.running && agent.state === "busy" && <WorkingIndicator />}
           </div>
           {pending && <PermissionCard agent={agent} event={pending} latest={latest} disabled={offline} onSettled={refresh} />}
           <PhoneAnnotationForm agent={agent} />

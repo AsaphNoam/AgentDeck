@@ -32,6 +32,7 @@ import { useAnnotationStore } from "../../store/annotationStore";
 import { useAgentStore } from "../../store/agentStore";
 import { useHeldStore } from "../../store/heldStore";
 import { withdrawHeldMessage } from "../../lib/heldMessage";
+import { WorkingIndicator } from "./WorkingIndicator";
 import { useUiStore } from "../../store/uiStore";
 
 // openFile/onOpenFile are per-surface, exactly as annotationsEnabled already is
@@ -140,12 +141,7 @@ export function TranscriptView({ agentId, events, sourceActive = false, annotati
           </p>
         )}
         <BackgroundTaskList agentId={agentId} tasks={collectTasks(events)} controllable={taskControl} />
-        {busy && (
-          <div className="transcript-pending" aria-live="polite">
-            <span className="spinner" aria-hidden="true" />
-            <span>Working…</span>
-          </div>
-        )}
+        {busy && <WorkingIndicator />}
         {held !== undefined && <HeldMessage agentId={agentId} text={held} />}
       </div>
       {!atBottom && (

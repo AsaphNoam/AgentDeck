@@ -16,6 +16,8 @@ import { chromium, devices } from "playwright";
 
 const [fixturePath, out = join(tmpdir(), "phone-render.png")] = process.argv.slice(2);
 const historyCheck = process.argv.includes("--history-check");
+const spinnerCheck = process.argv.includes("--spinner-check");
+let skin = "";
 
 const agent = {
   agent_id: "a1", name: "phone-render", role: "implementer", project: "my-app", backend: "claude", model: "m",
@@ -48,6 +50,7 @@ try {
     window.EventSource = class extends EventTarget {
       constructor() {
         super();
+        window.__phoneRenderSource = this;
         setTimeout(() => {
           this.onopen?.();
           for (const data of hydrated) this.dispatchEvent(new MessageEvent("state_update", { data: JSON.stringify(data) }));
@@ -59,6 +62,7 @@ try {
   // A URL predicate, not "**/api/**", which would also catch Vite's /src/api modules.
   await context.route((url) => url.pathname.startsWith("/api/"), (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (spinnerCheck && path === "/api/config") return route.fulfill({ json: { appearance_skin: skin } });
     if (path === "/api/sessions/a1/transcript") {
       if (!history) return route.fulfill({ json: transcript });
       const url = new URL(route.request().url());
@@ -94,6 +98,38 @@ try {
     console.log(`automatic upward load kept the visible anchor within ${drift}px`);
   }
   await page.screenshot({ path: out, fullPage: !historyCheck });
+  if (shown && spinnerCheck) {
+    for (const theme of ["", "sky-grove", "studio"]) {
+      skin = theme;
+      await page.goto("http://localhost:5199/remote.html");
+      await page.evaluate(() => {
+        history.pushState(null, "", "/agent/a1");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await page.getByRole("list", { name: "Conversation" }).waitFor();
+      await page.waitForFunction((theme) => (document.documentElement.dataset.skin || "") === theme, theme);
+      const update = (data) => page.evaluate((data) => {
+        window.__phoneRenderSource.dispatchEvent(new MessageEvent("state_update", { data: JSON.stringify({ agent_id: "a1", data }) }));
+      }, data);
+      await update({ ...agent, state: "busy" });
+      await page.getByText("Working…", { exact: true }).waitFor();
+      await page.locator(".transcript-pending").scrollIntoViewIfNeeded();
+      const metrics = await page.locator(".spinner").evaluate((el) => ({ duration: getComputedStyle(el).animationDuration, animation: getComputedStyle(el).animationName, overflow: document.documentElement.scrollWidth > innerWidth }));
+      if (metrics.duration !== "0.7s" || metrics.animation !== "ad-spin" || metrics.overflow) throw new Error(JSON.stringify(metrics));
+      await page.screenshot({ path: out.replace(/\.png$/, `-${theme || "core"}-busy.png`) });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const reduced = await page.locator(".spinner").evaluate((el) => getComputedStyle(el).animationDuration);
+      if (reduced !== "2.4s") throw new Error(`reduced motion: ${reduced}`);
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      for (const state of ["idle", "waiting_input", "error"]) {
+        await update({ ...agent, state });
+        await page.getByText("Working…", { exact: true }).waitFor({ state: "hidden" });
+      }
+      await update({ ...agent, state: "busy", running: false });
+      await page.getByText("Working…", { exact: true }).waitFor({ state: "hidden" });
+      console.log(`${theme || "core"} spinner: ${JSON.stringify(metrics)}, reduced=${reduced}; busy → idle/waiting/error/stopped passed`);
+    }
+  }
   console.log(`wrote ${out}`);
   if (!shown) {
     console.error("the conversation did not render; see the screenshot");
