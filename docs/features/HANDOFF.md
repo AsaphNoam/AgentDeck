@@ -19,7 +19,23 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   [`RELEASE-v0.12.0-notes.md`](../archive/state/RELEASE-v0.12.0-notes.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
-- **Active change:** Agent groups on desktop and mobile.
+- **Active change:** None.
+- **Review pending — desktop/phone group controls (FS-02.R72–R76/A54–A57,
+  FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118, TS-13.R24):**
+  shared searchable picker in ordinary launch/reassignment, collapsible phone sections,
+  desktop cross-group drag, and project-scoped Stop/Archive replace global release.
+  All-member lifecycle/archive reservations precede effects; per-member results survive card
+  removal. Cross-group moves preserve manual order; pointer collision targets the actual header,
+  keyboard drag retains rectangles, and empty Ungrouped appears during drag. Phone Manage
+  follows live membership updates. Range begins `4a7899b`, includes `d5b43f5` and `c50e09e`,
+  plus the approved stale FileViewer assertion correction in this closure commit.
+  Both Go variants, clean UI/build/embed/tagged binary, 758 UI tests and 41 style/presentation
+  checks pass. Final authenticated fake-peer/fake-provider browser journey passed 33 checks in
+  Core, Sky & Grove and Studio at 1024/1440 desktop and 360/390/430 phone, including live
+  regroup, collapsed-header drag beside Ungrouped, scoped Stop/Archive, individual Restore,
+  legacy route absence and no exceptions. Evidence: `/tmp/chuck-group-journey-final/`;
+  development matrix: `/tmp/chuck-group-matrix/`; group-only snapshot:
+  `/tmp/chuck-group-final-verify/`. Original mobile detail/composer edits remain unstaged.
 - **Review pending — mobile working spinner (FS-20.R44/A16, TS-08.R117):** phone Chat
   now shares the desktop's `WorkingIndicator` at the transcript tail for connected, running,
   busy chat agents. Thinking/streaming show it; idle, approval waiting, stopped, terminal and
@@ -90,37 +106,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-[`agent-groups-on-desktop-and-mobile.md`](../ready-changes/agent-groups-on-desktop-and-mobile.md)
-is in progress solely for the closure blocker below. Group projection, bulk confirmation/results,
-server lifecycle/access services, shared picker/launch, desktop drag and phone sections/Manage
-are implemented. Cross-group moves change identity only and preserve manual order. Server tests
-prove scoped actions, narrow remote fields, lifecycle conflicts and batch archive failure with
-stopped-state publication. Existing dirty mobile detail/composer edits remain preserved.
-
-Final implementation is verified apart from an unrelated existing UI assertion. The complete
-Go matrix (untagged and `sqlite_fts5`) passes; clean group-only UI snapshot
-`/tmp/chuck-group-final-verify/` passes presentation/style checks, TypeScript/Vite build,
-generated embed and tagged binary build. Full UI run: 757 passed, one failed
-(`FileViewer.test.tsx:328`, unchanged by the group work). A repeat clean snapshot confirms the
-same obsolete `[data-file-open]` max-width expectation. Source CSS now uses FS-12.R61's
-conversation measure. Approval for this small test-only correction is pending below; afterward
-rerun UI tests, close this ready change and add its implementation to the available review units.
-
-Final browser receipts: `/tmp/chuck-group-journey-final/`; actual embedded desktop and
-authenticated TLS phone handler, isolated home, fake provider and fake tailnet peer (no real
-tailnet contacted). Covers 1024/1440 desktop, 360/390/430 phone, all three appearances, group
-picker, collapsed-header drag with adjacent Ungrouped, live phone regroup, scoped Stop/Archive,
-retained project, individual Restore and no browser exceptions. Development matrix:
-`/tmp/chuck-group-matrix/`. Pointer collision now uses pointer position; keyboard collision
-retains rectangles, and an empty Ungrouped target appears during a drag. Mounted phone Manage
-follows live group updates without overwriting a refused draft. The initial Go run also hit a
-transient mail-activation receipt assertion; its focused retry and both complete final variants
-passed. No mail implementation change was made.
-
-Direction: experienced operators organize active work with compact incumbent group headers and
-dialogs. Group labels remain quiet identity metadata; explicit project/member/running counts make
-bulk scope clear. Retain result feedback on the project surface after cards disappear. Existing
-drag handle and keyboard picker stay complementary. No added motion or presentation layer.
+None.
 
 ## Acceptance gates still owed
 
@@ -213,14 +199,6 @@ and does not close any manual provider gates.
 
 ## Blocked on human
 
-- **Group work closure — test-only correction approval:** `ui/src/components/chat/FileViewer.test.tsx:328`
-  asserts the old `.chat-panel[data-file-open="true"]` max-width selector. This selector was
-  removed by the earlier agent-page layout work; both this test and its CSS are unchanged by
-  group work. The full UI suite fails only this assertion. Asked whether to update that one
-  stale layout assertion to the current FS-12.R61/TS-08.R112 contract (small test-only change).
-  Leave it unchanged until the human answers; all group changes and remaining checks are
-  independently verified. Do not call overall work complete before UI closure passes.
-
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older
 release is separate publication work. Do not retag or recut it.
@@ -233,6 +211,11 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Group work closed:** user approved updating the stale FileViewer layout
+  assertion to FS-12.R61's page-spanning panel; all 758 UI tests pass. Group implementation,
+  complete Go/build checks and rendered receipts are ready for independent review. Existing
+  mobile detail/composer work was preserved.
 
 - **2026-10-10 — Feature design:** Completed group selection/creation, mobile sections and
   bidirectional changes, desktop cross-group drag, project-only Stop/Archive and narrow phone

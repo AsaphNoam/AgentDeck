@@ -308,7 +308,7 @@ describe("the open file as part of the address", () => {
 
   // jsdom evaluates no CSS and knows nothing of container queries, so the
   // stylesheet is the only witness that the viewer docks in its own leading track
-  // and that the width cap relaxes by state rather than measurement (INV §13).
+  // and that the page-spanning panel leaves room for it without measured width (INV §13).
   it("docks through the transcript region's own grid with no measured width", () => {
     const css = fs.readFileSync(path.resolve(__dirname, "../../styles/features/agent.css"), "utf8");
 
@@ -321,10 +321,10 @@ describe("the open file as part of the address", () => {
     // Narrow form: the column takes width from the transcript.
     expect(css).toMatch(/\.file-viewer \{[^}]*width: min\(46cqi, 520px\)/);
     expect(css).toMatch(/\.file-viewer-body \[data-file-marked="true"\]/);
-    // Docked form: the relaxed content cap pays for it instead.
+    // Docked form: the page-spanning panel already has room for the leading track.
     const docked = css.match(/@container transcript \(min-width: 860px\) \{([\s\S]*?)\n\}/);
     expect(docked).not.toBeNull();
     expect(docked![1]).toMatch(/\.file-viewer \{[^}]*width: min\(38cqi, 640px\)/);
-    expect(css).toMatch(/\.chat-panel\[data-file-open="true"\] \{[^}]*max-width/);
+    expect(css).toMatch(/\.chat-panel \{[^}]*max-width: none/);
   });
 });
