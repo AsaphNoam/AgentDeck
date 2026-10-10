@@ -81,13 +81,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   failure with Retry, a pipeline room, Files dialog → file viewer, and keyboard focus.
   Reviewer note: room status chip reuses `roomStatus` tones (Running/Waiting/Needs
   attention/Paused/Ended) rather than the study's openings/judge-failed labels.
-- **Review pending — project-dashboard agent cards (`4dc1b34`, FS-12.R65/A37, TS-08.R116):**
-  `AgentCard` adopts the Figma `SessionCard` study; supersessions of FS-02 are listed in R65.
-  Tests, build and `make test` passed; Core/Sky & Grove/Studio renders at 1024/1280 with the
-  fake-backend harness are in shared resources `session-card-design/` (`ref/`, `runs/final/`).
-  Owed: independent A37 comparison incl. live error, terminal agent, unread mail, pipeline
-  agent, permission in an expanded pane, drag reorder, keyboard focus. Notes: the name is a
-  link (body/chevron expand); state labels keep Chuck's Busy/Waiting vocabulary.
+- **Review closed — project-dashboard agent cards (`4dc1b34`, FS-12.R65/A37, TS-08.R116):**
+  independent source/spec and rendered study comparison passed without findings on 2026-10-10.
+  Core/Sky & Grove/Studio at 1024/1280 covered live busy/idle/waiting/error/stopped states,
+  long names, terminal/mail/pipeline presentation, expanded permission/activity/composer,
+  collapse/navigation, pane cycling, focus/hover, Send/Cancel and persisted drag reorder.
+  Evidence: `/tmp/chuck-card-review-20261010/`; closure details below. Other review units and
+  unrelated uncommitted presentation work remain independent.
 - **Design ready — quota continuation:**
   [`continue-chats-after-quota-reset.md`](../ready-changes/continue-chats-after-quota-reset.md)
   is Waiting to start: FS-01.R40–R45/FS-04.R53, TS-02.R45/TS-03.R60,
@@ -235,6 +235,33 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Review:** Closed project-dashboard agent-card unit `4dc1b34` without findings
+  (FS-12.R65/A37, TS-08.R116); committed card follow-ups through `33439e1` were included,
+  without reopening their already-closed small-change units. Independent bounded Luna source/spec
+  audit and rendered critique plus parent comparison against `session-card-design/ref/` passed.
+  Reviewed a HEAD archive in `/tmp/chuck-card-review-20261010/source`, preserving all dirty and
+  staged work in the main checkout. Built/embedded that isolated UI and ran the real loopback-only
+  server with a disposable home and deterministic fake ACP; browser/server permissions were
+  approved and execution succeeded. Core/Sky & Grove/Studio at 1024/1280 covered live busy,
+  idle, permission-waiting, provider-error and stopped states, a long unbroken name, completed
+  transcript/activity and pending permission, header/chevron collapse, name navigation,
+  context menu, pane cycling, outlined name/chevron/grip focus, Send, Cancel and persisted drag
+  reorder. Terminal identity, unread/Sent and pipeline lineage were supplemental serialized
+  presentation inputs applied to real fake-provider agents; no terminal/provider or pipeline
+  lifecycle claim is made. The development matrix and border-strengthening hover passed in all
+  appearances. All 91 browser checks passed without page errors; 63 focused UI tests, 41
+  style/presentation checks, UI build/embed and tagged fixture build passed. Initial fixture
+  failures were corrected: shared-worker SSE bypassed supplemental REST data, the leading edge
+  is a pseudo-element, and a previously cancelled held turn needed a fresh agent. A suspected
+  typography mismatch was rejected after verifying the exact study CSS and screenshot pixel
+  scale: state 11px, metadata/context/footer 10px, title 16px and preview 13px match.
+  Invariant sweep: §§2/8/10/13/17 applicable and passed; §§1/3–7/9/11–12/14–16 have no applicable
+  surface in this card unit. Local choices accepted: existing Busy/Waiting vocabulary, whole-K
+  counts, stopped fading, shared semantic palettes, live activity and retained pane sizing follow
+  the requirements; no new product decision. **Fix model:** none — no open findings.
+  Evidence and temporary harnesses: `/tmp/chuck-card-review-20261010/evidence/`.
+  Only this state file changed; independent review units remain unchanged.
 
 - **2026-10-10 — Quota design:** Approved recovery retention/API replacement and promoted
   default-on all-chat quota continuation to a waiting ready change. Prepared 5-hour/weekly
