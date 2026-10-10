@@ -31,7 +31,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   independent source/spec and rendered review passed without findings on 2026-10-10. Project
   and Archive cards passed in all three appearances at 1024/1440, including removed origins,
   separate keyboard focus and hover.
-  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below.
+  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below. Follow-up: the room list
+  now shares the agent grid's centred 1680px column (rendered at 1440/1920).
 - **Review pending — Think Tank room page (FS-12.R64/A36, TS-08.R115):** the full room page
   adopts the Figma Make `ThinkTank` study (source: Figma MCP resource
   `file://figma/make/source/OykxmXqZnnyA67QA1lv3AU/src/ThinkTank.tsx` + `think-tank.css`):

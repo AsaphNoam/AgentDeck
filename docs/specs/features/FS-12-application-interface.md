@@ -458,7 +458,9 @@ Requirements are user-observable.
   name link with ↗ or plain name when deleted, project · turns left, and Ready/Speaking ●/
   Exhausted/Departed), then a footer with the room's scope or origin at the left and judge
   state at the right. The icon tile hides on narrow sections and the card stacks on very narrow
-  ones. All three appearances express the composition through their semantic palettes. The
+  ones. The room section shares the agent grid's centred maximum width, so room and agent cards
+  align on wide screens. All three appearances express the composition through their semantic
+  palettes. The
   study's sample rooms and copy are excluded; real status, attention, allowance, judge and
   retained-identity data drive the card, and FS-02.R71/FS-21.R44 behavior is unchanged.
 

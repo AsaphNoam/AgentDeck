@@ -1,6 +1,8 @@
 @layer ad-features {
+/* Room cards share the agent grid's column so both areas align (FS-12.R63). */
 .grid-view,
-.empty-state {
+.empty-state,
+.think-tank-list {
   margin: 0 auto;
   max-width: 1680px;
 }
