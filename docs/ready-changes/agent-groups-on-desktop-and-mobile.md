@@ -1,6 +1,6 @@
 # Agent groups on desktop and mobile
 
-**State:** Waiting to start
+**State:** In progress
 **Why:** Direct `/design-feature` request on 2026-10-10, expanded to bidirectional updates,
 cross-group drag and bulk Stop/Archive; current-project scope and desktop drag/mobile picker
 confirmed. The user explicitly waived backwards compatibility and requested replacing global release.

@@ -97,10 +97,12 @@ export function updateAgentIdentity(agentId: string, body: { name?: string; grou
   });
 }
 
-export function releaseGroup(group: string) {
-  return json<{ group: string; stopped: Array<{ agent_id: string; ok: boolean; error?: string }> }>(
-    `/api/groups/${encodeURIComponent(group)}/release`,
-    { method: "POST" },
+export type GroupActionResult = { project: string; group: string; results: Array<{ agent_id: string; ok: boolean; error?: { code: string; message: string } }> };
+
+export function actOnGroup(project: string, group: string, action: "stop" | "archive") {
+  return json<GroupActionResult>(
+    `/api/projects/${encodeURIComponent(project)}/groups/${action}`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group }) },
   );
 }
 

@@ -1,8 +1,8 @@
-import { DndContext, type DragEndEvent, type DragOverEvent } from "@dnd-kit/core";
+import { DndContext, useDroppable, type DragEndEvent, type DragOverEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
-import { getLayout, putLayout, releaseGroup } from "../../api/client";
+import { getLayout, putLayout, updateAgentIdentity } from "../../api/client";
 import type { AgentState, AgentStatus } from "../../api/types";
 import { useAgentStore } from "../../store/agentStore";
 import { useTranscriptStore } from "../../store/transcriptStore";
@@ -17,7 +17,9 @@ import { ThinkTankSetupDialog } from "../../features/thinktank/ThinkTankSetupDia
 import { useProjects } from "../../api/config";
 import { useTasks } from "../../api/tasks";
 import { needsAttention } from "../../features/tasks/taskWork";
-import { Button, ConfirmDialog, IconButton, PageHeader } from "../ui";
+import { Button, IconButton, PageHeader } from "../ui";
+import { groupAgents } from "../../lib/groups";
+import { useGroupActions } from "../groups/GroupActions";
 import { CollapseAllIcon } from "../ui/icons";
 
 // projectID scopes which agents the grid shows; fixedProject locks New Agent to a
@@ -55,8 +57,10 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const pushError = useUiStore((state) => state.pushError);
   const [showNewAgent, setShowNewAgent] = useState(false);
   const [showThinkTank, setShowThinkTank] = useState(false);
-  const [releaseGroupLabel, setReleaseGroupLabel] = useState<string | null>(null);
-  const [releaseGroupError, setReleaseGroupError] = useState("");
+  const groupActions = useGroupActions({ project: projectID, projectTitle });
+  const [moving, setMoving] = useState(false);
+  const movingRef = useRef(false);
+  const [dropGroup, setDropGroup] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [refusedDrop, setRefusedDrop] = useState(false);
   const projects = useProjects();
@@ -227,14 +231,37 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   // Marking the refusal while the drag is still in flight states it before the release
   // without interrupting the drag (FS-02.R53).
   const onDragOver = ({ active, over }: DragOverEvent) => {
-    setRefusedDrop(!!over && agents[String(active.id)]?.running !== agents[String(over.id)]?.running);
+    const destination = destinationGroup(over ? String(over.id) : null);
+    const source = agents[String(active.id)];
+    const crossGroup = !!source && destination !== null && destination !== (source.group?.trim() || "_ungrouped");
+    setDropGroup(crossGroup ? destination : null);
+    setRefusedDrop(!!source && !!over && !crossGroup && !!agents[String(over.id)] && source.running !== agents[String(over.id)].running);
+  };
+
+  const destinationGroup = (id: string | null) => {
+    if (id === null) return null;
+    if (id.startsWith("group:")) return id.slice(6);
+    return agents[id] ? agents[id].group?.trim() || "_ungrouped" : null;
   };
 
   const onDragEnd = (event: DragEndEvent) => {
     setRefusedDrop(false);
+    setDropGroup(null);
     if (!event.over || event.active.id === event.over.id) return;
     const activeID = String(event.active.id);
     const overID = String(event.over.id);
+    const destination = destinationGroup(overID);
+    const source = agents[activeID];
+    if (!source || expanded.includes(activeID) || movingRef.current) return;
+    if (destination !== null && destination !== (source.group?.trim() || "_ungrouped")) {
+      movingRef.current = true;
+      setMoving(true);
+      void updateAgentIdentity(activeID, { group: destination === "_ungrouped" ? "" : destination })
+        .catch((err: unknown) => pushError("Moving agent failed", err instanceof Error ? err.message : String(err)))
+        .finally(() => { movingRef.current = false; setMoving(false); });
+      return;
+    }
+    if (!agents[overID]) return;
     // Manual drag order cannot override the running-first boundary (FS-02.R45), so a
     // drop onto the other block reorders nothing and writes no layout — returning here
     // keeps both `arrayMove` and the persisted order untouched.
@@ -272,12 +299,13 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <IconButton type="button" aria-label="Collapse all" title="Collapse all" onClick={collapseAll}><CollapseAllIcon /></IconButton>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button>{thinkTankAction}<DensityControl /></>}
         data-slot="header"
       />
-      <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => setRefusedDrop(false)}>
+      <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => { setRefusedDrop(false); setDropGroup(null); }}>
           <div className="group-stack" data-slot="groups" data-drop={refusedDrop ? "refused" : undefined} onKeyDown={cyclePaneFocus}>
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;
               return (
-                <section className="agent-group" data-ui="agent-group" data-state={collapsed ? "collapsed" : "expanded"} key={group.key}>
+                <GroupDropSection group={group.key} disabled={moving} key={group.key}>
+                <section className={`agent-group${dropGroup === group.key ? " agent-group-drop" : ""}`} data-ui="agent-group" data-state={collapsed ? "collapsed" : "expanded"} aria-label={`Group ${group.label}`}>
                   <header className="agent-group-header" data-slot="header">
                     <button type="button" onClick={() => toggleGroupCollapsed(group.key)} aria-expanded={!collapsed}>
                       {collapsed ? ">" : "v"}
@@ -285,14 +313,11 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                     <strong>{group.label}</strong>
                     <span data-slot="summary">{group.agents.length} agents</span>
                     <span data-slot="summary">{summary(group.agents)}</span>
-                    {group.key !== "_ungrouped" && (
-                      <button
-                        type="button"
-                        className="group-release"
-                        onClick={() => { setReleaseGroupError(""); setReleaseGroupLabel(group.key); }}
-                      >
-                        Release group
-                      </button>
+                    {projectID && group.key !== "_ungrouped" && (
+                      <>
+                        <button type="button" className="group-release" disabled={groupActions.pending || !group.agents.some((agent) => agent.running)} onClick={() => groupActions.open("stop", group.key, group.agents)}>Stop group</button>
+                        <button type="button" disabled={groupActions.pending} onClick={() => groupActions.open("archive", group.key, group.agents)}>Archive group</button>
+                      </>
                     )}
                   </header>
                   {!collapsed && (
@@ -317,6 +342,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
                     </div>
                   )}
                 </section>
+                </GroupDropSection>
               );
             })}
           </div>
@@ -335,19 +361,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
       {body}
       <NewAgentModal open={showNewAgent} onClose={() => setShowNewAgent(false)} fixedProject={fixedProject} />
       {fixedProject && <ThinkTankSetupDialog open={showThinkTank} onClose={() => setShowThinkTank(false)} originProject={fixedProject} />}
-      {releaseGroupLabel && (
-        <ConfirmDialog
-          open
-          title={`Release group ${releaseGroupLabel}?`}
-          confirmLabel="Release group"
-          destructive
-          onCancel={() => { setReleaseGroupError(""); setReleaseGroupLabel(null); }}
-          onConfirm={() => releaseGroup(releaseGroupLabel).then(() => setReleaseGroupLabel(null)).catch((err: unknown) => { const message = err instanceof Error ? err.message : String(err); setReleaseGroupError(message); pushError("Release group failed", message); })}
-        >
-          <p>This stops every agent in the group. Their sessions remain available to resume later.</p>
-          {releaseGroupError && <p className="form-error">{releaseGroupError}</p>}
-        </ConfirmDialog>
-      )}
+      {groupActions.feedback}
     </>
   );
 }
@@ -365,26 +379,9 @@ export function mergeScopedOrder(globalIDs: string[], scopedIDs: string[], reord
   return globalIDs.map((id) => (scoped.has(id) ? reorderedScopedIDs[nextScopedID++] : id));
 }
 
-function groupAgents(items: AgentState[]) {
-  const map = new Map<string, AgentState[]>();
-  for (const agent of items) {
-    const key = agent.group?.trim() || "_ungrouped";
-    map.set(key, [...(map.get(key) ?? []), agent]);
-  }
-  return [...map.entries()]
-    .sort(([a], [b]) => {
-      if (a === "_ungrouped") return 1;
-      if (b === "_ungrouped") return -1;
-      return a.localeCompare(b);
-    })
-    .map(([key, agents]) => ({
-      key,
-      label: key === "_ungrouped" ? "Ungrouped" : key,
-      // Running agents lead each section and the manual order survives inside each
-      // block, so supervision starts with live work (FS-02.R45). `running` is the sole
-      // test — the live `state` values never move a card (FS-12.R37).
-      agents: [...agents.filter((agent) => agent.running), ...agents.filter((agent) => !agent.running)],
-    }));
+function GroupDropSection({ group, disabled, children }: { group: string; disabled: boolean; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: `group:${group}`, disabled });
+  return <div ref={setNodeRef}>{children}</div>;
 }
 
 function summary(agents: AgentState[]) {

@@ -838,7 +838,7 @@ describe("CardGrid", () => {
       // A person moved this stage agent out of its section by hand.
       a_moved: stage("a_moved", "work", 2, ""),
     }, { "Work — Ship": { collapsed: true } });
-    renderWithQuery(<CardGrid />);
+    renderWithQuery(<CardGrid projectID="my-app" />);
 
     const headers = () => [...document.querySelectorAll('[data-ui="agent-group"] header')];
     await waitFor(() => expect(headers()).toHaveLength(3));
@@ -846,7 +846,7 @@ describe("CardGrid", () => {
       .toEqual(["Review — Ship", "Work — Ship", "Ungrouped"]);
 
     // The retried stage's section counts both its agents and summarizes their states;
-    // every named stage section offers Release group.
+    // every named stage section offers project-scoped Stop group.
     const review = headers()[0];
     expect([...review.querySelectorAll('[data-slot="summary"]')].map((n) => n.textContent))
       .toEqual(["2 agents", "1 idle · 1 busy"]);
@@ -863,5 +863,40 @@ describe("CardGrid", () => {
     expect(ungrouped.querySelectorAll('[data-ui="agent-card"]')).toHaveLength(1);
     const moved = ungrouped.querySelector('.pipeline-association[href="/pipelines/runs/pr_1"]');
     expect(moved?.textContent).toBe("Ship · work · attempt 2");
+  });
+
+  it("moves across groups through identity without changing manual order, including a collapsed header", async () => {
+    const bodies: unknown[] = [];
+    seedGrid(["a_1", "a_2", "a_3"], {
+      a_1: agent("a_1", { group: "Alpha" }),
+      a_2: agent("a_2", { group: "Beta", running: false }),
+      a_3: agent("a_3"),
+    }, { Beta: { collapsed: true } });
+    server.use(http.post("/api/sessions/a_1/identity", async ({ request }) => {
+      bodies.push(await request.json());
+      return HttpResponse.json({});
+    }));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    act(() => dnd.onDragOver?.({ active: { id: "a_1" }, over: { id: "group:Beta" } }));
+    expect(screen.getByRole("region", { name: "Group Beta" })).toHaveClass("agent-group-drop");
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "group:Beta" } }));
+    await waitFor(() => expect(bodies).toEqual([{ group: "Beta" }]));
+    expect(useAgentStore.getState().order).toEqual(["a_1", "a_2", "a_3"]);
+    expect(useAgentStore.getState().agents.a_1.group).toBe("Alpha");
+    await act(async () => { await Promise.resolve(); });
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "group:_ungrouped" } }));
+    await waitFor(() => expect(bodies).toEqual([{ group: "Beta" }, { group: "" }]));
+  });
+
+  it("keeps membership and order on a rejected move and reports the server reason", async () => {
+    seedGrid(["a_1", "a_2"], { a_1: agent("a_1", { group: "Alpha" }), a_2: agent("a_2", { group: "Beta", running: false }) });
+    server.use(http.post("/api/sessions/a_1/identity", () => HttpResponse.json({ error: { code: "conflict", message: "Archive in progress" } }, { status: 409 })));
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
+    await waitFor(() => expect(useUiStore.getState().toasts.at(-1)?.body).toBe("Archive in progress"));
+    expect(useAgentStore.getState().order).toEqual(["a_1", "a_2"]);
+    expect(useAgentStore.getState().agents.a_1.group).toBe("Alpha");
   });
 });

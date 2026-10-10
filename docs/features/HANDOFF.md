@@ -19,7 +19,7 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   [`RELEASE-v0.12.0-notes.md`](../archive/state/RELEASE-v0.12.0-notes.md).
 - **Repository:** GitHub is `AsaphNoam/Chuck` (renamed 2026-10-09); the old name redirects.
   Installer/updater defaults match it, so no `CHUCK_REPO`/`--repo` override is needed.
-- **Active change:** None.
+- **Active change:** Agent groups on desktop and mobile.
 - **Review pending — mobile working spinner (FS-20.R44/A16, TS-08.R117):** phone Chat
   now shares the desktop's `WorkingIndicator` at the transcript tail for connected, running,
   busy chat agents. Thinking/streaming show it; idle, approval waiting, stopped, terminal and
@@ -90,7 +90,21 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 
 ## Active change
 
-None. All queued review findings are closed.
+[`agent-groups-on-desktop-and-mobile.md`](../ready-changes/agent-groups-on-desktop-and-mobile.md)
+is in progress. Implement project-scoped group lifecycle/access services, shared picker/launch,
+then desktop drag and phone projection/management. Focused checks close each slice; final closure
+includes the shared matrix and three-appearance desktop/phone browser journeys. Existing dirty
+mobile detail/composer edits are unrelated and must be preserved.
+
+Checkpoint: shared group projection, project-owned bulk confirmation/results and desktop section
+drop targets are implemented. Cross-group moves issue identity only; persisted manual order is
+unchanged on success/refusal. 37 focused grid/action tests and the presentation contract pass.
+Backend, picker and phone slices are being integrated; final acceptance and closure remain owed.
+
+Direction: experienced operators organize active work with compact incumbent group headers and
+dialogs. Group labels remain quiet identity metadata; explicit project/member/running counts make
+bulk scope clear. Retain result feedback on the project surface after cards disappear. Existing
+drag handle and keyboard picker stay complementary. No added motion or presentation layer.
 
 ## Acceptance gates still owed
 

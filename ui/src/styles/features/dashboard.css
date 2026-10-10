@@ -58,6 +58,18 @@
   gap: var(--ad-space-3);
 }
 
+.agent-group-drop {
+  outline: var(--ad-border-thick) solid var(--ad-action-primary);
+  outline-offset: var(--ad-space-1);
+}
+
+.group-action-result {
+  padding: var(--ad-space-3);
+  border: var(--ad-border-thin) solid var(--ad-border-default);
+  border-radius: var(--ad-radius-medium);
+  overflow-wrap: anywhere;
+}
+
 .agent-group-header {
   align-items: center;
   border-bottom: none;
