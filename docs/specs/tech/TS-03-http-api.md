@@ -777,13 +777,15 @@ gate before rereading and writing identity, preventing a move during an admitted
 conflicts use R3's structured error. Persist identity before publishing the existing full
 `state_update`; connected desktop/phone entries and reconnect hydration consume that same truth.
 
-**R57 (planned) — Project group actions are additive, scoped lifecycle operations.** Add
+**R57 (planned) — Project group actions replace global release with scoped lifecycle operations.** Add
 `POST /api/projects/{project}/groups/stop` and `/groups/archive`, each accepting exactly
 `{group:string}`. Carry the existing unrestricted trimmed label in JSON rather than imposing
 a path-safe name grammar. Resolve a deterministic snapshot of non-archived identities
 matching both project and normalized named group; empty membership returns `group_not_found`.
-The project is never archived by these routes. Existing `/api/groups/{group}/release` keeps its
-global semantics and response for compatibility; dashboard and phone use the scoped routes.
+The project is never archived by these routes. Remove `/api/groups/{group}/release` and its
+global-label behavior; migrate all callers to the project-scoped routes without an alias or
+compatibility shim. This supersedes R5's release-route inventory and R27's global release
+protocol while retaining R27's zero-side-effect lifecycle-conflict guarantee under R58.
 Both new routes return `200 {project, group, results:[{agent_id, ok, error?:{code,message}}]}`
 after execution, including mixed member outcomes. Preflight failures return R3's envelope;
 empty collections serialize as `[]`. A disconnect/cancellation never rolls back already
@@ -854,8 +856,9 @@ integers instead of silently applying defaults.
 
 ## 5. Deviations & open decisions
 
-- R56–R58 are the group-design technical draft; additive project action routes, legacy release
-  compatibility and TS-13.R24's narrow phone access extension await human confirmation.
+- R56–R58 are confirmed planned group contracts. The user waived legacy release compatibility:
+  remove that route and move its functionality to project-scoped actions. TS-13.R24 defines the
+  confirmed paired-phone group access extension; no database migration or retention change.
 
 - **Pipeline replacement:** TS-09.R44 changes pipeline template/start/detail payloads to version 2
   without retaining old pipeline payload compatibility, under FS-14.R69. Existing route families,

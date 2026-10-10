@@ -1078,6 +1078,11 @@ replacement; §6 identifies its supersessions and any remaining design decision.
 
 ## 6. Deviations & open decisions
 
+- **Planned group action replacement:** FS-02.R75–R76 and TS-03.R57–R58 replace R58's
+  Release group action with current-project Stop/Archive. Stage groups remain ordinary editable
+  labels; these actions retain existing per-agent owner/lifecycle behavior and do not acquire a
+  new run-wide Stop meaning merely because members share a label.
+
 - **Planned quota recovery:** FS-01.R40–R45 covers every quota-interrupted pipeline chat,
   including its standing owner, stage coordinator, delegate and room-backed stage participants.
   It authorizes only same-work continuation after a known reset, not generic blocked-result

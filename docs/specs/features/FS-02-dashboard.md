@@ -589,7 +589,7 @@ show the named group, project, total non-archived member count and running count
 with Cancel focused. Stop is unavailable when no member is running; Archive includes stopped members.
 Ungrouped has no bulk action. Both actions affect only members in the current project;
 same-named groups in other projects are untouched. This supersedes R20's dashboard Release
-group scope and label; compatibility for existing API clients is specified separately.
+group scope and label; the old global release API is replaced by the scoped action API.
 
 **R76 (planned).** Group actions disable repeat submission while pending and report
 success or the identities and reasons of failed members. A lifecycle conflict discovered before
@@ -950,14 +950,17 @@ a real desktop browser journey at 1024px and a wider viewport in all three appea
 stopped members. Confirm Stop group and Archive group from desktop and phone, checking the
 confirmed scope, retained conversations, active project, individual Restore and live updates on
 the other device. Verify Cancel, a pre-execution lifecycle conflict with zero changes, and partial
-failure with per-member feedback and retry. — server/UI tests and a fake-provider browser journey.
+failure with per-member feedback and retry. Exercise a group label containing `/` through the
+actual JSON wire and confirm the old global release route is absent on both listeners.
+— server/UI tests and a fake-provider browser journey.
 
 ## 6. Deviations & open decisions
 
 - R72–R76/A54–A57 scope confirmed: all-project suggestions, desktop/phone creation,
   collapsible phone sections, bidirectional membership updates, project-only bulk actions,
   desktop drag and phone picker. Archive preserves conversations and individual Restore.
-  Technical protocol and narrow paired-phone route extension await confirmation; no ready change yet.
+  Project action API replacement and narrow paired-phone route extension are confirmed; the
+  legacy global release API has no compatibility requirement. All new behavior remains planned.
 
 - R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
   creation and the conversation-page behavior.

@@ -418,7 +418,7 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
 ## 6. Deviations & open decisions
 
 - R45–R46/A17–A18 are confirmed, including project-only bulk actions and mobile picker
-  without drag. The narrow paired-phone route extension awaits technical confirmation.
+  without drag and the narrow paired-phone route extension.
   New controls remain planned; shipped exclusions are superseded only on delivery.
 
 - R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you

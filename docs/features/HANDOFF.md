@@ -183,18 +183,6 @@ and does not close any manual provider gates.
 
 ## Blocked on human
 
-- **Group selection, moves and bulk actions design:** expanded drafts FS-02.R72–R76/A54–A57
-  and FS-20.R45–R46/A17–A18 are in `docs/ideas.md`. Picker, desktop/phone creation and phone
-  sections confirmed; added bidirectional updates, cross-group drag, Stop group and Archive group.
-  Confirmed current project, desktop drag and phone picker, named-group confirmations, preserved
-  history and individual Restore, preflight conflicts with zero changes and per-member failures.
-  Existing labels live on Mac agent identities, without separate empty records. Release currently
-  matches labels globally; tailnet rejects group launch and identity/release routes. Technical
-  drafts TS-03.R56–R58, TS-08.R118 and TS-13.R24 await approval of additive project-scoped
-  stop/archive APIs (`{group}` body), legacy global-release compatibility and paired-phone group
-  launch/group-only identity/action allowlist. No schema migration or retention change. Next:
-  approve the boundary, then create the ready change and remove the idea. No product code yet.
-
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older
 release is separate publication work. Do not retag or recut it.
@@ -207,6 +195,14 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design:** Completed group selection/creation, mobile sections and
+  bidirectional changes, desktop cross-group drag, project-only Stop/Archive and narrow phone
+  mutation access. The user waived compatibility; global release will be removed and callers
+  migrated to the scoped API. Ready change:
+  [`agent-groups-on-desktop-and-mobile.md`](../ready-changes/agent-groups-on-desktop-and-mobile.md).
+  FS-02.R72–R76/A54–A57, FS-20.R45–R46/A17–A18, TS-03.R56–R58, TS-08.R118 and TS-13.R24
+  remain planned. No product code, schema migration or retention change; Active change remains None.
 
 - **2026-10-10 — Feature design:** Confirmed project-only group bulk actions and desktop
   drag/mobile picker; completed feature scope and drafted the API, lifecycle, presentation and

@@ -18,10 +18,9 @@ Example:
   reads as broken: the drag listener is bound only to the tiny 28×28px `::` handle
   (`AgentCard.tsx`), not the card itself, so dragging the card body does nothing — and because the
   card's `onClick` navigates to the agent, a failed drag attempt looks like an accidental page
-  change. Dropping a card onto another group's section also doesn't move it between groups (`order`
-  is one flat array independent of `group`), so it silently snaps back. Needs whole-card drag (with
-  an activation distance so a plain click still opens the agent) and either real cross-group drop
-  support or a clear affordance that drag only reorders within a group.
+  change. Needs whole-card drag with an activation distance so a plain click still opens the agent.
+  Cross-group membership drops are specified separately in
+  `docs/ready-changes/agent-groups-on-desktop-and-mobile.md`.
 - **No Content-Security-Policy.** Neither the Go server nor `ui/index.html` sets a CSP header or
   meta tag. CSP is the third layer every diagram/Markdown-rendering hardening guide recommends
   alongside sanitization, and it would also bound the existing Markdown, diff, and xterm surfaces.
@@ -33,30 +32,6 @@ Example:
 
 These are worth shaping into a possible change, but are not ready to build. Defining an idea updates
 the relevant feature and technical specifications; it does not change product code.
-
-- **Group selection, creation and mobile visibility.** Requested with `/design-feature` on
-  2026-10-10: list existing groups when assigning an agent, filter them while typing and offer
-  a new name to create a group; include a group option when creating an agent; expose groups
-  on mobile. The operator confirmed all-project suggestions, desktop/phone creation and
-  collapsible phone sections with Ungrouped last, adding bidirectional updates, cross-group
-  drag, Stop group and Archive group. Expanded draft: FS-02.R72–R76/A54–A57 and
-  FS-20.R45–R46/A17–A18. Confirmed current-project bulk scope and desktop drag with phone picker.
-  Named-group confirmations,
-  archive preserves conversation/history and individual restoration; preflight conflicts change
-  nothing, operational member failures retain successes and identify failures for retry.
-  Existing groups are labels on agent identities, not separately retained empty records.
-  Evidence: CardContextMenu derives all loaded labels and uses input/datalist; desktop launch
-  accepts group and the phone launch client supports it, while the desktop form/type omit it. Phone
-  ProjectScreen already receives group but never displays it. Current Release group matches labels
-  globally, and drag only changes order. Tailnet currently rejects group launch values and omits
-  identity/group release routes, so phone group mutation needs an explicit narrow route extension.
-  Cross-group drag overlaps the recorded drag-usability idea; whole-card dragging stays separate.
-  Technical draft: TS-03.R56–R58, TS-08.R118, TS-13.R24. Add project-scoped
-  `POST /api/projects/{project}/groups/stop|archive` with `{group}`, preserving the existing global
-  release API; paired phones may use those routes, group launch and group-only identity updates.
-  Shared validation, existing lifecycle/archive gates, bounded member execution and per-member
-  errors preserve local truth and history. No schema migration or new retention. Await approval
-  of these additive API/phone access boundaries before promotion; no product code or ready change.
 
 - **Quota indicator and automatic continuation.** Requested with `/design-feature` on 2026-10-09:
   when a provider interrupts work because its quota is exhausted, show a system quota-limit

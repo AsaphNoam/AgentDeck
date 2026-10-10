@@ -456,6 +456,11 @@ transitions:
 
 ## 6. Deviations & open decisions
 
+- **Planned group API replacement:** FS-02.R75–R76 and TS-03.R57–R58 replace the
+  dashboard's global Release group with project-scoped Stop group and Archive group. R21/R34's
+  orphan cleanup, shared stop seam and all-member conflict guarantees continue under those routes;
+  the old HTTP release route is removed on delivery. No new lifecycle path bypasses these claims.
+
 - **Pipeline replacement:** FS-14.R74 (shipped 2026-09-13) replaced R33's historical
   pipeline-association wake veto with current ownership; R33 and A17 were reconciled on
   2026-09-28. TS-10.R28–R30 route waits and resumes

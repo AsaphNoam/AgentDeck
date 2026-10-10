@@ -151,6 +151,10 @@ terminal agents from becoming statusless or unmessageable.
 
 ## 6. Deviations & open decisions
 
+- **Planned group API replacement:** FS-02.R75–R76 and TS-03.R57–R58 supersede R18's
+  old release endpoint with project-scoped group Stop/Archive. Terminal and chat members remain
+  subject to the same group membership, orphan cleanup, archive preservation and lifecycle claims.
+
 - **Driver selection has no UI (tmux/iTerm2 unselectable in normal use).** The launch and switch
   **APIs** accept `driver` and `GET /api/capabilities` advertises `tmux`/`iterm2`, but the New-Agent
   modal and switch dialog expose only a chat/terminal choice and never send `driver`, so only the

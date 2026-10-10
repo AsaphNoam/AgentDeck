@@ -246,13 +246,14 @@ the installed app on iOS.
   launch field allowlist with `group`. Allow existing `POST /api/sessions/{id}/identity` only
   with a required string `group`; reject name, project, role, runtime and all other fields with
   `remote_field_not_allowed`. Allow TS-03.R57's project-scoped group stop/archive routes with
-  exactly the required string `group`, rejecting all other fields; keep global
-  `/api/groups/{group}/release` denied. All use R4's guard,
+  exactly the required string `group`, rejecting all other fields. The old global
+  `/api/groups/{group}/release` route is removed from both listeners and the route inventory.
+  All use R4's guard,
   device authentication, R6's 1 MiB body bound/device attribution and the shared desktop services
   and group validator. No phone-only persistence or broad identity/config access is added.
   Archive reads, Restore and layout writes remain denied. Inventory tests independently cover
   the new route producers and rejection of forbidden fields, revoked/unpaired devices and global
-  group release. This narrowly supersedes R5/R21's group and identity exclusions.
+  group release's absence. This narrowly supersedes R5/R21's group and identity exclusions.
 
 ## 3. Interfaces & data shapes
 
@@ -294,7 +295,7 @@ INV §16 (bounded pairing attempts, push queue, and coalescing).
 
 ## 5. Deviations & open decisions
 
-- R24's narrow paired-phone group mutation access awaits human confirmation with TS-03.R57.
+- R24 is the confirmed planned paired-phone group mutation extension with TS-03.R57.
 
 - Tests use a fake listener and fake `WhoIs`; the real tailnet, certificate issuance, and real push
   services are covered only by FS-20's manual gates.

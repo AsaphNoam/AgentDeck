@@ -43,6 +43,10 @@ implementation plan. A large change may have a temporary plan in `docs/plans/` f
 
 ## Changes waiting to start
 
+- [`agent-groups-on-desktop-and-mobile.md`](agent-groups-on-desktop-and-mobile.md) — group
+  pickers, phone sections, desktop cross-group drag and project-scoped Stop/Archive, replacing
+  the old global release API.
+
 - [`use-installed-provider-clis.md`](use-installed-provider-clis.md) — use installed Claude/Codex
   by default with a backend-level bundle choice, scoped runtime feedback, local model refresh and
   explicitly capped compatibility work.
