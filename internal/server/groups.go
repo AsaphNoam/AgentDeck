@@ -137,8 +137,7 @@ func (s *Server) groupAction(ctx context.Context, project, group string, ids []s
 			agent, err := s.stateStore.ReadAgent(id)
 			if err != nil {
 				for _, leased := range startLeased {
-					agent, _ := s.stateStore.ReadAgent(leased)
-					s.releaseAgentStart(agent.Project, leased)
+					s.releaseAgentStart(projects[leased], leased)
 				}
 				for _, claimedID := range claimed {
 					s.releaseLifecycle(claimedID)
@@ -147,14 +146,14 @@ func (s *Server) groupAction(ctx context.Context, project, group string, ids []s
 			}
 			if ae := s.acquireAgentStart(agent.Project, id); ae != nil {
 				for _, leased := range startLeased {
-					old, _ := s.stateStore.ReadAgent(leased)
-					s.releaseAgentStart(old.Project, leased)
+					s.releaseAgentStart(projects[leased], leased)
 				}
 				for _, claimedID := range claimed {
 					s.releaseLifecycle(claimedID)
 				}
 				return nil, errGroupLifecycleBusy
 			}
+			projects[id] = agent.Project
 			startLeased = append(startLeased, id)
 		}
 	}
@@ -162,8 +161,7 @@ func (s *Server) groupAction(ctx context.Context, project, group string, ids []s
 		agent, err := s.stateStore.ReadAgent(id)
 		if err != nil || agent.Project != project || agent.Archived || strings.TrimSpace(agent.Group) != group {
 			for _, leased := range startLeased {
-				old, _ := s.stateStore.ReadAgent(leased)
-				s.releaseAgentStart(old.Project, leased)
+				s.releaseAgentStart(projects[leased], leased)
 			}
 			for _, claimedID := range claimed {
 				s.releaseLifecycle(claimedID)
@@ -176,8 +174,7 @@ func (s *Server) groupAction(ctx context.Context, project, group string, ids []s
 	}
 	defer func() {
 		for _, id := range startLeased {
-			agent, _ := s.stateStore.ReadAgent(id)
-			s.releaseAgentStart(agent.Project, id)
+			s.releaseAgentStart(projects[id], id)
 		}
 		for _, id := range claimed {
 			s.releaseLifecycle(id)

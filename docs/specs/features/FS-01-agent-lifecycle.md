@@ -272,7 +272,7 @@ transitions:
   the running row is deleted and the status set to `done` (`"process exited"`),
   so no ghost card survives. A running row whose **PID is still alive** (the agent CLI outlived a
   dashboard crash) is **preserved** as an orphan — the new server does not adopt it into the registry.
-- **R21** — A lifecycle action (Stop, Switch, Release group) on such an orphan **reaps** it: because
+- **R21** — A lifecycle action (Stop, Switch, project group Stop/Archive) on such an orphan **reaps** it: because
   the registry has no handle, the server checks the running row, SIGKILLs the live PID, and deletes
   the row — so Stop/Release report success only after the process is actually gone, and Switch cannot
   spawn a second process under the same `agent_id`.
@@ -306,14 +306,14 @@ transitions:
   SQLite driver cannot load FTS5. The authoritative session row and lifecycle state still commit,
   derived search-document writes are skipped until an FTS5-capable build returns, and no raw SQLite
   module error reaches the launch/resume response.
-- **R34** — **Stop and resume are one exclusive transition per agent.** Stop (R6), Release group
-  (FS-02.R20), explicit Resume (R10), and every wake (R33) take the same exclusive per-agent
-  lifecycle claim, so an agent is never being started and stopped at once. Stop and Release group
+- **R34** — **Stop and resume are one exclusive transition per agent.** Stop (R6), project group
+  Stop/Archive (FS-02.R75–R76), explicit Resume (R10), and every wake (R33) take the same exclusive per-agent
+  lifecycle claim, so an agent is never being started and stopped at once. Stop and group Stop
   run one shared stop-and-teardown seam rather than two spellings of it, so the claim cannot be
   bypassed through whichever verb omits it. A stop that arrives while a resume or wake holds the
   claim returns `409 conflict` instead of reporting success, and may be retried once the transition
-  settles (the client is not obliged to retry automatically; TS-03.R25). Release group reserves every
-  member's claim before stopping any of them, so one busy member rejects the whole release with `409`
+  settles (the client is not obliged to retry automatically; TS-03.R25). Group actions reserve every
+  member's claim before stopping any of them, so one busy member rejects the whole action with `409`
   and leaves every member running. Either way the in-flight resume completes normally with its
   registration intact. Without this, a stop could not
   tell a resume in progress from a stopped agent, so it took its idempotent already-stopped path and

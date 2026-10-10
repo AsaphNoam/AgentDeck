@@ -1,4 +1,4 @@
-import { DndContext, useDroppable, type DragEndEvent, type DragOverEvent } from "@dnd-kit/core";
+import { DndContext, pointerWithin, rectIntersection, useDroppable, type DragEndEvent, type DragOverEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useRef, useState, type ComponentProps, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
@@ -61,6 +61,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   const [moving, setMoving] = useState(false);
   const movingRef = useRef(false);
   const [dropGroup, setDropGroup] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [refusedDrop, setRefusedDrop] = useState(false);
   const projects = useProjects();
@@ -117,7 +118,12 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
     [agents, globalIds, projectID],
   );
 
-  const grouped = useMemo(() => groupAgents(ids.map((id) => agents[id]).filter(Boolean)), [agents, ids]);
+  const grouped = useMemo(() => {
+    const groups = groupAgents(ids.map((id) => agents[id]).filter(Boolean));
+    // Clearing membership remains reachable by drag even when everyone is grouped.
+    if (dragging && !groups.some((group) => group.key === "_ungrouped")) groups.push({ key: "_ungrouped", label: "Ungrouped", agents: [] });
+    return groups;
+  }, [agents, ids, dragging]);
 
   // FS-02.R61 — a chat agent that newly enters `waiting_input` opens its own pane, so a
   // conversation stopped for an approval is in front of the person instead of behind a
@@ -245,6 +251,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
   };
 
   const onDragEnd = (event: DragEndEvent) => {
+    setDragging(false);
     setRefusedDrop(false);
     setDropGroup(null);
     if (!event.over || event.active.id === event.over.id) return;
@@ -299,7 +306,7 @@ export function CardGrid({ projectID, projectTitle, fixedProject }: { projectID?
         actions={<><TaskAttentionLink projectID={projectID} />{hasExpandedOnGrid && <IconButton type="button" aria-label="Collapse all" title="Collapse all" onClick={collapseAll}><CollapseAllIcon /></IconButton>}<Button variant="primary" type="button" onClick={() => setShowNewAgent(true)}>New agent</Button>{thinkTankAction}<DensityControl /></>}
         data-slot="header"
       />
-      <DndContext onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => { setRefusedDrop(false); setDropGroup(null); }}>
+      <DndContext collisionDetection={(args) => args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args)} onDragStart={() => setDragging(true)} onDragEnd={onDragEnd} onDragOver={onDragOver} onDragCancel={() => { setDragging(false); setRefusedDrop(false); setDropGroup(null); }}>
           <div className="group-stack" data-slot="groups" data-drop={refusedDrop ? "refused" : undefined} onKeyDown={cyclePaneFocus}>
             {grouped.map((group) => {
               const collapsed = groupLayout[group.key]?.collapsed ?? false;

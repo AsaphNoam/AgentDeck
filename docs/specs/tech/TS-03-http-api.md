@@ -387,13 +387,11 @@ inherits the whole-mux `localOnly` guard, and ships with its TypeScript client a
 lockstep (R11). Tests replace the command boundary with a deterministic fake; they never open a real
 panel.
 
-**R27 — Group release does not return a partial lifecycle-conflict result.** `POST
-`/api/groups/{group}/release` first takes TS-01.R16's exclusive lifecycle claim for every current
-member before it stops any. If any claim is already held, it releases every claim it took, stops no
-member, and returns the R3 `409 conflict` response; the dashboard's existing action-error path
-surfaces it and permits a retry. A successful `200` retains its ordered
-`{group,stopped:[{agent_id,ok,error?}]}` result and has claimed every member for the complete
-stop-and-registration-cleanup operation.
+**R27 — Group actions do not return a partial lifecycle-conflict result.** The project-scoped
+routes in R57–R58 take TS-01.R16's exclusive lifecycle claim for every snapshot member before
+changing any. A busy member releases every reservation and returns R3's `409 conflict` with no
+member effect. After execution begins, R57's ordered per-member results explain partial failures.
+R57 supersedes this requirement's original global release route and response shape.
 
 - **R28** — The route inventory gains task creation, listing, and detail; cancel, retry,
   re-arm, and delete; a person-recorded task result (FS-16.R22); a project-scoped signal fire; and the

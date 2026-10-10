@@ -1328,6 +1328,9 @@ only existing state-color/typographic feedback changes, and reduced motion loses
   unchanged, then renders normal running-first placement. Same-group drops keep R45/R53 and
   expanded panes remain non-draggable. The destination has a token-based highlight and named
   drop target; the picker remains the keyboard alternative. Only server success commits membership.
+  Pointer collision uses the pointer location so a tall dragged card cannot select an adjacent
+  section behind the intended header; keyboard drag retains rectangle collision. An empty
+  Ungrouped target appears during drag when all agents have named groups.
   A shared pure group projection supplies project membership/counts and running-first order to
   desktop and phone. Phone collapse is transient view state and never writes desktop layout.
   Group actions/results remain owned by a mounted project surface after archived rows disappear.

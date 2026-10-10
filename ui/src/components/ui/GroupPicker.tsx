@@ -18,12 +18,13 @@ export function GroupPicker({
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [filtering, setFiltering] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const labels = useMemo(() => [...new Set(groups.map((group) => group.trim()).filter((group) => group && group !== RESERVED_GROUP))].sort(), [groups]);
   const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+    const needle = filtering ? query.trim().toLowerCase() : "";
     return labels.filter((label) => label.toLowerCase().includes(needle));
-  }, [labels, query]);
+  }, [labels, query, filtering]);
   const trimmed = query.trim();
   const exact = labels.find((label) => label === trimmed);
   const reserved = trimmed === RESERVED_GROUP;
@@ -53,11 +54,11 @@ export function GroupPicker({
         aria-autocomplete="list"
         value={query}
         disabled={disabled}
-        onFocus={() => { setOpen(true); setActive(0); }}
+        onFocus={() => { setOpen(true); setActive(0); setFiltering(false); }}
         onBlur={() => window.setTimeout(() => {
           if (!rootRef.current?.contains(document.activeElement)) { setQuery(value); setOpen(false); }
         }, 0)}
-        onChange={(event) => { setQuery(event.target.value); setOpen(true); setActive(0); }}
+        onChange={(event) => { setQuery(event.target.value); setOpen(true); setActive(0); setFiltering(true); }}
         onKeyDown={(event) => {
           if (event.key === "Escape") { setQuery(value); setOpen(false); return; }
           if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); setActive((index) => Math.min(index + 1, choices.length - 1)); return; }

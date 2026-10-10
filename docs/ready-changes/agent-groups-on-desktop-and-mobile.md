@@ -53,4 +53,5 @@ in the feature deviations. No CLI, MCP or embedded operator-package caller was f
 
 ## Waiting on
 
-None. Product and API/access scope are settled; implementation has not started.
+Implementation is complete; final closure awaits approval for the unrelated stale FileViewer
+layout assertion described in HANDOFF.md. Group product/API/access scope remains settled.

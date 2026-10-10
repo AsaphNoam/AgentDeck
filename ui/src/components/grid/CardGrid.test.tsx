@@ -25,13 +25,15 @@ const dnd = vi.hoisted(() => ({
   items: [] as string[],
   onDragEnd: undefined as ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined,
   onDragOver: undefined as ((event: { active: { id: string }; over: { id: string } | null }) => void) | undefined,
+  onDragStart: undefined as (() => void) | undefined,
 }));
 
 vi.mock("@dnd-kit/core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@dnd-kit/core")>()),
-  DndContext: ({ children, onDragEnd, onDragOver }: { children: React.ReactNode; onDragEnd: typeof dnd.onDragEnd; onDragOver: typeof dnd.onDragOver }) => {
+  DndContext: ({ children, onDragEnd, onDragOver, onDragStart }: { children: React.ReactNode; onDragEnd: typeof dnd.onDragEnd; onDragOver: typeof dnd.onDragOver; onDragStart: typeof dnd.onDragStart }) => {
     dnd.onDragEnd = onDragEnd;
     dnd.onDragOver = onDragOver;
+    dnd.onDragStart = onDragStart;
     // DndContext renders before its children on every pass, so this is where the
     // per-pass record starts.
     dnd.itemLists = [];
@@ -897,6 +899,18 @@ describe("CardGrid", () => {
     act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: { id: "a_2" } }));
     await waitFor(() => expect(useUiStore.getState().toasts.at(-1)?.body).toBe("Archive in progress"));
     expect(useAgentStore.getState().order).toEqual(["a_1", "a_2"]);
+    expect(useAgentStore.getState().agents.a_1.group).toBe("Alpha");
+  });
+
+  it("offers an empty Ungrouped drop target only while dragging when all agents are grouped", async () => {
+    seedGrid(["a_1"], { a_1: agent("a_1", { group: "Alpha" }) });
+    renderWithQuery(<CardGrid projectID="my-app" />);
+    await screen.findByText("a_1");
+    expect(screen.queryByRole("region", { name: "Group Ungrouped" })).toBeNull();
+    act(() => dnd.onDragStart?.());
+    expect(screen.getByRole("region", { name: "Group Ungrouped" })).toHaveTextContent("0 agents");
+    act(() => dnd.onDragEnd?.({ active: { id: "a_1" }, over: null }));
+    expect(screen.queryByRole("region", { name: "Group Ungrouped" })).toBeNull();
     expect(useAgentStore.getState().agents.a_1.group).toBe("Alpha");
   });
 });

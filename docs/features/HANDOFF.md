@@ -91,20 +91,31 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
 ## Active change
 
 [`agent-groups-on-desktop-and-mobile.md`](../ready-changes/agent-groups-on-desktop-and-mobile.md)
-is in progress. Implement project-scoped group lifecycle/access services, shared picker/launch,
-then desktop drag and phone projection/management. Focused checks close each slice; final closure
-includes the shared matrix and three-appearance desktop/phone browser journeys. Existing dirty
-mobile detail/composer edits are unrelated and must be preserved.
+is in progress solely for the closure blocker below. Group projection, bulk confirmation/results,
+server lifecycle/access services, shared picker/launch, desktop drag and phone sections/Manage
+are implemented. Cross-group moves change identity only and preserve manual order. Server tests
+prove scoped actions, narrow remote fields, lifecycle conflicts and batch archive failure with
+stopped-state publication. Existing dirty mobile detail/composer edits remain preserved.
 
-Checkpoint: shared group projection, project-owned bulk confirmation/results and desktop section
-drop targets are implemented. Cross-group moves issue identity only; persisted manual order is
-unchanged on success/refusal. 37 focused grid/action tests and the presentation contract pass.
-Backend, picker and phone slices are integrated. 88 focused picker/launch/phone tests pass;
-server tests prove scoped actions, narrow remote fields, lifecycle conflicts and batch archive
-failure with stopped-state publication. Authenticated fake-peer browser run passed 31 checks
-across all appearances at 1024/1440 desktop and 360/390/430 phone, including cross-device drag,
-regroup, Stop/Archive and Restore (`/tmp/chuck-group-journey/`). Long phone header composition
-was improved after inspection; rerender and final closure matrix remain owed.
+Final implementation is verified apart from an unrelated existing UI assertion. The complete
+Go matrix (untagged and `sqlite_fts5`) passes; clean group-only UI snapshot
+`/tmp/chuck-group-final-verify/` passes presentation/style checks, TypeScript/Vite build,
+generated embed and tagged binary build. Full UI run: 757 passed, one failed
+(`FileViewer.test.tsx:328`, unchanged by the group work). A repeat clean snapshot confirms the
+same obsolete `[data-file-open]` max-width expectation. Source CSS now uses FS-12.R61's
+conversation measure. Approval for this small test-only correction is pending below; afterward
+rerun UI tests, close this ready change and add its implementation to the available review units.
+
+Final browser receipts: `/tmp/chuck-group-journey-final/`; actual embedded desktop and
+authenticated TLS phone handler, isolated home, fake provider and fake tailnet peer (no real
+tailnet contacted). Covers 1024/1440 desktop, 360/390/430 phone, all three appearances, group
+picker, collapsed-header drag with adjacent Ungrouped, live phone regroup, scoped Stop/Archive,
+retained project, individual Restore and no browser exceptions. Development matrix:
+`/tmp/chuck-group-matrix/`. Pointer collision now uses pointer position; keyboard collision
+retains rectangles, and an empty Ungrouped target appears during a drag. Mounted phone Manage
+follows live group updates without overwriting a refused draft. The initial Go run also hit a
+transient mail-activation receipt assertion; its focused retry and both complete final variants
+passed. No mail implementation change was made.
 
 Direction: experienced operators organize active work with compact incumbent group headers and
 dialogs. Group labels remain quiet identity metadata; explicit project/member/running counts make
@@ -201,6 +212,14 @@ and does not close any manual provider gates.
   No product code or permission defaults changed.
 
 ## Blocked on human
+
+- **Group work closure — test-only correction approval:** `ui/src/components/chat/FileViewer.test.tsx:328`
+  asserts the old `.chat-panel[data-file-open="true"]` max-width selector. This selector was
+  removed by the earlier agent-page layout work; both this test and its CSS are unchanged by
+  group work. The full UI suite fails only this assertion. Asked whether to update that one
+  stale layout assertion to the current FS-12.R61/TS-08.R112 contract (small test-only change).
+  Leave it unchanged until the human answers; all group changes and remaining checks are
+  independently verified. Do not call overall work complete before UI closure passes.
 
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older

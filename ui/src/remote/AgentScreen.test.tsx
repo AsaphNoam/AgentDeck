@@ -663,6 +663,16 @@ describe("AgentScreen diff annotations", () => {
 });
 
 describe("AgentScreen group management", () => {
+  it("reflects a live membership update while Manage is mounted", async () => {
+    useConnection.setState({ agents: { a1: { ...agent, group: "Alpha" } } });
+    renderScreen();
+    fireEvent.click(await screen.findByRole("tab", { name: "Manage" }));
+    const picker = await screen.findByRole("combobox", { name: "Group" });
+    expect(picker).toHaveValue("Alpha");
+    act(() => useConnection.setState({ agents: { a1: { ...agent, group: "Beta" } } }));
+    await waitFor(() => expect(picker).toHaveValue("Beta"));
+  });
+
   it("saves only the group identity and keeps the draft after refusal", async () => {
     const current = { ...agent, group: "Alpha" };
     const other = { ...agent, agent_id: "a2", name: "other", group: "Beta" };

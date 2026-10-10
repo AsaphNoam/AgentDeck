@@ -126,7 +126,7 @@ body { min-height: 100dvh; -webkit-text-size-adjust: 100%; }
 .phone-agent-groups { display: grid; gap: var(--ad-space-3); }
 .phone-agent-group { border-top: var(--ad-border-thin) solid var(--ad-border-default); }
 .phone-agent-group-header { display: grid; gap: var(--ad-space-2); padding: var(--ad-space-3) 0; }
-.phone-agent-group-header > button:first-child { background: transparent; border: 0; color: var(--ad-text-primary); display: grid; gap: var(--ad-space-1); min-width: 0; padding: 0; text-align: left; overflow-wrap: anywhere; }
+.phone-agent-group-header > button:first-child { background: transparent; border: 0; color: var(--ad-text-primary); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ad-space-1); justify-items: start; min-width: 0; padding: 0; text-align: left; overflow-wrap: anywhere; width: 100%; }
 .phone-agent-group-header > button:first-child span { color: var(--ad-text-muted); font-size: 0.6875rem; white-space: nowrap; }
 .phone-agent-group-actions { display: flex; gap: var(--ad-space-1); justify-content: flex-end; }
 .phone-agent-group-actions button { background: transparent; border: 0; color: var(--ad-state-done); font-size: 0.6875rem; padding: var(--ad-space-1); }

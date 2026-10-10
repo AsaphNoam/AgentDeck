@@ -558,7 +558,7 @@ function AgentManagement({ agent, offline, busy, act, rename, setRename, error }
   // A runtime change from either device restarts the switch draft from the
   // agent's live runtime (FS-20.R17).
   useEffect(() => setRuntime({ backend: agent.backend, model: agent.model, effort: agent.effort ?? "" }), [agent.backend, agent.model, agent.effort]);
-  useEffect(() => setGroup(agent.group ?? ""), [agent.agent_id]);
+  useEffect(() => setGroup(agent.group ?? ""), [agent.agent_id, agent.group]);
   const findModel = (backendID: string, modelID: string) => options.data?.backends.find((item) => item.id === backendID)?.models.find((item) => item.id === modelID);
   const backend = options.data?.backends.find((item) => item.id === runtime.backend);
   const model = findModel(runtime.backend, runtime.model);

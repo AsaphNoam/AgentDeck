@@ -186,6 +186,7 @@ button:disabled {
 }
 
 .group-picker { position: relative; }
+.group-picker input { min-width: 0; width: 100%; }
 .group-action-result {
   padding: var(--ad-space-3);
   border: var(--ad-border-thin) solid var(--ad-border-default);
@@ -214,6 +215,7 @@ button:disabled {
   width: 100%;
 }
 .group-picker-options button:hover,
+.group-picker-options [aria-selected="true"] button,
 .group-picker-options button:focus-visible { background: var(--ad-surface-subtle); }
 
 .form-warning {
