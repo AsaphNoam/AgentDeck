@@ -183,12 +183,15 @@ and does not close any manual provider gates.
 
 ## Blocked on human
 
-- **Group selection and mobile visibility design:** feature drafts FS-02.R72–R73/A54–A55
-  and FS-20.R45/A17 are in `docs/ideas.md`. Await scope confirmation: retain all-project name
-  suggestions; explicit select/create in desktop and phone New agent; collapsible phone project
-  groups, Ungrouped last; phone reassignment/bulk actions excluded. Existing labels live on agent
-  identities on the Mac, with no separate empty-group records. Next: confirm scope, complete
-  feature acceptance and then technical design. No product code or ready change.
+- **Group selection, moves and bulk actions design:** expanded drafts FS-02.R72–R76/A54–A57
+  and FS-20.R45–R46/A17–A18 are in `docs/ideas.md`. Picker, desktop/phone creation and phone
+  sections confirmed; added bidirectional updates, cross-group drag, Stop group and Archive group.
+  Await current-project versus global bulk scope and desktop-only versus mobile drag. Recommended:
+  current project, desktop drag and phone picker, named-group confirmations, preserved history and
+  individual Restore, preflight conflicts with zero changes and per-member operational failures.
+  Existing labels live on Mac agent identities, without separate empty records. Release currently
+  matches labels globally; tailnet rejects group launch and identity/release routes. Next: settle
+  scope, then technical design. No product code or ready change.
 
 The published `v0.11.0` release body remains empty. Its notes are preserved in
 [`RELEASE-v0.11.0-notes.md`](../archive/state/RELEASE-v0.11.0-notes.md); editing that older
@@ -202,6 +205,11 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Feature design:** Confirmed group picker/creation and mobile sections;
+  expanded draft for bidirectional moves, cross-group drag, Stop group and Archive group.
+  Audited global release and existing lifecycle/archive seams; action scope and phone drag
+  remain pending. Unrelated mobile presentation changes preserved.
 
 - **2026-10-10 — Feature design:** Recorded group selection/creation and mobile visibility;
   drafted FS-02/FS-20 behavior and acceptance. Read-only audit confirmed global suggestions,

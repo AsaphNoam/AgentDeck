@@ -270,9 +270,17 @@ cloud service or account. This is the one planned exception to FS-00.R1/R2 (FS-0
   views show no working indicator. Reduced motion uses the desktop's slower rotation.
 
 - **R45 (planned) — Group membership is visible on the phone.** A project's agent list
-  exposes each agent's named group or Ungrouped status while retaining its name and live state.
-  Desktop membership changes reach the phone through existing live refresh behavior. This extends
-  R34; section layout and phone group editing/creation scope await confirmation.
+  displays collapsible named group sections with member counts and Ungrouped last, retaining each
+  agent's name and live state and running-first placement within each section. Membership changes
+  from either device reach both desktop and phone through shared live state. This extends R34.
+
+- **R46 (planned) — Group selection and actions work on the phone.** Phone New agent
+  offers FS-02.R72–R73's optional Group picker. Manage offers the same picker for reassignment
+  and blank removal. Group headers offer FS-02.R75–R76's Stop group and Archive group with their
+  confirmations and result feedback. Offline disables these actions under R23; a refused move or
+  launch retains entered values. This supersedes R35's groups exclusion and extends phone
+  management only for these group actions. Desktop drag and the phone picker are the proposed move
+  controls; mobile drag scope awaits confirmation.
 
 ## 3. States & transitions
 
@@ -398,13 +406,20 @@ Phone connection: `Connected ↔ Reconnecting → Mac unreachable (since <time>)
   browser pass across all three appearances, including reduced motion.
 
 - **A17 (planned)** (R45) — At 390px with agents in two groups and without a group,
-  verify membership, long names without horizontal overflow and live desktop reassignment.
+  verify sections, counts, collapse, long names without horizontal overflow and bidirectional
+  reassignment with a desktop session open.
   — phone component tests and a browser pass in all three appearances.
+
+- **A18 (planned)** (R46) — Create in an existing/new/blank group, move through Manage,
+  Stop group and Archive group; verify desktop reflects each accepted change and each device
+  reflects changes from the other. Offline permits no action; refusals preserve the form values.
+  — focused remote route/form tests and FS-02.A57's two-device browser journey at 390px.
 
 ## 6. Deviations & open decisions
 
-- R45/A17 await confirmation of collapsible sections versus row labels, and group selection
-  in phone New agent. R35's shipped group exclusion remains until its planned extension is confirmed.
+- R45/A17's collapsible sections and bidirectional updates are confirmed. R46/A18 add requested
+  phone reassignment and bulk group actions; project scope and mobile drag remain open with
+  FS-02.R75. New group controls remain planned; shipped exclusions are superseded only on delivery.
 
 - R33–R35 and R40 restructured the phone behavior on 2026-10-02: R11's Moving and Since you
   last looked sections, R14's task controls, R15's New work screen, R30, and the task halves of

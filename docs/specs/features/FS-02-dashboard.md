@@ -558,10 +558,39 @@ project that is not repo-backed, or is archived, shows no such action.
 the list; a new non-empty name offers an explicit **Create group “<name>”** choice. Selecting
 an existing name reuses it; confirming a new name assigns the agent to it. Blank clears the
 assignment; Cancel changes nothing. Typing alone never creates or assigns a group. This extends R37.
+Suggestions retain the existing all-project scope and unique trimmed labels. The internal
+Ungrouped key is not a usable name. Groups remain agent identity labels stored on the Mac;
+there is no independently retained empty group. Confirmed membership changes are visible on
+desktop and phone through shared live state, regardless of which device made the change.
 
 **R73 (planned).** New agent offers an optional Group field with R72's selection, filtering
 and new-name choice. Blank launches an ungrouped agent; success places the agent in its chosen
 group immediately. A refused launch retains the group and other entered values for retry.
+
+**R74 (planned).** Dragging a collapsed agent card into a different group section moves
+its membership to that group, including from Ungrouped. Dropping into Ungrouped clears it.
+Both a section's header and its agent area accept a drop, including collapsed sections. A
+different group's running/stopped boundary never prevents a membership move; after success
+the agent follows R45's running-first placement in the destination. Same-group reorder keeps
+R45/R53. A valid destination is visibly highlighted; Escape or an outside drop does nothing.
+Failure shows the server reason and leaves membership and persisted order unchanged. This
+supersedes only R45's statement that separate cross-group drag behavior is unchanged.
+
+**R75 (planned).** Named group headers offer **Stop group** and **Archive group** on
+desktop and phone. Stop group replaces the user-facing Release group label, stopping running
+members while retaining the group, stopped agents and conversations. Archive group stops running
+members and archives every non-archived member under FS-05.R32/R34's preservation and individual
+restoration rules; it does not archive the project or delete conversations. Both actions first
+show the named group, action scope and member count in a confirmation with Cancel focused.
+The proposal limits actions to the current project's members; final scope awaits confirmation.
+Ungrouped has no bulk action in this proposal.
+
+**R76 (planned).** Group actions disable repeat submission while pending and report
+success or the identities and reasons of failed members. A lifecycle conflict discovered before
+execution affects no member. Once execution begins, successful member changes remain if another
+member fails; retry targets remaining eligible members. Normal per-agent lifecycle restrictions
+and owner behavior remain applicable. Membership is resolved at submission; newly joined members
+are not silently added to an operation already running.
 
 ## 5. Acceptance criteria
 
@@ -905,10 +934,25 @@ selection and a visible assignment error. — focused dialog tests and a desktop
 initial membership. Refuse a launch and verify all entered values remain for retry. — launch
 form tests and a desktop browser journey.
 
+**A56 (planned)** (R74) — Drag between named groups, from Ungrouped and back; use a
+collapsed header and a destination with the other running/stopped status. Verify live membership
+on a second device, running-first placement, unchanged same-group reorder restrictions, Cancel,
+outside drop and rejected mutation without order/membership changes. — focused drag tests and
+a real desktop browser journey at 1024px and a wider viewport in all three appearances.
+
+**A57 (planned)** (R75–R76) — Seed the same label in two projects with running and
+stopped members. Confirm Stop group and Archive group from desktop and phone, checking the
+confirmed scope, retained conversations, active project, individual Restore and live updates on
+the other device. Verify Cancel, a pre-execution lifecycle conflict with zero changes, and partial
+failure with per-member feedback and retry. — server/UI tests and a fake-provider browser journey.
+
 ## 6. Deviations & open decisions
 
-- R72–R73/A54–A55 await scope confirmation: project-local versus cross-project suggestions,
-  and whether creation includes phone New agent. No technical design or ready change yet.
+- R72–R73/A54–A55 scope confirmed: all-project suggestions, desktop/phone creation,
+  collapsible phone sections and bidirectional membership updates. Expanded R74–R76/A56–A57
+  await confirmation of project-scoped bulk actions and desktop drag with phone picker, versus
+  mobile drag too. Proposed named-group bulk actions preserve conversations and allow individual
+  Restore. No technical design or ready change yet.
 
 - R65/A47 shipped 2026-10-06 (`components/grid/CardGrid.tsx`, `features/thinktank/`); FS-21 governs room
   creation and the conversation-page behavior.
