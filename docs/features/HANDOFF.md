@@ -36,17 +36,13 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   legacy route absence and no exceptions. Evidence: `/tmp/chuck-group-journey-final/`;
   development matrix: `/tmp/chuck-group-matrix/`; group-only snapshot:
   `/tmp/chuck-group-final-verify/`. Original mobile detail/composer edits remain unstaged.
-- **Review pending — mobile working spinner (FS-20.R44/A16, TS-08.R117):** phone Chat
-  now shares the desktop's `WorkingIndicator` at the transcript tail for connected, running,
-  busy chat agents. Thinking/streaming show it; idle, approval waiting, stopped, terminal and
-  disconnected views do not. Existing animation and reduced-motion slowdown are shared.
-  Focused desktop/phone tests and state transitions pass; actual phone-entry browser checks
-  passed in Core, Sky & Grove and Studio, with normal/reduced motion and no overflow.
-  Evidence: `/tmp/mobile-spinner-*-busy.png`; development matrix: `/tmp/mobile-spinner-matrix-*.png`.
-  Both Go variants, tagged build and UI embed passed. Spinner-only index snapshot verified in
-  `/tmp/mobile-spinner-verify-final/`: 739 UI tests, 41 presentation checks and UI build passed.
-  Shared-worktree pretest encountered an unrelated in-progress context-menu contract mismatch;
-  that work and the existing mobile detail/composer edits remain unstaged and untouched.
+- **Small-change review — 2026-10-10:** mobile spinner `ada153b` (FS-20.R44/A16,
+  TS-08.R117), fine right-click menus `083aa23` (FS-12.R66), agent-page width `e2621ac`
+  (FS-12.R61), and token-count/stopped-card follow-up `ded893c` (FS-12.R65/R67) closed
+  without findings. Room-list width `ce46d56` (FS-12.R63) remains open for ROOM-WIDTH-01
+  below. The larger group-controls, room-page and base agent-card reviews remain independent.
+  Source audits, 116 focused UI tests, 41 presentation checks and independent rendered review
+  completed; evidence: `/tmp/chuck-small-review-20261010/`.
 - **Fix closed — mobile history (MOBILE-HISTORY-01):** phone transcript windows now hold 750
   events, load older pages automatically on upward scrolling with viewport anchoring, preserve
   bounded loaded history across live refreshes, and recover intervening gaps. The formerly skipped
@@ -58,8 +54,8 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   independent source/spec and rendered review passed without findings on 2026-10-10. Project
   and Archive cards passed in all three appearances at 1024/1440, including removed origins,
   separate keyboard focus and hover.
-  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below. Follow-up: the room list
-  now shares the agent grid's centred 1680px column (rendered at 1440/1920).
+  Evidence: `/tmp/chuck-room-review-20261010/`; closure details below. The later room-list
+  width follow-up `ce46d56` has ROOM-WIDTH-01 open; the original card review stays closed.
 - **Review pending — Think Tank room page (FS-12.R64/A36, TS-08.R115):** the full room page
   adopts the Figma Make `ThinkTank` study (source: Figma MCP resource
   `file://figma/make/source/OykxmXqZnnyA67QA1lv3AU/src/ThinkTank.tsx` + `think-tank.css`):
@@ -83,11 +79,6 @@ Follow [`AGENT-WORKFLOW.md`](AGENT-WORKFLOW.md).
   Owed: independent A37 comparison incl. live error, terminal agent, unread mail, pipeline
   agent, permission in an expanded pane, drag reorder, keyboard focus. Notes: the name is a
   link (body/chevron expand); state labels keep Chuck's Busy/Waiting vocabulary.
-- **Review pending — fine right-click menus (FS-12.R66):** CSS-only restyle of the shared
-  `.context-menu` (`styles/features/dashboard.css`); the presentation test now holds menus to
-  R66's medium radius. 739 UI tests, style checks and build passed; renders of agent card,
-  project card and agent header menus in all three appearances are in
-  `session-card-design/runs/menus/`. Owed: link/annotation menus, focus row, short viewport.
 - **Design awaiting technical decisions:** Quota indicator and automatic continuation in
   [`ideas.md`](../ideas.md). Product scope confirmed: global on by default, every chat agent,
   including task/pipeline/Think Tank work, and the exact Chuck continuation notice. Planned
@@ -169,6 +160,24 @@ and does not close any manual provider gates.
 
 ## Review findings
 
+### Room-list width follow-up — `ce46d56`
+
+**Fix model:** trivial/easy — Claude Sonnet or Codex Luna.
+
+- **Must fix — ROOM-WIDTH-01 (INV §13):**
+  `ui/src/styles/features/dashboard.css:5–7` adds auto inline margins to the size-contained
+  `.think-tank-list` without giving it an inline size. Open Archive with retained rooms:
+  its section collapses to 0px wide inside a 960px archive page at 1024px, and room cards
+  overflow as an approximately 80px sliver with word-by-word wrapping and thousands of pixels
+  of vertical content. Reproduced in Core, Sky & Grove and Studio with the actual embedded
+  UI and real fake-provider server. This violates FS-12.R63's Archive room-card composition
+  and FS-05.R39's usable retained-room discovery. Removing only the newly added inline auto
+  margins in the browser restores a 960px list. Give the centered size container an explicit
+  available width while retaining its 1680px cap; verify both Project and Archive at 1024px
+  and wide desktop widths in all appearances. Evidence:
+  `/tmp/chuck-small-review-20261010/evidence/extra-report.json`, `*-archive-width.png`
+  and `*-archive-before-margin.png`. No product fix made during review.
+
 ## Browser-verification permission investigation — 2026-10-09
 
 - **Report (verbatim):** “Blocked why, /investigate-bug Chuck needs to be able to do this”.
@@ -211,6 +220,26 @@ focused on open gates, decisions, paused work, and the current release until the
 updated after publication.
 
 ## Recent changelog
+
+- **2026-10-10 — Review:** Reviewed all five small committed changes in one session.
+  Independent bounded Luna source/spec audits found no source defects; parent rendered review
+  found ROOM-WIDTH-01 on the room-list width follow-up, which stays open. Spinner, menus,
+  agent-page width and token/stopped-card follow-ups closed without findings; the larger base
+  card, room-page and group-control units remain pending. Built the working UI (including
+  preserved uncommitted phone styling) and tagged fake-provider server in an isolated snapshot;
+  bounded approved loopback desktop and fake-peer TLS phone fixtures used isolated homes.
+  All three appearances passed 1024/1440/1920/2560 agent measures, project room/grid alignment,
+  whole-K counts, stopped treatment, card/project/header/annotation/link menus, settled hover,
+  keyboard focus, short viewport, phone busy/idle/stopped and normal/reduced-motion rotation.
+  A controlled SSE error checked phone connection-loss gating; offline emulation did not break
+  the existing SSE stream and was not counted as a real network-disconnect receipt.
+  Main rendered run: 79 checks, no exceptions. Focused UI rerun: 116 passed; initial unrelated
+  mobile-history test failure passed alone and on the full rerun. Presentation/style checks
+  (41), build/embed and tagged fixture build passed. Invariant sweep: §§2/8/10/13/17 applicable;
+  ROOM-WIDTH-01 is §13, with no other violations; §§1/3–7/9/11–12/14–16 have no applicable
+  surface. Local choices in the passing units accepted as specified; no new product decision.
+  Evidence and temporary harnesses: `/tmp/chuck-small-review-20261010/`.
+  Only this state file changed; all pre-existing dirty work preserved.
 
 - **2026-10-10 — Group work closed:** user approved updating the stale FileViewer layout
   assertion to FS-12.R61's page-spanning panel; all 758 UI tests pass. Group implementation,
